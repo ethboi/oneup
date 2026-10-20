@@ -6,6 +6,7 @@ use near_sdk::store::{IterableMap, LookupMap};
 use near_sdk::{env, near, require, AccountId, BorshStorageKey, PanicOnDefault};
 use oneup_math as math;
 
+mod emissions;
 mod epochs;
 mod events;
 mod oracle;
@@ -15,6 +16,7 @@ mod views;
 #[cfg(test)]
 mod tests;
 
+pub use emissions::{Activity, EpochEmissions, MarketEmission};
 pub use epochs::{Closing, EpochSummary};
 pub use events::Event;
 pub use oracle::OraclePrice;
@@ -127,6 +129,17 @@ pub struct Epoch {
     /// Σ profit paid out after the cut.
     pub payouts: U128,
     pub cuts: U128,
+    pub markets: Vec<MarketTotals>,
+}
+
+/// One market's results in an epoch: buybacks (§7) and emissions (§8) are split by these.
+#[near(serializers = [json, borsh])]
+#[derive(Clone, Debug, Default)]
+pub struct MarketTotals {
+    pub market_id: String,
+    pub losses: U128,
+    pub payouts: U128,
+    pub cuts: U128,
 }
 
 #[derive(BorshStorageKey)]
@@ -138,6 +151,9 @@ enum StorageKey {
     Positions,
     EpochLosses { epoch: u64 },
     Epochs,
+    Activity,
+    Emissions,
+    OneupOwed,
 }
 
 #[near(contract_state)]
@@ -169,6 +185,18 @@ pub struct House {
     buyback_usdc: u128,
     closing: Option<Closing>,
     epochs: LookupMap<u64, EpochSummary>,
+    /// $1UP token and ve contracts.
+    oneup: Option<AccountId>,
+    ve: Option<AccountId>,
+    /// Vote shares in force (ppm), set by `ve` each epoch. Empty: live markets share equally.
+    vote_shares: Vec<(String, U128)>,
+    /// Each wallet's cut paid and losses per market, per epoch, until it claims emissions.
+    activity: LookupMap<(u64, AccountId), Vec<Activity>>,
+    emissions: LookupMap<u64, EpochEmissions>,
+    /// $1UP owed after a failed claim transfer.
+    oneup_owed: LookupMap<AccountId, u128>,
+    /// Emissions nobody could earn (a market with no winners and no Extra Lives).
+    treasury_oneup: u128,
 }
 
 pub(crate) fn now_s() -> u64 {
@@ -199,6 +227,13 @@ impl House {
             buyback_usdc: 0,
             closing: None,
             epochs: LookupMap::new(StorageKey::Epochs),
+            oneup: None,
+            ve: None,
+            vote_shares: vec![],
+            activity: LookupMap::new(StorageKey::Activity),
+            emissions: LookupMap::new(StorageKey::Emissions),
+            oneup_owed: LookupMap::new(StorageKey::OneupOwed),
+            treasury_oneup: 0,
         }
     }
 
@@ -239,6 +274,12 @@ impl House {
     pub fn set_life(&mut self, life: AccountId) {
         self.assert_owner();
         self.life = Some(life);
+    }
+
+    pub fn set_token_and_ve(&mut self, oneup: AccountId, ve: AccountId) {
+        self.assert_owner();
+        self.oneup = Some(oneup);
+        self.ve = Some(ve);
     }
 
     pub fn set_oracle(&mut self, oracle: AccountId) {

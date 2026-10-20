@@ -24,6 +24,7 @@ pub const LIFE_CAP_MIN_PPM: u128 = 1_200_000;
 pub const LIFE_CAP_POOL: u128 = 1_000_000 * USDC;
 
 pub const ONEUP: u128 = 1_000_000_000_000_000_000;
+pub const SUPPLY: u128 = 1_000_000_000 * ONEUP;
 pub const EMISSIONS_TOTAL: u128 = 900_000_000 * ONEUP;
 pub const EMISSION_EPOCHS: u64 = 208;
 pub const VE_MAX_EPOCHS: u64 = 52;

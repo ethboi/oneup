@@ -85,15 +85,18 @@ Run: `cd contracts && cargo test -p oneup-math -p oneup-house` · `./build.sh &&
 - [x] Tests: 12 extra-life (incl. never-overpays property), 22 house (hand-worked epoch, house-loses
       epoch, epoch closes inside the random-sequence property test); sandbox `lose_close_epoch_claim`
 
-### Stage 3 — $1UP, ve, bribes (5–7 Nov)
+### Stage 3 — $1UP, ve, bribes · ✅ done, gate passed
 
-- [ ] `oneup-token`: 1B fixed supply, 900M emissions over 208 epochs, 5% Rhea seed, 5% treasury
-- [ ] Emissions: by market vote share, then 50/50 winners (by cut paid) / losers (by face value)
-- [ ] `ve`: lock 1–52 weeks as veNFT, linear decay, per-epoch vote allocation across markets
-- [ ] Vote shares feed house capacity split + emissions split
-- [ ] Bribe boxes paid to a market's voters at epoch end; 30% buyback paid to voters by market profit
-
-**Gate 3:** full epoch cycle (trade → close epoch → emissions → vote → capacity change) passes in sandbox.
+- [x] `oneup-token`: NEP-141, 1B fixed supply minted once (900M house, 50M Rhea seed, 50M treasury)
+- [x] House emissions: per-epoch split by vote share, then 50/50 winners (by cut) / losers (by loss,
+      ∝ face) per market; unearnable market emissions → treasury; `claim_emissions(epochs)`
+- [x] `ve`: veNFT locks (NEP-171), 1–52 epochs, linear decay; O(1) per-market totals via sums +
+      scheduled expiries; votes count from next epoch and persist
+- [x] House → `ve.checkpoint(e)` at each epoch start → `house.set_vote_shares` sets market capacity
+- [x] Bribe boxes (any NEP-141, for next epoch's voters) and buyback rewards by market; claims handle
+      late-arriving rewards; failed transfers kept as owed
+- [x] Tests: 13 ve (incl. tally = direct-sum property), 3 new house, 2 token; sandbox
+      `trade_vote_emissions_capacity` (vote → capacity, emissions claimed in $1UP)
 
 ### Stage 4 — Buybacks + listing (7–8 Nov)
 

@@ -195,8 +195,11 @@ impl House {
             IterableMap::new(StorageKey::EpochLosses { epoch: next }),
         );
         let finished = std::mem::replace(&mut self.epoch, Epoch { id: next, started_at: now, ..Default::default() });
+        let house_net = finished.losses.0.saturating_sub(finished.payouts.0);
+        self.record_emissions(&finished, house_net > 0);
+        self.checkpoint_ve(next);
         self.closing = Some(Closing {
-            house_net: finished.losses.0.saturating_sub(finished.payouts.0),
+            house_net,
             cap_ppm: math::life_cap_ppm(self.pool),
             epoch: finished,
             ended_at: now,

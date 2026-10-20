@@ -37,6 +37,7 @@ fn setup(seed: u128) -> House {
     let mut h = House::new(acc("owner"), acc("usdc"), acc("oracle"), Some(params));
     h.add_market(MARKET.into(), "feed".into(), 100);
     h.set_life(acc("life"));
+    h.set_token_and_ve(acc("oneup"), acc("ve"));
     ctx("usdc", T0);
     let _ = h.ft_on_transfer(acc("owner"), U128(seed), r#"{"seed":{}}"#.into());
     h
@@ -379,6 +380,63 @@ fn failed_mint_is_not_owed() {
     let before = h.lives_owed;
     let _ = h.on_minted(U128(usd(500)), false, Err(near_sdk::PromiseError::Failed));
     assert_eq!(h.lives_owed, before - usd(500));
+}
+
+#[test]
+fn emissions_split_winners_and_losers() {
+    let mut h = setup(usd(25_000));
+    ctx("owner", T0);
+    h.add_market("BTC-USD".into(), "btc".into(), 100);
+    ctx("ve", T0);
+    h.set_vote_shares(1, vec![(MARKET.into(), U128(600_000)), ("BTC-USD".into(), U128(400_000))]);
+    deposit(&mut h, "alice", usd(1_000));
+    deposit(&mut h, "bob", usd(1_000));
+    deposit(&mut h, "carol", usd(1_000));
+    // NEAR-USD: Alice wins (cut 50), Bob and Carol lose 500 and 250
+    let a = open(&mut h, "alice", Side::Long, usd(1_000), 10, 500, T0);
+    close(&mut h, "alice", a, 510, T0 + 100);
+    let b = open(&mut h, "bob", Side::Short, usd(1_000), 10, 500, T0 + 200);
+    close(&mut h, "bob", b, 525, T0 + 300);
+    let c = open(&mut h, "carol", Side::Short, usd(1_000), 10, 500, T0 + 400);
+    close(&mut h, "carol", c, 512 /* −2.4% × 10 = −240 */, T0 + 500);
+    ctx("keeper", T0 + 600);
+    close_epoch_fully(&mut h);
+
+    let per = oneup_math::emissions_for_epoch(1);
+    let near = per * 6 / 10;
+    let e = h.get_emissions(1).unwrap();
+    assert!(e.lives);
+    assert_eq!(e.markets[0].winners.0, near / 2);
+    // BTC-USD had no trades: its 40% goes to the treasury
+    assert_eq!(h.get_treasury_oneup().0, per - near);
+    assert_eq!(h.get_claimable_emissions(acc("alice"), vec![1]).0, near / 2);
+    let losers = near - near / 2;
+    assert_eq!(h.get_claimable_emissions(acc("bob"), vec![1]).0, losers * 500 / 740);
+    assert_eq!(h.get_claimable_emissions(acc("carol"), vec![1]).0, losers * 240 / 740);
+    // claiming clears the activity
+    ctx("alice", T0 + 700);
+    let _ = h.claim_emissions(vec![1]);
+    assert_eq!(h.get_claimable_emissions(acc("alice"), vec![1]).0, 0);
+}
+
+#[test]
+fn votes_set_capacity() {
+    let mut h = setup(usd(100_000));
+    ctx("owner", T0);
+    h.add_market("BTC-USD".into(), "btc".into(), 100);
+    assert_eq!(h.get_vote_shares().len(), 2); // equal before any votes
+    ctx("ve", T0);
+    h.set_vote_shares(1, vec![("BTC-USD".into(), U128(1_000_000))]);
+    let q = h.quote_open(MARKET.into(), Side::Long, U128(usd(10)), 10, None);
+    assert_eq!(q.reason.as_deref(), Some("Market capacity reached"));
+}
+
+#[test]
+#[should_panic(expected = "Only ve")]
+fn only_ve_sets_shares() {
+    let mut h = setup(usd(100_000));
+    ctx("alice", T0);
+    h.set_vote_shares(1, vec![]);
 }
 
 mod invariants {

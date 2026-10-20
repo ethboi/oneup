@@ -21,14 +21,7 @@ async fn lose_close_epoch_claim() -> anyhow::Result<()> {
 
     // Close the epoch, stepping until done
     e.worker.fast_forward(10).await?;
-    let mut steps = vec![];
-    loop {
-        let r: String = e.keeper.call(e.house.id(), "close_epoch").args_json(json!({})).max_gas().transact().await?.into_result()?.json()?;
-        steps.push(r.clone());
-        if r == "closed" || steps.len() > 10 {
-            break;
-        }
-    }
+    let steps = close_epoch(&e).await?;
     assert_eq!(steps.first().map(String::as_str), Some("begun"));
     assert_eq!(steps.last().map(String::as_str), Some("closed"), "{steps:?}");
 

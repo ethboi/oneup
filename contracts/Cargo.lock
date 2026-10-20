@@ -2637,6 +2637,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "oneup-token"
+version = "0.1.0"
+dependencies = [
+ "near-contract-standards",
+ "near-sdk",
+ "oneup-math",
+]
+
+[[package]]
+name = "oneup-ve"
+version = "0.1.0"
+dependencies = [
+ "near-contract-standards",
+ "near-sdk",
+ "oneup-math",
+ "proptest",
+]
+
+[[package]]
 name = "openssl"
 version = "0.10.81"
 source = "registry+https://github.com/rust-lang/crates.io-index"

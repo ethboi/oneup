@@ -19,6 +19,8 @@ pub struct Env {
     pub oracle: Contract,
     pub life: Contract,
     pub house: Contract,
+    pub oneup: Contract,
+    pub ve: Contract,
     pub owner: Account,
     pub keeper: Account,
 }
@@ -35,6 +37,8 @@ pub async fn setup(epoch_length_s: u64) -> anyhow::Result<Env> {
     let oracle = worker.dev_deploy(&wasm("mock_oracle")).await?;
     let life = worker.dev_deploy(&wasm("oneup_extra_life")).await?;
     let house = worker.dev_deploy(&wasm("oneup_house")).await?;
+    let oneup = worker.dev_deploy(&wasm("oneup_token")).await?;
+    let ve = worker.dev_deploy(&wasm("oneup_ve")).await?;
 
     usdc.call("new").args_json(json!({"owner": owner.id()})).transact().await?.into_result()?;
     oracle.call("new").args_json(json!({"owner": owner.id(), "pusher": keeper.id()})).transact().await?.into_result()?;
@@ -55,6 +59,25 @@ pub async fn setup(epoch_length_s: u64) -> anyhow::Result<Env> {
         .await?
         .into_result()?;
     owner.call(house.id(), "set_life").args_json(json!({"life": life.id()})).transact().await?.into_result()?;
+    // $1UP: 900M to the house; the owner stands in for the Rhea seed and the treasury
+    oneup
+        .call("new")
+        .args_json(json!({"house": house.id(), "rhea_seed": owner.id(), "treasury": owner.id()}))
+        .transact()
+        .await?
+        .into_result()?;
+    ve.call("new")
+        .args_json(json!({"owner": owner.id(), "house": house.id(), "oneup": oneup.id()}))
+        .transact()
+        .await?
+        .into_result()?;
+    owner
+        .call(house.id(), "set_token_and_ve")
+        .args_json(json!({"oneup": oneup.id(), "ve": ve.id()}))
+        .transact()
+        .await?
+        .into_result()?;
+    register(&owner, &oneup, ve.id().as_str()).await?;
     owner
         .call(house.id(), "add_market")
         .args_json(json!({"market_id": "NEAR-USD", "feed_id": FEED, "max_leverage": 100}))
@@ -76,7 +99,7 @@ pub async fn setup(epoch_length_s: u64) -> anyhow::Result<Env> {
         .await?
         .into_result()?;
 
-    Ok(Env { worker, usdc, oracle, life, house, owner, keeper })
+    Ok(Env { worker, usdc, oracle, life, house, oneup, ve, owner, keeper })
 }
 
 pub async fn push(e: &Env, cents: i64, publish_time: u64) -> anyhow::Result<()> {
@@ -124,4 +147,28 @@ pub async fn open(e: &Env, t: &Account, side: &str, margin: u128, leverage: u32,
     assert!(filled, "fill refused");
     let positions = view(&e.house, "get_positions", json!({"account_id": t.id()})).await?;
     Ok((positions.as_array().unwrap().last().unwrap()["id"].as_u64().unwrap(), placed_at))
+}
+
+/// NEP-145 storage registration on a token.
+pub async fn register(payer: &Account, token: &Contract, account: &str) -> anyhow::Result<()> {
+    payer
+        .call(token.id(), "storage_deposit")
+        .args_json(json!({"account_id": account}))
+        .deposit(NearToken::from_millinear(10))
+        .transact()
+        .await?
+        .into_result()?;
+    Ok(())
+}
+
+/// Calls `close_epoch` until it returns "closed". Returns the steps.
+pub async fn close_epoch(e: &Env) -> anyhow::Result<Vec<String>> {
+    let mut steps = vec![];
+    loop {
+        let r: String = e.keeper.call(e.house.id(), "close_epoch").args_json(json!({})).max_gas().transact().await?.into_result()?.json()?;
+        steps.push(r.clone());
+        if r == "closed" || steps.len() > 10 {
+            return Ok(steps);
+        }
+    }
 }

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["math", "house", "mock-usdc", "mock-oracle", "extra-life", "tests"]
+members = ["math", "house", "mock-usdc", "mock-oracle", "extra-life", "oneup-token", "ve", "tests"]
 
 [workspace.dependencies]
 near-sdk = "5.29.1"

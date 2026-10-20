@@ -300,6 +300,7 @@ impl House {
             let l = self.epoch_losses.get(&pos.owner).copied().unwrap_or(0);
             self.epoch_losses.insert(pos.owner.clone(), l + s.pool_taken);
         }
+        self.record_activity(&pos.owner, &pos.market_id, s);
 
         Event::PositionClosed {
             position_id,
