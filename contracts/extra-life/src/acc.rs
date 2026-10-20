@@ -72,16 +72,29 @@ impl Accumulator {
     }
 
     pub fn remaining(&self, owed: u128, at: Snapshot) -> u128 {
-        if at.era != self.era {
-            return 0;
-        }
-        match self.scale - at.scale {
-            0 => mul_div_ceil(owed, self.acc, at.acc),
-            1 => mul_div_ceil(owed, self.acc, at.acc * SCALE_STEP),
-            _ => 0,
-        }
-        .min(owed)
+        remaining_as_of(owed, at, self.snapshot())
     }
+
+    /// Takes a group of lives (all minted at one snapshot) out of the payout pool: they stop earning.
+    /// Returns what they were still owed.
+    pub fn expire(&mut self, owed: u128, at: Snapshot) -> u128 {
+        let left = self.remaining(owed, at);
+        self.total_remaining = self.total_remaining.saturating_sub(left);
+        left
+    }
+}
+
+/// What a life minted at `at` and owed `owed` still had left at snapshot `now`.
+pub fn remaining_as_of(owed: u128, at: Snapshot, now: Snapshot) -> u128 {
+    if at.era != now.era {
+        return 0;
+    }
+    match now.scale - at.scale {
+        0 => mul_div_ceil(owed, now.acc, at.acc),
+        1 => mul_div_ceil(owed, now.acc, at.acc * SCALE_STEP),
+        _ => 0,
+    }
+    .min(owed)
 }
 
 #[cfg(test)]
@@ -138,6 +151,20 @@ mod tests {
         assert!(a.remaining(10u128.pow(15), s) <= 1);
         let r = a.remaining(10u128.pow(12), late);
         assert!(r.abs_diff(10u128.pow(12) / 2) <= 10u128.pow(12) / 1_000, "late life {r}");
+    }
+
+    #[test]
+    fn expired_group_stops_earning() {
+        let mut a = Accumulator::default();
+        let old = a.add(1_000);
+        a.apply_pot(500); // old: 500 left
+        let young = a.add(1_000);
+        let frozen = a.snapshot();
+        assert_eq!(a.expire(1_000, old), 500);
+        assert_eq!(a.total_remaining, 1_000);
+        a.apply_pot(500); // all to the young group now
+        assert_eq!(remaining_as_of(1_000, old, frozen), 500);
+        assert_eq!(a.remaining(1_000, young), 500);
     }
 
     proptest! {

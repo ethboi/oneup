@@ -7,9 +7,10 @@ import { Trade } from "@/components/Trade";
 import { Lives } from "@/components/Lives";
 import { Vote } from "@/components/Vote";
 import { Solvency } from "@/components/Solvency";
+import { Fairness } from "@/components/Fairness";
 import { Toasts } from "@/components/Toasts";
 
-const TABS = ["Trade", "Extra Lives", "Vote", "Solvency"] as const;
+const TABS = ["Trade", "Extra Lives", "Vote", "Solvency", "Fairness"] as const;
 type Tab = (typeof TABS)[number];
 
 export default function Home() {
@@ -35,6 +36,7 @@ export default function Home() {
         {tab === "Extra Lives" && <Lives />}
         {tab === "Vote" && <Vote />}
         {tab === "Solvency" && <Solvency />}
+        {tab === "Fairness" && <Fairness />}
       </div>
       <Toasts />
     </OneUpProvider>

@@ -53,6 +53,8 @@ pub struct Params {
     /// D-1: count both sides of each market (true) or only the bigger side (spec as written).
     pub solvency_both_sides: bool,
     pub epoch_length_s: u64,
+    /// D-13: an Extra Life shares the pots of the epoch it's minted in and this many after, then expires.
+    pub life_expiry_epochs: u64,
 }
 
 impl Default for Params {
@@ -66,6 +68,7 @@ impl Default for Params {
             max_conf_ppm: U128(10_000),
             solvency_both_sides: true,
             epoch_length_s: 7 * 24 * 3600,
+            life_expiry_epochs: 13,
         }
     }
 }

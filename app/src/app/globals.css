@@ -14,6 +14,10 @@
   /* chart series, validated for colour-blind separation (dataviz validator) */
   --series-long: #3a86dc;
   --series-short: #d6732a;
+  /* categorical slots 1–3 (dataviz reference palette), validated on these surfaces */
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
 }
 
 @media (prefers-color-scheme: light) {
@@ -30,6 +34,9 @@
     --info: #1f6fd1;
     --series-long: #1f6fd1;
     --series-short: #c8641a;
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --series-3: #1baf7a;
   }
 }
 

@@ -47,3 +47,30 @@ async fn lose_close_epoch_claim() -> anyhow::Result<()> {
     assert_eq!(view(&e.usdc, "ft_balance_of", json!({"account_id": bob.id()})).await?, json!(claimable.to_string()));
     Ok(())
 }
+
+/// D-13: with a zero-epoch window a life only shares the pot of the epoch it was minted in.
+#[tokio::test]
+async fn lives_expire_after_their_window() -> anyhow::Result<()> {
+    let e = setup_with(5, 0).await?;
+    let bob = trader(&e, "bob", 500).await?;
+    let (pos, placed_at) = open(&e, &bob, "Long", 500, 50, 500).await?;
+    push(&e, 490, placed_at + 2).await?;
+    let ok: bool = e.keeper.call(e.house.id(), "liquidate").args_json(json!({"position_id": pos})).max_gas().transact().await?.json()?;
+    assert!(ok);
+    e.worker.fast_forward(10).await?;
+    close_epoch(&e).await?; // epoch 1: Bob's life is minted and paid from epoch 1's pot
+    let id = format!("1:{}", bob.id());
+    let paid_1 = view(&e.life, "life_info", json!({"token_id": id})).await?["paid"].clone();
+    assert_ne!(paid_1, json!("0"));
+
+    e.worker.fast_forward(10).await?;
+    let steps = close_epoch(&e).await?; // epoch 2: epoch-1 lives expire before the pot
+    assert!(steps.iter().any(|s| s == "expiring"), "{steps:?}");
+    let life = view(&e.life, "life_info", json!({"token_id": id})).await?;
+    assert_eq!(life["expired"], json!(true));
+    assert_eq!(life["paid"], paid_1, "an expired life earns nothing more");
+    // the house mirrors the life contract's total
+    let owed = view(&e.life, "total_owed_remaining", json!({})).await?;
+    assert_eq!(view(&e.house, "get_lives_state", json!({})).await?["lives_owed"], owed);
+    Ok(())
+}

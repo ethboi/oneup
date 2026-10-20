@@ -29,7 +29,10 @@ const credit = (c: Cohort, e: number, amount: number) => {
 };
 
 export interface RunResult {
+  /** OneUp with lives expiring (D-13, as the contracts do). */
   oneup: Cohort[];
+  /** OneUp as first specified: lives earn until paid. */
+  oneupNoExpiry: Cohort[];
   papertrade: Cohort[];
   /** Papertrade-style: share of all PAPER held by the losers of the first 10% of all losses. */
   ptEarlyShare: number;
@@ -156,10 +159,13 @@ export function papertrade(fs: Flow[], seed = 25_000) {
   return { cohorts, earlyShare: early / supply, peakQueue, lp: lpSeries };
 }
 
-export function run(fs: Flow[], seed = 25_000, expiry = Infinity): RunResult {
+export const LIFE_EXPIRY_EPOCHS = 13;
+
+export function run(fs: Flow[], seed = 25_000, expiry = LIFE_EXPIRY_EPOCHS): RunResult {
   const o = oneup(fs, seed, 0.5, expiry);
+  const n = oneup(fs, seed, 0.5, Infinity);
   const p = papertrade(fs, seed);
-  return { oneup: o.cohorts, papertrade: p.cohorts, ptEarlyShare: p.earlyShare, ptPeakQueue: p.peakQueue, oneupPool: o.pool, ptLp: p.lp };
+  return { oneup: o.cohorts, oneupNoExpiry: n.cohorts, papertrade: p.cohorts, ptEarlyShare: p.earlyShare, ptPeakQueue: p.peakQueue, oneupPool: o.pool, ptLp: p.lp };
 }
 
 /** Recovery per $1 lost for each quarter of the run, by when the loss happened. */

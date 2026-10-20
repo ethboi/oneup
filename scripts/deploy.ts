@@ -75,6 +75,7 @@ export async function deploy(opts: { home: string; rpcUrl: string; epochLengthS:
       max_conf_ppm: "10000",
       solvency_both_sides: true,
       epoch_length_s: opts.epochLengthS,
+      life_expiry_epochs: 13,
     },
   });
   await call(root, id("life"), "new", { owner: rootId, house: id("house"), usdc: id("usdc") });

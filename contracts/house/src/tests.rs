@@ -298,6 +298,10 @@ fn close_epoch_fully(h: &mut House) -> u32 {
                     let _ = h.on_minted(U128(0), true, Ok(vec![]));
                 }
             }
+            "expiring" => {
+                let owed = h.lives_owed;
+                let _ = h.on_expired(Ok(U128(owed)));
+            }
             _ => {}
         }
         assert!(steps < 100);
@@ -348,6 +352,11 @@ fn epoch_close_mints_and_pays() {
     assert_eq!(h.lives_owed, usd(25_000) + 1_781_028_000 + 890_514_000);
     let _ = h.on_minted(U128(0), true, Ok(vec![]));
     let _ = h.on_minted(U128(0), true, Ok(vec![]));
+    assert_eq!(h.close_epoch(None), "expiring");
+    assert_eq!(h.close_epoch(None), "waiting for expiry");
+    // the life contract reports what's still owed; the house takes its number
+    let owed = h.lives_owed;
+    let _ = h.on_expired(Ok(U128(owed)));
 
     assert_eq!(h.close_epoch(None), "closed");
     let s = h.get_epoch_summary(1).unwrap();

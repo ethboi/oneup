@@ -41,7 +41,7 @@ anyone ──ft_transfer_call──▶ usdc/any FT ──▶ ve                 
 | `expire(order_id)` | anyone | after `FILL_WINDOW` with no valid price; refunds margin |
 | `liquidate(position_id)` | anyone | latest price; pnl ≤ −0.9M → margin to pool |
 | `take_profit(position_id)` | anyone | latest price; pnl at cap → close |
-| `close_epoch(limit)` | anyone | resumable: first call freezes epoch `e` and starts `e+1` ("begun"); then mints Extra Lives `limit` per call ("minting"), waits for mints to land ("waiting for mints"), pays the pot and sets aside buyback USDC ("closed") |
+| `close_epoch(limit)` | anyone | resumable: first call freezes epoch `e` and starts `e+1` ("begun"); then mints Extra Lives `limit` per call ("minting"), waits for mints to land ("waiting for mints"), expires lives past their window ("expiring"), pays the pot and sets aside buyback USDC ("closed") |
 | `set_vote_shares(epoch, shares)` | `ve` only | capacity + emission shares in force for `epoch` |
 | `add_market(market_id, feed_id, max_leverage)` | `ve` only (listing), or owner before launch | |
 | `claim_emissions(epochs)` | trader | $1UP earned as winner (by cut) and loser (by face) per maths §8 |
@@ -82,6 +82,7 @@ Heals.
 |---|---|---|
 | `mint_batch(epoch, items: [{owner, face, cap_ppm}])` | `house` | one token per loser; `ACC_at_mint` = current ACC, so the same epoch's pot pays them (D-4) |
 | `ft_on_transfer(sender_id, amount, msg)` | USDC, sender `house` | `{"epoch_pot":{"epoch":e}}` → applies `r_e` |
+| `expire(through_epoch) → U128` | `house` | lives minted in `through_epoch` or earlier stop earning (D-13); returns the total still owed, which the house mirrors |
 | `claim(token_ids)` | token owner | sends claimable USDC |
 | `nft_transfer…` | standard | unclaimed USDC moves with the token |
 

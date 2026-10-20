@@ -7,6 +7,7 @@ import { fmtClock, useNow } from "./Header";
 export function Lives() {
   const { o, d, me, tx, run } = useOneUp();
   const lives = usePoll(() => o.lives(me), [me]) ?? [];
+  const expiry = usePoll(() => o.view<{ life_expiry_epochs: number }>(d.contracts.house, "get_params"), [], 60_000)?.life_expiry_epochs;
   const pending = usePoll(() => o.pendingLife(me), [me]);
   const epoch = usePoll(() => o.epoch(), []);
   const now = useNow();
@@ -46,14 +47,14 @@ export function Lives() {
       {lives.length === 0 && <p className="label">No Extra Lives yet. Lose a trade and wait for the epoch to end.</p>}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {lives.map((l) => (
-          <LifeCard key={l.token_id} l={l} />
+          <LifeCard key={l.token_id} l={l} expiry={expiry} />
         ))}
       </div>
     </div>
   );
 }
 
-function LifeCard({ l }: { l: LifeInfo }) {
+function LifeCard({ l, expiry }: { l: LifeInfo; expiry?: number }) {
   const owed = BigInt(l.owed);
   const paid = BigInt(l.paid);
   const pct = owed === 0n ? 0 : Number((paid * 10_000n) / owed) / 100;
@@ -62,7 +63,7 @@ function LifeCard({ l }: { l: LifeInfo }) {
       <div className="flex items-start justify-between">
         <div>
           <div className="label">{l.epoch === 0 ? "Seed" : `Epoch ${l.epoch}`}</div>
-          <div className="text-lg font-bold">{l.full_heal ? "Full Heal" : "Extra Life"}</div>
+          <div className="text-lg font-bold">{l.full_heal ? "Full Heal" : l.expired ? "Expired" : "Extra Life"}</div>
         </div>
         <Heart full={l.full_heal} />
       </div>
@@ -81,7 +82,10 @@ function LifeCard({ l }: { l: LifeInfo }) {
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--panel-2)]" role="progressbar" aria-valuenow={pct}>
         <div className="h-full rounded-full bg-[var(--accent)] transition-all" style={{ width: `${pct}%` }} />
       </div>
-      <div className="label num mt-1">{pct.toFixed(1)}% to Full Heal</div>
+      <div className="label num mt-1">
+        {pct.toFixed(1)}% to Full Heal
+        {l.epoch > 0 && expiry !== undefined && !l.full_heal && (l.expired ? " · stopped earning" : ` · earns through epoch ${l.epoch + expiry}`)}
+      </div>
     </div>
   );
 }

@@ -141,9 +141,11 @@ Run: `cd contracts && cargo test -p oneup-math -p oneup-house` · `./build.sh &&
       topping up, claiming Extra Lives / emissions / voter rewards, locking and voting (`pnpm bots`)
 - [x] `sim/`: OneUp vs Papertrade-style (parameters from Papertrade's docs) on the same seeded flows;
       recovery per $1 lost by cohort over equal windows, late-period payout capture (`pnpm sim`)
-- [ ] Finding D-13: as written, late losers recover less; lives expiring after 13–26 epochs fixes it.
-      Decide, then update contracts + the demo's "fair to late players" scene
-- [ ] Simulation chart in the app and README
+- [x] Finding D-13: as written, late losers recovered less; lives now expire after 13 epochs (contracts,
+      house expiry step, sim default). Recovery is ~flat (13.0¢ → 10.2¢); year-1 losers take 0% of year-3
+      payouts vs 12% Papertrade-style
+- [x] Fairness view in the app (median of 20 seeds, validated palette, table view)
+- [ ] Simulation chart in the README
 
 ### Stage 8 — Intents, testnet, bots (10–12 Nov)
 

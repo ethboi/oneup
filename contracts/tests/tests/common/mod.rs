@@ -31,6 +31,10 @@ pub fn usd(x: u128) -> String {
 }
 
 pub async fn setup(epoch_length_s: u64) -> anyhow::Result<Env> {
+    setup_with(epoch_length_s, 13).await
+}
+
+pub async fn setup_with(epoch_length_s: u64, life_expiry_epochs: u64) -> anyhow::Result<Env> {
     let worker = near_workspaces::sandbox().await?;
     let owner = worker.root_account()?;
     let keeper = worker.dev_create_account().await?;
@@ -52,7 +56,7 @@ pub async fn setup(epoch_length_s: u64) -> anyhow::Result<Env> {
     let params = json!({
         "leverage_hard_limit": 250, "min_margin": usd(1), "min_hold_s": 60, "fill_window_s": 30,
         "max_price_age_s": 60, "max_conf_ppm": "10000", "solvency_both_sides": true,
-        "epoch_length_s": epoch_length_s
+        "epoch_length_s": epoch_length_s, "life_expiry_epochs": life_expiry_epochs
     });
     house
         .call("new")

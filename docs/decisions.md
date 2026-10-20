@@ -92,7 +92,7 @@ $25K. With the 1M local seed (needed for D-1 capacity), 975K of seed money count
 live epoch paid 292K to Extra Lives and 146K into $1UP buybacks from a 500 house profit. Now the floor is
 the total seeded, so the seed is only ever repaid from profit. Same result as the spec at a $25K seed.
 
-## D-13 · Extra Lives should expire · **Open (recommend 13–26 epochs)**
+## D-13 · Extra Lives expire after 13 epochs · **Decided (20 Oct 2026)**
 
 `pnpm sim` (OneUp vs Papertrade-style on the same flows, 20 seeds, each loss followed for 52 weeks):
 

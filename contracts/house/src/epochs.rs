@@ -4,7 +4,8 @@
 //! 1. begin: freeze the epoch's counters and its losers; start the next epoch
 //! 2. mint: one Extra Life per loser, `limit` per call, sized from the house's net result
 //! 3. wait: until every mint has landed, so this epoch's lives share this epoch's pot (D-4)
-//! 4. pay: the surplus above the reserve → Extra Life pot + buyback USDC; record the summary
+//! 4. expire: lives past their window stop earning (D-13); the life contract returns what's still owed
+//! 5. pay: the surplus above the reserve → Extra Life pot + buyback USDC; record the summary
 
 use near_sdk::json_types::U128;
 use near_sdk::store::IterableMap;
@@ -20,6 +21,8 @@ const GAS_MINT_PER_LIFE: Gas = Gas::from_tgas(6);
 const GAS_MINT_CALLBACK: Gas = Gas::from_tgas(10);
 const GAS_FT_TRANSFER_CALL: Gas = Gas::from_tgas(60);
 const GAS_POT_CALLBACK: Gas = Gas::from_tgas(15);
+const GAS_EXPIRE: Gas = Gas::from_tgas(30);
+const GAS_EXPIRE_CALLBACK: Gas = Gas::from_tgas(10);
 const DEFAULT_BATCH: u32 = 20;
 const MAX_BATCH: u32 = 30;
 
@@ -34,6 +37,7 @@ pub struct MintItem {
 #[ext_contract(ext_life)]
 trait ExtraLife {
     fn mint_batch(&mut self, epoch: u64, items: Vec<MintItem>) -> Vec<String>;
+    fn expire(&mut self, through_epoch: u64) -> U128;
 }
 
 #[near(serializers = [borsh])]
@@ -45,6 +49,8 @@ pub struct Closing {
     pub losers: IterableMap<AccountId, u128>,
     pub lives_minted: u32,
     pub pending_mints: u32,
+    pub expiring: bool,
+    pub expired: bool,
 }
 
 #[near(serializers = [json, borsh])]
@@ -115,6 +121,21 @@ impl House {
             "minting"
         } else if c.pending_mints > 0 {
             "waiting for mints"
+        } else if !c.expired {
+            if !c.expiring {
+                c.expiring = true;
+                // lives minted in epoch m share pots m..=m+expiry, so before paying epoch E's pot,
+                // expire everything minted in E − expiry − 1 or earlier
+                let through = c.epoch.id.saturating_sub(self.params.life_expiry_epochs + 1);
+                ext_life::ext(self.life.clone().expect("life"))
+                    .with_static_gas(GAS_EXPIRE)
+                    .expire(through)
+                    .then(Self::ext(env::current_account_id()).with_static_gas(GAS_EXPIRE_CALLBACK).on_expired())
+                    .detach();
+                "expiring"
+            } else {
+                "waiting for expiry"
+            }
         } else {
             self.pay(c);
             return "closed".into();
@@ -137,6 +158,23 @@ impl House {
             return false;
         }
         true
+    }
+
+    /// The life contract's total still owed after expiry: the house mirrors it exactly.
+    #[private]
+    pub fn on_expired(&mut self, #[callback_result] owed: Result<U128, PromiseError>) -> bool {
+        let Some(c) = self.closing.as_mut() else { return false };
+        match owed {
+            Ok(owed) => {
+                self.lives_owed = owed.0;
+                c.expired = true;
+                true
+            }
+            Err(_) => {
+                c.expiring = false; // try again on the next call
+                false
+            }
+        }
     }
 
     #[private]
@@ -206,6 +244,8 @@ impl House {
             losers,
             lives_minted: 0,
             pending_mints: 0,
+            expiring: false,
+            expired: false,
         });
     }
 

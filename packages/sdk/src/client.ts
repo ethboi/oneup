@@ -98,6 +98,7 @@ export interface LifeInfo {
   paid: U128;
   claimable: U128;
   full_heal: boolean;
+  expired: boolean;
 }
 
 export interface LockInfo {

@@ -111,3 +111,31 @@ fn one_life_per_wallet_per_epoch() {
     ctx("house", 0);
     c.mint_batch(1, vec![item("alice", 1_000, 2_000_000), item("alice", 5, 2_000_000)]);
 }
+
+#[test]
+fn expired_lives_keep_what_they_earned() {
+    let mut c = setup();
+    ctx("house", 0);
+    c.mint_batch(1, vec![item("alice", 1_000, 1_000_000)]);
+    pot(&mut c, 400);
+    ctx("house", 0);
+    c.mint_batch(2, vec![item("bob", 1_000, 1_000_000)]);
+    assert_eq!(c.expire(1).0, 1_000 * USDC); // Alice's 600 unpaid drops out; Bob's 1_000 is all that is owed
+    pot(&mut c, 500);
+    let a = c.life_info("1:alice".into()).unwrap();
+    assert!(a.expired && !a.full_heal);
+    assert_eq!(a.paid.0, 400 * USDC);
+    assert_eq!(c.life_info("2:bob".into()).unwrap().paid.0, 500 * USDC);
+    // expiring again is a no-op
+    ctx("house", 0);
+    assert_eq!(c.expire(1).0, 500 * USDC);
+}
+
+#[test]
+#[should_panic(expected = "Epoch already expired")]
+fn no_minting_into_an_expired_epoch() {
+    let mut c = setup();
+    ctx("house", 0);
+    c.expire(3);
+    c.mint_batch(2, vec![item("alice", 1_000, 1_000_000)]);
+}

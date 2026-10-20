@@ -130,6 +130,11 @@ bb_pot  = 0.3 × P + (0.6 × P − el_pot)          # buybacks get whatever the 
 Each unpaid Extra Life `j`: `pay_j = floor(el_pot × owed_remaining_j / Σ owed_remaining)`.
 When `paid_j = owed_j` it becomes a **Full Heal** and stops earning.
 
+**Expiry (D-13).** A life minted in epoch `m` shares the pots of epochs `m … m + LIFE_EXPIRY` (13 by default),
+then expires: it keeps what it earned (still claimable) and drops out of `Σ owed_remaining`. Before paying
+epoch `E`'s pot, every life minted in `E − LIFE_EXPIRY − 1` or earlier expires. The seed's life never
+expires. Without this, unpaid claims grow without bound and later losers recover far less (see D-13).
+
 After payout `pool' ≥ pool − 0.9 × 0.5 × (pool − R) > R ≥ 1.2 × E`, so the solvency rule still holds.
 
 ## 7. Buybacks to voters

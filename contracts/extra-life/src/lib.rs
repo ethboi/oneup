@@ -20,7 +20,7 @@ use oneup_math as math;
 use std::collections::HashMap;
 
 mod acc;
-pub use acc::{Accumulator, Snapshot};
+pub use acc::{remaining_as_of, Accumulator, Snapshot};
 
 const GAS_FT_TRANSFER: Gas = Gas::from_tgas(15);
 const GAS_CLAIM_CALLBACK: Gas = Gas::from_tgas(10);
@@ -56,6 +56,18 @@ pub struct LifeInfo {
     pub claimable: U128,
     /// Paid its cap: stops earning, stays as a badge.
     pub full_heal: bool,
+    /// Past its earning window: keeps what it earned, earns no more.
+    pub expired: bool,
+}
+
+/// Every life minted in one epoch shares a snapshot, so the group expires in one step.
+#[near(serializers = [borsh])]
+#[derive(Clone, Debug)]
+pub struct Cohort {
+    pub owed: u128,
+    pub at: Snapshot,
+    /// Snapshot when the group expired; its lives' balances are frozen there.
+    pub expired_at: Option<Snapshot>,
 }
 
 #[near(serializers = [json])]
@@ -72,6 +84,7 @@ enum StorageKey {
     Enumeration,
     Approval,
     Lives,
+    Cohorts,
 }
 
 #[allow(dead_code)]
@@ -91,6 +104,9 @@ pub struct ExtraLife {
     acc: Accumulator,
     /// USDC received and not yet claimed. Claims never exceed it.
     held: u128,
+    cohorts: LookupMap<u64, Cohort>,
+    /// Next epoch whose lives may expire (the seed, epoch 0, never does).
+    next_expiry: u64,
 }
 
 pub fn token_id(epoch: u64, owner: &AccountId) -> TokenId {
@@ -115,6 +131,8 @@ impl ExtraLife {
             lives: LookupMap::new(StorageKey::Lives),
             acc: Accumulator::default(),
             held: 0,
+            cohorts: LookupMap::new(StorageKey::Cohorts),
+            next_expiry: 1,
         }
     }
 
@@ -130,6 +148,16 @@ impl ExtraLife {
             }
             let id = token_id(epoch, &item.owner);
             let at = self.acc.add(owed);
+            match self.cohorts.get_mut(&epoch) {
+                Some(c) => {
+                    require!(c.at == at && c.expired_at.is_none(), "Epoch's lives already settled");
+                    c.owed += owed;
+                }
+                None => {
+                    require!(epoch == 0 || epoch >= self.next_expiry, "Epoch already expired");
+                    self.cohorts.insert(epoch, Cohort { owed, at, expired_at: None });
+                }
+            }
             self.lives.insert(
                 id.clone(),
                 Life { epoch, face: item.face.0, cap_ppm: item.cap_ppm.0, owed, at, claimed: 0 },
@@ -150,6 +178,23 @@ impl ExtraLife {
             ids.push(id);
         }
         ids
+    }
+
+    /// House only, before each epoch's pot: lives minted in `through_epoch` or earlier stop earning.
+    /// Returns the total still owed to lives that are earning, which the house mirrors.
+    pub fn expire(&mut self, through_epoch: u64) -> U128 {
+        require!(env::predecessor_account_id() == self.house, "Only the house");
+        while self.next_expiry <= through_epoch {
+            let e = self.next_expiry;
+            if let Some(mut c) = self.cohorts.get(&e).cloned() {
+                let left = self.acc.expire(c.owed, c.at);
+                c.expired_at = Some(self.acc.snapshot());
+                self.cohorts.insert(e, c);
+                env::log_str(&format!("epoch {e} lives expired with {left} unpaid"));
+            }
+            self.next_expiry += 1;
+        }
+        U128(self.acc.total_remaining)
     }
 
     /// USDC from the house: an epoch's pot, shared pro rata to what each life is still owed.
@@ -236,7 +281,13 @@ impl ExtraLife {
 
 impl ExtraLife {
     fn paid(&self, life: &Life) -> u128 {
-        life.owed - self.acc.remaining(life.owed, life.at)
+        let frozen = self.cohorts.get(&life.epoch).and_then(|c| c.expired_at);
+        let now = frozen.unwrap_or_else(|| self.acc.snapshot());
+        life.owed - remaining_as_of(life.owed, life.at, now)
+    }
+
+    fn expired(&self, life: &Life) -> bool {
+        self.cohorts.get(&life.epoch).is_some_and(|c| c.expired_at.is_some())
     }
 
     fn claimable(&self, life: &Life) -> u128 {
@@ -255,6 +306,7 @@ impl ExtraLife {
             paid: U128(paid),
             claimable: U128(paid.saturating_sub(life.claimed)),
             full_heal: paid >= life.owed,
+            expired: self.expired(life),
         }
     }
 }
