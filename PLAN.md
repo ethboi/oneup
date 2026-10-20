@@ -108,13 +108,18 @@ Run: `cd contracts && cargo test -p oneup-math -p oneup-house` · `./build.sh &&
 - [x] 256-bit `mul_div` in `oneup-math` for every pro-rata split (the sandbox caught a u128 overflow
       in ve reward claims)
 - [x] Sandbox `listing_and_buyback_to_voters`: propose → vote → listed; loss → buyback → swap → voter claims
-- [ ] Deploy all to testnet (needs testnet accounts; see open items)
+- [x] ~~Testnet deploy~~ dropped: everything runs on a local NEAR chain (`pnpm localnet`)
 
-### Stage 5 — SDK, keeper, API (5–9 Nov, parallel with 3–4)
+### Stage 5 — Localnet, SDK, keeper, API
 
-- [ ] `packages/sdk`: typed bindings + shared maths, tested against the same vectors as the contracts
-- [ ] `keeper`: price push, fill pending orders, scan + liquidate, close epochs; idempotent, restart-safe
-- [ ] `api`: index contract events → SQLite; endpoints for trades, epochs, pool/solvency series, Extra Lives
+- [x] `pnpm localnet`: persistent local NEAR node (near-sandbox, like `hardhat node`) in `.localnet/`,
+      bound to 127.0.0.1; on a fresh chain deploys and wires all 7 contracts, lists NEAR/BTC/ETH, seeds a
+      1M USDC pool and the swap, funds the keeper, 6 bots and a demo trader; writes `localnet.json`
+- [x] `packages/sdk`: bigint port of `oneup-math` (same vectors), typed views and calls for every contract
+- [x] `keeper`: sim (steerable random walk) or live Pyth Hermes prices; fills/expires orders, liquidates,
+      takes profit at cap, steps epoch closes, runs buybacks; control port for demo price moves
+- [x] `pnpm smoke`: deposit → 50x long → keeper fill → price −2% → keeper liquidation, on localnet
+- [ ] `api`: index events → SQLite; trades, epochs, pool/solvency series
 
 ### Stage 6 — Web app (6–10 Nov)
 

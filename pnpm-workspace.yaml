@@ -1,0 +1,8 @@
+packages:
+  - packages/*
+  - keeper
+  - api
+  - app
+  - sim
+onlyBuiltDependencies:
+  - near-sandbox

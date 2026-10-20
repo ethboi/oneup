@@ -1,0 +1,27 @@
+{
+  "name": "oneup",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.18.3",
+  "scripts": {
+    "build:contracts": "cd contracts && ./build.sh",
+    "localnet": "tsx scripts/localnet.ts",
+    "localnet:reset": "rm -rf .localnet localnet.json",
+    "deploy:local": "tsx scripts/deploy.ts",
+    "test": "pnpm -r test",
+    "typecheck": "tsc -b",
+    "smoke": "tsx scripts/smoke.ts",
+    "keeper": "pnpm --filter @oneup/keeper start"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.1",
+    "near-sandbox": "0.3.4",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "vitest": "5.0.3"
+  },
+  "dependencies": {
+    "@oneup/sdk": "workspace:*",
+    "near-api-js": "7.3.1"
+  }
+}
