@@ -611,7 +611,7 @@ mod invariants {
                 }
                 prop_assert_eq!(total_held(&h), total);
                 prop_assert!(h.liability <= h.pool, "liability {} > pool {}", h.liability, h.pool);
-                prop_assert!(h.pool >= oneup_math::reserve(h.liability).min(h.pool));
+                prop_assert!(h.pool >= oneup_math::reserve(h.liability, h.reserve_floor()).min(h.pool));
                 let sum: u128 = h.markets.values().map(|m| h.market_liability(m)).sum();
                 prop_assert_eq!(sum, h.liability);
             }

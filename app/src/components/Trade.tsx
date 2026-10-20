@@ -1,0 +1,212 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import {
+  USDC,
+  fmtUsdc,
+  liquidationPrice,
+  maxLiability,
+  pnl,
+  priceToNumber,
+  type Order,
+  type Position,
+  type Side,
+} from "@oneup/sdk";
+import { useOneUp, usePoll } from "@/lib/oneup";
+import { PriceChart, type Mark } from "./PriceChart";
+import { useNow } from "./Header";
+
+const MIN_HOLD_S = 60;
+
+export function Trade() {
+  const { o, me, prices, history } = useOneUp();
+  const markets = usePoll(() => o.markets(), [], 5000) ?? [];
+  const [market, setMarket] = useState("NEAR-USD");
+  const positions = usePoll(() => o.positions(me), [me]) ?? [];
+  const orders = usePoll(() => o.orders(me), [me]) ?? [];
+
+  const marks: Mark[] = positions
+    .filter((p) => p.market_id === market)
+    .flatMap((p) => [
+      { price: priceToNumber(BigInt(p.entry_price)), label: `#${p.id} entry`, color: "var(--info)" },
+      {
+        price: priceToNumber(liquidationPrice(p.side, BigInt(p.entry_price), p.leverage)),
+        label: `#${p.id} liq`,
+        color: "var(--short)",
+      },
+    ]);
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
+      <div className="flex min-w-0 flex-col gap-4">
+        <div className="panel p-3">
+          <div className="mb-2 flex flex-wrap gap-2">
+            {markets.filter((m) => m.live).map((m) => (
+              <button
+                key={m.id}
+                onClick={() => setMarket(m.id)}
+                className={`btn ${m.id === market ? "btn-accent" : "btn-ghost"} num`}
+              >
+                {m.id} {prices[m.id] ? fmtPrice(prices[m.id]) : ""}
+              </button>
+            ))}
+          </div>
+          <PriceChart points={history[market] ?? []} marks={marks} />
+        </div>
+        <Positions positions={positions} orders={orders} />
+      </div>
+      <OrderForm market={market} maxLeverage={markets.find((m) => m.id === market)?.max_leverage ?? 100} />
+    </div>
+  );
+}
+
+function OrderForm({ market, maxLeverage }: { market: string; maxLeverage: number }) {
+  const { o, tx, run, prices, me } = useOneUp();
+  const [side, setSide] = useState<Side>("Long");
+  const [margin, setMargin] = useState("500");
+  const [leverage, setLeverage] = useState(50);
+  const m = BigInt(Math.floor(Number(margin) || 0)) * USDC;
+  const price = prices[market];
+  const quote = usePoll(() => o.quoteOpen(market, side, m, leverage, price), [market, side, margin, leverage, price?.toString()]);
+  const free = usePoll(() => o.balance(me), [me]);
+  const short = free !== undefined && BigInt(free) < m;
+
+  return (
+    <div className="panel flex flex-col gap-4 p-4">
+      <div className="grid grid-cols-2 gap-2">
+        {(["Long", "Short"] as const).map((s) => (
+          <button
+            key={s}
+            onClick={() => setSide(s)}
+            className="btn"
+            style={{
+              background: side === s ? (s === "Long" ? "var(--long)" : "var(--short)") : "var(--panel-2)",
+              color: side === s ? "#0b0d10" : "var(--muted)",
+            }}
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+
+      <label className="flex flex-col gap-1">
+        <span className="label">Margin (USDC)</span>
+        <input className="input num" value={margin} onChange={(e) => setMargin(e.target.value)} />
+      </label>
+
+      <label className="flex flex-col gap-1">
+        <span className="label flex justify-between">
+          <span>Leverage</span>
+          <span className="num text-[var(--text)]">{leverage}×</span>
+        </span>
+        <input type="range" min={1} max={maxLeverage} value={leverage} onChange={(e) => setLeverage(Number(e.target.value))} />
+      </label>
+
+      <dl className="grid grid-cols-2 gap-y-2 text-sm">
+        <dt className="label">Position size</dt>
+        <dd className="num text-right">${fmtUsdc(m * BigInt(leverage), 0)}</dd>
+        <dt className="label">Max profit (9× margin)</dt>
+        <dd className="num text-right">${fmtUsdc(maxLiability(m), 0)}</dd>
+        <dt className="label">Winner&apos;s cut</dt>
+        <dd className="num text-right">{quote ? `${(Number(quote.cut_ppm) / 1e4).toFixed(1)}%` : "…"}</dd>
+        <dt className="label">Liquidation price</dt>
+        <dd className="num text-right">{quote?.liquidation_price ? fmtPrice(BigInt(quote.liquidation_price)) : "…"}</dd>
+      </dl>
+
+      {quote && !quote.allowed && <p className="text-sm text-[var(--short)]">{quote.reason}</p>}
+      {short && <p className="text-sm text-[var(--short)]">Not enough free balance. Deposit first.</p>}
+
+      <button
+        className="btn py-3"
+        style={{ background: side === "Long" ? "var(--long)" : "var(--short)", color: "#0b0d10" }}
+        disabled={!quote?.allowed || short || m === 0n}
+        onClick={() => run(`${side} ${market} ${leverage}× · $${margin}`, () => tx.placeOpen(market, side, m, leverage))}
+      >
+        {side} {market}
+      </button>
+      <p className="label">
+        Fills at the first oracle price after you place the order, so nobody trades on a price they already know. No
+        fees, no funding. Lose and you get an Extra Life.
+      </p>
+    </div>
+  );
+}
+
+function Positions({ positions, orders }: { positions: Position[]; orders: Order[] }) {
+  const { tx, run, prices } = useOneUp();
+  const now = useNow();
+  const rows = useMemo(
+    () =>
+      positions.map((p) => {
+        const mark = prices[p.market_id];
+        const v = mark ? pnl(p.side, BigInt(p.margin), p.leverage, BigInt(p.entry_price), mark) : 0n;
+        return { p, mark, v, hold: Math.max(0, p.opened_at + MIN_HOLD_S - now) };
+      }),
+    [positions, prices, now],
+  );
+
+  return (
+    <div className="panel overflow-x-auto p-4">
+      <div className="mb-3 font-semibold">Positions</div>
+      {rows.length === 0 && orders.length === 0 && <p className="label">No open positions.</p>}
+      {rows.length > 0 && (
+        <table className="num w-full min-w-[640px] text-sm">
+          <thead>
+            <tr className="label text-left">
+              <th className="pb-2 font-normal">Market</th>
+              <th className="pb-2 font-normal">Size</th>
+              <th className="pb-2 font-normal">Entry</th>
+              <th className="pb-2 font-normal">Mark</th>
+              <th className="pb-2 font-normal">Liq.</th>
+              <th className="pb-2 text-right font-normal">PnL</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({ p, mark, v, hold }) => (
+              <tr key={p.id} className="border-t border-[var(--line)]">
+                <td className="py-2">
+                  <span style={{ color: p.side === "Long" ? "var(--long)" : "var(--short)" }}>{p.side}</span> {p.market_id}{" "}
+                  {p.leverage}×
+                </td>
+                <td>${fmtUsdc(BigInt(p.margin) * BigInt(p.leverage), 0)}</td>
+                <td>{fmtPrice(BigInt(p.entry_price))}</td>
+                <td>{mark ? fmtPrice(mark) : "…"}</td>
+                <td>{fmtPrice(liquidationPrice(p.side, BigInt(p.entry_price), p.leverage))}</td>
+                <td className="text-right" style={{ color: v >= 0n ? "var(--long)" : "var(--short)" }}>
+                  {v >= 0n ? "+" : ""}
+                  {fmtUsdc(v)}
+                </td>
+                <td className="pl-3 text-right">
+                  {p.close_order !== null ? (
+                    <span className="label">closing…</span>
+                  ) : (
+                    <button
+                      className="btn btn-ghost py-1"
+                      disabled={hold > 0}
+                      onClick={() => run(`Close #${p.id}`, () => tx.placeClose(p.id))}
+                    >
+                      {hold > 0 ? `Close in ${hold}s` : "Close"}
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {orders.filter((x) => "Open" in x.kind).map((x) => (
+        <p key={x.id} className="label mt-2">
+          Order {x.id}: {"Open" in x.kind && `${x.kind.Open.side} ${x.market_id} ${x.kind.Open.leverage}×`}, waiting for the
+          next oracle price…
+        </p>
+      ))}
+    </div>
+  );
+}
+
+export function fmtPrice(p: bigint) {
+  const v = priceToNumber(p);
+  const digits = v < 10 ? 4 : v < 1000 ? 2 : 0;
+  return v.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+}

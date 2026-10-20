@@ -226,7 +226,7 @@ impl House {
     }
 
     fn pay(&mut self, c: Closing) {
-        let p = math::epoch_payout(self.pool, self.liability, self.lives_owed);
+        let p = math::epoch_payout(self.pool, self.liability, self.lives_owed, self.reserve_floor());
         self.pool -= p.lives_pot + p.buyback_pot;
         self.buyback_usdc += p.buyback_pot;
         if p.buyback_pot > 0 {

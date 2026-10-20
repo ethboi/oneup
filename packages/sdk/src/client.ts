@@ -49,6 +49,7 @@ export interface Solvency {
   liability: U128;
   reserve: U128;
   surplus: U128;
+  seed: U128;
   both_sides: boolean;
   markets: { id: string; long_liability: U128; short_liability: U128; liability: U128; capacity: U128 }[];
 }

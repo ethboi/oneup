@@ -121,13 +121,19 @@ Run: `cd contracts && cargo test -p oneup-math -p oneup-house` · `./build.sh &&
 - [x] `pnpm smoke`: deposit → 50x long → keeper fill → price −2% → keeper liquidation, on localnet
 - [ ] `api`: index events → SQLite; trades, epochs, pool/solvency series
 
-### Stage 6 — Web app (6–10 Nov)
+### Stage 6 — Web app (`app/`, Next.js 16, port 3020)
 
-- [ ] Wallet selector login, deposit/withdraw
-- [ ] Trade screen: market list, price, open/close, pending fill state, PnL, liquidation price
-- [ ] Extra Lives: face value, cap, paid so far, bar to Full Heal, claim
-- [ ] Lock + vote: veNFTs, vote allocation, bribes, propose market
-- [ ] Solvency dashboard: pool, reserve, worst-case payout vs pool, per-market capacity
+- [x] Dev wallet on localnet: signs in the browser with `localnet.json` keys; switch demo trader / bots
+      (NEAR wallet selector can't reach a local chain; it's the path for a real network)
+- [x] Header: pool, epoch countdown, free balance, wallet USDC/$1UP, faucet, deposit, withdraw
+- [x] Trade: markets with live oracle prices, price chart with entry/liquidation lines, order form with
+      the contract's own quote (cut, liq price, refusal reason), positions with live PnL and min-hold countdown
+- [x] Extra Lives: pending life this epoch, NFT cards (face, cap, owed, paid, progress to Full Heal), claim
+- [x] Vote: vote shares now → next epoch, lock $1UP, per-lock vote allocation, claim buybacks/bribes,
+      propose a market (500 USDC bond), bribe voters
+- [x] Solvency: worst case vs pool vs reserve, per-market longs/shorts vs capacity (colour-blind-safe
+      pair, validated), epoch history table
+- [ ] Demo polish pass once bots and the simulation exist
 
 ### Stage 7 — Simulation (9–11 Nov)
 

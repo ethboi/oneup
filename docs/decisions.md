@@ -85,6 +85,13 @@ try the real Rhea testnet contract only if time allows.
 permissionless call would let anyone pass 0 and sandwich the swap. The keeper runs it with the owner key
 and a quote minus slippage. Mainnet option: a TWAP check against the pool before swapping, then open it up.
 
+## D-12 · The reserve floor is the seed actually deposited · **Decided**
+
+Spec: "The reserve is 1.2× the solvency total, and never below the $25K seed." The code first hard-coded
+$25K. With the 1M local seed (needed for D-1 capacity), 975K of seed money counted as surplus: the first
+live epoch paid 292K to Extra Lives and 146K into $1UP buybacks from a 500 house profit. Now the floor is
+the total seeded, so the seed is only ever repaid from profit. Same result as the spec at a $25K seed.
+
 ## D-11 · Known POC limits · **Noted**
 
 - Rewards for a (market, epoch) with no voters stay in `ve` (no sweep yet).

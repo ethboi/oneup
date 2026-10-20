@@ -20,6 +20,8 @@ pub struct Solvency {
     pub liability: U128,
     pub reserve: U128,
     pub surplus: U128,
+    /// The reserve's floor: the seed.
+    pub seed: U128,
     pub both_sides: bool,
     pub markets: Vec<MarketSolvency>,
 }
@@ -101,12 +103,13 @@ impl House {
                 capacity: U128(math::capacity(m.capacity_ppm.0, self.pool)),
             })
             .collect();
-        let reserve = math::reserve(self.liability);
+        let reserve = math::reserve(self.liability, self.reserve_floor());
         Solvency {
             pool: U128(self.pool),
             liability: U128(self.liability),
             reserve: U128(reserve),
             surplus: U128(self.pool.saturating_sub(reserve)),
+            seed: U128(self.seed),
             both_sides: self.params.solvency_both_sides,
             markets,
         }
@@ -134,6 +137,11 @@ impl House {
 }
 
 impl House {
+    /// The seed, or the spec's 25K before any seed.
+    pub(crate) fn reserve_floor(&self) -> u128 {
+        if self.seed > 0 { self.seed } else { math::MIN_RESERVE }
+    }
+
     fn open_refusal(&self, market_id: &str, side: Side, margin: u128, leverage: u32, liability: u128) -> Option<String> {
         let m = match self.markets.get(market_id) {
             Some(m) => m,

@@ -110,7 +110,8 @@ export const owed = (face: bigint, capPpm: bigint) => (face * capPpm) / PPM;
 
 // §6 Surplus and payout
 
-export const reserve = (liability: bigint) => max(divCeil(liability * RESERVE_PPM, PPM), MIN_RESERVE);
+/** 1.2× the solvency total, never below the seed (`floor`), so only house profit is ever shared out. */
+export const reserve = (liability: bigint, floor = MIN_RESERVE) => max(divCeil(liability * RESERVE_PPM, PPM), floor);
 
 export interface EpochPayout {
   reserve: bigint;
@@ -119,8 +120,8 @@ export interface EpochPayout {
   buybackPot: bigint;
 }
 
-export function epochPayout(pool: bigint, liability: bigint, owedRemaining: bigint): EpochPayout {
-  const r = reserve(liability);
+export function epochPayout(pool: bigint, liability: bigint, owedRemaining: bigint, floor = MIN_RESERVE): EpochPayout {
+  const r = reserve(liability, floor);
   const surplus = max(pool - r, 0n);
   const payout = (surplus * PAYOUT_PPM) / PPM;
   const livesShare = (payout * LIVES_SHARE_PPM) / PPM;

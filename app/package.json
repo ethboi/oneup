@@ -1,0 +1,28 @@
+{
+  "name": "@oneup/app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -H 127.0.0.1 -p 3020",
+    "build": "next build",
+    "start": "next start -H 127.0.0.1 -p 3020",
+    "typecheck": "tsc --noEmit",
+    "test": "echo no tests"
+  },
+  "dependencies": {
+    "@oneup/sdk": "workspace:*",
+    "near-api-js": "7.3.1",
+    "next": "16.4.2",
+    "react": "19.2.9",
+    "react-dom": "19.2.9"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "24.19.1",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "tailwindcss": "4.3.3",
+    "typescript": "6.0.3"
+  }
+}

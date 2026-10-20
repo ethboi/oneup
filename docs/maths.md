@@ -119,7 +119,7 @@ epoch close. (The demo script says one "drops into the wallet" on liquidation; i
 At epoch close, after minting `e`'s Extra Lives:
 
 ```
-R       = max(1.2 × E, 25_000)                  # reserve
+R       = max(1.2 × E, seed)                    # reserve: never below the seed actually deposited
 S       = max(0, pool − R)                      # surplus
 P       = 0.5 × S                               # max payout this epoch
 el_pot  = min(0.6 × P, Σ owed_remaining)        # to unpaid Extra Lives (including ones just minted)

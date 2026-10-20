@@ -34,12 +34,14 @@ async fn lose_close_epoch_claim() -> anyhow::Result<()> {
     assert_eq!(life["face"], json!(usd(500)));
     assert_eq!(life["owed"], json!("959800000"));
 
-    // The pot: surplus 75_500 above the 25K reserve, half paid out, 60% of that to lives
-    assert_eq!(summary["lives_pot"], json!(usd(22_650)));
-    assert_eq!(view(&e.life, "held", json!({})).await?, json!(usd(22_650)));
+    // The pot: the reserve never drops below the 100K seed, so only the 500 profit is surplus;
+    // half is paid out, 60% of that (150) to lives
+    assert_eq!(summary["surplus"], json!(usd(500)));
+    assert_eq!(summary["lives_pot"], json!(usd(150)));
+    assert_eq!(view(&e.life, "held", json!({})).await?, json!(usd(150)));
     let claimable: u128 = life["claimable"].as_str().unwrap().parse()?;
     // pro rata to owed: 959.8 / 100_959.8 of the pot
-    assert_eq!(claimable, 22_650 * USDC * 959_800_000 / 100_959_800_000);
+    assert_eq!(claimable, 150 * USDC * 959_800_000 / 100_959_800_000);
 
     bob.call(e.life.id(), "claim").args_json(json!({"token_ids": [id]})).max_gas().transact().await?.into_result()?;
     assert_eq!(view(&e.usdc, "ft_balance_of", json!({"account_id": bob.id()})).await?, json!(claimable.to_string()));

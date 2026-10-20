@@ -14,6 +14,7 @@ pub const CUT_BASE_PPM: u128 = 100_000;
 pub const CUT_MAX_PPM: u128 = 250_000;
 
 pub const RESERVE_PPM: u128 = 1_200_000;
+/// The spec's seed. The reserve floor is the seed actually deposited (see `reserve`).
 pub const MIN_RESERVE: u128 = 25_000 * USDC;
 pub const PAYOUT_PPM: u128 = 500_000;
 pub const LIVES_SHARE_PPM: u128 = 600_000;
@@ -180,12 +181,13 @@ pub struct EpochPayout {
     pub buyback_pot: u128,
 }
 
-pub fn reserve(liability: u128) -> u128 {
-    div_ceil(liability * RESERVE_PPM, PPM).max(MIN_RESERVE)
+/// 1.2× the solvency total, never below the seed (`floor`), so only house profit is ever shared out.
+pub fn reserve(liability: u128, floor: u128) -> u128 {
+    div_ceil(liability * RESERVE_PPM, PPM).max(floor)
 }
 
-pub fn epoch_payout(pool: u128, liability: u128, owed_remaining: u128) -> EpochPayout {
-    let reserve = reserve(liability);
+pub fn epoch_payout(pool: u128, liability: u128, owed_remaining: u128, floor: u128) -> EpochPayout {
+    let reserve = reserve(liability, floor);
     let surplus = pool.saturating_sub(reserve);
     let payout = surplus * PAYOUT_PPM / PPM;
     let lives_share = payout * LIVES_SHARE_PPM / PPM;
@@ -359,16 +361,25 @@ mod tests {
     }
 
     #[test]
+    fn seed_above_profit_is_not_surplus() {
+        // a 1M seed with 500 of house profit: only the 500 is surplus
+        let p = epoch_payout(usd(1_000_500), 0, usd(1_000_000), usd(1_000_000));
+        assert_eq!(p.surplus, usd(500));
+        assert_eq!(p.lives_pot, usd(150));
+        assert_eq!(p.buyback_pot, usd(75));
+    }
+
+    #[test]
     fn v5_epoch_payout() {
         let owed_total = usd(1_840) + usd(10_000) + usd(25_000);
-        let p = epoch_payout(usd(200_000), usd(50_000), owed_total);
+        let p = epoch_payout(usd(200_000), usd(50_000), owed_total, MIN_RESERVE);
         assert_eq!(p.reserve, usd(60_000));
         assert_eq!(p.surplus, usd(140_000));
         assert_eq!(p.lives_pot, usd(36_840));
         assert_eq!(p.buyback_pot, usd(26_160));
         assert_eq!(usd(200_000) - p.lives_pot - p.buyback_pot, usd(137_000));
 
-        let p = epoch_payout(usd(120_000), usd(50_000), owed_total);
+        let p = epoch_payout(usd(120_000), usd(50_000), owed_total, MIN_RESERVE);
         assert_eq!(p.lives_pot, usd(18_000));
         assert_eq!(p.buyback_pot, usd(9_000));
         // the doc's whole-dollar vector: floors of 18_000 × owed / 36_840
@@ -409,8 +420,10 @@ mod tests {
         }
 
         #[test]
-        fn payout_keeps_reserve(pool in 0u128..10_000_000 * USDC, liab in 0u128..10_000_000 * USDC, owed in 0u128..10_000_000 * USDC) {
-            let p = epoch_payout(pool, liab, owed);
+        fn payout_keeps_reserve(pool in 0u128..10_000_000 * USDC, liab in 0u128..10_000_000 * USDC, owed in 0u128..10_000_000 * USDC, seed in 0u128..2_000_000 * USDC) {
+            let p = epoch_payout(pool, liab, owed, seed);
+            // the seed is never shared out
+            prop_assert!(pool < seed || pool - p.lives_pot - p.buyback_pot >= seed);
             prop_assert!(p.lives_pot <= owed);
             if pool > p.reserve {
                 prop_assert!(pool - p.lives_pot - p.buyback_pot >= p.reserve);

@@ -144,7 +144,9 @@ function controlServer(port: number) {
       res.statusCode = 400;
       res.end(String(e));
     }
-  }).listen(port, "127.0.0.1", () => log(`sim price control on http://127.0.0.1:${port}`));
+  })
+    .on("error", (e) => log(`price control off: ${e.message}`))
+    .listen(port, "127.0.0.1", () => log(`sim price control on http://127.0.0.1:${port}`));
 }
 
 async function tick() {

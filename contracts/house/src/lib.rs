@@ -168,6 +168,8 @@ pub struct House {
     params: Params,
     /// House-owned USDC. Trader balances and margins are never part of it.
     pool: u128,
+    /// Total seeded. The reserve never goes below it, so the seed is only repaid from profit.
+    seed: u128,
     /// Σ market liability (maths §3), kept in step with the markets.
     liability: u128,
     balances: LookupMap<AccountId, u128>,
@@ -219,6 +221,7 @@ impl House {
             oracle,
             params: params.unwrap_or_default(),
             pool: 0,
+            seed: 0,
             liability: 0,
             balances: LookupMap::new(StorageKey::Balances),
             markets: IterableMap::new(StorageKey::Markets),
