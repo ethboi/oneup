@@ -159,6 +159,9 @@ function LockForm() {
   );
 }
 
+/** Pyth's DOGE/USD feed id (from Hermes' feed list, 2026-10-20). */
+const DOGE_FEED = "dcef50dd0a4cd2dcc17e45df1676dcb336a11a61c69df7a0299b0150c672d25c";
+
 function Proposals() {
   const { o, tx, run } = useOneUp();
   const proposals = usePoll(() => o.proposals(), [], 5000) ?? [];
@@ -172,6 +175,15 @@ function Proposals() {
           <span className="font-semibold">{p.market_id}</span> <span className="label">needs 2% of votes · idle {p.idle}/4</span>
         </div>
       ))}
+      <button
+        className="label self-start underline"
+        onClick={() => {
+          setMarket("DOGE-USD");
+          setFeed(DOGE_FEED);
+        }}
+      >
+        Use DOGE-USD (Pyth feed)
+      </button>
       <input className="input" value={market} onChange={(e) => setMarket(e.target.value.toUpperCase())} placeholder="Market, e.g. DOGE-USD" />
       <input className="input" value={feed} onChange={(e) => setFeed(e.target.value)} placeholder="Pyth feed id (hex)" />
       <button className="btn btn-ghost" disabled={!market || !feed} onClick={() => run(`Propose ${market}`, () => tx.propose(market, feed))}>

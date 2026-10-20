@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   USDC,
   fmtUsdc,
@@ -14,7 +14,7 @@ import {
 } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { PriceChart, type Mark } from "./PriceChart";
-import { useNow } from "./Header";
+import { fmtClock, useNow } from "./Header";
 
 const MIN_HOLD_S = 60;
 
@@ -39,6 +39,7 @@ export function Trade() {
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
       <div className="flex min-w-0 flex-col gap-4">
+        <LossBanner />
         <div className="panel p-3">
           <div className="mb-2 flex flex-wrap gap-2">
             {markets.filter((m) => m.live).map((m) => (
@@ -209,4 +210,46 @@ export function fmtPrice(p: bigint) {
   const v = priceToNumber(p);
   const digits = v < 10 ? 4 : v < 1000 ? 2 : 0;
   return v.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+}
+
+/** Shows the moment a loss turns into a pending Extra Life (liquidation or a losing close). */
+function LossBanner() {
+  const { o, d, me } = useOneUp();
+  const pending = usePoll(() => o.pendingLife(me), [me]);
+  const epoch = usePoll(() => o.epoch(), []);
+  const now = useNow();
+  const prev = useRef<{ me: string; v: bigint } | null>(null);
+  const [loss, setLoss] = useState<{ amount: bigint; total: bigint } | null>(null);
+
+  useEffect(() => {
+    if (pending === undefined) return;
+    const v = BigInt(pending);
+    const p = prev.current;
+    if (p && p.me === me && v > p.v) setLoss({ amount: v - p.v, total: v });
+    if (p && (p.me !== me || v < p.v)) setLoss(null); // other account, or a new epoch
+    prev.current = { me, v };
+  }, [pending, me]);
+
+  if (!loss) return null;
+  const left = epoch ? Math.max(0, epoch.started_at + d.epochLengthS - now) : 0;
+  return (
+    <div className="panel flex items-center gap-4 border-[var(--accent)] p-4" role="status">
+      <svg width="36" height="36" viewBox="0 0 24 24" aria-hidden className="shrink-0">
+        <path d="M12 21s-7-4.5-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 6c-2.5 4.5-9.5 9-9.5 9z" fill="none" stroke="var(--accent)" strokeWidth="2" />
+        <path d="M12 9v6M9 12h6" stroke="var(--accent)" strokeWidth="2" />
+      </svg>
+      <div className="flex-1">
+        <div className="font-semibold">
+          You lost ${fmtUsdc(loss.amount)}. That&apos;s an Extra Life in the making.
+        </div>
+        <div className="label num">
+          ${fmtUsdc(loss.total)} lost this epoch. Your Extra Life is minted when the epoch ends in {fmtClock(left)}, sized
+          from what the house made.
+        </div>
+      </div>
+      <button className="btn btn-ghost" onClick={() => setLoss(null)} aria-label="Dismiss">
+        ✕
+      </button>
+    </div>
+  );
 }

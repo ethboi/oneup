@@ -38,7 +38,9 @@ const keeper = oneup.calls(accountSender(new Account(d.keeper.id, oneup.provider
 const owner = oneup.calls(accountSender(new Account(d.owner.id, oneup.provider, d.owner.key as KeyPairString)));
 const FILL_WINDOW_S = 30;
 
-const source: PriceSource = args.prices === "hermes" ? new HermesSource(d.markets) : new SimSource(d.markets);
+const source: PriceSource = args.prices === "hermes" ? new HermesSource() : new SimSource(d.markets);
+/** Markets as listed on chain (refreshed every tick, so markets listed by vote get prices too). */
+let feeds = new Map<string, string>(d.markets.map((m) => [m.id, m.feedId]));
 /** Latest pushed price per feed, 1e8 units, and its publish time. */
 const latest = new Map<string, { price: bigint; time: number }>();
 
@@ -46,7 +48,9 @@ const log = (...m: unknown[]) => console.log(new Date().toISOString().slice(11, 
 const nowS = () => Math.floor(Date.now() / 1000);
 
 async function pushPrices() {
-  const updates = await source.next();
+  const listed = (await oneup.markets()).filter((m) => m.live);
+  feeds = new Map(listed.map((m) => [m.id, m.feed_id]));
+  const updates = await source.next(listed.map((m) => ({ id: m.id, feedId: m.feed_id })));
   await keeper.pushPrices(updates);
   for (const u of updates) {
     const p = normalizePrice(BigInt(u.price), u.expo);
@@ -55,7 +59,6 @@ async function pushPrices() {
 }
 
 async function handleOrders() {
-  const feeds = new Map(d.markets.map((m) => [m.id, m.feedId]));
   for (const o of await oneup.listOrders(0, 200)) {
     const label = "Open" in o.kind ? `open ${o.kind.Open.side} ${o.market_id}` : `close #${o.kind.Close.position_id}`;
     if (nowS() > o.placed_at + FILL_WINDOW_S) {
@@ -71,7 +74,6 @@ async function handleOrders() {
 }
 
 async function handlePositions() {
-  const feeds = new Map(d.markets.map((m) => [m.id, m.feedId]));
   let all: Position[] = [];
   for (let from = 0; ; from += 100) {
     const page = await oneup.listPositions(from, 100);

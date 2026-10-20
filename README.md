@@ -130,7 +130,8 @@ duplicate-registration panic), and running the demo found a third (the reserve f
 ## What's mocked locally
 
 - **Prices** come from the keeper, which pushes a steerable random walk (or live Pyth prices with
-  `--prices hermes`) to a Pyth-compatible oracle. On mainnet the house points at Outlayer's
+  `--prices hermes`, which needs a `PYTH_API_KEY`: Hermes now refuses unauthenticated requests) to a
+  Pyth-compatible oracle. Markets listed by vote are priced automatically. On mainnet the house points at Outlayer's
   `price-oracle-pyth.near` with the same calls. Outlayer's testnet feed was stale when checked.
 - **USDC** is a local token with a faucet. **Buybacks** swap on a local constant-product pool standing in
   for Rhea.
