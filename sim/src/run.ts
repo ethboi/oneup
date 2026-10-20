@@ -1,6 +1,7 @@
 // `pnpm sim`: runs the model and writes sim/out/results.json (the app's Simulation view reads it).
 
 import { mkdirSync, writeFileSync } from "node:fs";
+import { fairnessSvg } from "./svg.ts";
 import { resolve } from "node:path";
 import { LIFE_EXPIRY_EPOCHS, earlyShareOfPayouts, flows, run, windowedByQuarter, type Cohort } from "./model.ts";
 
@@ -55,6 +56,7 @@ const out = {
 const dir = resolve(import.meta.dirname, "../out");
 mkdirSync(dir, { recursive: true });
 writeFileSync(resolve(dir, "results.json"), JSON.stringify(out, null, 2));
+writeFileSync(resolve(import.meta.dirname, "../../docs/fairness.svg"), fairnessSvg(out.series));
 
 const c = (x: number) => `${(x * 100).toFixed(1)}¢`;
 const p = (x: number) => `${(x * 100).toFixed(1)}%`;

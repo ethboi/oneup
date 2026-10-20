@@ -1,0 +1,76 @@
+// `pnpm demo`: everything in one command. Builds the contracts if needed, runs the simulation if it has no
+// results yet, starts the local chain (deploying on first run), then the keeper, the bots and the app.
+// Ctrl-C stops it all; chain state persists in .localnet/ (`pnpm localnet:reset` for a fresh start).
+
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+
+const ROOT = resolve(import.meta.dirname, "..");
+const WASMS = ["oneup_house", "oneup_extra_life", "oneup_token", "oneup_ve", "mock_usdc", "mock_oracle", "mock_swap"];
+const APP_URL = "http://127.0.0.1:3020";
+const children: ChildProcess[] = [];
+
+const COLORS = { chain: 90, keeper: 36, bots: 35, app: 33 } as const;
+type Name = keyof typeof COLORS;
+
+function start(name: Name, cmd: string, args: string[], onLine?: (line: string) => void): ChildProcess {
+  const c = spawn(cmd, args, { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, FORCE_COLOR: "0" } });
+  const tag = `\x1b[${COLORS[name]}m${name.padEnd(6)}\x1b[0m│ `;
+  let buf = "";
+  const out = (chunk: Buffer) => {
+    buf += chunk.toString();
+    const lines = buf.split("\n");
+    buf = lines.pop()!;
+    for (const l of lines) {
+      if (l.trim()) process.stdout.write(tag + l + "\n");
+      onLine?.(l);
+    }
+  };
+  c.stdout!.on("data", out);
+  c.stderr!.on("data", out);
+  c.on("exit", (code) => {
+    process.stdout.write(`${tag}exited (${code})\n`);
+    if (!stopping) stop(1);
+  });
+  children.push(c);
+  return c;
+}
+
+let stopping = false;
+function stop(code = 0) {
+  if (stopping) return;
+  stopping = true;
+  for (const c of children.reverse()) c.kill("SIGINT");
+  setTimeout(() => process.exit(code), 1500);
+}
+process.on("SIGINT", () => stop(0));
+process.on("SIGTERM", () => stop(0));
+
+function step(msg: string, cmd: string, args: string[], cwd = ROOT) {
+  console.log(`\n▸ ${msg}`);
+  const r = spawnSync(cmd, args, { cwd, stdio: "inherit" });
+  if (r.status !== 0) {
+    console.error(`✕ ${msg} failed`);
+    process.exit(1);
+  }
+}
+
+if (WASMS.some((w) => !existsSync(resolve(ROOT, `contracts/target/near/${w}/${w}.wasm`)))) {
+  step("Building contracts (needs Rust + cargo-near; see README)", "./build.sh", [], resolve(ROOT, "contracts"));
+}
+if (!existsSync(resolve(ROOT, "sim/out/results.json"))) {
+  step("Running the early-vs-late simulation", "pnpm", ["--filter", "@oneup/sim", "start"]);
+}
+
+console.log("\n▸ Starting the local NEAR chain");
+start("chain", "pnpm", ["-s", "localnet"], (line) => {
+  if (!line.startsWith("Ctrl-C")) return;
+  start("keeper", "pnpm", ["-s", "--filter", "@oneup/keeper", "start"]);
+  setTimeout(() => start("bots", "pnpm", ["-s", "--filter", "@oneup/bots", "start"]), 3000);
+  start("app", "pnpm", ["-s", "--filter", "@oneup/app", "dev"], (l) => {
+    if (l.includes("Ready")) {
+      console.log(`\n  OneUp is running at ${APP_URL}\n  Demo trader: demo.test.near (switch to the bots in the account menu)\n  Move a price: curl -XPOST localhost:8787/price -d '{"market":"NEAR-USD","movePct":-2}'\n  Ctrl-C to stop.\n`);
+    }
+  });
+});

@@ -6,3 +6,5 @@ node_modules/
 *.log
 .localnet/
 localnet.json
+*.tsbuildinfo
+next-env.d.ts

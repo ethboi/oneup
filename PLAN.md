@@ -147,19 +147,21 @@ Run: `cd contracts && cargo test -p oneup-math -p oneup-house` · `./build.sh &&
 - [x] Fairness view in the app (median of 20 seeds, validated palette, table view)
 - [ ] Simulation chart in the README
 
-### Stage 8 — Intents, testnet, bots (10–12 Nov)
+### Stage 8 — One-command demo · ✅
 
-- [ ] NEAR Intents 1Click deposit/withdraw in the app (fallback: testnet faucet button)
-- [ ] Demo bots trading on testnet; 10-minute epochs live
-- [ ] Dry-run the demo script end to end at least twice
-
-**Gate 8 (11 Nov):** demo script runs on testnet. Anything not working by now is cut, not fixed.
+- [x] ~~Testnet + NEAR Intents~~: no testnet; Intents has no local/testnet deployment, so it's listed as
+      not integrated in the README
+- [x] `pnpm demo`: builds contracts if missing, runs the sim if needed, starts the chain (deploys on first
+      run), keeper, bots and app with prefixed logs; Ctrl-C stops all
+- [x] `pnpm stop`: stops only processes whose cwd is inside the repo
+- [x] `pnpm test` / `pnpm test:sandbox` work from a clean shell
 
 ### Stage 9 — Ship (12–14 Nov)
 
-- [ ] README: pitch, money-flow diagram, architecture, how solvency works, test commands, `pnpm demo`
-- [ ] Record the 2-minute video, X post
-- [ ] Submit by 14 Nov 23:59 UTC
+- [x] README: pitch, money-flow diagram (mermaid), rules, fairness chart + table, repo map, what's mocked
+- [ ] Dry-run the 2-minute demo script twice; adjust bot pace if epochs feel empty
+- [ ] Record the video, X post
+- [ ] Public repo, then submit (one submission, not editable) by 14 Nov 23:59 UTC
 
 ## Cut lines (in order, if a gate slips)
 

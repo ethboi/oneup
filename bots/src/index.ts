@@ -61,7 +61,7 @@ const STYLES: Style[] = [
     stopLoss: 0.5,
     maxHoldS: [120, 300],
   },
-  { name: "whale", side: coin, margin: [5_000, 15_000], leverage: [2, 5], takeProfit: 0.1, stopLoss: 0.1, maxHoldS: [180, 480] },
+  { name: "whale", side: coin, margin: [3_000, 8_000], leverage: [2, 5], takeProfit: 0.1, stopLoss: 0.1, maxHoldS: [180, 480] },
   {
     name: "scalper",
     side: (h) => (h.length < 4 ? null : h.at(-1)! > h.at(-4)! ? "Long" : "Short"),
