@@ -1,0 +1,293 @@
+//! The OneUp house: one USDC pool every trade is against, at the oracle price.
+//! Formulas live in `oneup-math` (docs/maths.md); this crate holds state and the rules around it.
+
+use near_sdk::json_types::U128;
+use near_sdk::store::{IterableMap, LookupMap};
+use near_sdk::{env, near, require, AccountId, BorshStorageKey, PanicOnDefault};
+use oneup_math as math;
+
+mod events;
+mod oracle;
+mod trading;
+mod views;
+
+#[cfg(test)]
+mod tests;
+
+pub use events::Event;
+pub use oracle::OraclePrice;
+
+#[near(serializers = [json, borsh])]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Side {
+    Long,
+    Short,
+}
+
+impl From<Side> for math::Side {
+    fn from(s: Side) -> Self {
+        match s {
+            Side::Long => math::Side::Long,
+            Side::Short => math::Side::Short,
+        }
+    }
+}
+
+#[near(serializers = [json, borsh])]
+#[derive(Clone, Debug)]
+pub struct Params {
+    /// Hard ceiling for any market's max leverage (votes can't exceed it).
+    pub leverage_hard_limit: u32,
+    pub min_margin: U128,
+    pub min_hold_s: u64,
+    /// A fill must use a price published within this many seconds after the order (D-2).
+    pub fill_window_s: u64,
+    pub max_price_age_s: u64,
+    pub max_conf_ppm: U128,
+    /// D-1: count both sides of each market (true) or only the bigger side (spec as written).
+    pub solvency_both_sides: bool,
+    pub epoch_length_s: u64,
+}
+
+impl Default for Params {
+    fn default() -> Self {
+        Self {
+            leverage_hard_limit: 250,
+            min_margin: U128(math::USDC),
+            min_hold_s: 60,
+            fill_window_s: 30,
+            max_price_age_s: 60,
+            max_conf_ppm: U128(10_000),
+            solvency_both_sides: true,
+            epoch_length_s: 7 * 24 * 3600,
+        }
+    }
+}
+
+#[near(serializers = [json, borsh])]
+#[derive(Clone, Debug)]
+pub struct Market {
+    pub id: String,
+    /// Pyth feed id, hex without `0x`.
+    pub feed_id: String,
+    pub max_leverage: u32,
+    pub live: bool,
+    /// Σ 9 × margin over open longs (and pending long opens).
+    pub long_liability: U128,
+    pub short_liability: U128,
+    /// Share of the pool this market may use, ppm. Set by ve votes; 100% until then.
+    pub capacity_ppm: U128,
+}
+
+#[near(serializers = [json, borsh])]
+#[derive(Clone, Debug)]
+pub enum OrderKind {
+    Open { side: Side, margin: U128, leverage: u32, cut_ppm: U128 },
+    Close { position_id: u64 },
+}
+
+#[near(serializers = [json, borsh])]
+#[derive(Clone, Debug)]
+pub struct Order {
+    pub id: u64,
+    pub owner: AccountId,
+    pub market_id: String,
+    pub kind: OrderKind,
+    /// Block time in seconds.
+    pub placed_at: u64,
+}
+
+#[near(serializers = [json, borsh])]
+#[derive(Clone, Debug)]
+pub struct Position {
+    pub id: u64,
+    pub owner: AccountId,
+    pub market_id: String,
+    pub side: Side,
+    pub margin: U128,
+    pub leverage: u32,
+    /// 1e8 price units.
+    pub entry_price: U128,
+    /// Oracle publish time of the entry price; later actions need a price at least this new.
+    pub entry_publish_time: u64,
+    pub opened_at: u64,
+    pub cut_ppm: U128,
+    pub close_order: Option<u64>,
+}
+
+#[near(serializers = [json, borsh])]
+#[derive(Clone, Debug, Default)]
+pub struct Epoch {
+    pub id: u64,
+    pub started_at: u64,
+    /// Σ losses taken by the pool from closes in this epoch (liquidations count the full margin).
+    pub losses: U128,
+    /// Σ profit paid out after the cut.
+    pub payouts: U128,
+    pub cuts: U128,
+}
+
+#[derive(BorshStorageKey)]
+#[near]
+enum StorageKey {
+    Balances,
+    Markets,
+    Orders,
+    Positions,
+    EpochLosses,
+}
+
+#[near(contract_state)]
+#[derive(PanicOnDefault)]
+pub struct House {
+    owner: AccountId,
+    usdc: AccountId,
+    oracle: AccountId,
+    params: Params,
+    /// House-owned USDC. Trader balances and margins are never part of it.
+    pool: u128,
+    /// Σ market liability (maths §3), kept in step with the markets.
+    liability: u128,
+    balances: LookupMap<AccountId, u128>,
+    markets: IterableMap<String, Market>,
+    orders: IterableMap<u64, Order>,
+    positions: IterableMap<u64, Position>,
+    next_id: u64,
+    epoch: Epoch,
+    /// Each wallet's losses in the current epoch: its pending Extra Life.
+    epoch_losses: IterableMap<AccountId, u128>,
+}
+
+pub(crate) fn now_s() -> u64 {
+    env::block_timestamp() / 1_000_000_000
+}
+
+#[near]
+impl House {
+    #[init]
+    pub fn new(owner: AccountId, usdc: AccountId, oracle: AccountId, params: Option<Params>) -> Self {
+        Self {
+            owner,
+            usdc,
+            oracle,
+            params: params.unwrap_or_default(),
+            pool: 0,
+            liability: 0,
+            balances: LookupMap::new(StorageKey::Balances),
+            markets: IterableMap::new(StorageKey::Markets),
+            orders: IterableMap::new(StorageKey::Orders),
+            positions: IterableMap::new(StorageKey::Positions),
+            next_id: 1,
+            epoch: Epoch { id: 1, started_at: now_s(), ..Default::default() },
+            epoch_losses: IterableMap::new(StorageKey::EpochLosses),
+        }
+    }
+
+    // Admin. Market listing moves to `ve` in stage 4; until then the owner lists markets.
+
+    pub fn add_market(&mut self, market_id: String, feed_id: String, max_leverage: u32) {
+        self.assert_owner();
+        require!(!self.markets.contains_key(&market_id), "Market exists");
+        require!(
+            (1..=self.params.leverage_hard_limit).contains(&max_leverage),
+            "Leverage above hard limit"
+        );
+        self.markets.insert(
+            market_id.clone(),
+            Market {
+                id: market_id,
+                feed_id,
+                max_leverage,
+                live: true,
+                long_liability: U128(0),
+                short_liability: U128(0),
+                capacity_ppm: U128(math::PPM),
+            },
+        );
+    }
+
+    pub fn set_market_live(&mut self, market_id: String, live: bool) {
+        self.assert_owner();
+        self.market_mut(&market_id).live = live;
+    }
+
+    pub fn set_capacity(&mut self, market_id: String, capacity_ppm: U128) {
+        self.assert_owner();
+        require!(capacity_ppm.0 <= math::PPM, "Capacity above 100%");
+        self.market_mut(&market_id).capacity_ppm = capacity_ppm;
+    }
+
+    pub fn set_oracle(&mut self, oracle: AccountId) {
+        self.assert_owner();
+        self.oracle = oracle;
+    }
+
+    pub fn set_params(&mut self, params: Params) {
+        self.assert_owner();
+        require!(params.solvency_both_sides == self.params.solvency_both_sides || self.positions.is_empty(),
+            "Change the solvency rule only with no open positions");
+        self.params = params;
+    }
+}
+
+impl House {
+    fn assert_owner(&self) {
+        require!(env::predecessor_account_id() == self.owner, "Only the owner");
+    }
+
+    pub(crate) fn market(&self, id: &str) -> &Market {
+        self.markets.get(id).unwrap_or_else(|| env::panic_str("No such market"))
+    }
+
+    pub(crate) fn market_mut(&mut self, id: &str) -> &mut Market {
+        self.markets.get_mut(id).unwrap_or_else(|| env::panic_str("No such market"))
+    }
+
+    pub(crate) fn market_liability(&self, m: &Market) -> u128 {
+        math::market_liability(m.long_liability.0, m.short_liability.0, self.params.solvency_both_sides)
+    }
+
+    pub(crate) fn balance(&self, account: &AccountId) -> u128 {
+        self.balances.get(account).copied().unwrap_or(0)
+    }
+
+    pub(crate) fn credit(&mut self, account: &AccountId, amount: u128) {
+        if amount > 0 {
+            let b = self.balance(account);
+            self.balances.insert(account.clone(), b + amount);
+        }
+    }
+
+    pub(crate) fn debit(&mut self, account: &AccountId, amount: u128) {
+        let b = self.balance(account);
+        require!(b >= amount, "Not enough free balance");
+        self.balances.insert(account.clone(), b - amount);
+    }
+
+    /// Adds or removes a position's max liability. Additions are checked against the solvency rule
+    /// and the market's capacity; removals never are (closes are never refused).
+    pub(crate) fn change_liability(&mut self, market_id: &str, side: Side, amount: u128, add: bool) {
+        let both = self.params.solvency_both_sides;
+        let pool = self.pool;
+        let m = self.markets.get_mut(market_id).unwrap_or_else(|| env::panic_str("No such market"));
+        let before = math::market_liability(m.long_liability.0, m.short_liability.0, both);
+        let slot = match side {
+            Side::Long => &mut m.long_liability,
+            Side::Short => &mut m.short_liability,
+        };
+        slot.0 = if add { slot.0 + amount } else { slot.0 - amount };
+        let after = math::market_liability(m.long_liability.0, m.short_liability.0, both);
+        let capacity = math::capacity(m.capacity_ppm.0, pool);
+        self.liability = self.liability - before + after;
+        if add && after > before {
+            require!(self.liability <= pool, "Pool can't cover this trade");
+            require!(after <= capacity, "Market capacity reached");
+        }
+    }
+
+    pub(crate) fn take_id(&mut self) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        id
+    }
+}
