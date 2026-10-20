@@ -33,8 +33,9 @@ impl House {
             match parsed {
                 DepositMsg::Seed {} => {
                     require!(sender_id == self.owner, "Only the owner seeds the pool");
-                    // The seed's Extra Life (1.0× cap) is minted in stage 2.
                     self.pool += amount.0;
+                    // The seed provider's Extra Life: 1.0× cap, so the seed is paid back like any claim.
+                    self.mint_lives(0, vec![(sender_id.clone(), amount.0, math::PPM)], false).detach();
                     Event::Seed { amount, pool: U128(self.pool) }.emit();
                 }
             }

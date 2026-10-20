@@ -5,3 +5,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc a32a9bae46074eca3383e683ea160c1fbf7b815caba3b08305c6fe42d8556d7b # shrinks to ops = [Open { who: 0, long: false, margin: 1000000, lev: 1 }]
+cc 8c8ef4362951d69ef827ed4b048bb301d25ad2fefead40442df1760662149a55 # shrinks to ops = [Open { who: 0, long: true, margin: 196000000, lev: 65 }, Open { who: 0, long: false, margin: 1000000, lev: 7 }, Keeper { pick: 0 }, Move { bps: 1400 }, Keeper { pick: 0 }, Keeper { pick: 0 }, CloseEpoch]

@@ -72,17 +72,18 @@ Built with the recommended defaults for D-1 … D-9 (switchable: `Params.solvenc
 
 Run: `cd contracts && cargo test -p oneup-math -p oneup-house` · `./build.sh && cargo test -p oneup-integration`
 
-### Stage 2 — Epochs + Extra Lives (3–5 Nov)
+### Stage 2 — Epochs + Extra Lives · ✅ done, gate passed
 
-- [ ] Epoch close (permissionless after epoch end): house net result, losers' share, reserve, surplus
-- [ ] Mint one Extra Life per losing wallet per epoch, face value pro rata to losses; cap 2.0× → 1.2× at $1M
-- [ ] Surplus payout ≤ 50%: 60% Extra Lives (pro rata to owed), 30% buyback bucket, 10% pool; 60% rolls to
-      buybacks when nothing is owed
-- [ ] Claim; Full Heal state at cap; NEP-171 transfer keeps claim with the token
-- [ ] Seed Extra Life (1.0× cap) minted to the seed provider
-- [ ] Tests against `docs/maths.md` vectors
-
-**Gate 2:** a scripted multi-epoch scenario settles exactly to the maths vectors.
+- [x] `close_epoch(limit)`: permissionless, resumable (begun → minting → waiting for mints → closed);
+      trading never pauses
+- [x] One Extra Life per losing wallet per epoch, face pro rata to losses, cap 2.0× → 1.2× at $1M
+- [x] Payout ≤ 50% of surplus above the reserve: 60% Extra Lives (capped at what's owed, rest to
+      buybacks), 30% buyback USDC (held for stage 4), 10% stays
+- [x] `extra-life` contract: NEP-171 + metadata + enumeration + approvals; token id `<epoch>:<owner>`;
+      O(1) pro-rata payout via a product accumulator with rescaling; claim; unclaimed USDC moves with the token
+- [x] Seed Extra Life (1.0× cap) minted on seed
+- [x] Tests: 12 extra-life (incl. never-overpays property), 22 house (hand-worked epoch, house-loses
+      epoch, epoch closes inside the random-sequence property test); sandbox `lose_close_epoch_claim`
 
 ### Stage 3 — $1UP, ve, bribes (5–7 Nov)
 

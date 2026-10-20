@@ -6,6 +6,7 @@ use near_sdk::store::{IterableMap, LookupMap};
 use near_sdk::{env, near, require, AccountId, BorshStorageKey, PanicOnDefault};
 use oneup_math as math;
 
+mod epochs;
 mod events;
 mod oracle;
 mod trading;
@@ -14,6 +15,7 @@ mod views;
 #[cfg(test)]
 mod tests;
 
+pub use epochs::{Closing, EpochSummary};
 pub use events::Event;
 pub use oracle::OraclePrice;
 
@@ -134,7 +136,8 @@ enum StorageKey {
     Markets,
     Orders,
     Positions,
-    EpochLosses,
+    EpochLosses { epoch: u64 },
+    Epochs,
 }
 
 #[near(contract_state)]
@@ -156,6 +159,16 @@ pub struct House {
     epoch: Epoch,
     /// Each wallet's losses in the current epoch: its pending Extra Life.
     epoch_losses: IterableMap<AccountId, u128>,
+    /// The Extra Life NFT contract.
+    life: Option<AccountId>,
+    /// Σ still owed to Extra Lives (mirrors the life contract's total).
+    lives_owed: u128,
+    /// USDC sent to the life contract as epoch pots.
+    lives_paid: u128,
+    /// Buyback USDC set aside from surplus, waiting to be swapped for $1UP (stage 4).
+    buyback_usdc: u128,
+    closing: Option<Closing>,
+    epochs: LookupMap<u64, EpochSummary>,
 }
 
 pub(crate) fn now_s() -> u64 {
@@ -179,7 +192,13 @@ impl House {
             positions: IterableMap::new(StorageKey::Positions),
             next_id: 1,
             epoch: Epoch { id: 1, started_at: now_s(), ..Default::default() },
-            epoch_losses: IterableMap::new(StorageKey::EpochLosses),
+            epoch_losses: IterableMap::new(StorageKey::EpochLosses { epoch: 1 }),
+            life: None,
+            lives_owed: 0,
+            lives_paid: 0,
+            buyback_usdc: 0,
+            closing: None,
+            epochs: LookupMap::new(StorageKey::Epochs),
         }
     }
 
@@ -215,6 +234,11 @@ impl House {
         self.assert_owner();
         require!(capacity_ppm.0 <= math::PPM, "Capacity above 100%");
         self.market_mut(&market_id).capacity_ppm = capacity_ppm;
+    }
+
+    pub fn set_life(&mut self, life: AccountId) {
+        self.assert_owner();
+        self.life = Some(life);
     }
 
     pub fn set_oracle(&mut self, oracle: AccountId) {

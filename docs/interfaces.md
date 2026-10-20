@@ -6,7 +6,7 @@ Four contracts plus two mocks, all near-sdk Rust. Amounts are `U128` strings in 
 | Contract | Testnet account | Holds |
 |---|---|---|
 | `house` | `house.oneup.testnet` | pool + trader USDC, positions, epochs, 900M $1UP for emissions |
-| `extra-life` | `life.oneup.testnet` | Extra Life NFTs + USDC paid to them, until claimed |
+| `extra-life` (`oneup-extra-life`) | `life.oneup.testnet` | Extra Life NFTs + USDC paid to them, until claimed |
 | `oneup-token` | `token.oneup.testnet` | $1UP ledger |
 | `ve` | `ve.oneup.testnet` | locked $1UP, veNFTs, votes, bribes, buyback $1UP for voters, listing bonds |
 | `mock-usdc` | `usdc.oneup.testnet` | demo collateral with a faucet (D-8) |
@@ -41,8 +41,7 @@ anyone ──ft_transfer_call──▶ usdc/any FT ──▶ ve                 
 | `expire(order_id)` | anyone | after `FILL_WINDOW` with no valid price; refunds margin |
 | `liquidate(position_id)` | anyone | latest price; pnl ≤ −0.9M → margin to pool |
 | `take_profit(position_id)` | anyone | latest price; pnl at cap → close |
-| `close_epoch_begin()` | anyone | after epoch end; freezes epoch `e`, starts `e+1`; trading never pauses |
-| `close_epoch_step(limit)` | anyone | resumable state machine over losers and markets, `limit` items per call (gas): mint Extra Lives → pay Extra Life pot → buybacks → record emission totals |
+| `close_epoch(limit)` | anyone | resumable: first call freezes epoch `e` and starts `e+1` ("begun"); then mints Extra Lives `limit` per call ("minting"), waits for mints to land ("waiting for mints"), pays the pot and sets aside buyback USDC ("closed") |
 | `set_vote_shares(epoch, shares)` | `ve` only | capacity + emission shares in force for `epoch` |
 | `add_market(market_id, feed_id, max_leverage)` | `ve` only (listing), or owner before launch | |
 | `claim_emissions(epochs)` | trader | $1UP earned as winner (by cut) and loser (by face) per maths §8 |
@@ -81,7 +80,7 @@ Heals.
 
 | Method | Caller | Does |
 |---|---|---|
-| `mint_batch(epoch, items: [{owner, face, cap, owed}])` | `house` | one token per loser; `ACC_at_mint` = current ACC, so the same epoch's pot pays them (D-4) |
+| `mint_batch(epoch, items: [{owner, face, cap_ppm}])` | `house` | one token per loser; `ACC_at_mint` = current ACC, so the same epoch's pot pays them (D-4) |
 | `ft_on_transfer(sender_id, amount, msg)` | USDC, sender `house` | `{"epoch_pot":{"epoch":e}}` → applies `r_e` |
 | `claim(token_ids)` | token owner | sends claimable USDC |
 | `nft_transfer…` | standard | unclaimed USDC moves with the token |

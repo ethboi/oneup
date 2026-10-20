@@ -33,8 +33,10 @@ fn ctx(predecessor: &str, t: u64) {
 fn setup(seed: u128) -> House {
     ctx("owner", T0);
     near_sdk::mock::with_mocked_blockchain(|b| drop(b.take_storage()));
-    let mut h = House::new(acc("owner"), acc("usdc"), acc("oracle"), None);
+    let params = crate::Params { epoch_length_s: 600, ..Default::default() };
+    let mut h = House::new(acc("owner"), acc("usdc"), acc("oracle"), Some(params));
     h.add_market(MARKET.into(), "feed".into(), 100);
+    h.set_life(acc("life"));
     ctx("usdc", T0);
     let _ = h.ft_on_transfer(acc("owner"), U128(seed), r#"{"seed":{}}"#.into());
     h
@@ -282,6 +284,103 @@ fn d1_spec_rule_can_go_bust() {
     h.internal_keeper_close(short, CloseReason::TakeProfit, px(12, T0 + 30), T0 + 30).unwrap();
 }
 
+/// Runs `close_epoch` to the end, landing each mint batch as the life contract would.
+fn close_epoch_fully(h: &mut House) -> u32 {
+    let mut steps = 0;
+    loop {
+        steps += 1;
+        match h.close_epoch(Some(2)).as_str() {
+            "closed" => return steps,
+            "waiting for mints" => {
+                for _ in 0..h.get_closing().unwrap().pending_mints {
+                    let _ = h.on_minted(U128(0), true, Ok(vec![]));
+                }
+            }
+            _ => {}
+        }
+        assert!(steps < 100);
+    }
+}
+
+#[test]
+#[should_panic(expected = "Epoch not over yet")]
+fn epoch_runs_its_length() {
+    let mut h = setup(usd(25_000));
+    ctx("keeper", T0 + 599);
+    h.close_epoch(None);
+}
+
+/// Three traders in one epoch, then the close. Numbers worked by hand in the comments.
+#[test]
+fn epoch_close_mints_and_pays() {
+    let mut h = setup(usd(25_000));
+    assert_eq!(h.lives_owed, usd(25_000)); // the seed's Extra Life, 1.0×
+    for w in ["alice", "bob", "carol"] {
+        deposit(&mut h, w, usd(1_000));
+    }
+    // Alice wins 200 at 10x; cut 25% (9K of a 25K pool is past the cap) → pool pays 150
+    let a = open(&mut h, "alice", Side::Long, usd(1_000), 10, 500, T0);
+    close(&mut h, "alice", a, 510, T0 + 100);
+    // Bob is liquidated: 1_000
+    let b = open(&mut h, "bob", Side::Long, usd(1_000), 50, 500, T0 + 200);
+    h.internal_keeper_close(b, CloseReason::Liquidation, px(491, T0 + 210), T0 + 210).unwrap();
+    // Carol closes a short at −500
+    let c = open(&mut h, "carol", Side::Short, usd(1_000), 10, 500, T0 + 300);
+    close(&mut h, "carol", c, 525, T0 + 400);
+    assert_eq!(h.get_pool().0, usd(26_350));
+    // a loss in the next epoch doesn't count toward this one
+    ctx("keeper", T0 + 600);
+    assert_eq!(h.close_epoch(Some(1)), "begun");
+    assert_eq!(h.get_epoch().id, 2);
+    assert_eq!(h.get_pending_life(acc("bob")).0, 0);
+
+    let v = h.get_closing().unwrap();
+    assert_eq!(v.house_net.0, usd(1_350)); // 1_500 lost − 150 paid
+    assert_eq!(v.cap_ppm.0, 1_978_920); // 2.0 − 0.8 × 26_350 / 1M
+    assert_eq!(v.losers_left, 2);
+
+    assert_eq!(h.close_epoch(Some(1)), "minting");
+    assert_eq!(h.close_epoch(Some(1)), "minting");
+    assert_eq!(h.close_epoch(Some(1)), "waiting for mints");
+    // faces 900 (Bob) and 450 (Carol) at 1.97892×
+    assert_eq!(h.lives_owed, usd(25_000) + 1_781_028_000 + 890_514_000);
+    let _ = h.on_minted(U128(0), true, Ok(vec![]));
+    let _ = h.on_minted(U128(0), true, Ok(vec![]));
+
+    assert_eq!(h.close_epoch(None), "closed");
+    let s = h.get_epoch_summary(1).unwrap();
+    // surplus 1_350 above the 25K reserve; pay half: 405 to lives, 202.5 to buybacks
+    assert_eq!(s.surplus.0, usd(1_350));
+    assert_eq!(s.lives_pot.0, usd(405));
+    assert_eq!(s.buyback_pot.0, 202_500_000);
+    assert_eq!(s.lives_minted, 2);
+    assert_eq!(h.get_pool().0, 25_742_500_000);
+    assert!(h.get_closing().is_none());
+}
+
+#[test]
+fn no_lives_when_the_house_loses() {
+    let mut h = setup(usd(25_000));
+    deposit(&mut h, "alice", usd(1_000));
+    deposit(&mut h, "bob", usd(100));
+    let a = open(&mut h, "alice", Side::Long, usd(1_000), 10, 500, T0);
+    close(&mut h, "alice", a, 520, T0 + 100); // +400, cut 100 → pool pays 300
+    let b = open(&mut h, "bob", Side::Short, usd(100), 10, 500, T0 + 200);
+    close(&mut h, "bob", b, 510, T0 + 300); // −20
+    ctx("keeper", T0 + 600);
+    close_epoch_fully(&mut h);
+    let s = h.get_epoch_summary(1).unwrap();
+    assert_eq!((s.house_net.0, s.lives_minted, s.lives_pot.0), (0, 0, 0));
+}
+
+#[test]
+fn failed_mint_is_not_owed() {
+    let mut h = setup(usd(25_000));
+    let before = h.lives_owed;
+    let _ = h.on_minted(U128(usd(500)), false, Err(near_sdk::PromiseError::Failed));
+    assert_eq!(h.lives_owed, before - usd(500));
+}
+
 mod invariants {
     use super::*;
     use proptest::prelude::*;
@@ -293,6 +392,7 @@ mod invariants {
         Close { pick: usize },
         Keeper { pick: usize },
         Expire { pick: usize },
+        CloseEpoch,
     }
 
     fn op() -> impl Strategy<Value = Op> {
@@ -303,6 +403,7 @@ mod invariants {
             (0..16usize).prop_map(|pick| Op::Close { pick }),
             (0..16usize).prop_map(|pick| Op::Keeper { pick }),
             (0..16usize).prop_map(|pick| Op::Expire { pick }),
+            Just(Op::CloseEpoch),
         ]
     }
 
@@ -319,7 +420,7 @@ mod invariants {
             })
             .sum();
         let positions: u128 = h.positions.values().map(|p| p.margin.0).sum();
-        h.pool + balances + orders + positions
+        h.pool + balances + orders + positions + h.buyback_usdc + h.lives_paid
     }
 
     proptest! {
@@ -369,6 +470,11 @@ mod invariants {
                             let _ = h.internal_keeper_close(*id, CloseReason::TakeProfit, px(cents, t), t);
                         }
                     }
+                    Op::CloseEpoch => {
+                        t += 600;
+                        ctx("keeper", t);
+                        close_epoch_fully(&mut h);
+                    }
                     Op::Expire { pick } => {
                         let os: Vec<_> = h.orders.values().cloned().collect();
                         if let Some(o) = os.get(pick % os.len().max(1)) {
@@ -378,6 +484,7 @@ mod invariants {
                 }
                 prop_assert_eq!(total_held(&h), total);
                 prop_assert!(h.liability <= h.pool, "liability {} > pool {}", h.liability, h.pool);
+                prop_assert!(h.pool >= oneup_math::reserve(h.liability).min(h.pool));
                 let sum: u128 = h.markets.values().map(|m| h.market_liability(m)).sum();
                 prop_assert_eq!(sum, h.liability);
             }

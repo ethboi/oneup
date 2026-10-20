@@ -1,7 +1,7 @@
 use near_sdk::json_types::U128;
 use near_sdk::{near, AccountId};
 
-use crate::Side;
+use crate::{EpochSummary, Side};
 
 /// NEP-297 events, `standard: "oneup"`. The indexer (api/) builds history from these.
 #[near(event_json(standard = "oneup"))]
@@ -40,6 +40,8 @@ pub enum Event {
         payout: U128,
         pool: U128,
     },
+    #[event_version("1.0.0")]
+    EpochClosed { summary: EpochSummary },
 }
 
 #[near(serializers = [json])]
