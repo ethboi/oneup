@@ -135,10 +135,15 @@ Run: `cd contracts && cargo test -p oneup-math -p oneup-house` · `./build.sh &&
       pair, validated), epoch history table
 - [ ] Demo polish pass once bots and the simulation exist
 
-### Stage 7 — Simulation (9–11 Nov)
+### Stage 7 — Simulation + bots
 
-- [ ] `sim`: agent-based run with shared maths; early vs late traders, OneUp vs Papertrade-style rules
-- [ ] Charts exported for the app and README; sim also used to sanity-check parameters
+- [x] `bots/`: 6 rule-based agents (degen, trend, fader, whale, scalper, voter) trading on localnet,
+      topping up, claiming Extra Lives / emissions / voter rewards, locking and voting (`pnpm bots`)
+- [x] `sim/`: OneUp vs Papertrade-style (parameters from Papertrade's docs) on the same seeded flows;
+      recovery per $1 lost by cohort over equal windows, late-period payout capture (`pnpm sim`)
+- [ ] Finding D-13: as written, late losers recover less; lives expiring after 13–26 epochs fixes it.
+      Decide, then update contracts + the demo's "fair to late players" scene
+- [ ] Simulation chart in the app and README
 
 ### Stage 8 — Intents, testnet, bots (10–12 Nov)
 

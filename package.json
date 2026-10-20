@@ -11,7 +11,9 @@
     "test": "pnpm -r test",
     "typecheck": "tsc -b",
     "smoke": "tsx scripts/smoke.ts",
-    "keeper": "pnpm --filter @oneup/keeper start"
+    "keeper": "pnpm --filter @oneup/keeper start",
+    "bots": "pnpm --filter @oneup/bots start",
+    "sim": "pnpm --filter @oneup/sim start"
   },
   "devDependencies": {
     "@types/node": "24.19.1",

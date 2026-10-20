@@ -1,6 +1,7 @@
 packages:
   - packages/*
   - keeper
+  - bots
   - api
   - app
   - sim

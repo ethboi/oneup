@@ -92,6 +92,28 @@ $25K. With the 1M local seed (needed for D-1 capacity), 975K of seed money count
 live epoch paid 292K to Extra Lives and 146K into $1UP buybacks from a 500 house profit. Now the floor is
 the total seeded, so the seed is only ever repaid from profit. Same result as the spec at a $25K seed.
 
+## D-13 · Extra Lives should expire · **Open (recommend 13–26 epochs)**
+
+`pnpm sim` (OneUp vs Papertrade-style on the same flows, 20 seeds, each loss followed for 52 weeks):
+
+| USDC back within a year per $1 lost | Q1 | Q2 | Q3 | Q4 |
+|---|---|---|---|---|
+| OneUp, spec as written | 24.0¢ | 13.3¢ | 8.7¢ | 7.0¢ |
+| Papertrade-style | 13.0¢ | 17.3¢ | 10.7¢ | 7.8¢ |
+| OneUp, lives expire after 26 epochs | 17.2¢ | 11.6¢ | 9.8¢ | 10.7¢ |
+| OneUp, lives expire after 13 epochs | 13.0¢ | 10.3¢ | 9.3¢ | 10.2¢ |
+
+As written, OneUp is *less* fair to late losers than Papertrade-style, even at flat volume (16.4¢ → 4.9¢).
+Cause: each profitable epoch mints claims worth 1.2–2.0× its profit, but only ~30% of surplus is paid to
+lives, so unpaid claims pile up without bound and every new life shares the pot with the backlog: a payout
+queue for losers. Expiring lives after N epochs bounds the backlog; at 13 epochs recovery is nearly flat and
+late losers get ~10¢ instead of 7¢. What OneUp does win on: year-1 losers take 6.6% of year-3 payouts vs
+12.0% under Papertrade-style (they were 8.5% of losses).
+
+Also worth knowing for the pitch: with Papertrade's real parameters (flat 100 PAPER/$ below $2M LP, LP
+capped at $5M) the first 10% of losses hold ~10.5% of PAPER, so its early-holder problem is milder than the
+pitch implies. Its weak point in this model is the perpetual claim, not the mint rate.
+
 ## D-11 · Known POC limits · **Noted**
 
 - Rewards for a (market, epoch) with no voters stay in `ve` (no sweep yet).
