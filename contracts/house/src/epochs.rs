@@ -229,6 +229,9 @@ impl House {
         let p = math::epoch_payout(self.pool, self.liability, self.lives_owed);
         self.pool -= p.lives_pot + p.buyback_pot;
         self.buyback_usdc += p.buyback_pot;
+        if p.buyback_pot > 0 {
+            self.record_buyback(&c.epoch, p.buyback_pot);
+        }
         if p.lives_pot > 0 {
             self.lives_owed -= p.lives_pot;
             self.lives_paid += p.lives_pot;

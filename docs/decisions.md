@@ -79,6 +79,20 @@ Rhea's testnet exchange (`ref-finance-101.testnet`) exists but looks unmaintaine
 Build the swap against a small `mock-swap` (fixed or simple x·y=k pool) behind the same call shape;
 try the real Rhea testnet contract only if time allows.
 
+## D-10 · Buybacks are triggered by the owner · **Decided for the POC**
+
+`house.buyback(epoch, min_out)` is owner-only: `min_out` is the worst price accepted, and a
+permissionless call would let anyone pass 0 and sandwich the swap. The keeper runs it with the owner key
+and a quote minus slippage. Mainnet option: a TWAP check against the pool before swapping, then open it up.
+
+## D-11 · Known POC limits · **Noted**
+
+- Rewards for a (market, epoch) with no voters stay in `ve` (no sweep yet).
+- `mock-swap` updates reserves before its payout lands; a failed payout isn't rolled back.
+- ve vote sums use `amount × ppm × end epoch`; fine for weekly epochs, revisit before running 10-minute
+  epochs for years.
+- House storage is paid by the contract (min margin 1 USDC bounds spam); no per-user storage deposits.
+
 ## Research (20 Oct 2026)
 
 - **R-1 · Code before 1 Nov?** No explicit rule. The site says "Build your project during the hackathon".

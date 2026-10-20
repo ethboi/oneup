@@ -6,6 +6,7 @@ use near_sdk::store::{IterableMap, LookupMap};
 use near_sdk::{env, near, require, AccountId, BorshStorageKey, PanicOnDefault};
 use oneup_math as math;
 
+mod buyback;
 mod emissions;
 mod epochs;
 mod events;
@@ -16,6 +17,7 @@ mod views;
 #[cfg(test)]
 mod tests;
 
+pub use buyback::{Buyback, BuybackStatus};
 pub use emissions::{Activity, EpochEmissions, MarketEmission};
 pub use epochs::{Closing, EpochSummary};
 pub use events::Event;
@@ -154,6 +156,7 @@ enum StorageKey {
     Activity,
     Emissions,
     OneupOwed,
+    Buybacks,
 }
 
 #[near(contract_state)]
@@ -197,6 +200,9 @@ pub struct House {
     oneup_owed: LookupMap<AccountId, u128>,
     /// Emissions nobody could earn (a market with no winners and no Extra Lives).
     treasury_oneup: u128,
+    /// USDC → $1UP swap (Rhea on mainnet, `mock-swap` on testnet).
+    swap: Option<AccountId>,
+    buybacks: LookupMap<u64, Buyback>,
 }
 
 pub(crate) fn now_s() -> u64 {
@@ -234,13 +240,17 @@ impl House {
             emissions: LookupMap::new(StorageKey::Emissions),
             oneup_owed: LookupMap::new(StorageKey::OneupOwed),
             treasury_oneup: 0,
+            swap: None,
+            buybacks: LookupMap::new(StorageKey::Buybacks),
         }
     }
 
     // Admin. Market listing moves to `ve` in stage 4; until then the owner lists markets.
 
+    /// Owner, or `ve` when a proposed market reaches 2% of votes.
     pub fn add_market(&mut self, market_id: String, feed_id: String, max_leverage: u32) {
-        self.assert_owner();
+        let caller = env::predecessor_account_id();
+        require!(caller == self.owner || Some(caller) == self.ve, "Only the owner or ve");
         require!(!self.markets.contains_key(&market_id), "Market exists");
         require!(
             (1..=self.params.leverage_hard_limit).contains(&max_leverage),
@@ -280,6 +290,11 @@ impl House {
         self.assert_owner();
         self.oneup = Some(oneup);
         self.ve = Some(ve);
+    }
+
+    pub fn set_swap(&mut self, swap: AccountId) {
+        self.assert_owner();
+        self.swap = Some(swap);
     }
 
     pub fn set_oracle(&mut self, oracle: AccountId) {

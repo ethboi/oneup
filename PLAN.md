@@ -98,12 +98,17 @@ Run: `cd contracts && cargo test -p oneup-math -p oneup-house` · `./build.sh &&
 - [x] Tests: 13 ve (incl. tally = direct-sum property), 3 new house, 2 token; sandbox
       `trade_vote_emissions_capacity` (vote → capacity, emissions claimed in $1UP)
 
-### Stage 4 — Buybacks + listing (7–8 Nov)
+### Stage 4 — Buybacks + listing · ✅ contracts done; testnet deploy pending
 
-- [ ] Buyback swap USDC → $1UP on Rhea (testnet pool seeded); fallback: mock swap at a fixed price
-- [ ] Market proposal with $500 bond; live at ≥ 2% votes; bond to treasury after 4 epochs with no votes
-
-**Gate 4:** contracts feature-complete; deploy all to testnet (target 8 Nov, hard stop 11 Nov).
+- [x] `mock-swap` (x·y=k, 0.3% fee) standing in for Rhea; pays out with `ft_transfer_call`
+- [x] House buyback: per-epoch USDC + market weights (positive house profit, else vote shares) →
+      `buyback(epoch, min_out)` (owner, D-10) → proceeds forwarded to `ve` for that epoch's voters
+- [x] Listing in `ve`: 500 USDC bond; listed at ≥ 2% of votes (house `add_market`, then shares, in
+      order), bond refunded; 4 idle checkpoints → bond to treasury
+- [x] 256-bit `mul_div` in `oneup-math` for every pro-rata split (the sandbox caught a u128 overflow
+      in ve reward claims)
+- [x] Sandbox `listing_and_buyback_to_voters`: propose → vote → listed; loss → buyback → swap → voter claims
+- [ ] Deploy all to testnet (needs testnet accounts; see open items)
 
 ### Stage 5 — SDK, keeper, API (5–9 Nov, parallel with 3–4)
 

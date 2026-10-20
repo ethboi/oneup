@@ -16,7 +16,7 @@ fn ctx(predecessor: &str) {
 fn setup() -> Ve {
     ctx("owner");
     near_sdk::mock::with_mocked_blockchain(|b| drop(b.take_storage()));
-    Ve::new(acc("owner"), acc("house"), acc("oneup"))
+    Ve::new(acc("owner"), acc("house"), acc("oneup"), acc("usdc"), acc("treasury"))
 }
 
 fn send(v: &mut Ve, token: &str, sender: &str, amount: u128, msg: &str) -> u128 {
@@ -161,4 +161,54 @@ fn only_owner_votes() {
     let mut v = setup();
     let a = lock(&mut v, "alice", 100, 2);
     vote(&mut v, "bob", &a, &[("NEAR", PPM)]);
+}
+
+const BOND: u128 = 500_000_000;
+
+#[test]
+fn proposal_lists_at_two_percent() {
+    let mut v = setup();
+    send(&mut v, "usdc", "project", BOND, r#"{"propose":{"market_id":"MEME-USD","feed_id":"meme"}}"#);
+    let a = lock(&mut v, "alice", 9_800, 52);
+    let b = lock(&mut v, "bob", 200, 52);
+    vote(&mut v, "alice", &a, &[("NEAR-USD", PPM)]);
+    vote(&mut v, "bob", &b, &[("MEME-USD", PPM)]);
+    checkpoint(&mut v, 2); // MEME has exactly 2%
+    assert!(v.get_proposals().is_empty());
+}
+
+#[test]
+fn idle_proposal_is_dropped_after_four_epochs() {
+    let mut v = setup();
+    send(&mut v, "usdc", "project", BOND, r#"{"propose":{"market_id":"MEME-USD","feed_id":"meme"}}"#);
+    let a = lock(&mut v, "alice", 1_000, 52);
+    vote(&mut v, "alice", &a, &[("NEAR-USD", PPM)]);
+    for e in 2..=4 {
+        checkpoint(&mut v, e);
+        assert_eq!(v.get_proposals()[0].idle, (e - 1) as u32);
+    }
+    checkpoint(&mut v, 5);
+    assert!(v.get_proposals().is_empty());
+}
+
+#[test]
+fn small_support_keeps_waiting() {
+    let mut v = setup();
+    send(&mut v, "usdc", "project", BOND, r#"{"propose":{"market_id":"MEME-USD","feed_id":"meme"}}"#);
+    let a = lock(&mut v, "alice", 9_900, 52);
+    let b = lock(&mut v, "bob", 100, 52);
+    vote(&mut v, "alice", &a, &[("NEAR-USD", PPM)]);
+    vote(&mut v, "bob", &b, &[("MEME-USD", PPM)]);
+    for e in 2..=7 {
+        checkpoint(&mut v, e);
+    }
+    let p = &v.get_proposals()[0];
+    assert_eq!(p.idle, 0); // 1% isn't enough to list, but it isn't idle either
+}
+
+#[test]
+#[should_panic(expected = "The bond is 500 USDC")]
+fn bond_is_exact() {
+    let mut v = setup();
+    send(&mut v, "usdc", "project", BOND - 1, r#"{"propose":{"market_id":"MEME-USD","feed_id":"meme"}}"#);
 }

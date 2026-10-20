@@ -21,6 +21,7 @@ pub struct Env {
     pub house: Contract,
     pub oneup: Contract,
     pub ve: Contract,
+    pub swap: Contract,
     pub owner: Account,
     pub keeper: Account,
 }
@@ -39,6 +40,7 @@ pub async fn setup(epoch_length_s: u64) -> anyhow::Result<Env> {
     let house = worker.dev_deploy(&wasm("oneup_house")).await?;
     let oneup = worker.dev_deploy(&wasm("oneup_token")).await?;
     let ve = worker.dev_deploy(&wasm("oneup_ve")).await?;
+    let swap = worker.dev_deploy(&wasm("mock_swap")).await?;
 
     usdc.call("new").args_json(json!({"owner": owner.id()})).transact().await?.into_result()?;
     oracle.call("new").args_json(json!({"owner": owner.id(), "pusher": keeper.id()})).transact().await?.into_result()?;
@@ -67,7 +69,7 @@ pub async fn setup(epoch_length_s: u64) -> anyhow::Result<Env> {
         .await?
         .into_result()?;
     ve.call("new")
-        .args_json(json!({"owner": owner.id(), "house": house.id(), "oneup": oneup.id()}))
+        .args_json(json!({"owner": owner.id(), "house": house.id(), "oneup": oneup.id(), "usdc": usdc.id(), "treasury": owner.id()}))
         .transact()
         .await?
         .into_result()?;
@@ -78,6 +80,13 @@ pub async fn setup(epoch_length_s: u64) -> anyhow::Result<Env> {
         .await?
         .into_result()?;
     register(&owner, &oneup, ve.id().as_str()).await?;
+    swap.call("new")
+        .args_json(json!({"owner": owner.id(), "usdc": usdc.id(), "oneup": oneup.id()}))
+        .transact()
+        .await?
+        .into_result()?;
+    register(&owner, &oneup, swap.id().as_str()).await?;
+    owner.call(house.id(), "set_swap").args_json(json!({"swap": swap.id()})).transact().await?.into_result()?;
     owner
         .call(house.id(), "add_market")
         .args_json(json!({"market_id": "NEAR-USD", "feed_id": FEED, "max_leverage": 100}))
@@ -86,7 +95,7 @@ pub async fn setup(epoch_length_s: u64) -> anyhow::Result<Env> {
         .into_result()?;
 
     // register the contracts on USDC, then seed the pool with 100K
-    for id in [house.id(), life.id()] {
+    for id in [house.id(), life.id(), ve.id(), swap.id()] {
         owner.call(usdc.id(), "mint").args_json(json!({"receiver_id": id, "amount": "0"})).transact().await?.into_result()?;
     }
     owner.call(usdc.id(), "mint").args_json(json!({"receiver_id": owner.id(), "amount": usd(100_000)})).transact().await?.into_result()?;
@@ -99,7 +108,7 @@ pub async fn setup(epoch_length_s: u64) -> anyhow::Result<Env> {
         .await?
         .into_result()?;
 
-    Ok(Env { worker, usdc, oracle, life, house, oneup, ve, owner, keeper })
+    Ok(Env { worker, usdc, oracle, life, house, oneup, ve, swap, owner, keeper })
 }
 
 pub async fn push(e: &Env, cents: i64, publish_time: u64) -> anyhow::Result<()> {
@@ -171,4 +180,26 @@ pub async fn close_epoch(e: &Env) -> anyhow::Result<Vec<String>> {
             return Ok(steps);
         }
     }
+}
+
+/// `ft_transfer_call` from `from`, attaching 1 yocto and max gas.
+pub async fn transfer_call(from: &Account, token: &Contract, to: &str, amount: String, msg: &str) -> anyhow::Result<()> {
+    from.call(token.id(), "ft_transfer_call")
+        .args_json(json!({"receiver_id": to, "amount": amount, "msg": msg}))
+        .deposit(NearToken::from_yoctonear(1))
+        .max_gas()
+        .transact()
+        .await?
+        .into_result()?;
+    Ok(())
+}
+
+pub async fn transfer(from: &Account, token: &Contract, to: &str, amount: String) -> anyhow::Result<()> {
+    from.call(token.id(), "ft_transfer")
+        .args_json(json!({"receiver_id": to, "amount": amount}))
+        .deposit(NearToken::from_yoctonear(1))
+        .transact()
+        .await?
+        .into_result()?;
+    Ok(())
 }

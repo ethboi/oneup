@@ -25,6 +25,11 @@ pub mod tally;
 use tally::{power, Alloc, Tally};
 
 const MAX_MARKETS_PER_VOTE: usize = 10;
+const LISTING_BOND: u128 = 500 * math::USDC;
+const LISTING_SHARE_PPM: u128 = 20_000;
+const LISTING_MAX_IDLE_EPOCHS: u32 = 4;
+const LISTING_MAX_LEVERAGE: u32 = 100;
+const GAS_ADD_MARKET: Gas = Gas::from_tgas(15);
 const GAS_FT_TRANSFER: Gas = Gas::from_tgas(15);
 const GAS_CALLBACK: Gas = Gas::from_tgas(10);
 const GAS_SET_SHARES: Gas = Gas::from_tgas(30);
@@ -47,6 +52,17 @@ impl Lock {
     }
 }
 
+#[near(serializers = [json, borsh])]
+#[derive(Clone, Debug)]
+pub struct Proposal {
+    pub market_id: String,
+    pub feed_id: String,
+    pub proposer: AccountId,
+    pub created: u64,
+    /// Checkpoints in a row with no votes.
+    pub idle: u32,
+}
+
 #[near(serializers = [json])]
 pub struct LockInfo {
     pub token_id: TokenId,
@@ -66,6 +82,7 @@ enum TransferMsg {
     Lock { epochs: u64 },
     Bribe { market_id: String },
     Buyback { epoch: u64, per_market: Vec<(String, U128)> },
+    Propose { market_id: String, feed_id: String },
 }
 
 #[derive(BorshStorageKey)]
@@ -92,6 +109,7 @@ trait FungibleToken {
 #[ext_contract(ext_house)]
 trait House {
     fn set_vote_shares(&mut self, epoch: u64, shares: Vec<(String, U128)>);
+    fn add_market(&mut self, market_id: String, feed_id: String, max_leverage: u32);
 }
 
 #[near(contract_state)]
@@ -100,6 +118,9 @@ pub struct Ve {
     owner: AccountId,
     house: AccountId,
     oneup: AccountId,
+    usdc: AccountId,
+    treasury: AccountId,
+    proposals: Vec<Proposal>,
     /// The house's current epoch, as of its last checkpoint.
     epoch: u64,
     tally: Tally,
@@ -119,7 +140,7 @@ pub struct Ve {
 #[near]
 impl Ve {
     #[init]
-    pub fn new(owner: AccountId, house: AccountId, oneup: AccountId) -> Self {
+    pub fn new(owner: AccountId, house: AccountId, oneup: AccountId, usdc: AccountId, treasury: AccountId) -> Self {
         Self {
             tokens: NonFungibleToken::new(
                 StorageKey::OwnerById,
@@ -131,6 +152,9 @@ impl Ve {
             owner,
             house,
             oneup,
+            usdc,
+            treasury,
+            proposals: vec![],
             epoch: 1,
             tally: Tally { processed: 1, ..Default::default() },
             locks: LookupMap::new(StorageKey::Locks),
@@ -165,6 +189,12 @@ impl Ve {
                 for (m, a) in per_market {
                     self.add_reward(epoch, m, token.clone(), a.0);
                 }
+            }
+            TransferMsg::Propose { market_id, feed_id } => {
+                require!(token == self.usdc && amount.0 == LISTING_BOND, "The bond is 500 USDC");
+                require!(!market_id.is_empty() && market_id.len() <= 32, "Bad market id");
+                require!(!self.proposals.iter().any(|p| p.market_id == market_id), "Already proposed");
+                self.proposals.push(Proposal { market_id, feed_id, proposer: sender_id, created: self.epoch, idle: 0 });
             }
         }
         PromiseOrValue::Value(U128(0))
@@ -209,8 +239,14 @@ impl Ve {
         } else {
             votes.iter().map(|(m, v)| (m.clone(), U128(v * math::PPM / total))).collect()
         };
+        // Listings first, so the house knows a new market before its share arrives.
+        let listed = self.settle_proposals(&votes, total);
         self.totals.insert(epoch, votes.into_iter().map(|(m, v)| (m, U128(v))).collect());
-        ext_house::ext(self.house.clone()).with_static_gas(GAS_SET_SHARES).set_vote_shares(epoch, shares).detach();
+        let set = ext_house::ext(self.house.clone()).with_static_gas(GAS_SET_SHARES);
+        match listed {
+            Some(adds) => adds.then(set.set_vote_shares(epoch, shares)).detach(),
+            None => set.set_vote_shares(epoch, shares).detach(),
+        }
     }
 
     /// Pays a lock's buybacks and bribes for finished epochs. Late rewards can be claimed later.
@@ -294,6 +330,10 @@ impl Ve {
         t.checkpoint(self.epoch + 1).into_iter().map(|(m, v)| (m, U128(v))).collect()
     }
 
+    pub fn get_proposals(&self) -> Vec<Proposal> {
+        self.proposals.clone()
+    }
+
     pub fn get_rewards(&self, epoch: u64, market_id: String) -> Vec<(AccountId, U128)> {
         self.rewards.get(&(epoch, market_id)).map(|r| r.iter().map(|(t, a)| (t.clone(), U128(*a))).collect()).unwrap_or_default()
     }
@@ -332,6 +372,33 @@ impl Ve {
         };
         self.tokens.internal_mint_with_refund(id.clone(), owner.clone(), Some(metadata), None);
         NftMint { owner_id: &owner, token_ids: &[&id], memo: None }.emit();
+    }
+
+    /// Lists proposals with ≥ 2% of votes (bond back) and drops ones idle for 4 checkpoints (bond to the
+    /// treasury). Returns the house calls for the listings.
+    fn settle_proposals(&mut self, votes: &[(String, u128)], total: u128) -> Option<Promise> {
+        let mut adds: Option<Promise> = None;
+        let mut keep = vec![];
+        for mut p in std::mem::take(&mut self.proposals) {
+            let v = votes.iter().find(|(m, _)| *m == p.market_id).map(|(_, v)| *v).unwrap_or(0);
+            if total > 0 && v * math::PPM / total >= LISTING_SHARE_PPM {
+                let add = ext_house::ext(self.house.clone())
+                    .with_static_gas(GAS_ADD_MARKET)
+                    .add_market(p.market_id.clone(), p.feed_id.clone(), LISTING_MAX_LEVERAGE);
+                adds = Some(match adds {
+                    Some(a) => a.and(add),
+                    None => add,
+                });
+                self.send(self.usdc.clone(), p.proposer.clone(), LISTING_BOND);
+            } else if v == 0 && p.idle + 1 >= LISTING_MAX_IDLE_EPOCHS {
+                self.send(self.usdc.clone(), self.treasury.clone(), LISTING_BOND);
+            } else {
+                p.idle = if v == 0 { p.idle + 1 } else { 0 };
+                keep.push(p);
+            }
+        }
+        self.proposals = keep;
+        adds
     }
 
     fn add_reward(&mut self, epoch: u64, market_id: String, token: AccountId, amount: u128) {

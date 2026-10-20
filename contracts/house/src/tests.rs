@@ -38,6 +38,7 @@ fn setup(seed: u128) -> House {
     h.add_market(MARKET.into(), "feed".into(), 100);
     h.set_life(acc("life"));
     h.set_token_and_ve(acc("oneup"), acc("ve"));
+    h.set_swap(acc("swap"));
     ctx("usdc", T0);
     let _ = h.ft_on_transfer(acc("owner"), U128(seed), r#"{"seed":{}}"#.into());
     h
@@ -437,6 +438,74 @@ fn only_ve_sets_shares() {
     let mut h = setup(usd(100_000));
     ctx("alice", T0);
     h.set_vote_shares(1, vec![]);
+}
+
+#[test]
+fn buyback_split_by_market_profit() {
+    let mut h = setup(usd(25_000));
+    ctx("owner", T0);
+    h.add_market("BTC-USD".into(), "btc".into(), 100);
+    deposit(&mut h, "bob", usd(2_000));
+    // NEAR-USD: Bob's short loses 740 (+7.4% × 10); BTC-USD: his long loses 500
+    let b = open(&mut h, "bob", Side::Short, usd(1_000), 10, 500, T0);
+    close(&mut h, "bob", b, 537, T0 + 100);
+    ctx("bob", T0 + 200);
+    let o = h.place_open("BTC-USD".into(), Side::Long, U128(usd(1_000)), 10);
+    ctx("keeper", T0 + 201);
+    h.internal_fill(o, px(500, T0 + 201), T0 + 201).unwrap();
+    close_btc(&mut h, T0 + 300);
+    ctx("keeper", T0 + 600);
+    close_epoch_fully(&mut h);
+
+    let bb = h.get_buyback(1).unwrap();
+    assert_eq!(bb.status, crate::BuybackStatus::Pending);
+    assert_eq!(bb.usdc.0, h.get_epoch_summary(1).unwrap().buyback_pot.0);
+    // 740 and 500 of house profit → 740/1_240 and 500/1_240
+    assert_eq!(bb.weights, vec![(MARKET.to_string(), U128(596_774)), ("BTC-USD".to_string(), U128(403_225))]);
+
+    ctx("owner", T0 + 700);
+    h.buyback(1, U128(0));
+    assert_eq!(h.get_buyback(1).unwrap().status, crate::BuybackStatus::Swapping);
+    // the swap pulled the USDC
+    let held = h.buyback_usdc;
+    let _ = h.on_buyback_sent(1, bb.usdc, Ok(bb.usdc));
+    assert_eq!(h.buyback_usdc, held - bb.usdc.0);
+    // proceeds arrive and are forwarded
+    ctx("oneup", T0 + 701);
+    let _ = h.ft_on_transfer(acc("swap"), U128(1_000_000), r#"{"buyback_proceeds":{"epoch":1}}"#.into());
+    let bb = h.get_buyback(1).unwrap();
+    assert_eq!((bb.status, bb.oneup.0), (crate::BuybackStatus::Done, 1_000_000));
+}
+
+fn close_btc(h: &mut House, t: u64) {
+    let id = h.positions.values().find(|p| p.market_id == "BTC-USD").unwrap().id;
+    ctx("bob", t);
+    let o = h.place_close(id);
+    ctx("keeper", t + 1);
+    h.internal_fill(o, px(475, t + 1), t + 1).unwrap(); // −5% × 10 = −500
+}
+
+#[test]
+fn refused_swap_can_be_retried() {
+    let mut h = setup(usd(25_000));
+    deposit(&mut h, "bob", usd(1_000));
+    let b = open(&mut h, "bob", Side::Short, usd(1_000), 10, 500, T0);
+    close(&mut h, "bob", b, 550, T0 + 100);
+    ctx("keeper", T0 + 600);
+    close_epoch_fully(&mut h);
+    ctx("owner", T0 + 700);
+    h.buyback(1, U128(u128::MAX));
+    let usdc = h.get_buyback(1).unwrap().usdc;
+    let _ = h.on_buyback_sent(1, usdc, Ok(U128(0)));
+    assert_eq!(h.get_buyback(1).unwrap().status, crate::BuybackStatus::Pending);
+}
+
+#[test]
+#[should_panic(expected = "Only swap proceeds")]
+fn proceeds_only_from_the_swap() {
+    let mut h = setup(usd(25_000));
+    ctx("oneup", T0);
+    let _ = h.ft_on_transfer(acc("mallory"), U128(1), r#"{"buyback_proceeds":{"epoch":1}}"#.into());
 }
 
 mod invariants {

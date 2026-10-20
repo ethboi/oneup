@@ -23,7 +23,11 @@ impl House {
 
     /// USDC in. `msg = ""` credits the sender's free balance; `{"seed":{}}` from the owner adds to the pool.
     pub fn ft_on_transfer(&mut self, sender_id: AccountId, amount: U128, msg: String) -> PromiseOrValue<U128> {
-        require!(env::predecessor_account_id() == self.usdc, "Only USDC deposits");
+        let token = env::predecessor_account_id();
+        if Some(&token) == self.oneup.as_ref() {
+            return self.on_buyback_proceeds(sender_id, amount, msg);
+        }
+        require!(token == self.usdc, "Only USDC deposits");
         if msg.is_empty() {
             self.credit(&sender_id, amount.0);
             Event::Deposit { account_id: sender_id, amount }.emit();
