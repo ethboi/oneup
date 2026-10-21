@@ -8,6 +8,7 @@ import { lifeValue, lockValue, useOneupPrice } from "@/lib/value";
 import { fmtOneup } from "./Header";
 import { PixelHeart } from "./Pixel";
 import { useListings } from "./Sell";
+import { Icon } from "./Icon";
 
 export function Market() {
   const { o, d, me } = useOneUp();
@@ -21,7 +22,7 @@ export function Market() {
     <div className="flex flex-col gap-4">
       <div className="panel flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="display text-lg">Market</div>
+          <div className="text-lg font-extrabold">Market</div>
           <p className="label mt-1 max-w-2xl">
             Buy someone&apos;s Extra Life and its USDC payouts are yours. Buy a lock and you get its $1UP when it ends,
             and its share of buybacks until then. Paid from your wallet&apos;s USDC; the NFT moves to you in the same step.
@@ -50,7 +51,7 @@ export function Market() {
 function Section({ title, empty, children }: { title: string; empty: string; children: React.ReactNode[] }) {
   return (
     <div className="flex flex-col gap-2">
-      <div className="display text-lg">{title}</div>
+      <div className="text-lg font-extrabold">{title}</div>
       {children.length === 0 ? <p className="label">{empty}</p> : <div className="grid gap-3 md:grid-cols-2">{children}</div>}
     </div>
   );
@@ -83,7 +84,7 @@ function LockRow({ l, px }: { l: Listing; px: bigint }) {
   return (
     <Row
       l={l}
-      icon={<span className="display flex h-9 w-9 items-center justify-center rounded-lg border-2 border-[var(--edge)] bg-[var(--accent)] text-[var(--on-color)]">1UP</span>}
+      icon={<span className="display flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--edge)] bg-[var(--accent)] text-[var(--on-color)]">1UP</span>}
       title={info ? `${fmtOneup(info.amount)} $1UP lock` : "$1UP lock"}
       detail={info ? lockDetail(info) : "…"}
       worth={info && px > 0n ? lockValue(info, px) : undefined}
@@ -120,6 +121,7 @@ function Row({ l, icon, title, detail, worth, worthLabel }: { l: Listing; icon: 
           </button>
         ) : (
           <button className="btn btn-accent px-3 py-1" onClick={() => run(`Buy for $${fmtUsdc(price, 0)}`, () => tx.buy(l.nft_contract, l.token_id, price))}>
+            <Icon name="cart" size={15} />
             Buy
           </button>
         )}

@@ -1,7 +1,7 @@
 // The OneUp keeper: anyone can run one. Each tick it pushes prices, fills and expires orders, liquidates
 // and takes profit at the cap, steps epoch closes, and (with the owner key) runs buybacks.
 //
-//   pnpm --filter @oneup/keeper start [--prices sim|hermes] [--tick 3000] [--control 8787]
+//   pnpm --filter @oneup/keeper start [--prices sim|hermes] [--tick 3000] [--price-tick 1000] [--control 8787]
 //
 // With sim prices, a control port on 127.0.0.1 lets a demo steer a market:
 //   curl -XPOST localhost:8787/price -d '{"market":"NEAR-USD","price":2.45}'
@@ -10,7 +10,7 @@ import { createServer } from "node:http";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { Account, type KeyPairString } from "near-api-js";
+import { Account, KeyPair, type KeyPairString } from "near-api-js";
 import {
   OneUp,
   accountSender,
@@ -27,6 +27,7 @@ const { values: args } = parseArgs({
   options: {
     prices: { type: "string", default: "sim" },
     tick: { type: "string", default: "3000" },
+    "price-tick": { type: "string", default: "1000" },
     control: { type: "string", default: "8787" },
     config: { type: "string", default: resolve(import.meta.dirname, "../../localnet.json") },
   },
@@ -47,11 +48,11 @@ const latest = new Map<string, { price: bigint; time: number }>();
 const log = (...m: unknown[]) => console.log(new Date().toISOString().slice(11, 19), ...m);
 const nowS = () => Math.floor(Date.now() / 1000);
 
-async function pushPrices() {
+async function pushPrices(pusher: ReturnType<OneUp["calls"]>) {
   const listed = (await oneup.markets()).filter((m) => m.live);
   feeds = new Map(listed.map((m) => [m.id, m.feed_id]));
   const updates = await source.next(listed.map((m) => ({ id: m.id, feedId: m.feed_id })));
-  await keeper.pushPrices(updates);
+  await pusher.pushPrices(updates);
   for (const u of updates) {
     const p = normalizePrice(BigInt(u.price), u.expo);
     if (p !== null) latest.set(u.feed_id, { price: p, time: u.publish_time });
@@ -151,9 +152,32 @@ function controlServer(port: number) {
     .listen(port, "127.0.0.1", () => log(`sim price control on http://127.0.0.1:${port}`));
 }
 
+/**
+ * Prices go out on their own loop and their own key: a function-call key that can only call the oracle's
+ * `push_prices`. A slow fill or epoch close then never holds up a price (or the app's chart), and the two
+ * loops don't fight over one key's nonce.
+ */
+async function priceSender() {
+  const kp = KeyPair.fromRandom("ed25519");
+  const main = new Account(d.keeper.id, oneup.provider, d.keeper.key as KeyPairString);
+  await main.addFunctionCallAccessKey({ publicKey: kp.getPublicKey(), contractId: d.contracts.oracle, methodNames: ["push_prices"] });
+  return oneup.calls(accountSender(new Account(d.keeper.id, oneup.provider, kp.toString() as KeyPairString)));
+}
+
+async function priceLoop(pusher: ReturnType<OneUp["calls"]>) {
+  for (;;) {
+    const start = Date.now();
+    try {
+      await pushPrices(pusher);
+    } catch (e) {
+      log(`prices: ${e instanceof Error ? e.message.split("\n")[0] : e}`);
+    }
+    await new Promise((r) => setTimeout(r, Math.max(0, Number(args["price-tick"]) - (Date.now() - start))));
+  }
+}
+
 async function tick() {
   const steps: [string, () => Promise<void>][] = [
-    ["prices", pushPrices],
     ["orders", handleOrders],
     ["positions", handlePositions],
     ["epoch", handleEpoch],
@@ -169,6 +193,7 @@ async function tick() {
 
 log(`keeper ${d.keeper.id} on ${d.rpcUrl}, ${args.prices} prices, ${d.markets.length} markets`);
 controlServer(Number(args.control));
+void priceLoop(await priceSender());
 for (;;) {
   const start = Date.now();
   await tick();

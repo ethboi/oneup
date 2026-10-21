@@ -83,7 +83,7 @@ export function Logo({ size = 40 }: { size?: number }) {
     <span className="relative inline-block" style={{ width: size, height: size }} aria-hidden>
       <PixelHeart size={size} />
       <span
-        className="display absolute -right-2 -top-1 rounded-md border-2 border-[var(--edge)] bg-[var(--accent)] px-1 text-[11px] leading-[14px] text-[var(--on-color)]"
+        className="display absolute -right-2 -top-1 rounded-md border border-[var(--edge)] bg-[var(--accent)] px-1 text-[11px] leading-[14px] text-[var(--on-color)]"
       >
         +1
       </span>
@@ -96,7 +96,7 @@ export function HealthBar({ value, segments = 10, color = "var(--heart)", label 
   const lit = Math.round(Math.max(0, Math.min(1, value)) * segments);
   return (
     <div
-      className="flex gap-[3px] rounded-md border-2 border-[var(--edge)] bg-[var(--panel-2)] p-[3px]"
+      className="flex gap-[3px] rounded-md border border-[var(--edge)] bg-[var(--panel-2)] p-[3px]"
       role="progressbar"
       aria-label={label}
       aria-valuenow={Math.round(value * 100)}

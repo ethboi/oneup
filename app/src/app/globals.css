@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 /*
- * Handheld console. The page is the shell, panels are plastic, buttons press down, and the price chart is
- * the LCD. Only buttons get a hard drop: depth means "you can press this".
+ * Handheld console, kept polished: the page is the shell, panels sit raised, and the price chart is the
+ * LCD. The retro lives in the console, the pixel type and the hearts; controls are standard.
  */
 :root {
   --font-display: var(--font-pixel), ui-monospace, monospace;
@@ -12,14 +12,24 @@
   --panel: #f7f8fb;
   --panel-2: #eceef4;
   --edge: #1c1b29; /* outlines */
-  --depth: #1c1b29; /* the hard drop under pressable things */
   --line: #c9ccd9; /* quiet separators inside panels */
+  /* panels sit raised, not outlined: a light edge, a top highlight and a soft drop */
+  --panel-edge: #d3d6e0;
+  --input-edge: #c3c7d4;
+  --field: #ffffff;
+  --panel-shadow: inset 0 1px 0 rgb(255 255 255 / 0.9), 0 1px 2px rgb(28 27 41 / 0.06), 0 10px 28px -14px rgb(28 27 41 / 0.28);
   --text: #1c1b29;
   --muted: #5e6178;
   --accent: #f2b705; /* coin */
   --heart: #e2257a;
-  --long: #18a148;
-  --short: #e0322b;
+  --long: #137a43;
+  --short: #d23a3a;
+  /* filled Long/Short buttons, white text (≥ 4.5:1 in both themes) */
+  --long-fill: #137a43;
+  --short-fill: #d23a3a;
+  /* buttons: the heart's magenta for primary actions (a shade deeper for white text, 5.1:1) */
+  --primary: #d11f70;
+  --on-fill: #ffffff;
   --info: #2a6fd6;
   --on-color: #1c1b29;
 
@@ -49,14 +59,20 @@
     --panel: #222434;
     --panel-2: #2b2e42;
     --edge: #474b6c;
-    --depth: #05060b;
     --line: #363a52;
+    --panel-edge: #343850;
+    --input-edge: #40445f;
+    --field: #1a1c29;
+    --panel-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px -14px rgb(0 0 0 / 0.7);
     --text: #eceef6;
     --muted: #9ba0b9;
     --accent: #ffc83d;
     --heart: #ff4fa3;
-    --long: #3fcb6a;
-    --short: #ff5a4f;
+    --long: #2fb466;
+    --short: #ec5050;
+    --long-fill: #1b7f47;
+    --short-fill: #c43636;
+    --primary: #c81e6c;
     --info: #5aa9ff;
     --case: #262838;
     --bezel: #13141f;
@@ -96,8 +112,9 @@ body {
 
   .panel {
     background: var(--panel);
-    border: 2px solid var(--edge);
+    border: 1px solid var(--panel-edge);
     border-radius: 16px;
+    box-shadow: var(--panel-shadow);
   }
 
   .label {
@@ -105,94 +122,178 @@ body {
     font-size: 12.5px;
   }
 
+  /* standard buttons: a flat fill (--btn-bg, set by the variant or inline for Long/Short), a thin edge,
+     a faint shadow; hover shifts the colour toward the text colour, so it works in both themes */
   .btn {
-    border: 2px solid var(--edge);
-    border-radius: 12px;
-    padding: 7px 14px;
+    --btn-bg: var(--panel);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: var(--btn-bg);
+    border: 1px solid color-mix(in srgb, var(--btn-bg) 80%, var(--text));
+    border-radius: 10px;
+    padding: 8px 14px;
     font-weight: 800;
     font-size: 14px;
-    background: var(--panel);
-    box-shadow: 0 4px 0 var(--depth);
-    transform: translateY(0);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.2),
+      0 1px 2px rgb(0 0 0 / 0.1);
     transition:
-      transform 0.06s,
-      box-shadow 0.06s;
-    margin-bottom: 4px; /* room for the depth so neighbours don't overlap it */
+      background-color 0.15s,
+      transform 0.06s;
+  }
+  .btn:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--btn-bg) 90%, var(--text));
   }
   .btn:active:not(:disabled) {
-    transform: translateY(3px);
-    box-shadow: 0 1px 0 var(--depth);
+    transform: translateY(1px);
+    box-shadow: none;
   }
+  /* disabled always reads as disabled, whatever colour the button was given inline */
   .btn:disabled {
-    opacity: 0.45;
+    background: var(--panel-2) !important;
+    color: var(--muted) !important;
+    border-color: var(--panel-edge) !important;
     cursor: not-allowed;
-    box-shadow: 0 2px 0 var(--depth);
-    transform: translateY(2px);
+    box-shadow: none;
   }
   .btn-ghost {
-    background: var(--panel-2);
+    --btn-bg: var(--field);
+    border-color: var(--input-edge);
   }
+  /* the primary action (class name kept from the first palette) */
   .btn-accent {
-    background: var(--accent);
-    color: var(--on-color);
+    --btn-bg: var(--primary);
+    color: var(--on-fill);
   }
   .btn:focus-visible,
-  .input:focus-visible,
   .tab:focus-visible {
     outline: 3px solid var(--info);
     outline-offset: 2px;
   }
 
+  /* text fields: recessed, with a soft focus ring rather than a hard outline */
   .input {
-    background: var(--panel);
-    border: 2px solid var(--edge);
+    background: var(--field);
+    border: 1px solid var(--input-edge);
     border-radius: 10px;
-    padding: 7px 10px;
+    padding: 8px 12px;
+    min-height: 40px;
     width: 100%;
     font-weight: 700;
+    box-shadow: inset 0 1px 2px rgb(28 27 41 / 0.07);
+    transition:
+      border-color 0.15s,
+      box-shadow 0.15s;
+  }
+  .input:hover {
+    border-color: color-mix(in srgb, var(--input-edge) 55%, var(--text));
+  }
+  .input:focus-visible {
+    outline: none;
+    border-color: var(--info);
+    box-shadow:
+      inset 0 1px 2px rgb(28 27 41 / 0.07),
+      0 0 0 3px color-mix(in srgb, var(--info) 25%, transparent);
+  }
+  select.input {
+    appearance: none;
+    padding-right: 34px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%238a8fa6' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+  }
+  /* a unit shown inside a field: wrap the input in .field and add a .field-unit */
+  .field {
+    position: relative;
+  }
+  .field .input {
+    padding-right: 60px;
+  }
+  .field-unit {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 700;
+    pointer-events: none;
+  }
+  /* quick picks under a field (leverage presets, Max) */
+  .chip {
+    border: 1px solid var(--input-edge);
+    background: var(--field);
+    border-radius: 999px;
+    padding: 3px 10px;
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--muted);
+    transition:
+      background 0.15s,
+      color 0.15s;
+  }
+  .chip:hover {
+    color: var(--text);
+  }
+  .chip[aria-pressed="true"] {
+    background: var(--text);
+    border-color: var(--text);
+    color: var(--panel);
+  }
+  .chip:focus-visible {
+    outline: 3px solid var(--info);
+    outline-offset: 2px;
   }
 
-  /* chunky slider: ink track, square coin thumb */
+  /* slider: a rounded track that fills with the primary colour, and a round thumb */
   .slider {
     appearance: none;
     width: 100%;
-    height: 22px;
+    height: 24px;
     background: transparent;
   }
   .slider::-webkit-slider-runnable-track {
-    height: 10px;
-    border: 2px solid var(--edge);
-    border-radius: 6px;
-    background: linear-gradient(var(--accent), var(--accent)) 0 / var(--fill, 50%) 100% no-repeat, var(--panel-2);
+    height: 6px;
+    border-radius: 999px;
+    background: linear-gradient(var(--primary), var(--primary)) 0 / var(--fill, 50%) 100% no-repeat, var(--panel-2);
+    box-shadow: inset 0 1px 2px rgb(28 27 41 / 0.15);
   }
   .slider::-moz-range-track {
     height: 6px;
-    border: 2px solid var(--edge);
-    border-radius: 6px;
+    border-radius: 999px;
     background: var(--panel-2);
+    box-shadow: inset 0 1px 2px rgb(28 27 41 / 0.15);
   }
   .slider::-moz-range-progress {
     height: 6px;
-    background: var(--accent);
-    border-radius: 6px 0 0 6px;
+    border-radius: 999px;
+    background: var(--primary);
   }
   .slider::-webkit-slider-thumb {
     appearance: none;
-    width: 22px;
-    height: 22px;
-    margin-top: -8px;
-    border: 2px solid var(--edge);
-    border-radius: 5px;
-    background: var(--panel);
-    box-shadow: 0 3px 0 var(--depth);
+    width: 20px;
+    height: 20px;
+    margin-top: -7px;
+    border-radius: 999px;
+    background: #fff;
+    border: 1px solid var(--input-edge);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
   }
   .slider::-moz-range-thumb {
     width: 18px;
     height: 18px;
-    border: 2px solid var(--edge);
-    border-radius: 5px;
-    background: var(--panel);
-    box-shadow: 0 3px 0 var(--depth);
+    border-radius: 999px;
+    background: #fff;
+    border: 1px solid var(--input-edge);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
+  }
+  .slider:focus-visible {
+    outline: none;
+  }
+  .slider:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--info) 30%, transparent);
   }
 
   /* the LCD: flat green with a faint pixel grid and a recessed edge */
@@ -208,7 +309,8 @@ body {
   /* the handheld's case: one big rounded corner, bottom right */
   .case {
     background: var(--case);
-    border: 2px solid var(--edge);
+    border: 1px solid var(--panel-edge);
+    box-shadow: var(--panel-shadow);
     border-radius: 20px 20px 72px 20px;
   }
   .bezel {
@@ -220,29 +322,43 @@ body {
     height: 7px;
     background: linear-gradient(var(--stripe-1) 0 2px, transparent 2px 5px, var(--stripe-2) 5px 7px);
   }
-  .bezel-btn {
-    border-radius: 999px;
-    padding: 5px 12px;
-    font-weight: 800;
-    font-size: 13px;
-    background: #3b3a52;
-    color: #d6d7e6;
-    box-shadow: 0 3px 0 #000;
-    margin-bottom: 3px;
+  /* market tiles under the screen: symbol, price, change; the selected one sits raised */
+  .market-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+    min-width: 132px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    text-align: left;
+    transition:
+      background-color 0.15s,
+      border-color 0.15s;
   }
-  .bezel-btn[aria-pressed="true"] {
-    background: var(--accent);
-    color: var(--on-color);
+  .market-tile:hover {
+    background: color-mix(in srgb, var(--panel) 60%, transparent);
   }
-  .bezel-btn:active {
-    transform: translateY(2px);
-    box-shadow: 0 1px 0 #000;
+  .market-tile[aria-pressed="true"] {
+    background: var(--panel);
+    border-color: var(--panel-edge);
+    box-shadow:
+      inset 0 -2px 0 var(--primary),
+      0 1px 3px rgb(28 27 41 / 0.12);
+  }
+  .market-tile:focus-visible {
+    outline: 3px solid var(--info);
+    outline-offset: 2px;
   }
 
   /* the cartridge tab strip */
   .tab {
-    font-family: var(--font-display);
-    font-size: 15px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 800;
+    font-size: 14px;
     padding: 6px 14px;
     border-radius: 10px;
     color: #b9bbd0; /* the strip is always dark */
@@ -263,6 +379,15 @@ body {
       font-size: 16px;
     }
   }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.spin {
+  animation: spin 0.8s linear infinite;
 }
 
 /* the one orchestrated moment: a loss turning into an Extra Life */
@@ -327,7 +452,8 @@ body {
   .heart-pop,
   .plus-one,
   .boot-logo,
-  .boot-text {
+  .boot-text,
+  .spin {
     animation: none;
   }
   .btn {

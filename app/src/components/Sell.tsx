@@ -5,6 +5,7 @@
 import { useState } from "react";
 import { USDC, fmtUsdc, type Listing } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
+import { Icon } from "./Icon";
 
 export function useListings() {
   const { o } = useOneUp();
@@ -19,7 +20,7 @@ export function Sell({ nft, tokenId, suggested, listings }: { nft: string; token
 
   if (listing) {
     return (
-      <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border-2 border-dashed border-[var(--line)] px-3 py-2 text-sm">
+      <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-dashed border-[var(--line)] px-3 py-2 text-sm">
         <span className="num">For sale at ${fmtUsdc(BigInt(listing.price))}</span>
         <button className="btn btn-ghost px-3 py-1" onClick={() => run("Take down listing", () => tx.delist(nft, tokenId))}>
           Take down
@@ -30,6 +31,7 @@ export function Sell({ nft, tokenId, suggested, listings }: { nft: string; token
   if (!open) {
     return (
       <button className="btn btn-ghost mt-3 w-full" onClick={() => setOpen(true)}>
+        <Icon name="tag" />
         Sell
       </button>
     );
@@ -37,8 +39,10 @@ export function Sell({ nft, tokenId, suggested, listings }: { nft: string; token
   const raw = BigInt(Math.floor(Number(price) || 0)) * USDC;
   return (
     <div className="mt-3 flex items-center gap-2">
-      <span className="label">$</span>
-      <input className="input num" value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal" aria-label="Price in USDC" />
+      <span className="field flex-1">
+        <input className="input num" value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal" aria-label="Price in USDC" />
+        <span className="field-unit">USDC</span>
+      </span>
       <button
         className="btn btn-accent shrink-0"
         disabled={raw === 0n}
@@ -46,8 +50,8 @@ export function Sell({ nft, tokenId, suggested, listings }: { nft: string; token
       >
         List
       </button>
-      <button className="btn btn-ghost shrink-0 px-3" onClick={() => setOpen(false)} aria-label="Cancel">
-        ✕
+      <button className="btn btn-ghost shrink-0 px-2.5" onClick={() => setOpen(false)} aria-label="Cancel">
+        <Icon name="x" />
       </button>
     </div>
   );

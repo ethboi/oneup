@@ -2,9 +2,10 @@
 
 // The console's LCD: price line from the app's polled history, in four shades of green, with entry and
 // liquidation marks told apart by dash pattern (the screen has no colours to spare). Drawn at the
-// container's real width with a crosshair readout that follows a mouse or a finger.
+// container's real width with a crosshair readout that follows a mouse or a finger. The time axis slides
+// with the clock and each new price eases in, so the line moves steadily between oracle updates.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useWidth } from "@/lib/useWidth";
 
 export interface Mark {
@@ -14,6 +15,28 @@ export interface Mark {
 }
 
 const DASH = { entry: "6 4", liq: "2 3" } as const;
+/** How long a new price takes to ease in. */
+const EASE_MS = 500;
+
+/** The clock, at about 30 frames a second; frozen (null) when the viewer prefers reduced motion. */
+function useClock(): number | null {
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let raf = 0;
+    let last = 0;
+    const frame = (t: number) => {
+      if (t - last > 33) {
+        last = t;
+        setNow(Date.now());
+      }
+      raf = requestAnimationFrame(frame);
+    };
+    raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+  return now;
+}
 
 export function PriceChart({ points, marks = [] }: { points: { t: number; p: number }[]; marks?: Mark[] }) {
   const [ref, W] = useWidth();
@@ -21,6 +44,7 @@ export function PriceChart({ points, marks = [] }: { points: { t: number; p: num
   const H = narrow ? 210 : 250;
   const PAD = { l: 10, r: narrow ? 64 : 84, t: 34, b: 14 }; // room at the top for the readout the console prints on screen
   const [hover, setHover] = useState<number | null>(null);
+  const now = useClock();
 
   if (points.length < 2) {
     return (
@@ -35,12 +59,20 @@ export function PriceChart({ points, marks = [] }: { points: { t: number; p: num
   const pad = (hi - lo || hi * 0.002) * 0.15;
   lo -= pad;
   hi += pad;
+  const last = points[points.length - 1];
+  const prev = points[points.length - 2];
+  // the newest price eases in from the one before; the line then holds it out to the present
+  const k = now === null ? 1 : Math.min(1, Math.max(0, (now - last.t) / EASE_MS));
+  const headP = prev.p + (last.p - prev.p) * (1 - (1 - k) ** 3);
   const t0 = points[0].t;
-  const t1 = points[points.length - 1].t;
+  const t1 = now === null ? last.t : Math.max(last.t, now);
   const x = (t: number) => PAD.l + ((t - t0) / Math.max(1, t1 - t0)) * (W - PAD.l - PAD.r);
   const y = (p: number) => PAD.t + (1 - (p - lo) / (hi - lo)) * (H - PAD.t - PAD.b);
-  const line = points.map((pt, i) => `${i ? "L" : "M"}${x(pt.t).toFixed(1)} ${y(pt.p).toFixed(1)}`).join(" ");
-  const last = points[points.length - 1];
+  const line =
+    points
+      .slice(0, -1)
+      .map((pt, i) => `${i ? "L" : "M"}${x(pt.t).toFixed(1)} ${y(pt.p).toFixed(1)}`)
+      .join(" ") + ` L${x(last.t).toFixed(1)} ${y(headP).toFixed(1)} L${x(t1).toFixed(1)} ${y(headP).toFixed(1)}`;
   const digits = last.p < 10 ? 4 : last.p < 1000 ? 2 : 0;
   const h = hover === null ? null : points[hover];
 
@@ -83,8 +115,8 @@ export function PriceChart({ points, marks = [] }: { points: { t: number; p: num
             </text>
           </g>
         ))}
-        <rect x={x(last.t) - 4} y={y(last.p) - 4} width="8" height="8" fill="var(--lcd-ink)" />
-        <text x={W - PAD.r + 6} y={y(last.p) - 8} fontSize="14" fontWeight="700" fill="var(--lcd-ink)" className="num">
+        <rect x={x(t1) - 4} y={y(headP) - 4} width="8" height="8" fill="var(--lcd-ink)" />
+        <text x={W - PAD.r + 6} y={y(headP) - 8} fontSize="14" fontWeight="700" fill="var(--lcd-ink)" className="num">
           {last.p.toFixed(digits)}
         </text>
         {h && (
@@ -96,7 +128,7 @@ export function PriceChart({ points, marks = [] }: { points: { t: number; p: num
       </svg>
       {h && (
         <div
-          className="display num pointer-events-none absolute top-2 rounded-md border-2 border-[var(--lcd-ink)] bg-[var(--lcd)] px-2 py-1 text-xs text-[var(--lcd-ink)]"
+          className="display num pointer-events-none absolute top-2 rounded-md border border-[var(--lcd-ink)] bg-[var(--lcd)] px-2 py-1 text-xs text-[var(--lcd-ink)]"
           style={x(h.t) > W / 2 ? { right: W - x(h.t) + 10 } : { left: x(h.t) + 10 }}
         >
           <div className="text-sm">{h.p.toFixed(digits)}</div>

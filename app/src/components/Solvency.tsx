@@ -116,7 +116,7 @@ export function Solvency() {
       </div>
 
       <div className="panel overflow-x-auto p-5">
-        <div className="display text-lg">Epochs</div>
+        <div className="text-lg font-extrabold">Epochs</div>
         {(history ?? []).length === 0 ? (
           <p className="label mt-2">No closed epochs yet.</p>
         ) : (

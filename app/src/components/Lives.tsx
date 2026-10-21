@@ -7,6 +7,7 @@ import { HealthBar, PixelHeart } from "./Pixel";
 import { fmtOneup } from "./Header";
 import { Sell, useListings } from "./Sell";
 import { lifeValue } from "@/lib/value";
+import { Icon } from "./Icon";
 
 export function Lives() {
   const { o, d, me, tx, run } = useOneUp();
@@ -24,7 +25,7 @@ export function Lives() {
     <div className="flex flex-col gap-4">
       <div className="panel flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="display text-lg">Next Extra Life, epoch <span className="num">{epoch?.id ?? "…"}</span></div>
+          <div className="text-lg font-extrabold">Next Extra Life, epoch <span className="num">{epoch?.id ?? "…"}</span></div>
           <p className="label mt-1 max-w-xl">
             Your losses this epoch. When the epoch ends, the house&apos;s profit is split across its losers in proportion
             to what they lost: that share is your Extra Life&apos;s face value. If the house didn&apos;t make money, no
@@ -39,7 +40,7 @@ export function Lives() {
       </div>
 
       <div className="flex items-center justify-between">
-        <div className="display text-lg">Your Extra Lives <span className="num">({lives.length})</span></div>
+        <div className="text-lg font-extrabold">Your Extra Lives <span className="num">({lives.length})</span></div>
         <button
           className="btn btn-accent"
           disabled={claimable === 0n}
@@ -47,6 +48,7 @@ export function Lives() {
             run(`Claim $${fmtUsdc(claimable)}`, () => tx.claimLives(lives.filter((l) => BigInt(l.claimable) > 0n).map((l) => l.token_id)))
           }
         >
+          <Icon name="claim" />
           Claim ${fmtUsdc(claimable)}
         </button>
       </div>
@@ -88,7 +90,7 @@ function LifeCard({ l, expiry, listings }: { l: LifeInfo; expiry?: number; listi
       <div className="flex items-center gap-3">
         <PixelHeart size={44} fill={l.full_heal ? 1 : Math.max(0.12, progress)} label={`${state}, ${(progress * 100).toFixed(0)}% paid`} />
         <div className="flex-1">
-          <div className="display text-lg leading-tight">{state}</div>
+          <div className="text-lg font-extrabold leading-tight">{state}</div>
           <div className="label">{l.epoch === 0 ? "Seed life" : `From epoch ${l.epoch}`}</div>
         </div>
         <div className="text-right">
@@ -105,7 +107,7 @@ function LifeCard({ l, expiry, listings }: { l: LifeInfo; expiry?: number; listi
           <span>{(progress * 100).toFixed(1)}% to Full Heal</span>
         </div>
       </div>
-      <dl className="num mt-3 grid grid-cols-2 gap-y-1 border-t-2 border-dashed border-[var(--line)] pt-3 text-sm">
+      <dl className="num mt-3 grid grid-cols-2 gap-y-1 border-t border-dashed border-[var(--line)] pt-3 text-sm">
         <dt className="label">Face value</dt>
         <dd className="text-right">${fmtUsdc(BigInt(l.face))}</dd>
         <dt className="label">Cap</dt>

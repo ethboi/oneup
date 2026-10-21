@@ -16,6 +16,7 @@ import { useOneUp, usePoll } from "@/lib/oneup";
 import { PriceChart, type Mark } from "./PriceChart";
 import { fmtClock, useNow } from "./Header";
 import { PixelHeart } from "./Pixel";
+import { Icon } from "./Icon";
 
 const MIN_HOLD_S = 60;
 
@@ -73,6 +74,25 @@ function Console({ market, setMarket, markets, marks }: { market: string; setMar
   const change = pts.length > 1 ? (pts[pts.length - 1].p / pts[0].p - 1) * 100 : 0;
   return (
     <div className="case order-2 min-w-0 p-3 sm:p-5">
+      <div className="-mx-1 mb-3 flex gap-1.5 overflow-x-auto px-1 pb-1 pt-0.5" role="group" aria-label="Market">
+        {markets.map((m) => {
+          const h = history[m] ?? [];
+          const ch = h.length > 1 ? (h[h.length - 1].p / h[0].p - 1) * 100 : null;
+          const [base, quote] = m.split("-");
+          return (
+            <button key={m} aria-pressed={m === market} onClick={() => setMarket(m)} className="market-tile num shrink-0">
+              <span className="text-sm">
+                <b>{base}</b>
+                <span className="text-[var(--muted)]">-{quote}</span>
+              </span>
+              <span className="text-base font-extrabold">{prices[m] ? fmtPrice(prices[m]) : "…"}</span>
+              <span className="text-xs font-bold" style={{ color: ch === null ? "var(--muted)" : ch >= 0 ? "var(--long)" : "var(--short)" }}>
+                {ch === null ? "–" : `${ch >= 0 ? "▲" : "▼"} ${Math.abs(ch).toFixed(2)}%`}
+              </span>
+            </button>
+          );
+        })}
+      </div>
       <div className="bezel px-3 pb-5 pt-3 sm:px-5">
         <div className="stripes mb-3" aria-hidden />
         <div className="relative">
@@ -89,18 +109,10 @@ function Console({ market, setMarket, markets, marks }: { market: string; setMar
         </div>
       </div>
 
-      <div className="mt-3 flex items-center justify-between px-1">
+      <div className="mt-3 px-1">
         <span className="display text-2xl italic text-[var(--wordmark)]">OneUp</span>
-        <span className="display num text-lg">{prices[market] ? fmtPrice(prices[market]) : "…"}</span>
       </div>
 
-      <div className="-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1 pt-0.5 sm:flex-wrap" role="group" aria-label="Market">
-        {markets.map((m) => (
-          <button key={m} aria-pressed={m === market} onClick={() => setMarket(m)} className="bezel-btn num shrink-0 whitespace-nowrap">
-            {m} {prices[m] ? fmtPrice(prices[m]) : ""}
-          </button>
-        ))}
-      </div>
     </div>
   );
 }
@@ -125,20 +137,31 @@ function OrderForm(props: { market: string; maxLeverage: number; side: Side; set
             role="radio"
             aria-checked={side === s}
             onClick={() => setSide(s)}
-            className="btn display rounded-full py-2 text-lg"
+            className="btn py-2 text-base"
             style={{
-              background: side === s ? (s === "Long" ? "var(--long)" : "var(--short)") : "var(--panel-2)",
-              color: side === s ? "var(--on-color)" : "var(--muted)",
-            }}
+              "--btn-bg": side === s ? (s === "Long" ? "var(--long-fill)" : "var(--short-fill)") : "var(--field)",
+              color: side === s ? "var(--on-fill)" : "var(--muted)",
+            } as React.CSSProperties}
           >
-            {s === "Long" ? "▲ Long" : "▼ Short"}
+            <Icon name={s === "Long" ? "up" : "down"} size={18} />
+            {s}
           </button>
         ))}
       </div>
 
       <label className="flex flex-col gap-1">
-        <span className="label">Margin (USDC)</span>
-        <input className="input num" value={margin} onChange={(e) => setMargin(e.target.value)} inputMode="decimal" />
+        <span className="label flex justify-between">
+          <span>Margin</span>
+          {free !== undefined && BigInt(free) >= USDC && (
+            <button type="button" className="chip" onClick={() => setMargin(String(Math.floor(Number(BigInt(free) / USDC))))}>
+              Max ${fmtUsdc(BigInt(free), 0)}
+            </button>
+          )}
+        </span>
+        <span className="field">
+          <input className="input num" value={margin} onChange={(e) => setMargin(e.target.value)} inputMode="decimal" aria-label="Margin" />
+          <span className="field-unit">USDC</span>
+        </span>
       </label>
 
       <label className="flex flex-col gap-1">
@@ -155,6 +178,15 @@ function OrderForm(props: { market: string; maxLeverage: number; side: Side; set
           onChange={(e) => setLeverage(Number(e.target.value))}
           style={{ "--fill": `${((leverage - 1) / Math.max(1, maxLeverage - 1)) * 100}%` } as React.CSSProperties}
         />
+        <span className="flex flex-wrap gap-1.5" role="group" aria-label="Leverage presets">
+          {[2, 5, 10, 25, 50, 100]
+            .filter((x) => x <= maxLeverage)
+            .map((x) => (
+              <button key={x} type="button" className="chip num" aria-pressed={leverage === x} onClick={() => setLeverage(x)}>
+                {x}×
+              </button>
+            ))}
+        </span>
       </label>
 
       <dl className="grid grid-cols-2 gap-y-2 text-sm">
@@ -172,8 +204,8 @@ function OrderForm(props: { market: string; maxLeverage: number; side: Side; set
       {short && <p className="text-sm text-[var(--short)]">Not enough free balance. Deposit first.</p>}
 
       <button
-        className="btn display py-3 text-lg"
-        style={{ background: side === "Long" ? "var(--long)" : "var(--short)", color: "var(--on-color)" }}
+        className="btn py-3 text-base"
+        style={{ "--btn-bg": side === "Long" ? "var(--long-fill)" : "var(--short-fill)", color: "var(--on-fill)" } as React.CSSProperties}
         disabled={!quote?.allowed || short || m === 0n}
         onClick={() => run(`${side} ${market} ${leverage}× · $${margin}`, () => tx.placeOpen(market, side, m, leverage))}
       >
@@ -202,7 +234,7 @@ function Positions({ positions, orders }: { positions: Position[]; orders: Order
 
   return (
     <div className="panel p-4">
-      <div className="display mb-3 text-lg">Positions</div>
+      <div className="mb-3 text-lg font-extrabold">Positions</div>
       {rows.length === 0 && orders.length === 0 && <p className="label">No open positions.</p>}
       <div className="flex flex-col gap-3 md:hidden">
         {rows.map(({ p, mark, v, hold }) => (
@@ -325,14 +357,14 @@ function LossBanner() {
         <span className="display plus-one absolute -top-3 left-1/2 -translate-x-1/2 text-lg text-[var(--heart)]">+1</span>
       </span>
       <div className="flex-1">
-        <div className="display text-lg leading-tight">Extra Life incoming</div>
+        <div className="text-lg font-extrabold leading-tight">Extra Life incoming</div>
         <div className="label num mt-1">
           You lost ${fmtUsdc(loss.amount)} (${fmtUsdc(loss.total)} this epoch). Your Extra Life and $1UP lock mint
           when the epoch ends in {fmtClock(left)}, sized from what the house made.
         </div>
       </div>
-      <button className="btn btn-ghost px-3" onClick={() => setLoss(null)} aria-label="Dismiss">
-        ✕
+      <button className="btn btn-ghost px-2.5" onClick={() => setLoss(null)} aria-label="Dismiss">
+        <Icon name="x" />
       </button>
     </div>
   );

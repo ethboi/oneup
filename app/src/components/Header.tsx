@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { USDC, fmtUsdc, ONEUP } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { Logo, PixelCoin, PixelHeart } from "./Pixel";
+import { Icon } from "./Icon";
 
 export function Header() {
   const { o, d, me, setMe, accounts, tx, run } = useOneUp();
@@ -31,11 +32,12 @@ export function Header() {
           <div className="label mt-1">Lose a trade, get a life.</div>
         </div>
         <button className="btn btn-ghost lg:hidden" onClick={() => setOpen(!open)} aria-expanded={open}>
+          <Icon name={open ? "x" : "wallet"} />
           {open ? "Done" : "Wallet"}
         </button>
       </div>
 
-      <div className="panel grid grid-cols-2 gap-px overflow-hidden bg-[var(--edge)] sm:grid-cols-4 lg:col-span-2 lg:row-start-2">
+      <div className="panel grid grid-cols-2 gap-px overflow-hidden bg-[var(--line)] sm:grid-cols-4 lg:col-span-2 lg:row-start-2">
         <Stat label="House pool" value={pool ? `$${fmtUsdc(BigInt(pool), 0)}` : "…"} />
         <Stat label={`Epoch ${epoch?.id ?? "…"} ends in`} value={fmtClock(left)} />
         <Stat label="Free balance" value={free ? `$${fmtUsdc(BigInt(free))}` : "…"} icon={<PixelCoin size={16} />} />
@@ -64,14 +66,20 @@ export function Header() {
             </option>
           ))}
         </select>
-        <input className="input num col-span-3 lg:w-24" value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="USDC amount" inputMode="decimal" />
+        <span className="field col-span-3 lg:w-36">
+          <input className="input num" value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="USDC amount" inputMode="decimal" />
+          <span className="field-unit">USDC</span>
+        </span>
         <button className="btn btn-ghost" onClick={() => run(`Faucet ${amount} USDC`, () => tx.faucet(amt))}>
+          <Icon name="faucet" />
           Faucet
         </button>
         <button className="btn btn-accent" disabled={amt === 0n} onClick={() => run(`Deposit ${amount} USDC`, () => tx.deposit(amt))}>
+          <Icon name="deposit" />
           Deposit
         </button>
         <button className="btn btn-ghost" disabled={amt === 0n} onClick={() => run(`Withdraw ${amount} USDC`, () => tx.withdraw(amt))}>
+          <Icon name="withdraw" />
           Withdraw
         </button>
       </div>

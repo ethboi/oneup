@@ -104,35 +104,42 @@ function Loaded({ d, children }: { d: Deployment; children: ReactNode }) {
     }
   }, []);
 
-  // Prices: poll the oracle and keep ~10 minutes of history per market.
+  // Prices: poll the oracle every second and keep the last 300 updates per market. A point is added only
+  // when the oracle publishes a new price, at the moment it arrives, so the chart moves with real updates
+  // instead of repeating the same price on every poll.
   const [prices, setPrices] = useState<Record<string, bigint>>({});
   const [history, setHistory] = useState<Record<string, { t: number; p: number }[]>>({});
   useEffect(() => {
     let live = true;
+    const published = new Map<string, number>();
     const tick = async () => {
       const markets = await o.markets().catch(() => []);
       const next: Record<string, bigint> = {};
+      const fresh: Record<string, number> = {};
       await Promise.all(
         markets.map(async (m) => {
           const p = await o.price(m.feed_id).catch(() => null);
           const v = p && normalizePrice(BigInt(p.price), p.expo);
-          if (v) next[m.id] = v;
+          if (!v) return;
+          next[m.id] = v;
+          if (published.get(m.id) !== p.publish_time) {
+            published.set(m.id, p.publish_time);
+            fresh[m.id] = Number(v) / 1e8;
+          }
         }),
       );
       if (!live) return;
       setPrices(next);
+      if (Object.keys(fresh).length === 0) return;
       const t = Date.now();
       setHistory((h) => {
         const out = { ...h };
-        for (const [k, v] of Object.entries(next)) {
-          const arr = (out[k] ?? []).concat({ t, p: Number(v) / 1e8 });
-          out[k] = arr.slice(-300);
-        }
+        for (const [k, p] of Object.entries(fresh)) out[k] = (out[k] ?? []).concat({ t, p }).slice(-300);
         return out;
       });
     };
     tick();
-    const i = setInterval(tick, 2000);
+    const i = setInterval(tick, 1000);
     return () => {
       live = false;
       clearInterval(i);

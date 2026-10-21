@@ -9,6 +9,7 @@ import { useOneUp, usePoll } from "@/lib/oneup";
 import { lockValue, useOneupPrice } from "@/lib/value";
 import { fmtOneup } from "./Header";
 import { Sell, useListings } from "./Sell";
+import { Icon } from "./Icon";
 
 const MAX = Number(VE_MAX_EPOCHS);
 
@@ -32,7 +33,7 @@ export function Locks() {
     <div className="grid gap-4 lg:grid-cols-[1fr_360px] lg:items-start">
       <div className="flex min-w-0 flex-col gap-4">
         <div className="panel p-4">
-          <div className="display text-lg">Earn the house&apos;s buybacks</div>
+          <div className="text-lg font-extrabold">Earn the house&apos;s buybacks</div>
           <p className="label mt-1 max-w-2xl">
             Each epoch, 30% of the house&apos;s payout buys back $1UP for everyone locked, shared by weight: the amount
             locked × the epochs left ÷ {MAX}. Your weight counts from the epoch after you lock, and shrinks as the lock runs
@@ -45,7 +46,7 @@ export function Locks() {
           </dl>
         </div>
 
-        <div className="display text-lg">Your locks</div>
+        <div className="text-lg font-extrabold">Your locks</div>
         {locks.length === 0 && <p className="label">No locks yet. Lock $1UP, or lose a trade: losers get their $1UP as a two-year lock.</p>}
         <div className="grid gap-4 sm:grid-cols-2">
           {locks.map((l) => (
@@ -80,7 +81,7 @@ function LockCard({ l, epoch, px, listings }: { l: LockInfo; epoch: number; px: 
     <div className="panel p-4" style={l.withdrawn ? { opacity: 0.7 } : undefined}>
       <div className="flex items-start justify-between gap-2">
         <div>
-          <div className="display text-lg leading-tight">
+          <div className="text-lg font-extrabold leading-tight">
             <span className="num">{fmtOneup(l.amount)}</span> <span className="text-base">$1UP</span>
           </div>
           <div className="label">{l.from_loss ? `From a loss in epoch ${l.created - 1}` : `Locked by you in epoch ${l.created}`}</div>
@@ -112,20 +113,23 @@ function LockCard({ l, epoch, px, listings }: { l: LockInfo; epoch: number; px: 
           disabled={BigInt(claimable) === 0n}
           onClick={() => run(`Claim lock #${l.token_id} rewards`, () => tx.claimVe(l.token_id, past))}
         >
+          <Icon name="claim" />
           Claim
         </button>
         {ended && !l.withdrawn ? (
           <button className="btn btn-ghost" onClick={() => run(`Unlock #${l.token_id}`, () => tx.unlock(l.token_id))}>
+            <Icon name="unlock" />
             Unlock
           </button>
         ) : (
           <button className="btn btn-ghost" disabled={l.withdrawn} onClick={() => setLeaving(!leaving)} aria-expanded={leaving}>
+            <Icon name="leave" />
             Leave early
           </button>
         )}
       </div>
       {leaving && !l.withdrawn && (
-        <div className="mt-3 rounded-lg border-2 border-[var(--short)] p-3 text-sm">
+        <div className="mt-3 rounded-lg border border-[var(--short)] p-3 text-sm">
           <p>
             You get <b className="num">{fmtOneup((BigInt(l.amount) - penalty).toString())} $1UP</b> now. The other{" "}
             <b className="num">{fmtOneup(penalty.toString())}</b> ({((Number(penalty) / Number(l.amount)) * 100).toFixed(1)}%)
@@ -133,7 +137,7 @@ function LockCard({ l, epoch, px, listings }: { l: LockInfo; epoch: number; px: 
           </p>
           <button
             className="btn mt-2 w-full"
-            style={{ background: "var(--short)", color: "var(--on-color)" }}
+            style={{ "--btn-bg": "var(--short-fill)", color: "var(--on-fill)" } as React.CSSProperties}
             onClick={() => run(`Leave lock #${l.token_id} early`, () => tx.exitEarly(l.token_id)).then(() => setLeaving(false))}
           >
             Leave and pay {fmtOneup(penalty.toString())} $1UP
@@ -149,7 +153,7 @@ function LockCard({ l, epoch, px, listings }: { l: LockInfo; epoch: number; px: 
 function TimeBar({ left }: { left: number }) {
   const pct = (left / MAX) * 100;
   return (
-    <div className="mt-3 h-3 overflow-hidden rounded-md border-2 border-[var(--edge)] bg-[var(--panel-2)]" role="progressbar" aria-label="Lock time left" aria-valuenow={left} aria-valuemin={0} aria-valuemax={MAX}>
+    <div className="mt-3 h-3 overflow-hidden rounded-md border border-[var(--edge)] bg-[var(--panel-2)]" role="progressbar" aria-label="Lock time left" aria-valuenow={left} aria-valuemin={0} aria-valuemax={MAX}>
       <div className="h-full bg-[var(--info)]" style={{ width: `${pct}%` }} />
     </div>
   );
@@ -163,8 +167,11 @@ function LockForm() {
   const years = epochs / 52;
   return (
     <div className="panel flex flex-col gap-3 p-4">
-      <div className="display text-lg">Lock $1UP</div>
-      <input className="input num" value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="$1UP amount" inputMode="decimal" />
+      <div className="text-lg font-extrabold">Lock $1UP</div>
+      <span className="field">
+        <input className="input num" value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="$1UP amount" inputMode="decimal" />
+        <span className="field-unit">$1UP</span>
+      </span>
       <label className="flex flex-col gap-1">
         <span className="label flex justify-between">
           <span>Lock for</span>
@@ -187,6 +194,7 @@ function LockForm() {
         Leaving early costs up to half, less as the lock runs down.
       </p>
       <button className="btn btn-accent" disabled={raw === 0n} onClick={() => run(`Lock ${amount} $1UP`, () => tx.lock(raw, epochs))}>
+        <Icon name="lock" />
         Lock
       </button>
     </div>
