@@ -136,7 +136,7 @@ they were paid, so later losers recovered less. Making lives expire after 13 epo
 | [`app`](app) | Next.js app: trade, Extra Lives, locks, market, solvency, fairness |
 | [`docs`](docs) | [Maths](docs/maths.md), [interfaces](docs/interfaces.md), [decisions](docs/decisions.md), [plan](PLAN.md) |
 
-Tests: 84 contract unit and property tests, 5 end-to-end sandbox tests, plus SDK and simulation tests.
+Tests: 95 contract unit and property tests, 5 end-to-end sandbox tests, plus SDK and simulation tests.
 The sandbox tests found two real bugs during the build (a u128 overflow in reward splits and a
 duplicate-registration panic), and running the demo found a third (the reserve floor; decision D-12).
 

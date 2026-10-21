@@ -38,6 +38,14 @@ export function useHistory(account: string) {
   return h;
 }
 
+const REASON: Record<string, string> = {
+  Close: "Closed",
+  Liquidation: "Liquidated",
+  TakeProfit: "Took profit at the cap",
+  Target: "Take-profit hit",
+  Stop: "Stop-loss hit",
+};
+
 const when = (t: number) => new Date(t).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
 const short = (a: string) => a.replace(/\.test\.near$/, "");
 
@@ -83,7 +91,7 @@ function Row({ i, me }: { i: HistoryItem; me: string }) {
           <span style={{ color: tr.side === "Long" ? "var(--long)" : "var(--short)" }}>{tr.side}</span> {tr.market_id} {tr.leverage}×
         </>
       );
-      detail = `${tr.reason === "Liquidation" ? "Liquidated" : tr.reason === "TakeProfit" ? "Took profit at the cap" : "Closed"} · ${fmtPrice(BigInt(tr.entry_price))} → ${fmtPrice(BigInt(tr.exit_price))}`;
+      detail = `${REASON[tr.reason] ?? "Closed"} · ${fmtPrice(BigInt(tr.entry_price))} → ${fmtPrice(BigInt(tr.exit_price))}`;
       amount = (
         <span className="text-right" style={{ color }}>
           <span className="block font-extrabold">

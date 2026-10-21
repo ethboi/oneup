@@ -8,9 +8,12 @@ import {
   lifeCapPpm,
   liquidationPrice,
   maxLiability,
+  numberToPrice,
   owed,
   pnl,
   priceToNumber,
+  stopHit,
+  targetHit,
   type Order,
   type Position,
   type Side,
@@ -20,6 +23,7 @@ import { PriceChart, type Mark } from "./PriceChart";
 import { fmtClock, useNow } from "./Header";
 import { PixelHeart } from "./Pixel";
 import { Icon } from "./Icon";
+import { Popover } from "./Popover";
 import { ActivityList, useActivity } from "./Activity";
 import { HistoryList } from "./History";
 import { ShareButton, type CardData } from "./PnlCard";
@@ -125,6 +129,13 @@ function useTicket(market: string, maxLeverage: number) {
   const [side, setSide] = useState<Side>("Long");
   const [margin, setMargin] = useState("500");
   const [leverage, setLeverage] = useState(50);
+  const [tp, setTp] = useState("");
+  const [sl, setSl] = useState("");
+  // trigger prices belong to one market and side: clear them when either changes
+  useEffect(() => {
+    setTp("");
+    setSl("");
+  }, [market, side]);
   const m = BigInt(Math.floor(Number(margin) || 0)) * USDC;
   const price = prices[market];
   const quote = usePoll(() => o.quoteOpen(market, side, m, leverage, price), [market, side, margin, leverage, price?.toString()]);
@@ -133,13 +144,18 @@ function useTicket(market: string, maxLeverage: number) {
   const pool = BigInt(usePoll(() => o.pool(), []) ?? "0");
   // short of free balance: top up from the wallet in the same transaction
   const topUp = m > free ? m - free : 0n;
-  const blocked = !quote?.allowed || m === 0n || topUp > wallet;
+  const tpAt = toPrice(tp);
+  const slAt = toPrice(sl);
+  // a trigger already past the price would fire on the first price after the hold: refuse it here
+  const badTrigger = !!price && ((!!tpAt && targetHit(side, price, tpAt)) || (!!slAt && stopHit(side, price, slAt)));
+  const blocked = !quote?.allowed || m === 0n || topUp > wallet || badTrigger;
   const label = `${topUp > 0n ? `Deposit $${fmtUsdc(topUp, 0)} & ` : ""}${side} ${market}`;
+  const triggers = { takeProfit: tpAt, stopLoss: slAt };
   const submit = () =>
     run(`${side} ${market} ${leverage}× · $${margin}`, () =>
-      topUp > 0n ? tx.depositAndOpen(topUp, market, side, m, leverage) : tx.placeOpen(market, side, m, leverage),
+      topUp > 0n ? tx.depositAndOpen(topUp, market, side, m, leverage, triggers) : tx.placeOpen(market, side, m, leverage, triggers),
     );
-  return { market, maxLeverage, side, setSide, margin, setMargin, leverage, setLeverage, m, quote, free, wallet, pool, topUp, blocked, label, submit };
+  return { market, maxLeverage, side, setSide, margin, setMargin, leverage, setLeverage, tp, setTp, sl, setSl, price, m, quote, free, wallet, pool, topUp, blocked, label, submit };
 }
 
 /** The handheld: plastic case, slate surround with stripes, the LCD with its readout, and the market buttons. */
@@ -200,7 +216,8 @@ function Console({ market, setMarket, markets, marks }: { market: string; setMar
 }
 
 function OrderForm({ t }: { t: Ticket }) {
-  const { side, setSide, margin, setMargin, leverage, setLeverage, maxLeverage, m, quote, free, wallet, pool, topUp, blocked } = t;
+  const { side, setSide, margin, setMargin, leverage, setLeverage, maxLeverage, m, quote, free, wallet, pool, topUp, blocked, price } = t;
+  const liq = quote?.liquidation_price ? BigInt(quote.liquidation_price) : null;
   // what a full loss would bring: an Extra Life of at most the loss × today's cap, and up to 20 $1UP per $1
   const lifeUpTo = owed(m, lifeCapPpm(pool));
   const oneupUpTo = Number(m / USDC) * Number(ONEUP_PER_USDC);
@@ -279,8 +296,13 @@ function OrderForm({ t }: { t: Ticket }) {
         <dt className="label">Winner&apos;s cut</dt>
         <dd className="num text-right">{quote ? `${(Number(quote.cut_ppm) / 1e4).toFixed(1)}%` : "…"}</dd>
         <dt className="label">Liquidation price</dt>
-        <dd className="num text-right">{quote?.liquidation_price ? fmtPrice(BigInt(quote.liquidation_price)) : "…"}</dd>
+        <dd className="num text-right">
+          {liq ? fmtPrice(liq) : "…"}
+          {liq && price ? <span className="label"> ({away(price, liq)} away)</span> : null}
+        </dd>
       </dl>
+
+      <TriggerFields side={side} entry={price} margin={m} leverage={leverage} liq={liq} tp={t.tp} setTp={t.setTp} sl={t.sl} setSl={t.setSl} />
 
       {/* the promise, where the decision is made */}
       {m > 0n && (
@@ -386,8 +408,15 @@ function Positions({ positions, orders }: { positions: Position[]; orders: Order
               <dd>${fmtUsdc(BigInt(p.margin) * BigInt(p.leverage), 0)}</dd>
               <dd>{fmtPrice(BigInt(p.entry_price))}</dd>
               <dd>{mark ? fmtPrice(mark) : "…"}</dd>
-              <dd>{fmtPrice(liquidationPrice(p.side, BigInt(p.entry_price), p.leverage))}</dd>
+              <dd>
+                {fmtPrice(liquidationPrice(p.side, BigInt(p.entry_price), p.leverage))}
+                {mark && <span className="label block">{away(mark, liquidationPrice(p.side, BigInt(p.entry_price), p.leverage))} away</span>}
+              </dd>
             </dl>
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <TriggerSummary p={p} />
+              <EditTriggers key={JSON.stringify(p.triggers)} p={p} />
+            </div>
             <div className="mt-3 flex gap-2">
               <div className="flex-1">
                 <CloseButton p={p} hold={hold} wide />
@@ -406,6 +435,7 @@ function Positions({ positions, orders }: { positions: Position[]; orders: Order
               <th className="pb-2 font-normal">Entry</th>
               <th className="pb-2 font-normal">Mark</th>
               <th className="pb-2 font-normal">Liq.</th>
+              <th className="pb-2 font-normal">TP / SL</th>
               <th className="pb-2 text-right font-normal">PnL</th>
               <th />
             </tr>
@@ -413,14 +443,23 @@ function Positions({ positions, orders }: { positions: Position[]; orders: Order
           <tbody>
             {rows.map(({ p, mark, v, hold }) => (
               <tr key={p.id} className="border-t border-[var(--line)]">
-                <td className="py-2">
+                <td className="py-2.5">
                   <span style={{ color: p.side === "Long" ? "var(--long)" : "var(--short)" }}>{p.side}</span> {p.market_id}{" "}
                   {p.leverage}×
                 </td>
                 <td>${fmtUsdc(BigInt(p.margin) * BigInt(p.leverage), 0)}</td>
                 <td>{fmtPrice(BigInt(p.entry_price))}</td>
                 <td>{mark ? fmtPrice(mark) : "…"}</td>
-                <td>{fmtPrice(liquidationPrice(p.side, BigInt(p.entry_price), p.leverage))}</td>
+                <td>
+                  {fmtPrice(liquidationPrice(p.side, BigInt(p.entry_price), p.leverage))}
+                  {mark && <span className="label block">{away(mark, liquidationPrice(p.side, BigInt(p.entry_price), p.leverage))} away</span>}
+                </td>
+                <td>
+                  <span className="flex items-center gap-1">
+                    <TriggerSummary p={p} />
+                    <EditTriggers key={JSON.stringify(p.triggers)} p={p} />
+                  </span>
+                </td>
                 <td className="text-right" style={{ color: v >= 0n ? "var(--long)" : "var(--short)" }}>
                   {v >= 0n ? "+" : ""}
                   {fmtUsdc(v)}
@@ -457,6 +496,117 @@ function CloseButton({ p, hold, wide }: { p: Position; hold: number; wide?: bool
     >
       {hold > 0 ? `Close in ${hold}s` : "Close"}
     </button>
+  );
+}
+
+/** How far the mark is from a price, as a percentage of the mark. */
+const away = (mark: bigint, to: bigint) => `${((Math.abs(Number(to - mark)) / Number(mark)) * 100).toFixed(1)}%`;
+
+/** A typed price ("5.42") in 1e8 units, or null when blank or not a positive number. */
+const toPrice = (x: string) => (Number(x) > 0 ? numberToPrice(Number(x)) : null);
+
+/** Optional take-profit and stop-loss for a new order: prices, with what each would make or lose. */
+function TriggerFields(props: {
+  side: Side;
+  entry?: bigint;
+  margin: bigint;
+  leverage: number;
+  liq: bigint | null;
+  tp: string;
+  setTp: (x: string) => void;
+  sl: string;
+  setSl: (x: string) => void;
+}) {
+  const { side, entry, margin, leverage, liq, tp, setTp, sl, setSl } = props;
+  const [open, setOpen] = useState(false);
+  if (!open && !tp && !sl) {
+    return (
+      <button type="button" className="chip self-start" onClick={() => setOpen(true)}>
+        + Take profit / stop loss
+      </button>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-2 gap-2">
+        <TriggerInput label="Take profit" value={tp} set={setTp} hint={hint(side, entry, margin, leverage, tp, "tp", liq)} />
+        <TriggerInput label="Stop loss" value={sl} set={setSl} hint={hint(side, entry, margin, leverage, sl, "sl", liq)} />
+      </div>
+      <p className="label">Closes at the first oracle price past it, after the 60 s minimum hold.</p>
+    </div>
+  );
+}
+
+function TriggerInput({ label, value, set, hint }: { label: string; value: string; set: (x: string) => void; hint: { text: string; bad?: boolean } | null }) {
+  return (
+    <label className="flex min-w-0 flex-col gap-1">
+      <span className="label">{label}</span>
+      <input className="input num" value={value} onChange={(e) => set(e.target.value)} inputMode="decimal" placeholder="Price" aria-label={`${label} price`} />
+      <span className="label num truncate" style={hint?.bad ? { color: "var(--short)" } : undefined}>
+        {hint?.text ?? " "}
+      </span>
+    </label>
+  );
+}
+
+/** What a trigger at `x` would make or lose from `entry`, or why it won't work. */
+function hint(side: Side, entry: bigint | undefined, margin: bigint, leverage: number, x: string, kind: "tp" | "sl", liq: bigint | null) {
+  const at = toPrice(x);
+  if (!at || !entry || margin === 0n) return null;
+  if (kind === "tp" && targetHit(side, entry, at)) return { text: `Must be ${side === "Long" ? "above" : "below"} the price`, bad: true };
+  if (kind === "sl" && stopHit(side, entry, at)) return { text: `Must be ${side === "Long" ? "below" : "above"} the price`, bad: true };
+  if (kind === "sl" && liq && stopHit(side, at, liq)) return { text: "Past liquidation", bad: true };
+  const v = pnl(side, margin, leverage, entry, at);
+  const capped = v > maxLiability(margin) ? maxLiability(margin) : v;
+  const sign = capped >= 0n ? "+" : "−";
+  return { text: `${sign}$${fmtUsdc(capped < 0n ? -capped : capped, 0)} (${sign}${Math.abs((Number(capped) / Number(margin)) * 100).toFixed(0)}%)` };
+}
+
+function TriggerSummary({ p }: { p: Position }) {
+  const { take_profit: tp, stop_loss: sl } = p.triggers;
+  if (!tp && !sl) return <span className="label">–</span>;
+  return (
+    <span className="num text-xs leading-tight">
+      {tp && <span className="block text-[var(--long)]">TP {fmtPrice(BigInt(tp))}</span>}
+      {sl && <span className="block text-[var(--short)]">SL {fmtPrice(BigInt(sl))}</span>}
+    </span>
+  );
+}
+
+/** Set or clear an open position's take-profit and stop-loss. */
+function EditTriggers({ p }: { p: Position }) {
+  const { tx, run, prices } = useOneUp();
+  const mark = prices[p.market_id];
+  const show = (x: string | null) => (x ? String(priceToNumber(BigInt(x))) : "");
+  const [tp, setTp] = useState(show(p.triggers.take_profit));
+  const [sl, setSl] = useState(show(p.triggers.stop_loss));
+  const margin = BigInt(p.margin);
+  const liq = liquidationPrice(p.side, BigInt(p.entry_price), p.leverage);
+  return (
+    <Popover
+      label="Edit take profit and stop loss"
+      button={<Icon name="edit" size={14} />}
+      small
+    >
+      {(close) => (
+        <div className="flex flex-col gap-3">
+          <div className="text-sm font-extrabold">
+            TP / SL · {p.side} {p.market_id} {p.leverage}×
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <TriggerInput label="Take profit" value={tp} set={setTp} hint={hint(p.side, mark, margin, p.leverage, tp, "tp", liq)} />
+            <TriggerInput label="Stop loss" value={sl} set={setSl} hint={hint(p.side, mark, margin, p.leverage, sl, "sl", liq)} />
+          </div>
+          <p className="label">Gains and losses shown from the current price. Fires on the next oracle price past it; blank clears.</p>
+          <button
+            className="btn btn-accent"
+            onClick={() => run(`Set TP / SL on #${p.id}`, () => tx.setTriggers(p.id, { takeProfit: toPrice(tp), stopLoss: toPrice(sl) })).then(close)}
+          >
+            Save
+          </button>
+        </div>
+      )}
+    </Popover>
   );
 }
 

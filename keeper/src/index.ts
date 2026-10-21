@@ -1,5 +1,6 @@
-// The OneUp keeper: anyone can run one. Each tick it pushes prices, fills and expires orders, liquidates
-// and takes profit at the cap, steps epoch closes, and (with the owner key) runs buybacks.
+// The OneUp keeper: anyone can run one. Each tick it pushes prices, fills and expires orders, liquidates,
+// takes profit at the cap, fires traders' take-profits and stop-losses, steps epoch closes, and (with the
+// owner key) runs buybacks.
 //
 //   pnpm --filter @oneup/keeper start [--prices live|sim|hermes] [--tick 3000] [--price-tick 1000] [--control 8787]
 //
@@ -18,6 +19,8 @@ import {
   isLiquidatable,
   normalizePrice,
   pnl,
+  stopHit,
+  targetHit,
   type Deployment,
   type Position,
 } from "@oneup/sdk";
@@ -38,6 +41,7 @@ const oneup = new OneUp(d);
 const keeper = oneup.calls(accountSender(new Account(d.keeper.id, oneup.provider, d.keeper.key as KeyPairString)));
 const owner = oneup.calls(accountSender(new Account(d.owner.id, oneup.provider, d.owner.key as KeyPairString)));
 const FILL_WINDOW_S = 30;
+const minHoldS = (await oneup.params()).min_hold_s;
 
 const source: PriceSource =
   args.prices === "hermes" ? new HermesSource() : args.prices === "sim" ? new SimSource(d.markets) : new LiveSource();
@@ -93,6 +97,16 @@ async function handlePositions() {
     } else if (atProfitCap(v, margin)) {
       const ok = await keeper.takeProfit(p.id);
       log(`${ok ? "took profit at cap" : "could not take profit"} #${p.id} ${p.owner}`);
+    } else if (nowS() >= p.opened_at + minHoldS && px.time > p.triggers_set_at) {
+      // the trader's own triggers: after the minimum hold, on a price newer than when they were set
+      const { take_profit: tp, stop_loss: sl } = p.triggers;
+      if (tp && targetHit(p.side, px.price, BigInt(tp))) {
+        const ok = await keeper.hitTarget(p.id);
+        log(`${ok ? "hit take-profit" : "could not hit take-profit"} #${p.id} ${p.owner}`);
+      } else if (sl && stopHit(p.side, px.price, BigInt(sl))) {
+        const ok = await keeper.hitStop(p.id);
+        log(`${ok ? "hit stop-loss" : "could not hit stop-loss"} #${p.id} ${p.owner}`);
+      }
     }
   }
 }

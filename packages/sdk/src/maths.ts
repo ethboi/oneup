@@ -175,3 +175,9 @@ export const priceToNumber = (p: bigint) => Number(p) / 1e8;
 
 /** ppm → "1.84×" style number. */
 export const ppmToNumber = (p: bigint) => Number(p) / 1e6;
+export const numberToPrice = (x: number) => BigInt(Math.round(x * 1e8));
+
+/** Decision D-19: a take-profit fires once the price reaches it in the position's favour, a stop once it
+ *  reaches it against. */
+export const targetHit = (side: Side, price: bigint, target: bigint) => (side === "Long" ? price >= target : price <= target);
+export const stopHit = (side: Side, price: bigint, stop: bigint) => (side === "Long" ? price <= stop : price >= stop);

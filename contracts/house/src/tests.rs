@@ -53,7 +53,7 @@ fn deposit(h: &mut House, who: &str, amount: u128) {
 /// Places an open at `t` and fills it at `cents` one second later. Returns the position id.
 fn open(h: &mut House, who: &str, side: Side, margin: u128, lev: u32, cents: i64, t: u64) -> u64 {
     ctx(who, t);
-    let order = h.place_open(MARKET.into(), side, U128(margin), lev);
+    let order = h.place_open(MARKET.into(), side, U128(margin), lev, None, None);
     ctx("keeper", t + 1);
     h.internal_fill(order, px(cents, t + 1), t + 1).unwrap();
     h.next_id - 1
@@ -95,7 +95,7 @@ fn fills_only_at_a_price_published_after_the_order() {
     let mut h = setup(usd(100_000));
     deposit(&mut h, "alice", usd(1_000));
     ctx("alice", T0 + 100);
-    let order = h.place_open(MARKET.into(), Side::Long, U128(usd(1_000)), 50);
+    let order = h.place_open(MARKET.into(), Side::Long, U128(usd(1_000)), 50, None, None);
     assert_eq!(h.get_balance(acc("alice")).0, 0);
     assert_eq!(h.get_solvency().liability.0, usd(9_000));
 
@@ -123,7 +123,7 @@ fn expired_open_refunds_margin_and_liability() {
     let mut h = setup(usd(100_000));
     deposit(&mut h, "alice", usd(1_000));
     ctx("alice", T0);
-    let order = h.place_open(MARKET.into(), Side::Short, U128(usd(1_000)), 10);
+    let order = h.place_open(MARKET.into(), Side::Short, U128(usd(1_000)), 10, None, None);
     ctx("anyone", T0 + 31);
     h.expire(order);
     assert_eq!(h.get_balance(acc("alice")).0, usd(1_000));
@@ -136,7 +136,7 @@ fn cannot_expire_early() {
     let mut h = setup(usd(100_000));
     deposit(&mut h, "alice", usd(1_000));
     ctx("alice", T0);
-    let order = h.place_open(MARKET.into(), Side::Short, U128(usd(1_000)), 10);
+    let order = h.place_open(MARKET.into(), Side::Short, U128(usd(1_000)), 10, None, None);
     ctx("anyone", T0 + 30);
     h.expire(order);
 }
@@ -149,7 +149,7 @@ fn v4_solvency_counts_both_sides() {
     open(&mut h, "alice", Side::Long, usd(2_000), 10, 500, T0);
     open(&mut h, "alice", Side::Short, usd(500), 10, 500, T0);
     ctx("alice", T0 + 10);
-    h.place_open(MARKET.into(), Side::Long, U128(usd(300)), 10);
+    h.place_open(MARKET.into(), Side::Long, U128(usd(300)), 10, None, None);
 }
 
 #[test]
@@ -174,7 +174,7 @@ fn market_capacity() {
     deposit(&mut h, "alice", usd(2_000));
     open(&mut h, "alice", Side::Long, usd(1_000), 10, 500, T0);
     ctx("alice", T0 + 10);
-    h.place_open(MARKET.into(), Side::Long, U128(usd(200)), 10);
+    h.place_open(MARKET.into(), Side::Long, U128(usd(200)), 10, None, None);
 }
 
 #[test]
@@ -618,7 +618,7 @@ mod invariants {
                             || h.get_balance(acc(WHO[who])).0 < margin;
                         if !refused {
                             ctx(WHO[who], t);
-                            h.place_open(MARKET.into(), side, U128(margin), lev);
+                            h.place_open(MARKET.into(), side, U128(margin), lev, None, None);
                         }
                     }
                     Op::Move { bps } => cents = (cents * (10_000 + bps) / 10_000).max(1),
@@ -661,4 +661,80 @@ mod invariants {
             }
         }
     }
+}
+
+/// Decision D-19: take-profit and stop-loss, set with the order or later.
+fn open_with(h: &mut House, who: &str, side: Side, lev: u32, cents: i64, tp: Option<i64>, sl: Option<i64>) -> u64 {
+    let c = |x: i64| U128(x as u128 * 1_000_000);
+    ctx(who, T0);
+    let order = h.place_open(MARKET.into(), side, U128(usd(1_000)), lev, tp.map(c), sl.map(c));
+    ctx("keeper", T0 + 1);
+    h.internal_fill(order, px(cents, T0 + 1), T0 + 1).unwrap();
+    h.next_id - 1
+}
+
+#[test]
+fn take_profit_from_the_order_waits_out_the_hold() {
+    let mut h = setup(usd(100_000));
+    deposit(&mut h, "alice", usd(1_000));
+    let pos = open_with(&mut h, "alice", Side::Long, 10, 500, Some(510), Some(490));
+    // reached, but inside the 60 s minimum hold
+    assert!(h.internal_keeper_close(pos, CloseReason::Target, px(511, T0 + 30), T0 + 30).is_err());
+    // not reached
+    assert!(h.internal_keeper_close(pos, CloseReason::Target, px(509, T0 + 70), T0 + 70).is_err());
+    // the stop isn't hit by a rising price
+    assert!(h.internal_keeper_close(pos, CloseReason::Stop, px(511, T0 + 70), T0 + 70).is_err());
+    // closes at the oracle price that crossed, not at the trigger
+    h.internal_keeper_close(pos, CloseReason::Target, px(512, T0 + 71), T0 + 71).unwrap();
+    assert!(h.get_position(pos).is_none());
+    // +2.4% on 10,000 = +240, less the winner's cut
+    let bal = h.get_balance(acc("alice")).0;
+    assert!(bal > usd(1_000) && bal < usd(1_240));
+}
+
+#[test]
+fn stop_loss_on_a_short_counts_as_a_loss() {
+    let mut h = setup(usd(100_000));
+    deposit(&mut h, "bob", usd(1_000));
+    let pos = open_with(&mut h, "bob", Side::Short, 10, 500, None, Some(505));
+    assert!(h.internal_keeper_close(pos, CloseReason::Stop, px(504, T0 + 70), T0 + 70).is_err());
+    h.internal_keeper_close(pos, CloseReason::Stop, px(506, T0 + 71), T0 + 71).unwrap();
+    // −1.2% on 10,000 = −120: the rest comes back and the loss counts toward an Extra Life
+    assert_eq!(h.get_balance(acc("bob")).0, usd(880));
+    assert_eq!(h.get_pending_life(acc("bob")).0, usd(120));
+}
+
+#[test]
+fn triggers_set_later_fire_only_on_a_newer_price() {
+    let mut h = setup(usd(100_000));
+    deposit(&mut h, "alice", usd(1_000));
+    let pos = open_with(&mut h, "alice", Side::Long, 10, 500, None, None);
+    assert!(h.internal_keeper_close(pos, CloseReason::Target, px(520, T0 + 90), T0 + 90).is_err());
+    // a target already below the price: it must not close at the price she could see when setting it
+    ctx("alice", T0 + 100);
+    h.set_triggers(pos, Some(U128(490 * 1_000_000)), None);
+    assert!(h.internal_keeper_close(pos, CloseReason::Target, px(520, T0 + 100), T0 + 100).is_err());
+    h.internal_keeper_close(pos, CloseReason::Target, px(519, T0 + 101), T0 + 101).unwrap();
+    assert!(h.get_position(pos).is_none());
+}
+
+#[test]
+fn triggers_can_be_cleared() {
+    let mut h = setup(usd(100_000));
+    deposit(&mut h, "bob", usd(1_000));
+    let pos = open_with(&mut h, "bob", Side::Long, 10, 500, Some(510), Some(490));
+    ctx("bob", T0 + 10);
+    h.set_triggers(pos, None, None);
+    assert!(h.internal_keeper_close(pos, CloseReason::Stop, px(480, T0 + 80), T0 + 80).is_err());
+    assert!(h.internal_keeper_close(pos, CloseReason::Target, px(520, T0 + 80), T0 + 80).is_err());
+}
+
+#[test]
+#[should_panic(expected = "Not your position")]
+fn only_the_owner_sets_triggers() {
+    let mut h = setup(usd(100_000));
+    deposit(&mut h, "bob", usd(1_000));
+    let pos = open_with(&mut h, "bob", Side::Long, 10, 500, None, None);
+    ctx("mallory", T0 + 10);
+    h.set_triggers(pos, None, Some(U128(499 * 1_000_000)));
 }

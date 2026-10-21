@@ -139,8 +139,12 @@ class Bot {
     const q = await o.quoteOpen(m.id, side, margin, leverage);
     if (!q.allowed) return log(this.style.name, `skip ${m.id}: ${q.reason}`);
     try {
-      await this.tx.placeOpen(m.id, side, margin, leverage);
-      log(this.style.name, `open ${side} ${m.id} ${leverage}x $${fmtUsdc(margin, 0)}`);
+      // half the time, a take-profit at +40% of margin and a stop at −30%, like a careful trader
+      const px = latest.get(m.id)!;
+      const at = (roe: number) => (px * BigInt(Math.round((1 + ((side === "Long" ? 1 : -1) * roe) / leverage) * 1e6))) / 1_000_000n;
+      const triggers = Math.random() < 0.5 ? { takeProfit: at(0.4), stopLoss: at(-0.3) } : {};
+      await this.tx.placeOpen(m.id, side, margin, leverage, triggers);
+      log(this.style.name, `open ${side} ${m.id} ${leverage}x $${fmtUsdc(margin, 0)}${"takeProfit" in triggers ? " with TP/SL" : ""}`);
     } catch (e) {
       log(this.style.name, `open failed: ${short(e)}`);
     }

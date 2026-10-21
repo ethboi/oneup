@@ -90,6 +90,22 @@ pub fn at_profit_cap(pnl: i128, margin: u128) -> bool {
     pnl >= max_liability(margin) as i128
 }
 
+/// A take-profit is hit once the price reaches it in the position's favour (decision D-19).
+pub fn target_hit(side: Side, price: u128, target: u128) -> bool {
+    match side {
+        Side::Long => price >= target,
+        Side::Short => price <= target,
+    }
+}
+
+/// A stop-loss is hit once the price reaches it against the position.
+pub fn stop_hit(side: Side, price: u128, stop: u128) -> bool {
+    match side {
+        Side::Long => price <= stop,
+        Side::Short => price >= stop,
+    }
+}
+
 /// `P0 × (1 ∓ 0.9 / k)` in 1e8 price units.
 pub fn liquidation_price(side: Side, entry: u128, leverage: u32) -> u128 {
     let k = leverage as u128;

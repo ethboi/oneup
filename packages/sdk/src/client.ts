@@ -30,10 +30,19 @@ export interface Position {
   opened_at: number;
   cut_ppm: U128;
   close_order: number | null;
+  triggers: Triggers;
+  /** Block time the triggers were last set; only newer prices fire them. */
+  triggers_set_at: number;
+}
+
+/** Take-profit and stop-loss prices, 1e8 units (decision D-19). */
+export interface Triggers {
+  take_profit: U128 | null;
+  stop_loss: U128 | null;
 }
 
 export type OrderKind =
-  | { Open: { side: Side; margin: U128; leverage: number; cut_ppm: U128 } }
+  | { Open: { side: Side; margin: U128; leverage: number; cut_ppm: U128; triggers: Triggers } }
   | { Close: { position_id: number } };
 
 export interface Order {
@@ -203,7 +212,7 @@ export class OneUp {
   buyback = (epoch: number) => this.house<{ status: string; usdc: U128; oneup: U128 } | null>("get_buyback", { epoch });
   emissions = (epoch: number) => this.house<EpochEmissions | null>("get_emissions", { epoch });
   emissionCarry = () => this.house<U128>("get_emission_carry");
-  params = () => this.house<{ life_expiry_epochs: number; market_capacity_ppm: U128; oneup_per_usdc: number }>("get_params");
+  params = () => this.house<{ life_expiry_epochs: number; market_capacity_ppm: U128; oneup_per_usdc: number; min_hold_s: number }>("get_params");
   quoteOpen = (market_id: string, side: Side, margin: bigint, leverage: number, price?: bigint) =>
     this.house<Quote>("quote_open", {
       market_id,
@@ -246,17 +255,21 @@ export class OneUp {
       faucet: (amount: bigint) => send<void>({ contractId: c.usdc, methodName: "faucet", args: { amount: amount.toString() } }),
       deposit: (amount: bigint) => ftCall(c.usdc, c.house, amount, ""),
       /** Deposits `amount` from the wallet and places an open for `margin` in one transaction. */
-      depositAndOpen: (amount: bigint, market_id: string, side: Side, margin: bigint, leverage: number) =>
-        ftCall(c.usdc, c.house, amount, JSON.stringify({ open: { market_id, side, margin: margin.toString(), leverage } })),
+      depositAndOpen: (amount: bigint, market_id: string, side: Side, margin: bigint, leverage: number, t: TriggerArgs = {}) =>
+        ftCall(c.usdc, c.house, amount, JSON.stringify({ open: { market_id, side, margin: margin.toString(), leverage, ...triggerArgs(t) } })),
       withdraw: (amount: bigint) =>
         send<boolean>({ contractId: c.house, methodName: "withdraw", args: { amount: amount.toString() }, deposit: ONE_YOCTO }),
-      placeOpen: (market_id: string, side: Side, margin: bigint, leverage: number) =>
-        house<number>("place_open", { market_id, side, margin: margin.toString(), leverage }),
+      placeOpen: (market_id: string, side: Side, margin: bigint, leverage: number, t: TriggerArgs = {}) =>
+        house<number>("place_open", { market_id, side, margin: margin.toString(), leverage, ...triggerArgs(t) }),
+      /** Sets or clears a position's take-profit and stop-loss (1e8 price units; null clears). */
+      setTriggers: (position_id: number, t: TriggerArgs) => house<void>("set_triggers", { position_id, ...triggerArgs(t) }),
       placeClose: (position_id: number) => house<number>("place_close", { position_id }),
       fill: (order_id: number) => house<boolean>("fill", { order_id }),
       expire: (order_id: number) => house<void>("expire", { order_id }),
       liquidate: (position_id: number) => house<boolean>("liquidate", { position_id }),
       takeProfit: (position_id: number) => house<boolean>("take_profit", { position_id }),
+      hitTarget: (position_id: number) => house<boolean>("hit_target", { position_id }),
+      hitStop: (position_id: number) => house<boolean>("hit_stop", { position_id }),
       closeEpoch: (limit = 10) => house<string>("close_epoch", { limit }, MAX_GAS),
       buyback: (epoch: number, min_out: bigint) => house<void>("buyback", { epoch, min_out: min_out.toString() }, MAX_GAS),
       claimLives: (token_ids: string[]) => send<void>({ contractId: c.life, methodName: "claim", args: { token_ids } }),
@@ -285,3 +298,14 @@ export class OneUp {
     };
   }
 }
+
+/** Take-profit and stop-loss for an order or a position, 1e8 price units. */
+export interface TriggerArgs {
+  takeProfit?: bigint | null;
+  stopLoss?: bigint | null;
+}
+
+const triggerArgs = (t: TriggerArgs) => ({
+  take_profit: t.takeProfit ? t.takeProfit.toString() : null,
+  stop_loss: t.stopLoss ? t.stopLoss.toString() : null,
+});

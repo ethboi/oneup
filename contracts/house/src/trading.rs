@@ -4,7 +4,7 @@ use oneup_math as math;
 
 use crate::events::{CloseReason, Event};
 use crate::oracle::{ext_ft, ext_oracle, CheckedPrice, OraclePrice};
-use crate::{now_s, House, HouseExt, Order, OrderKind, Position, Side};
+use crate::{now_s, House, HouseExt, Order, OrderKind, Position, Side, Triggers};
 
 const GAS_ORACLE: Gas = Gas::from_tgas(10);
 const GAS_CALLBACK: Gas = Gas::from_tgas(40);
@@ -16,7 +16,16 @@ const GAS_WITHDRAW_CALLBACK: Gas = Gas::from_tgas(10);
 enum DepositMsg {
     Seed {},
     /// Deposit and place an open in one step; `margin` comes from the free balance after the deposit.
-    Open { market_id: String, side: Side, margin: U128, leverage: u32 },
+    Open {
+        market_id: String,
+        side: Side,
+        margin: U128,
+        leverage: u32,
+        #[serde(default)]
+        take_profit: Option<U128>,
+        #[serde(default)]
+        stop_loss: Option<U128>,
+    },
 }
 
 #[near]
@@ -45,11 +54,11 @@ impl House {
                     self.mint_lives(0, vec![(sender_id.clone(), amount.0, math::PPM)], false).detach();
                     Event::Seed { amount, pool: U128(self.pool) }.emit();
                 }
-                DepositMsg::Open { market_id, side, margin, leverage } => {
+                DepositMsg::Open { market_id, side, margin, leverage, take_profit, stop_loss } => {
                     // a refused open (capacity, leverage) panics, so the whole transfer is refunded
                     self.credit(&sender_id, amount.0);
                     Event::Deposit { account_id: sender_id.clone(), amount }.emit();
-                    self.internal_place_open(sender_id, market_id, side, margin, leverage);
+                    self.internal_place_open(sender_id, market_id, side, margin, leverage, Triggers { take_profit, stop_loss });
                 }
             }
         }
@@ -83,8 +92,30 @@ impl House {
 
     /// Moves `margin` from the free balance into a pending open. The solvency rule and the market's
     /// capacity are checked now, with the order counted, so the fill can't be refused for room.
-    pub fn place_open(&mut self, market_id: String, side: Side, margin: U128, leverage: u32) -> u64 {
-        self.internal_place_open(env::predecessor_account_id(), market_id, side, margin, leverage)
+    /// Optional take-profit and stop-loss prices go with the position once it fills.
+    pub fn place_open(
+        &mut self,
+        market_id: String,
+        side: Side,
+        margin: U128,
+        leverage: u32,
+        take_profit: Option<U128>,
+        stop_loss: Option<U128>,
+    ) -> u64 {
+        let triggers = Triggers { take_profit, stop_loss };
+        self.internal_place_open(env::predecessor_account_id(), market_id, side, margin, leverage, triggers)
+    }
+
+    /// Sets or clears a position's take-profit and stop-loss. They fire only on prices published after
+    /// this call, so a trigger set across the current price can't close at a price the trader already knows.
+    pub fn set_triggers(&mut self, position_id: u64, take_profit: Option<U128>, stop_loss: Option<U128>) {
+        let account = env::predecessor_account_id();
+        let p = self.positions.get_mut(&position_id).unwrap_or_else(|| env::panic_str("No such position"));
+        require!(p.owner == account, "Not your position");
+        require!(take_profit.is_none_or(|x| x.0 > 0) && stop_loss.is_none_or(|x| x.0 > 0), "Trigger prices must be above zero");
+        p.triggers = Triggers { take_profit, stop_loss };
+        p.triggers_set_at = now_s();
+        Event::TriggersSet { position_id, account_id: account, take_profit, stop_loss }.emit();
     }
     pub fn place_close(&mut self, position_id: u64) -> u64 {
         let account = env::predecessor_account_id();
@@ -150,6 +181,16 @@ impl House {
         self.price_then(position_id, CloseReason::TakeProfit)
     }
 
+    /// The trader's take-profit price was reached.
+    pub fn hit_target(&mut self, position_id: u64) -> Promise {
+        self.price_then(position_id, CloseReason::Target)
+    }
+
+    /// The trader's stop-loss price was reached.
+    pub fn hit_stop(&mut self, position_id: u64) -> Promise {
+        self.price_then(position_id, CloseReason::Stop)
+    }
+
     #[private]
     pub fn on_keeper_price(
         &mut self,
@@ -198,7 +239,7 @@ impl House {
         }
         self.orders.remove(&order_id);
         match order.kind {
-            OrderKind::Open { side, margin, leverage, cut_ppm } => {
+            OrderKind::Open { side, margin, leverage, cut_ppm, triggers } => {
                 let id = self.take_id();
                 self.positions.insert(
                     id,
@@ -214,6 +255,9 @@ impl House {
                         opened_at: now,
                         cut_ppm,
                         close_order: None,
+                        triggers,
+                        // the fill price is already newer than the order, so it may fire them (after the hold)
+                        triggers_set_at: order.placed_at,
                     },
                 );
                 Event::PositionOpened {
@@ -252,9 +296,14 @@ impl House {
             return Err("Price older than the entry");
         }
         let pnl = math::pnl(pos.side.into(), pos.margin.0, pos.leverage, pos.entry_price.0, p.price);
+        // the trader's own triggers wait out the minimum hold, like a close, and need a price newer than
+        // when they were set
+        let armed = now >= pos.opened_at + self.params.min_hold_s && p.publish_time > pos.triggers_set_at;
         let ok = match reason {
             CloseReason::Liquidation => math::is_liquidatable(pnl, pos.margin.0),
             CloseReason::TakeProfit => math::at_profit_cap(pnl, pos.margin.0),
+            CloseReason::Target => armed && pos.triggers.take_profit.is_some_and(|t| math::target_hit(pos.side.into(), p.price, t.0)),
+            CloseReason::Stop => armed && pos.triggers.stop_loss.is_some_and(|t| math::stop_hit(pos.side.into(), p.price, t.0)),
             CloseReason::Close => false,
         };
         if !ok {
@@ -309,7 +358,15 @@ impl House {
 }
 
 impl House {
-    pub(crate) fn internal_place_open(&mut self, account: AccountId, market_id: String, side: Side, margin: U128, leverage: u32) -> u64 {
+    pub(crate) fn internal_place_open(
+        &mut self,
+        account: AccountId,
+        market_id: String,
+        side: Side,
+        margin: U128,
+        leverage: u32,
+        triggers: Triggers,
+    ) -> u64 {
         let m = self.market(&market_id);
         require!(m.live, "Market is not live");
         require!(leverage >= 1 && leverage <= m.max_leverage, "Leverage out of range");
@@ -325,7 +382,7 @@ impl House {
                 id,
                 owner: account.clone(),
                 market_id: market_id.clone(),
-                kind: OrderKind::Open { side, margin, leverage, cut_ppm },
+                kind: OrderKind::Open { side, margin, leverage, cut_ppm, triggers },
                 placed_at: now_s(),
             },
         );

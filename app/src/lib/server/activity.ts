@@ -31,7 +31,7 @@ export interface TradeRecord {
   exit_price: string;
   /** Signed USDC, 6 decimals. */
   pnl: string;
-  reason: "Close" | "Liquidation" | "TakeProfit";
+  reason: "Close" | "Liquidation" | "TakeProfit" | "Target" | "Stop";
   opened_t: number;
   closed_t: number;
 }

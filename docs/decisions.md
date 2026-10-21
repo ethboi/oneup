@@ -168,7 +168,24 @@ $1UP unlocks earlier than it would have). The new lock counts from the next epoc
 old locks are closed but still earn the current epoch (their weight was fixed for it), and anything they
 earned and didn't claim is paid through the new lock; what they already claimed isn't paid twice.
 
-## D-11 · Known POC limits · **Noted**
+## D-19 · Take-profit and stop-loss · **Decided (21 Oct 2026)**
+
+A position can carry a take-profit and a stop-loss price, set with the order or changed later
+(`set_triggers`). They work like liquidation: the keeper sees the price cross, calls `hit_target` or
+`hit_stop`, and the house checks the trigger against the oracle and closes **at that oracle price**, not
+at the trigger, so a gap past it is neither a gift nor a theft. Two rules keep it from becoming a way
+round delayed fills (D-2):
+
+- **Only newer prices fire it.** A trigger fires only on a price published after it was set (for one set
+  with the order, after the order). Setting a stop across the current price can't close at a price the
+  trader already saw.
+- **The minimum hold applies**, as for a manual close.
+
+A loss closed by a stop counts toward an Extra Life like any other. The app warns about, and the order
+form refuses, a trigger already past the price; the contract allows it, since the newer-price rule makes
+it harmless.
+
+ · **Noted**
 
 - Rounding dust from sharing buybacks by weight stays in `ve` (no sweep).
 - `mock-swap` updates reserves before its payout lands; a failed payout isn't rolled back.

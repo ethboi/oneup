@@ -21,7 +21,7 @@ Account names are placeholders until `oneup.testnet` is created.
 ```
 trader ──ft_transfer_call──▶ usdc ──ft_on_transfer──▶ house        deposit
 trader ─▶ house.place_open / place_close / withdraw
-keeper ─▶ house.fill / liquidate / take_profit ──▶ oracle.get_price (cross-contract)
+keeper ─▶ house.fill / liquidate / take_profit / hit_target / hit_stop ──▶ oracle.get_price (cross-contract)
 keeper ─▶ house.close_epoch ──▶ ve.checkpoint, life.mint_batch, $1UP→ve (loser locks), usdc→life (pot)
 owner  ─▶ house.buyback ──▶ swap ──▶ house ──$1UP──▶ ve (lockers)
 holder ──ft_transfer_call──▶ token ──ft_on_transfer──▶ ve           lock
@@ -35,14 +35,16 @@ buyer  ──ft_transfer_call──▶ usdc ──▶ market ──▶ life|ve.n
 
 | Method | Caller | Does |
 |---|---|---|
-| `ft_on_transfer(sender_id, amount, msg)` | USDC contract | `msg = ""` credits the sender's free balance; `{"open":{market_id, side, margin, leverage}}` credits it and places an open in the same step (a refused open refunds the whole transfer); `{"seed":{}}` (owner) adds to pool and mints the seed Extra Life |
+| `ft_on_transfer(sender_id, amount, msg)` | USDC contract | `msg = ""` credits the sender's free balance; `{"open":{market_id, side, margin, leverage, take_profit?, stop_loss?}}` credits it and places an open in the same step (a refused open refunds the whole transfer); `{"seed":{}}` (owner) adds to pool and mints the seed Extra Life |
 | `withdraw(amount)` | trader | sends free balance; refunds on failed transfer |
-| `place_open(market_id, side, margin, leverage) → order_id` | trader | moves margin from free balance into the order; pre-checks solvency and capacity with the order counted |
+| `place_open(market_id, side, margin, leverage, take_profit?, stop_loss?) → order_id` | trader | moves margin from free balance into the order; pre-checks solvency and capacity with the order counted; optional trigger prices go with the position (D-19) |
+| `set_triggers(position_id, take_profit?, stop_loss?)` | owner of the position | sets or clears them; they fire only on prices published after this call |
 | `place_close(position_id) → order_id` | owner | only after the 60 s minimum hold |
 | `fill(order_id)` | anyone (keeper) | reads oracle; applies the fill rules in maths §2; opens or closes the position |
 | `expire(order_id)` | anyone | after `FILL_WINDOW` with no valid price; refunds margin |
 | `liquidate(position_id)` | anyone | latest price; pnl ≤ −0.9M → margin to pool |
 | `take_profit(position_id)` | anyone | latest price; pnl at cap → close |
+| `hit_target(position_id)` / `hit_stop(position_id)` | anyone | latest price past the trader's trigger, after the minimum hold and newer than the trigger → close at that price (reason `Target` / `Stop`) |
 | `close_epoch(limit)` | anyone | resumable: first call freezes epoch `e`, fixes its $1UP release (maths §8), checkpoints `ve` and starts `e+1` ("begun"); then mints Extra Lives and loser locks, `limit` (≤ 15) losers per call ("minting"), waits for both to land ("waiting for mints"), expires lives past their window ("expiring"), pays the pot and sets aside buyback USDC ("closed") |
 | `buyback(epoch, min_out)` | owner (D-10) | swaps the epoch's buyback USDC; the $1UP goes to `ve` for that epoch's lockers |
 | `add_market(market_id, feed_id, max_leverage)` | owner | new markets get `market_capacity_ppm` of the pool (D-14) |

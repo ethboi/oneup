@@ -4,7 +4,20 @@
 
 import { useEffect, useRef, useState } from "react";
 
-export function Popover({ button, label, align = "right", children }: { button: React.ReactNode; label: string; align?: "left" | "right"; children: (close: () => void) => React.ReactNode }) {
+export function Popover({
+  button,
+  label,
+  align = "right",
+  small,
+  children,
+}: {
+  button: React.ReactNode;
+  label: string;
+  align?: "left" | "right";
+  /** An icon-sized trigger, for use inside rows. */
+  small?: boolean;
+  children: (close: () => void) => React.ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -20,7 +33,7 @@ export function Popover({ button, label, align = "right", children }: { button: 
   }, [open]);
   return (
     <div ref={ref} className="relative">
-      <button className="btn btn-ghost" aria-expanded={open} aria-haspopup="dialog" aria-label={label} onClick={() => setOpen(!open)}>
+      <button className={`btn btn-ghost ${small ? "px-2 py-1" : ""}`} aria-expanded={open} aria-haspopup="dialog" aria-label={label} onClick={() => setOpen(!open)}>
         {button}
       </button>
       {open && (

@@ -42,6 +42,8 @@ pub enum Event {
     },
     #[event_version("1.0.0")]
     EpochClosed { summary: EpochSummary },
+    #[event_version("1.0.0")]
+    TriggersSet { position_id: u64, account_id: AccountId, take_profit: Option<U128>, stop_loss: Option<U128> },
 }
 
 #[near(serializers = [json])]
@@ -49,5 +51,10 @@ pub enum Event {
 pub enum CloseReason {
     Close,
     Liquidation,
+    /// The 9× profit cap.
     TakeProfit,
+    /// The trader's take-profit price.
+    Target,
+    /// The trader's stop-loss price.
+    Stop,
 }

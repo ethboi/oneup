@@ -97,7 +97,7 @@ pub struct Market {
 #[near(serializers = [json, borsh])]
 #[derive(Clone, Debug)]
 pub enum OrderKind {
-    Open { side: Side, margin: U128, leverage: u32, cut_ppm: U128 },
+    Open { side: Side, margin: U128, leverage: u32, cut_ppm: U128, triggers: Triggers },
     Close { position_id: u64 },
 }
 
@@ -128,6 +128,18 @@ pub struct Position {
     pub opened_at: u64,
     pub cut_ppm: U128,
     pub close_order: Option<u64>,
+    pub triggers: Triggers,
+    /// Block time (s) the triggers were last set; only prices published after it can fire them.
+    pub triggers_set_at: u64,
+}
+
+/// Take-profit and stop-loss prices (1e8 units). The keeper closes the position at the oracle price that
+/// crosses one, like a liquidation (decision D-19).
+#[near(serializers = [json, borsh])]
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Triggers {
+    pub take_profit: Option<U128>,
+    pub stop_loss: Option<U128>,
 }
 
 #[near(serializers = [json, borsh])]
