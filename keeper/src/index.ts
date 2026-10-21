@@ -1,9 +1,9 @@
 // The OneUp keeper: anyone can run one. Each tick it pushes prices, fills and expires orders, liquidates
 // and takes profit at the cap, steps epoch closes, and (with the owner key) runs buybacks.
 //
-//   pnpm --filter @oneup/keeper start [--prices sim|hermes] [--tick 3000] [--price-tick 1000] [--control 8787]
+//   pnpm --filter @oneup/keeper start [--prices live|sim|hermes] [--tick 3000] [--price-tick 1000] [--control 8787]
 //
-// With sim prices, a control port on 127.0.0.1 lets a demo steer a market:
+// With live or sim prices, a control port on 127.0.0.1 lets a demo steer a market:
 //   curl -XPOST localhost:8787/price -d '{"market":"NEAR-USD","price":2.45}'
 
 import { createServer } from "node:http";
@@ -21,11 +21,11 @@ import {
   type Deployment,
   type Position,
 } from "@oneup/sdk";
-import { HermesSource, SimSource, type PriceSource } from "./prices.ts";
+import { HermesSource, LiveSource, SimSource, type PriceSource, type Steerable } from "./prices.ts";
 
 const { values: args } = parseArgs({
   options: {
-    prices: { type: "string", default: "sim" },
+    prices: { type: "string", default: "live" },
     tick: { type: "string", default: "3000" },
     "price-tick": { type: "string", default: "1000" },
     control: { type: "string", default: "8787" },
@@ -39,7 +39,8 @@ const keeper = oneup.calls(accountSender(new Account(d.keeper.id, oneup.provider
 const owner = oneup.calls(accountSender(new Account(d.owner.id, oneup.provider, d.owner.key as KeyPairString)));
 const FILL_WINDOW_S = 30;
 
-const source: PriceSource = args.prices === "hermes" ? new HermesSource() : new SimSource(d.markets);
+const source: PriceSource =
+  args.prices === "hermes" ? new HermesSource() : args.prices === "sim" ? new SimSource(d.markets) : new LiveSource();
 /** Markets as listed on chain (refreshed every tick, so markets listed by vote get prices too). */
 let feeds = new Map<string, string>(d.markets.map((m) => [m.id, m.feedId]));
 /** Latest pushed price per feed, 1e8 units, and its publish time. */
@@ -125,8 +126,8 @@ async function runBuyback(epoch: number) {
 const fmt = (x?: string) => (x === undefined ? "-" : (Number(x) / 1e6).toLocaleString("en-US", { maximumFractionDigits: 2 }));
 
 function controlServer(port: number) {
-  if (!(source instanceof SimSource)) return;
-  const sim = source;
+  if (!(source instanceof SimSource || source instanceof LiveSource)) return;
+  const sim: Steerable = source;
   createServer(async (req, res) => {
     try {
       if (req.method === "GET" && req.url === "/prices") {
@@ -149,7 +150,7 @@ function controlServer(port: number) {
     }
   })
     .on("error", (e) => log(`price control off: ${e.message}`))
-    .listen(port, "127.0.0.1", () => log(`sim price control on http://127.0.0.1:${port}`));
+    .listen(port, "127.0.0.1", () => log(`price control on http://127.0.0.1:${port}`));
 }
 
 /**

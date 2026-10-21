@@ -142,9 +142,10 @@ duplicate-registration panic), and running the demo found a third (the reserve f
 
 ## What's mocked locally
 
-- **Prices** come from the keeper, which pushes a steerable random walk (or live Pyth prices with
-  `--prices hermes`, which needs a `PYTH_API_KEY`: Hermes now refuses unauthenticated requests) to a
-  Pyth-compatible oracle. Newly listed markets are priced automatically. On mainnet the house points at Outlayer's
+- **Prices** come from the keeper, which pushes real market prices (Binance's public API, Coinbase as a
+  fallback) to a Pyth-compatible oracle. A demo can still move a market: the push lands on top of the real
+  price, holds for 30 seconds and then drifts back. Offline, `--prices sim` is a steerable random walk;
+  `--prices hermes` reads Pyth directly but needs a `PYTH_API_KEY` (Hermes now refuses unauthenticated requests). Newly listed markets are priced automatically. On mainnet the house points at Outlayer's
   `price-oracle-pyth.near` with the same calls. Outlayer's testnet feed was stale when checked.
 - **USDC** is a local token with a faucet. **Buybacks** swap on a local constant-product pool standing in
   for Rhea.

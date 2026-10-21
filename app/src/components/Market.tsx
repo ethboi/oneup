@@ -9,7 +9,7 @@ import { fmtOneup } from "./Header";
 import { PixelHeart } from "./Pixel";
 import { Sell, useListings } from "./Sell";
 import { ActivityList, useActivity } from "./Activity";
-import { Empty, Explainer, Section } from "./ui";
+import { Empty, Explainer, PanelHead } from "./ui";
 import { Icon } from "./Icon";
 
 export function Market() {
@@ -31,26 +31,26 @@ export function Market() {
         </Explainer>
 
         {lives.length + locks.length === 0 ? (
-          <Section title="Nothing for sale right now">
+          <div className="panel divide-y divide-[var(--line)]">
+            <PanelHead title="Nothing for sale right now" />
             <YourItems px={px} listings={listings} />
-          </Section>
+          </div>
         ) : (
-          <>
-            <Section title={`Extra Lives (${lives.length})`}>
-              {lives.length === 0 ? <p className="label">None listed.</p> : <div className="grid gap-3 md:grid-cols-2">{lives.map((l) => <LifeRow key={l.token_id} l={l} />)}</div>}
-            </Section>
-            <Section title={`$1UP locks (${locks.length})`}>
-              {locks.length === 0 ? <p className="label">None listed.</p> : <div className="grid gap-3 md:grid-cols-2">{locks.map((l) => <LockRow key={l.token_id} l={l} px={px} />)}</div>}
-            </Section>
-          </>
+          <div className="panel divide-y divide-[var(--line)]">
+            <PanelHead title={`Extra Lives (${lives.length})`} />
+            {lives.length === 0 ? <p className="label p-4">None listed.</p> : lives.map((l) => <LifeRow key={l.token_id} l={l} />)}
+            <PanelHead title={`$1UP locks (${locks.length})`} />
+            {locks.length === 0 ? <p className="label p-4">None listed.</p> : locks.map((l) => <LockRow key={l.token_id} l={l} px={px} />)}
+          </div>
         )}
       </div>
 
-      <Section title="Recent sales">
-        <div className="panel p-4">
+      <div className="panel">
+        <PanelHead title="Recent sales" />
+        <div className="px-4 pb-2">
           <ActivityList items={sales} limit={10} empty="No sales yet." />
         </div>
-      </Section>
+      </div>
     </div>
   );
 }
@@ -61,14 +61,10 @@ function YourItems({ px, listings }: { px: bigint; listings: Listing[] }) {
   const lives = (usePoll(() => o.lives(me), [me]) ?? []).filter((l) => lifeValue(l) > 0n);
   const locks = (usePoll(() => o.locks(me), [me]) ?? []).filter((l) => !l.withdrawn);
   if (lives.length + locks.length === 0) {
-    return (
-      <div className="panel">
-        <Empty icon="store">Nothing listed, and you have nothing to sell yet. Extra Lives and $1UP locks arrive when you lose a trade.</Empty>
-      </div>
-    );
+    return <Empty icon="store">Nothing listed, and you have nothing to sell yet. Extra Lives and $1UP locks arrive when you lose a trade.</Empty>;
   }
   return (
-    <div className="panel divide-y divide-[var(--line)]">
+    <div className="divide-y divide-[var(--line)]">
       <p className="label p-3">List one of yours. Suggested prices are 70% of what a life can still pay and 80% of a lock&apos;s value if left today.</p>
       {lives.map((l) => (
         <div key={l.token_id} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center">
@@ -148,7 +144,7 @@ function Row({ l, icon, title, detail, worth, worthLabel }: { l: Listing; icon: 
   const discount = worth && worth > 0n ? Math.round((1 - Number(price) / Number(worth)) * 100) : null;
   const mine = l.seller === me;
   return (
-    <div className="panel flex items-center gap-3 p-3">
+    <div className="flex items-center gap-3 p-3 sm:px-4">
       <span className="shrink-0">{icon}</span>
       <div className="min-w-0 flex-1">
         <div className="truncate font-extrabold">{title}</div>

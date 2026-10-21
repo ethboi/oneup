@@ -34,8 +34,7 @@ export function Fairness() {
   const [first, , , last] = r.quarters.oneup;
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="panel p-5">
+    <div className="panel p-5">
         <p className="text-lg">
           A dollar lost in year 3 gets back <span className="num font-bold">{cents(last)}</span> within a year, about what a
           dollar lost early gets (<span className="num font-bold">{cents(first)}</span>). Year-1 losers take{" "}
@@ -48,10 +47,8 @@ export function Fairness() {
           each loss followed for {r.params.window} weeks.
         </p>
         <Chart r={r} />
-      </div>
 
-      <div className="panel p-5">
-        <div className="text-lg font-extrabold">USDC back within a year per $1 lost, by when the loss happened</div>
+        <div className="-mx-5 mt-5 border-t border-[var(--line)] px-5 pt-5 text-lg font-extrabold">USDC back within a year per $1 lost, by when the loss happened</div>
         {/* phones: periods down, rules across, so it fits without scrolling */}
         <table className="num mt-3 w-full text-sm md:hidden">
           <thead>
@@ -105,7 +102,6 @@ export function Fairness() {
             ))}
           </tbody>
         </table>
-      </div>
     </div>
   );
 }

@@ -27,8 +27,7 @@ export function Solvency() {
   const used = pct(liability, pool);
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="panel p-5">
+    <div className="panel p-5">
         <p className="text-lg">
           If every open position hit its max win at once, the house would pay{" "}
           <span className="num font-bold">${fmtUsdc(liability, 0)}</span>:{" "}
@@ -39,7 +38,7 @@ export function Solvency() {
           are counted, because positions close at different times.
         </p>
         {pool < big(s.seed) && (
-          <p className="mt-3 flex items-center gap-2 rounded-lg bg-[var(--panel-2)] px-3 py-2 text-sm">
+          <p className="mt-3 flex items-center gap-2 text-sm">
             <Icon name="info" />
             <span>
               No payouts until the pool is back above its <b className="num">${fmtUsdc(big(s.seed), 0)}</b> seed. It&apos;s{" "}
@@ -121,9 +120,8 @@ export function Solvency() {
             );
           })}
         </div>
-      </div>
 
-      <div className="panel overflow-x-auto p-5">
+      <div className="-mx-5 mt-5 overflow-x-auto border-t border-[var(--line)] px-5 pt-5">
         <div className="text-lg font-extrabold">Epochs</div>
         {(history ?? []).length === 0 ? (
           <p className="label mt-2">No closed epochs yet.</p>
