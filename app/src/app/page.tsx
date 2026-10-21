@@ -38,18 +38,8 @@ export default function Home() {
   return (
     <OneUpProvider>
       <div className="mx-auto max-w-[1280px] px-4 pb-24 lg:pb-16">
-        <Header />
+        <Header tabs={TABS.map((t) => ({ name: t, badge: t === "Extra Lives" ? ("lives" as const) : undefined }))} tab={tab} go={(t) => go(t as Tab)} />
         <Onboarding />
-        <nav className="mb-4 hidden lg:block" aria-label="Sections">
-          <div className="tabs" role="tablist">
-            {TABS.map((t) => (
-              <button key={t} role="tab" aria-selected={tab === t} onClick={() => go(t)} className="tab">
-                <Icon name={TAB_ICONS[t]} size={15} />
-                {t}
-              </button>
-            ))}
-          </div>
-        </nav>
         {tab === "Trade" && <Trade />}
         {tab === "Extra Lives" && <Lives />}
         {tab === "Locks" && <Locks />}

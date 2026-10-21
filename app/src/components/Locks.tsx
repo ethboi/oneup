@@ -11,7 +11,7 @@ import { lockValue, useOneupPrice } from "@/lib/value";
 import { fmtOneup } from "./Header";
 import { Icon } from "./Icon";
 import { Sell, useListings } from "./Sell";
-import { Empty, Explainer, Section, Stat, SummaryBar } from "./ui";
+import { Empty, Explainer, PanelHead, Stat, SummaryBar } from "./ui";
 
 const MAX = Number(VE_MAX_EPOCHS);
 
@@ -58,68 +58,63 @@ export function Locks() {
           NFT: sell it on the market instead of leaving early.
         </Explainer>
 
-        <SummaryBar
-          action={
-            <div className="flex flex-col gap-2 sm:items-end">
-              <button
-                className="btn btn-accent w-full sm:w-auto"
-                disabled={claimSum === 0n}
-                onClick={() => run(`Claim ${fmtOneup(claimSum.toString(), 2)} $1UP`, () => tx.claimVeMany(toClaim.slice(0, 30).map(([k]) => k), past))}
-              >
-                <Icon name="claim" />
-                {claimSum > 0n ? `Claim all ${fmtOneup(claimSum.toString(), 2)}` : "Nothing to claim yet"}
-              </button>
-              {lossLocks.length >= 2 && (
-                <button
-                  className="btn btn-ghost w-full sm:w-auto"
-                  onClick={() => run(`Merge ${lossLocks.length} loss-locks`, () => tx.mergeLocks(lossLocks.slice(0, 30).map((l) => l.token_id)))}
-                  title="One lock with the total amount, ending at the latest end. Claim first: it counts from next epoch."
-                >
-                  <Icon name="merge" />
-                  Merge {lossLocks.length} loss-locks
-                </button>
-              )}
-            </div>
-          }
-        >
-          <Stat label="Locked" value={`${fmtOneup(locked.toString())} $1UP`} />
-          <Stat label="Your weight next epoch" value={fmtOneup(mine.toString())} />
-          <Stat label="Your share" value={`${share.toFixed(2)}%`} />
-          <Stat label="Recent buybacks" value={`${fmtOneup((recent ?? 0n).toString())} $1UP`} />
-        </SummaryBar>
-
-        <Section title={`Running (${running.length})`}>
-          {running.length === 0 ? (
-            <Empty icon="lock">No locks yet. Lock $1UP here, or lose a trade: losers get their $1UP as a two-year lock.</Empty>
-          ) : (
-            <div className="panel divide-y divide-[var(--line)]">
-              {running
-                .sort((a, b) => Number(BigInt(b.amount) - BigInt(a.amount)))
-                .map((l) => (
-                  <LockRow key={l.token_id} l={l} epoch={id} px={px} claimable={claimable[l.token_id] ?? 0n} listings={listings} />
-                ))}
-            </div>
-          )}
-        </Section>
-
-        {closed.length > 0 && (
-          <Section
-            title={`Closed (${closed.length})`}
+        <div className="panel divide-y divide-[var(--line)]">
+          <SummaryBar
             action={
-              <button className="chip" onClick={() => setShowClosed(!showClosed)} aria-expanded={showClosed}>
-                {showClosed ? "Hide" : "Show"}
-              </button>
+              <div className="flex flex-col gap-2 sm:items-end">
+                <button
+                  className="btn btn-accent w-full sm:w-auto"
+                  disabled={claimSum === 0n}
+                  onClick={() => run(`Claim ${fmtOneup(claimSum.toString(), 2)} $1UP`, () => tx.claimVeMany(toClaim.slice(0, 30).map(([k]) => k), past))}
+                >
+                  <Icon name="claim" />
+                  {claimSum > 0n ? `Claim all ${fmtOneup(claimSum.toString(), 2)}` : "Nothing to claim yet"}
+                </button>
+                {lossLocks.length >= 2 && (
+                  <button
+                    className="btn btn-ghost w-full sm:w-auto"
+                    onClick={() => run(`Merge ${lossLocks.length} loss-locks`, () => tx.mergeLocks(lossLocks.slice(0, 30).map((l) => l.token_id)))}
+                    title="One lock with the total amount, ending at the latest end. Claim first: it counts from next epoch."
+                  >
+                    <Icon name="merge" />
+                    Merge {lossLocks.length} loss-locks
+                  </button>
+                )}
+              </div>
             }
           >
-            {showClosed && (
-              <div className="panel divide-y divide-[var(--line)]">
-                {closed.map((l) => (
-                  <LockRow key={l.token_id} l={l} epoch={id} px={px} claimable={claimable[l.token_id] ?? 0n} listings={listings} />
-                ))}
-              </div>
+            <Stat label="Locked" value={`${fmtOneup(locked.toString())} $1UP`} />
+            <Stat label="Your weight next epoch" value={fmtOneup(mine.toString())} />
+            <Stat label="Your share" value={`${share.toFixed(2)}%`} />
+            <Stat label="Recent buybacks" value={`${fmtOneup((recent ?? 0n).toString())} $1UP`} />
+          </SummaryBar>
+
+          <div className="divide-y divide-[var(--line)]">
+            <PanelHead title={`Running (${running.length})`} />
+            {running.length === 0 ? (
+              <Empty icon="lock">No locks yet. Lock $1UP here, or lose a trade: losers get their $1UP as a two-year lock.</Empty>
+            ) : (
+              running
+                .sort((a, b) => Number(BigInt(b.amount) - BigInt(a.amount)))
+                .map((l) => <LockRow key={l.token_id} l={l} epoch={id} px={px} claimable={claimable[l.token_id] ?? 0n} listings={listings} />)
             )}
-          </Section>
-        )}
+          </div>
+
+          {closed.length > 0 && (
+            <div className="divide-y divide-[var(--line)]">
+              <PanelHead
+                title={`Closed (${closed.length})`}
+                action={
+                  <button className="chip" onClick={() => setShowClosed(!showClosed)} aria-expanded={showClosed}>
+                    {showClosed ? "Hide" : "Show"}
+                  </button>
+                }
+              />
+              {showClosed &&
+                closed.map((l) => <LockRow key={l.token_id} l={l} epoch={id} px={px} claimable={claimable[l.token_id] ?? 0n} listings={listings} />)}
+            </div>
+          )}
+        </div>
       </div>
       <LockForm />
     </div>

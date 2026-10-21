@@ -3,57 +3,53 @@
 import { useEffect, useState } from "react";
 import { USDC, fmtUsdc, ONEUP } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
-import { Logo, PixelCoin, PixelHeart } from "./Pixel";
+import { Logo, PixelCoin } from "./Pixel";
 import { Icon } from "./Icon";
 import { Popover } from "./Popover";
 
-export function Header() {
+export interface NavTab {
+  name: string;
+  badge?: "lives";
+}
+
+/** One bar: brand, the section tabs (desktop), the pool and the epoch clock as plain text, Demo, and your account. */
+export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string; go: (t: string) => void }) {
   const { o, d, me } = useOneUp();
   const pool = usePoll(() => o.pool(), []);
   const epoch = usePoll(() => o.epoch(), []);
-  const free = usePoll(() => o.balance(me), [me]);
-  const wallet = usePoll(() => o.usdcBalance(me), [me]);
-  const oneup = usePoll(() => o.oneupBalance(me), [me]);
   const lives = usePoll(() => o.lives(me), [me]);
   const now = useNow();
   const left = epoch ? Math.max(0, epoch.started_at + d.epochLengthS - now) : 0;
-  const alive = lives?.filter((l) => !l.expired && !l.full_heal).length;
+  const alive = lives?.filter((l) => !l.expired && !l.full_heal).length ?? 0;
 
   return (
-    // One row: brand, then three controls (Demo, account, Funds); the HUD below. Same on phones.
-    <header className="flex flex-col gap-3 py-4 lg:py-5">
-      <div className="flex items-center gap-2 sm:gap-3">
-        <Logo size={40} />
-        <div className="min-w-0 flex-1">
-          <div className="display text-[26px] leading-none">OneUp</div>
-          <div className="label mt-1 hidden sm:block">Lose a trade, get a life.</div>
-        </div>
-        <DemoMenu />
-        <div className="hidden min-w-0 rounded-[10px] border border-[var(--panel-edge)] bg-[var(--panel)] px-3 py-1.5 text-right sm:block">
-          <div className="truncate text-sm font-extrabold">{me.replace(/\.test\.near$/, "")}</div>
-          <div className="label num">
-            ${wallet ? fmtUsdc(BigInt(wallet), 0) : "…"} USDC · {fmtOneup(oneup)} $1UP
-          </div>
-        </div>
-        <Funds free={free} wallet={wallet} />
+    <header className="mb-4 flex items-center gap-2 border-b border-[var(--line)] py-3 sm:gap-4 lg:mb-5">
+      <div className="flex shrink-0 items-center gap-2">
+        <Logo size={34} />
+        <span className="display hidden text-[22px] leading-none sm:inline">OneUp</span>
       </div>
-
-      <div className="panel grid grid-cols-2 gap-px overflow-hidden bg-[var(--line)] sm:grid-cols-4">
-        <Stat label="House pool" value={pool ? `$${fmtUsdc(BigInt(pool), 0)}` : "…"} />
-        <Stat label={`Epoch ${epoch?.id ?? "…"} ends in`} value={fmtClock(left)} />
-        <Stat label="Trading balance" value={free ? `$${fmtUsdc(BigInt(free))}` : "…"} icon={<PixelCoin size={16} />} />
-        <Stat
-          label="Extra Lives"
-          value={alive === undefined ? "…" : `×${alive}`}
-          icon={
-            <span className="flex gap-0.5">
-              {[0, 1, 2].map((i) => (
-                <PixelHeart key={i} size={16} fill={alive !== undefined && i < alive ? 1 : 0} />
-              ))}
-            </span>
-          }
-        />
-      </div>
+      <nav className="hidden min-w-0 flex-1 lg:block" aria-label="Sections">
+        <div className="tabs" role="tablist">
+          {tabs.map((t) => (
+            <button key={t.name} role="tab" aria-selected={tab === t.name} onClick={() => go(t.name)} className="tab">
+              {t.name}
+              {t.badge === "lives" && alive > 0 && <span className="tab-badge num">{alive}</span>}
+            </button>
+          ))}
+        </div>
+      </nav>
+      <dl className="num flex min-w-0 flex-1 justify-end gap-4 text-right lg:flex-none">
+        <div>
+          <dt className="label leading-tight">Pool</dt>
+          <dd className="font-extrabold leading-tight">{pool ? `$${fmtUsdc(BigInt(pool), 0)}` : "…"}</dd>
+        </div>
+        <div>
+          <dt className="label leading-tight">Epoch {epoch?.id ?? "…"}</dt>
+          <dd className="font-extrabold leading-tight">{fmtClock(left)}</dd>
+        </div>
+      </dl>
+      <DemoMenu />
+      <AccountMenu />
     </header>
   );
 }
@@ -102,18 +98,25 @@ function DemoMenu() {
   );
 }
 
-/** Move USDC between the wallet and the trading balance. Trades top themselves up, so this is optional. */
-function Funds({ free, wallet }: { free?: string; wallet?: string }) {
-  const { tx, run } = useOneUp();
+/** Your account: wallet and trading balances, and moving USDC between them. Trades top themselves up, so
+ *  depositing first is optional. */
+function AccountMenu() {
+  const { o, me, tx, run } = useOneUp();
+  const free = usePoll(() => o.balance(me), [me]);
+  const wallet = usePoll(() => o.usdcBalance(me), [me]);
+  const oneup = usePoll(() => o.oneupBalance(me), [me]);
   const [amount, setAmount] = useState("1000");
   const amt = BigInt(Math.floor(Number(amount) || 0)) * USDC;
   return (
     <Popover
-      label="Funds"
+      label="Account and funds"
       button={
         <>
           <Icon name="wallet" />
-          <span className="hidden sm:inline">Funds</span>
+          <span className="hidden text-left leading-tight sm:block">
+            <span className="block text-sm">{me.replace(/\.test\.near$/, "")}</span>
+            <span className="label num block font-normal">${wallet ? fmtUsdc(BigInt(wallet), 0) : "…"}</span>
+          </span>
         </>
       }
     >
@@ -123,7 +126,11 @@ function Funds({ free, wallet }: { free?: string; wallet?: string }) {
             <dt className="label">Wallet</dt>
             <dd className="text-right font-bold">${wallet ? fmtUsdc(BigInt(wallet)) : "…"}</dd>
             <dt className="label">Trading balance</dt>
-            <dd className="text-right font-bold">${free ? fmtUsdc(BigInt(free)) : "…"}</dd>
+            <dd className="flex items-center justify-end gap-1.5 font-bold">
+              <PixelCoin size={14} />${free ? fmtUsdc(BigInt(free)) : "…"}
+            </dd>
+            <dt className="label">$1UP</dt>
+            <dd className="text-right font-bold">{fmtOneup(oneup)}</dd>
           </dl>
           <span className="field">
             <input className="input num" value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="USDC amount" inputMode="decimal" />
@@ -143,18 +150,6 @@ function Funds({ free, wallet }: { free?: string; wallet?: string }) {
         </div>
       )}
     </Popover>
-  );
-}
-
-function Stat({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
-  return (
-    <div className="min-w-0 bg-[var(--panel)] px-4 py-2.5">
-      <div className="label truncate">{label}</div>
-      <div className="mt-0.5 flex items-center gap-2">
-        {icon}
-        <span className="display num truncate text-xl leading-tight">{value}</span>
-      </div>
-    </div>
   );
 }
 

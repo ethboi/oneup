@@ -1,7 +1,8 @@
 "use client";
 
-// Small shared pieces so every tab is built the same way: a section heading outside its panels with an
-// optional action, a one-line explainer that opens into "How it works", and a summary bar of stats.
+// Small shared pieces so every tab is built the same way: a section heading with an optional action, a
+// one-line explainer that opens into "How it works", and a summary row of stats. A tab's summary, status and
+// rows sit in one panel, split by hairlines (PanelHead names each group), rather than a box per piece.
 
 import { useState } from "react";
 import { Icon } from "./Icon";
@@ -45,10 +46,10 @@ export function Stat({ label, value, tone }: { label: string; value: React.React
   );
 }
 
-/** Stats in a row (two columns on phones), with the main action at the end. */
+/** Stats in a row (two columns on phones), with the main action at the end. Sits at the top of a panel. */
 export function SummaryBar({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div className="panel flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
+    <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
       <div className="grid flex-1 grid-cols-2 gap-4 sm:grid-cols-4">{children}</div>
       {action && <div className="shrink-0">{action}</div>}
     </div>
@@ -57,9 +58,19 @@ export function SummaryBar({ children, action }: { children: React.ReactNode; ac
 
 export function Empty({ icon, children }: { icon: Parameters<typeof Icon>[0]["name"]; children: React.ReactNode }) {
   return (
-    <div className="panel flex items-center gap-3 p-4 text-sm text-[var(--muted)]">
+    <div className="flex items-center gap-3 p-4 text-sm text-[var(--muted)]">
       <Icon name={icon} size={20} />
       <div>{children}</div>
+    </div>
+  );
+}
+
+/** A group's name inside a panel, with an optional action (Show / Hide). */
+export function PanelHead({ title, action }: { title: React.ReactNode; action?: React.ReactNode }) {
+  return (
+    <div className="flex min-h-11 items-center justify-between gap-3 px-4 pt-2">
+      <h3 className="font-extrabold">{title}</h3>
+      {action}
     </div>
   );
 }

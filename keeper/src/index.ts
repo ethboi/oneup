@@ -10,7 +10,7 @@ import { createServer } from "node:http";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { Account, KeyPair, type KeyPairString } from "near-api-js";
+import { Account, KeyPair, actions, type KeyPairString } from "near-api-js";
 import {
   OneUp,
   accountSender,
@@ -160,7 +160,11 @@ function controlServer(port: number) {
 async function priceSender() {
   const kp = KeyPair.fromRandom("ed25519");
   const main = new Account(d.keeper.id, oneup.provider, d.keeper.key as KeyPairString);
-  await main.addFunctionCallAccessKey({ publicKey: kp.getPublicKey(), contractId: d.contracts.oracle, methodNames: ["push_prices"] });
+  // no allowance: a capped key (the library's default is 0.25 NEAR) runs dry after about an hour of pushes
+  await main.signAndSendTransaction({
+    receiverId: d.keeper.id,
+    actions: [actions.addFunctionCallAccessKey(kp.getPublicKey(), d.contracts.oracle, ["push_prices"])],
+  });
   return oneup.calls(accountSender(new Account(d.keeper.id, oneup.provider, kp.toString() as KeyPairString)));
 }
 

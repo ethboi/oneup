@@ -61,7 +61,11 @@ function YourItems({ px, listings }: { px: bigint; listings: Listing[] }) {
   const lives = (usePoll(() => o.lives(me), [me]) ?? []).filter((l) => lifeValue(l) > 0n);
   const locks = (usePoll(() => o.locks(me), [me]) ?? []).filter((l) => !l.withdrawn);
   if (lives.length + locks.length === 0) {
-    return <Empty icon="store">Nothing listed, and you have nothing to sell yet. Extra Lives and $1UP locks arrive when you lose a trade.</Empty>;
+    return (
+      <div className="panel">
+        <Empty icon="store">Nothing listed, and you have nothing to sell yet. Extra Lives and $1UP locks arrive when you lose a trade.</Empty>
+      </div>
+    );
   }
   return (
     <div className="panel divide-y divide-[var(--line)]">

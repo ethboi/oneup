@@ -20,8 +20,7 @@ import { PriceChart, type Mark } from "./PriceChart";
 import { fmtClock, useNow } from "./Header";
 import { PixelHeart } from "./Pixel";
 import { Icon } from "./Icon";
-import { ActivityPanel } from "./Activity";
-import { Section } from "./ui";
+import { ActivityList, useActivity } from "./Activity";
 
 /** Chart windows: the app keeps up to 30 minutes of prices it has seen. */
 const RANGES = [
@@ -39,6 +38,16 @@ export function Trade() {
   const positions = usePoll(() => o.positions(me), [me]) ?? [];
   const orders = usePoll(() => o.orders(me), [me]) ?? [];
   const ticket = useTicket(market, markets.find((m) => m.id === market)?.max_leverage ?? 100);
+  // the phone trade bar only shows while the form itself is scrolled away
+  const formRef = useRef<HTMLDivElement>(null);
+  const [formVisible, setFormVisible] = useState(true);
+  useEffect(() => {
+    const el = formRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([e]) => setFormVisible(e.isIntersecting), { threshold: 0.15 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
   const marks: Mark[] = positions
     .filter((p) => p.market_id === market)
@@ -52,9 +61,9 @@ export function Trade() {
     ]);
 
   return (
-    // Phones: one column in the order banner, chart, order form, positions, feed (both columns dissolve via
-    // `contents` and `order` interleaves them), with a trade bar fixed at the bottom. Desktop: chart and
-    // positions left, form and feed right.
+    // Phones: one column in the order banner, chart, order form, then positions and activity (the left column
+    // dissolves via `contents` and `order` interleaves them), with a trade bar while the form is out of view.
+    // Desktop: chart over positions and activity on the left, the form on the right.
     <div className="flex flex-col gap-4 pb-24 lg:grid lg:grid-cols-[1fr_340px] lg:items-start lg:pb-0">
       <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
         <div className="order-1 empty:hidden">
@@ -62,18 +71,43 @@ export function Trade() {
         </div>
         <Console market={market} setMarket={setMarket} markets={markets.filter((m) => m.live).map((m) => m.id)} marks={marks} />
         <div className="order-4 min-w-0">
-          <Positions positions={positions} orders={orders} />
+          <Below positions={positions} orders={orders} />
         </div>
       </div>
-      <div className="contents lg:flex lg:flex-col lg:gap-4">
-        <div id="order-form" className="order-3">
-          <OrderForm t={ticket} />
-        </div>
-        <div className="order-5">
-          <ActivityPanel />
-        </div>
+      <div ref={formRef} id="order-form" className="order-3">
+        <OrderForm t={ticket} />
       </div>
-      <TradeBar t={ticket} />
+      {!formVisible && <TradeBar t={ticket} />}
+    </div>
+  );
+}
+
+/** Positions and the live feed share one panel, switched by tabs. */
+function Below({ positions, orders }: { positions: Position[]; orders: Order[] }) {
+  const [view, setView] = useState<"positions" | "activity">("positions");
+  const feed = useActivity().filter((a) => a.kind !== "opened");
+  return (
+    <div className="panel p-4 pt-2">
+      <div className="tabs-inline mb-2 flex items-center justify-between border-b border-[var(--line)]" role="tablist">
+        <div className="flex gap-1">
+          {(
+            [
+              ["positions", `Positions${positions.length ? ` (${positions.length})` : ""}`],
+              ["activity", "Activity"],
+            ] as const
+          ).map(([k, name]) => (
+            <button key={k} role="tab" aria-selected={view === k} onClick={() => setView(k)} className="tab">
+              {name}
+            </button>
+          ))}
+        </div>
+        {view === "activity" && (
+          <span className="flex items-center gap-1.5 text-xs font-bold text-[var(--long)]">
+            <span className="h-2 w-2 rounded-full bg-[var(--long)]" aria-hidden /> on chain
+          </span>
+        )}
+      </div>
+      {view === "positions" ? <Positions positions={positions} orders={orders} /> : <ActivityList items={feed} />}
     </div>
   );
 }
@@ -154,10 +188,6 @@ function Console({ market, setMarket, markets, marks }: { market: string; setMar
             )}
           </div>
         </div>
-      </div>
-
-      <div className="mt-3 px-1">
-        <span className="display text-2xl italic text-[var(--wordmark)]">OneUp</span>
       </div>
 
     </div>
@@ -249,7 +279,7 @@ function OrderForm({ t }: { t: Ticket }) {
 
       {/* the promise, where the decision is made */}
       {m > 0n && (
-        <div className="flex gap-3 rounded-lg bg-[color-mix(in_srgb,var(--heart)_8%,transparent)] p-3 text-sm">
+        <div className="flex gap-3 border-t border-[var(--line)] pt-3 text-sm">
           <PixelHeart size={22} className="mt-0.5 shrink-0" />
           <p>
             <b>If it loses</b>, you get an Extra Life that can pay back up to <b className="num">${fmtUsdc(lifeUpTo, 0)}</b>, plus up to{" "}
@@ -269,7 +299,7 @@ function OrderForm({ t }: { t: Ticket }) {
       >
         {t.label}
       </button>
-      <p className="label">Fills at the first oracle price after you place it, so nobody trades on a price they already know. No fees, no funding.</p>
+      <p className="label -mt-1 text-center">Fills at the next oracle price. No fees, no funding.</p>
     </div>
   );
 }
@@ -315,12 +345,11 @@ function Positions({ positions, orders }: { positions: Position[]; orders: Order
 
   const pending = orders.filter((x) => "Open" in x.kind);
   return (
-    <Section title={`Positions${rows.length ? ` (${rows.length})` : ""}`}>
-    <div className="panel p-4">
-      {rows.length === 0 && pending.length === 0 && <p className="label">No open positions. Pick a side and a size to open one.</p>}
-      <div className="flex flex-col gap-3 md:hidden">
+    <div>
+      {rows.length === 0 && pending.length === 0 && <p className="label py-2">No open positions. Pick a side and a size to open one.</p>}
+      <div className="flex flex-col md:hidden">
         {rows.map(({ p, mark, v, hold }) => (
-          <div key={p.id} className="num rounded-lg border border-[var(--line)] p-3 text-sm">
+          <div key={p.id} className="num border-b border-[var(--line)] py-3 text-sm last:border-0">
             <div className="flex items-baseline justify-between gap-2">
               <div className="font-semibold">
                 <span style={{ color: p.side === "Long" ? "var(--long)" : "var(--short)" }}>{p.side}</span> {p.market_id}{" "}
@@ -388,7 +417,6 @@ function Positions({ positions, orders }: { positions: Position[]; orders: Order
         </p>
       ))}
     </div>
-    </Section>
   );
 }
 

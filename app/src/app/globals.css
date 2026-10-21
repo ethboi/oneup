@@ -322,53 +322,46 @@ body {
     height: 7px;
     background: linear-gradient(var(--stripe-1) 0 2px, transparent 2px 5px, var(--stripe-2) 5px 7px);
   }
-  /* market tiles under the screen: symbol, price, change; the selected one sits raised */
+  /* market picker above the screen: plain text, the selected one underlined */
   .market-tile {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     gap: 1px;
-    min-width: 132px;
-    padding: 8px 12px;
-    border-radius: 10px;
-    border: 1px solid transparent;
+    min-width: 116px;
+    padding: 4px 4px 8px;
+    border-bottom: 2px solid transparent;
     text-align: left;
+    opacity: 0.7;
     transition:
-      background-color 0.15s,
+      opacity 0.15s,
       border-color 0.15s;
   }
   .market-tile:hover {
-    background: color-mix(in srgb, var(--panel) 60%, transparent);
+    opacity: 1;
   }
   .market-tile[aria-pressed="true"] {
-    background: var(--panel);
-    border-color: var(--panel-edge);
-    box-shadow:
-      inset 0 -2px 0 var(--primary),
-      0 1px 3px rgb(28 27 41 / 0.12);
+    opacity: 1;
+    border-color: var(--primary);
   }
   .market-tile:focus-visible {
     outline: 3px solid var(--info);
     outline-offset: 2px;
   }
 
-  /* desktop tabs: a light segmented control, so the console stays the one dark element */
+  /* desktop tabs: plain text in the header bar, the current one underlined in the heart colour */
   .tabs {
-    display: inline-flex;
+    display: flex;
     gap: 2px;
-    padding: 4px;
-    border-radius: 12px;
-    background: var(--panel-2);
-    border: 1px solid var(--panel-edge);
   }
   .tab {
+    position: relative;
     display: inline-flex;
     align-items: center;
     gap: 6px;
     font-weight: 800;
     font-size: 14px;
-    padding: 6px 14px;
-    border-radius: 9px;
+    padding: 8px 10px;
     color: var(--muted);
     white-space: nowrap;
     transition: color 0.15s;
@@ -377,9 +370,30 @@ body {
     color: var(--text);
   }
   .tab[aria-selected="true"] {
-    background: var(--panel);
     color: var(--text);
-    box-shadow: 0 1px 3px rgb(28 27 41 / 0.14);
+  }
+  .tab[aria-selected="true"]::after {
+    content: "";
+    position: absolute;
+    inset-inline: 10px;
+    /* header tabs sit on the header's bottom rule; in-panel tabs (.tabs-inline) on their own */
+    bottom: var(--tab-rule, -13px);
+    height: 2px;
+    border-radius: 2px;
+    background: var(--primary);
+  }
+  .tabs-inline {
+    --tab-rule: -1px;
+  }
+  .tab-badge {
+    min-width: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: var(--primary);
+    color: #fff;
+    font-size: 11px;
+    line-height: 18px;
+    text-align: center;
   }
 
   /* phones: a bottom tab bar */

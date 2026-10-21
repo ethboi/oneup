@@ -70,19 +70,3 @@ export function ActivityList({ items, limit = 8, empty = "Waiting for activityâ€
     </ul>
   );
 }
-
-/** The Trade tab's feed: everything but routine opens, so the interesting moments stand out. */
-export function ActivityPanel() {
-  const items = useActivity().filter((a) => a.kind !== "opened");
-  return (
-    <div className="panel p-4">
-      <div className="mb-1 flex items-center justify-between">
-        <h2 className="font-extrabold">Live</h2>
-        <span className="flex items-center gap-1.5 text-xs font-bold text-[var(--long)]">
-          <span className="h-2 w-2 rounded-full bg-[var(--long)]" aria-hidden /> on chain
-        </span>
-      </div>
-      <ActivityList items={items} />
-    </div>
-  );
-}

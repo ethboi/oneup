@@ -11,7 +11,7 @@ import { fmtClock, fmtOneup, useNow } from "./Header";
 import { Icon } from "./Icon";
 import { HealthBar, PixelHeart } from "./Pixel";
 import { Sell, useListings } from "./Sell";
-import { Empty, Explainer, Section, Stat, SummaryBar } from "./ui";
+import { Empty, Explainer, PanelHead, Stat, SummaryBar } from "./ui";
 
 export function Lives() {
   const { o, d, me, tx, run } = useOneUp();
@@ -38,56 +38,50 @@ export function Lives() {
         Sell one on the market and its unclaimed USDC goes with it.
       </Explainer>
 
-      <SummaryBar
-        action={
-          <button
-            className="btn btn-accent w-full sm:w-auto"
-            disabled={claimable === 0n}
-            onClick={() => run(`Claim $${fmtUsdc(claimable)}`, () => tx.claimLives(lives.filter((l) => BigInt(l.claimable) > 0n).map((l) => l.token_id)))}
-          >
-            <Icon name="claim" />
-            {claimable > 0n ? `Claim $${fmtUsdc(claimable)}` : "Nothing to claim yet"}
-          </button>
-        }
-      >
-        <Stat label="Still to earn" value={`$${fmtUsdc(owedLeft, 0)}`} />
-        <Stat label="Paid so far" value={`$${fmtUsdc(paid)}`} />
-        <Stat label="Ready to claim" value={`$${fmtUsdc(claimable)}`} tone={claimable > 0n ? "good" : undefined} />
-        <Stat label="Last epoch, to all lives" value={last ? `$${fmtUsdc(BigInt(last.lives_pot), 0)}` : "–"} />
-      </SummaryBar>
-
-      <NextLife epochId={epoch?.id} left={epoch ? epoch.started_at + d.epochLengthS : 0} />
-
-      <Section title={`Earning (${earning.length})`}>
-        {earning.length === 0 ? (
-          <Empty icon="heart">No Extra Lives earning. Lose a trade in an epoch the house ends in profit and one arrives when it closes.</Empty>
-        ) : (
-          <div className="panel divide-y divide-[var(--line)]">
-            {earning.map((l) => (
-              <LifeRow key={l.token_id} l={l} expiry={expiry} listings={listings} />
-            ))}
-          </div>
-        )}
-      </Section>
-
-      {done.length > 0 && (
-        <Section
-          title={`Finished (${done.length})`}
+      <div className="panel divide-y divide-[var(--line)]">
+        <SummaryBar
           action={
-            <button className="chip" onClick={() => setShowDone(!showDone)} aria-expanded={showDone}>
-              {showDone ? "Hide" : "Show"}
+            <button
+              className="btn btn-accent w-full sm:w-auto"
+              disabled={claimable === 0n}
+              onClick={() => run(`Claim $${fmtUsdc(claimable)}`, () => tx.claimLives(lives.filter((l) => BigInt(l.claimable) > 0n).map((l) => l.token_id)))}
+            >
+              <Icon name="claim" />
+              {claimable > 0n ? `Claim $${fmtUsdc(claimable)}` : "Nothing to claim yet"}
             </button>
           }
         >
-          {showDone && (
-            <div className="panel divide-y divide-[var(--line)]">
-              {done.map((l) => (
-                <LifeRow key={l.token_id} l={l} expiry={expiry} listings={listings} />
-              ))}
-            </div>
+          <Stat label="Still to earn" value={`$${fmtUsdc(owedLeft, 0)}`} />
+          <Stat label="Paid so far" value={`$${fmtUsdc(paid)}`} />
+          <Stat label="Ready to claim" value={`$${fmtUsdc(claimable)}`} tone={claimable > 0n ? "good" : undefined} />
+          <Stat label="Last epoch, to all lives" value={last ? `$${fmtUsdc(BigInt(last.lives_pot), 0)}` : "–"} />
+        </SummaryBar>
+
+        <NextLife epochId={epoch?.id} left={epoch ? epoch.started_at + d.epochLengthS : 0} />
+
+        <div className="divide-y divide-[var(--line)]">
+          <PanelHead title={`Earning (${earning.length})`} />
+          {earning.length === 0 ? (
+            <Empty icon="heart">No Extra Lives earning. Lose a trade in an epoch the house ends in profit and one arrives when it closes.</Empty>
+          ) : (
+            earning.map((l) => <LifeRow key={l.token_id} l={l} expiry={expiry} listings={listings} />)
           )}
-        </Section>
-      )}
+        </div>
+
+        {done.length > 0 && (
+          <div className="divide-y divide-[var(--line)]">
+            <PanelHead
+              title={`Finished (${done.length})`}
+              action={
+                <button className="chip" onClick={() => setShowDone(!showDone)} aria-expanded={showDone}>
+                  {showDone ? "Hide" : "Show"}
+                </button>
+              }
+            />
+            {showDone && done.map((l) => <LifeRow key={l.token_id} l={l} expiry={expiry} listings={listings} />)}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -107,7 +101,7 @@ function NextLife({ epochId, left }: { epochId?: number; left: number }) {
     oneup = losses > 0n ? (releasedEmissions(BigInt(carry) + emissionsForEpoch(BigInt(epoch.id)), net) * lost) / losses : 0n;
   }
   return (
-    <div className="panel flex items-center gap-3 px-4 py-3">
+    <div className="flex items-center gap-3 bg-[var(--panel-2)] px-4 py-3">
       <PixelHeart size={28} fill={lost > 0n ? 0.5 : 0} />
       <div className="min-w-0 flex-1 text-sm">
         <b>Next Extra Life, epoch {epochId ?? "…"}</b>

@@ -75,10 +75,8 @@ export function Solvency() {
             <span className="inline-block h-3 w-3 rounded-sm border border-[var(--line)] bg-[var(--panel-2)]" /> Pool
           </span>
         </div>
-      </div>
 
-      <div className="panel p-5">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div className="-mx-5 mt-5 flex flex-wrap items-baseline justify-between gap-2 border-t border-[var(--line)] px-5 pt-5">
           <div className="text-lg font-extrabold">Per market: max wins against its cap (half the pool)</div>
           <div className="flex gap-4 text-sm">
             <Legend color="var(--series-long)" label="Longs" />
