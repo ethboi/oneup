@@ -51,8 +51,6 @@ export function Trade() {
           setMarket={setMarket}
           markets={markets.filter((m) => m.live).map((m) => m.id)}
           marks={marks}
-          side={side}
-          setSide={setSide}
         />
         <div className="order-4 min-w-0">
           <Positions positions={positions} orders={orders} />
@@ -68,46 +66,25 @@ export function Trade() {
   );
 }
 
-/**
- * The handheld: plastic case, slate surround with stripes and a power LED, the LCD, then the D-pad
- * (market) and the A/B buttons (Long/Short, shared with the order form), and the market buttons.
- */
-function Console(props: { market: string; setMarket: (m: string) => void; markets: string[]; marks: Mark[]; side: Side; setSide: (s: Side) => void }) {
-  const { market, setMarket, markets, marks, side, setSide } = props;
+/** The handheld: plastic case, slate surround with stripes, the LCD with its readout, and the market buttons. */
+function Console({ market, setMarket, markets, marks }: { market: string; setMarket: (m: string) => void; markets: string[]; marks: Mark[] }) {
   const { prices, history } = useOneUp();
   const pts = history[market] ?? [];
   const change = pts.length > 1 ? (pts[pts.length - 1].p / pts[0].p - 1) * 100 : 0;
-  const step = (d: number) => {
-    if (markets.length === 0) return;
-    const i = markets.indexOf(market);
-    setMarket(markets[(i + d + markets.length) % markets.length]);
-  };
   return (
     <div className="case order-2 min-w-0 p-3 sm:p-5">
       <div className="bezel px-3 pb-5 pt-3 sm:px-5">
-        <div className="mb-3 flex items-center gap-2">
-          <span className="stripes w-6 sm:flex-1" aria-hidden />
-          <span className="display text-[11px] italic tracking-wider whitespace-nowrap text-[#c6c8da] sm:text-xs">
-            ORACLE PRICE MATRIX
-          </span>
-          <span className="stripes flex-1 sm:w-10 sm:flex-none" aria-hidden />
-        </div>
-        <div className="flex gap-3">
-          <div className="hidden w-10 shrink-0 flex-col items-center pt-12 sm:flex" aria-hidden>
-            <span className="h-2.5 w-2.5 rounded-full bg-[#ff3b4e] shadow-[0_0_8px_#ff3b4e]" />
-            <span className="display mt-1 text-[9px] text-[#c6c8da]">POWER</span>
-          </div>
-          <div className="relative min-w-0 flex-1">
-            <PriceChart points={pts} marks={marks} />
-            {/* the readout is printed on the screen, in LCD ink */}
-            <div className="display num pointer-events-none absolute left-3 top-2 flex items-baseline gap-2 text-[var(--lcd-ink)]">
-              <span className="font-[family-name:var(--font-display)] text-base">{market}</span>
-              {pts.length > 1 && (
-                <span className="text-sm">
-                  {change >= 0 ? "▲" : "▼"} {Math.abs(change).toFixed(2)}%
-                </span>
-              )}
-            </div>
+        <div className="stripes mb-3" aria-hidden />
+        <div className="relative">
+          <PriceChart points={pts} marks={marks} />
+          {/* the readout is printed on the screen, in LCD ink */}
+          <div className="display num pointer-events-none absolute left-3 top-2 flex items-baseline gap-2 text-[var(--lcd-ink)]">
+            <span className="font-[family-name:var(--font-display)] text-base">{market}</span>
+            {pts.length > 1 && (
+              <span className="text-sm">
+                {change >= 0 ? "▲" : "▼"} {Math.abs(change).toFixed(2)}%
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -117,60 +94,13 @@ function Console(props: { market: string; setMarket: (m: string) => void; market
         <span className="display num text-lg">{prices[market] ? fmtPrice(prices[market]) : "…"}</span>
       </div>
 
-      <div className="mt-3 flex items-center justify-between px-1 sm:px-4">
-        <DPad onStep={step} />
-        <div className="hidden flex-1 flex-wrap justify-center gap-2 px-4 lg:flex" role="group" aria-label="Market">
-          {markets.map((m) => (
-            <button key={m} aria-pressed={m === market} onClick={() => setMarket(m)} className="bezel-btn num shrink-0 whitespace-nowrap">
-              {m} {prices[m] ? fmtPrice(prices[m]) : ""}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-start gap-4 pr-1" role="radiogroup" aria-label="Side">
-          {(
-            [
-              ["B", "Short", "mt-6"],
-              ["A", "Long", ""],
-            ] as const
-          ).map(([key, s, offset]) => (
-            <div key={key} className={`flex flex-col items-center gap-1.5 ${offset}`}>
-              <button className="ab" role="radio" aria-checked={side === s} aria-pressed={side === s} aria-label={`${key}: ${s}`} onClick={() => setSide(s)}>
-                {key}
-              </button>
-              <span className="display text-xs" style={{ color: side === s ? (s === "Long" ? "var(--long)" : "var(--short)") : "var(--wordmark)" }}>
-                {s}
-              </span>
-            </div>
-          ))}
-        </div>
+      <div className="-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1 pt-0.5 sm:flex-wrap" role="group" aria-label="Market">
+        {markets.map((m) => (
+          <button key={m} aria-pressed={m === market} onClick={() => setMarket(m)} className="bezel-btn num shrink-0 whitespace-nowrap">
+            {m} {prices[m] ? fmtPrice(prices[m]) : ""}
+          </button>
+        ))}
       </div>
-
-      {/* phones: market buttons under the controls; desktop: between the D-pad and A/B */}
-      <div className="-mx-1 mt-4 flex gap-2 overflow-x-auto px-1 pb-1 pt-0.5 lg:hidden" role="group" aria-label="Market">
-          {markets.map((m) => (
-            <button key={m} aria-pressed={m === market} onClick={() => setMarket(m)} className="bezel-btn num shrink-0 whitespace-nowrap">
-              {m} {prices[m] ? fmtPrice(prices[m]) : ""}
-            </button>
-          ))}
-        </div>
-    </div>
-  );
-}
-
-/** A cross-shaped D-pad: left/up for the previous market, right/down for the next. */
-function DPad({ onStep }: { onStep: (d: number) => void }) {
-  const arm = "dpad-arm flex items-center justify-center text-[10px] text-[#8d8fa6]";
-  return (
-    <div className="grid grid-cols-[28px_28px_28px] grid-rows-[28px_28px_28px]" role="group" aria-label="Change market">
-      <span />
-      <button className={`${arm} rounded-t-md`} onClick={() => onStep(-1)} aria-label="Previous market">▲</button>
-      <span />
-      <button className={`${arm} rounded-l-md`} onClick={() => onStep(-1)} aria-label="Previous market">◀</button>
-      <span className="bg-[#23222f]" aria-hidden />
-      <button className={`${arm} rounded-r-md`} onClick={() => onStep(1)} aria-label="Next market">▶</button>
-      <span />
-      <button className={`${arm} rounded-b-md`} onClick={() => onStep(1)} aria-label="Next market">▼</button>
-      <span />
     </div>
   );
 }
