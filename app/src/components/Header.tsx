@@ -8,6 +8,7 @@ import { Icon } from "./Icon";
 import { Popover } from "./Popover";
 import { MuteButton } from "./Sounds";
 import { openBadges } from "./Achievements";
+import { endSession, saveSession, sessionAllowance, startSession } from "@/lib/session";
 
 export interface NavTab {
   name: string;
@@ -150,6 +151,7 @@ function AccountMenu() {
             </button>
           </div>
           <p className="label">Optional: placing a trade moves what it needs from your wallet in the same step.</p>
+          <FastTrading />
           <button className="btn btn-ghost justify-start" onClick={() => (close(), openBadges())}>
             <Icon name="trophy" />
             Achievements and console skins
@@ -158,6 +160,54 @@ function AccountMenu() {
         </div>
       )}
     </Popover>
+  );
+}
+
+/**
+ * One-tap trading: a trade-only session key on this device (lib/session.ts), and optionally gas paid by
+ * OneUp's relayer. Shows the key's gas budget and the account's own NEAR, which a gasless trade leaves alone.
+ */
+function FastTrading() {
+  const { d, o, me, main, session, run } = useOneUp();
+  const allowance = usePoll(() => (session ? sessionAllowance(o.provider, me, session) : Promise.resolve(null)), [me, session?.publicKey], 5000);
+  const near = usePoll(
+    () => o.provider.viewAccount({ accountId: me }).then((a) => (a as unknown as { amount: string }).amount),
+    [me],
+    5000,
+  );
+  const fmtNear = (y?: bigint | string | null) => (y == null ? "…" : (Number(BigInt(y) / 10n ** 18n) / 1e6).toFixed(4));
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-[var(--line)] p-3">
+      <label className="flex items-center justify-between gap-2 text-sm font-bold">
+        <span>One-tap trading</span>
+        <input
+          type="checkbox"
+          checked={!!session}
+          onChange={(e) =>
+            run(e.target.checked ? "Turn on one-tap trading" : "Turn off one-tap trading", () =>
+              e.target.checked ? startSession(main, d.contracts.house, true) : endSession(main, session!),
+            )
+          }
+        />
+      </label>
+      <p className="label">
+        A key on this device that can only open, close and set TP/SL. It can&apos;t deposit or withdraw.
+      </p>
+      {session && (
+        <>
+          <label className="flex items-center justify-between gap-2 text-sm">
+            <span>Gas paid by OneUp</span>
+            <input type="checkbox" checked={session.gasless} onChange={(e) => saveSession(me, { ...session, gasless: e.target.checked })} />
+          </label>
+          <dl className="num grid grid-cols-2 gap-y-0.5 text-xs">
+            <dt className="label">Key gas budget</dt>
+            <dd className="text-right">{allowance === null ? "key removed" : `${fmtNear(allowance)} NEAR`}</dd>
+            <dt className="label">Your NEAR</dt>
+            <dd className="text-right">{fmtNear(near)}</dd>
+          </dl>
+        </>
+      )}
+    </div>
   );
 }
 

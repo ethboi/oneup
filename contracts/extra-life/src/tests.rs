@@ -139,3 +139,24 @@ fn no_minting_into_an_expired_epoch() {
     c.expire(3);
     c.mint_batch(2, vec![item("alice", 1_000, 1_000_000)]);
 }
+
+#[test]
+fn metadata_is_drawn_from_the_life() {
+    let mut c = setup();
+    ctx("house", 0);
+    c.mint_batch(0, vec![item("seed", 1_000, 1_000_000)]);
+    c.mint_batch(1, vec![item("alice", 1_000, 1_000_000)]);
+    let media = |c: &ExtraLife| c.nft_token("1:alice".into()).unwrap().metadata.unwrap().media.unwrap();
+    let before = media(&c);
+    assert!(before.starts_with("data:image/svg+xml;utf8,<svg"));
+    // nothing paid: no heart-coloured cells yet
+    assert!(!before.contains("e2257a"));
+    pot(&mut c, 1_000);
+    let half = c.nft_token("1:alice".into()).unwrap().metadata.unwrap();
+    assert!(half.media.as_ref().unwrap().contains("e2257a"));
+    assert!(half.description.unwrap().starts_with("Paid 500.00 of 1000.00 USDC"));
+    pot(&mut c, 5_000);
+    let healed = c.nft_token("1:alice".into()).unwrap().metadata.unwrap();
+    assert!(healed.media.unwrap().contains("f2b705"));
+    assert!(healed.extra.unwrap().contains(r#""state":"full_heal""#));
+}

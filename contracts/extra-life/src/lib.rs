@@ -1,6 +1,7 @@
 //! Extra Life NFTs (NEP-171 + metadata + enumeration + approvals): capped USDC claims on house profit.
 //! The house mints one per losing wallet per epoch and sends each epoch's pot here; holders claim.
-//! Unclaimed USDC moves with the token when it's sold.
+//! Unclaimed USDC moves with the token when it's sold. The metadata is dynamic: every NFT view draws the
+//! token's image (a pixel heart that fills as it pays back) and description from its current state.
 
 use near_contract_standards::non_fungible_token::approval::NonFungibleTokenApproval;
 use near_contract_standards::non_fungible_token::core::{NonFungibleTokenCore, NonFungibleTokenResolver};
@@ -319,6 +320,83 @@ fn fmt_ppm(x: u128) -> String {
     format!("{}.{:02}", x / math::PPM, (x % math::PPM) / 10_000)
 }
 
+// Dynamic metadata
+
+const HEART: [&[u8; 9]; 8] = [b".##...##.", b"#*#######", b"#########", b"#########", b".#######.", b"..#####..", b"...###...", b"....#...."];
+
+impl ExtraLife {
+    /// The token with its image and description drawn from the life's state now.
+    fn dynamic(&self, mut t: Token) -> Token {
+        let Some(life) = self.lives.get(&t.token_id) else { return t };
+        let paid = self.paid(life);
+        let (state, line) = if paid >= life.owed {
+            (HeartState::Healed, format!("Full Heal: paid back all {} USDC.", fmt_usdc(life.owed)))
+        } else if self.expired(life) {
+            (HeartState::Expired, format!("Expired after paying {} of {} USDC.", fmt_usdc(paid), fmt_usdc(life.owed)))
+        } else {
+            (HeartState::Earning, format!("Paid {} of {} USDC so far, from OneUp house profit.", fmt_usdc(paid), fmt_usdc(life.owed)))
+        };
+        let m = t.metadata.get_or_insert_with(TokenMetadata::default);
+        m.media = Some(heart_svg(paid, life.owed, state));
+        m.description = Some(line);
+        m.extra = Some(format!(r#"{{"paid":"{}","owed":"{}","state":"{}"}}"#, paid, life.owed, state.name()));
+        t
+    }
+}
+
+#[derive(Clone, Copy)]
+enum HeartState {
+    Earning,
+    Healed,
+    Expired,
+}
+
+impl HeartState {
+    fn name(self) -> &'static str {
+        match self {
+            HeartState::Earning => "earning",
+            HeartState::Healed => "full_heal",
+            HeartState::Expired => "expired",
+        }
+    }
+}
+
+/// A pixel heart on an LCD screen, filled from the bottom by `paid / owed`: gold behind a Full Heal, grey
+/// once expired. A `data:` URI, so wallets show it without any server.
+fn heart_svg(paid: u128, owed: u128, state: HeartState) -> String {
+    let rows = HEART.len() as u128;
+    let filled = if owed == 0 { rows } else { (paid.min(owed) * rows).div_ceil(owed) };
+    let (bg, heart, empty) = match state {
+        HeartState::Earning => ("b7c49a", "e2257a", "8e9e6e"),
+        HeartState::Healed => ("f2b705", "e2257a", "e2257a"),
+        HeartState::Expired => ("c9cbd4", "8a8c99", "a9abb6"),
+    };
+    let on = |x: i32, y: i32| (0..9).contains(&x) && (0..8).contains(&y) && HEART[y as usize][x as usize] != b'.';
+    let mut cells = String::new();
+    // the ink outline: empty cells touching the heart
+    for y in -1..=8 {
+        for x in -1..=9 {
+            if !on(x, y) && (on(x - 1, y) || on(x + 1, y) || on(x, y - 1) || on(x, y + 1)) {
+                cells.push_str(&format!("<rect x='{}' y='{}' width='1' height='1' fill='%231c1b29'/>", x + 2, y + 2));
+            }
+        }
+    }
+    for (y, row) in HEART.iter().enumerate() {
+        for (x, c) in row.iter().enumerate() {
+            let fill = match c {
+                b'.' => continue,
+                b'*' => "ffffff",
+                _ if (rows - y as u128) <= filled => heart,
+                _ => empty,
+            };
+            cells.push_str(&format!("<rect x='{}' y='{}' width='1' height='1' fill='%23{fill}'/>", x + 2, y + 2));
+        }
+    }
+    format!(
+        "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 12' shape-rendering='crispEdges'><rect width='13' height='12' fill='%23{bg}'/>{cells}</svg>"
+    )
+}
+
 // NEP-171 plumbing
 
 #[near]
@@ -341,7 +419,7 @@ impl NonFungibleTokenCore for ExtraLife {
     }
 
     fn nft_token(&self, token_id: TokenId) -> Option<Token> {
-        self.tokens.nft_token(token_id)
+        self.tokens.nft_token(token_id).map(|t| self.dynamic(t))
     }
 }
 
@@ -388,7 +466,7 @@ impl NonFungibleTokenEnumeration for ExtraLife {
     }
 
     fn nft_tokens(&self, from_index: Option<U128>, limit: Option<u64>) -> Vec<Token> {
-        self.tokens.nft_tokens(from_index, limit)
+        self.tokens.nft_tokens(from_index, limit).into_iter().map(|t| self.dynamic(t)).collect()
     }
 
     fn nft_supply_for_owner(&self, account_id: AccountId) -> U128 {
@@ -396,7 +474,7 @@ impl NonFungibleTokenEnumeration for ExtraLife {
     }
 
     fn nft_tokens_for_owner(&self, account_id: AccountId, from_index: Option<U128>, limit: Option<u64>) -> Vec<Token> {
-        self.tokens.nft_tokens_for_owner(account_id, from_index, limit)
+        self.tokens.nft_tokens_for_owner(account_id, from_index, limit).into_iter().map(|t| self.dynamic(t)).collect()
     }
 }
 

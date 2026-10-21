@@ -5,6 +5,7 @@
 
 import { Account, type KeyPairString } from "near-api-js";
 import { sfx } from "./sound";
+import { loadSession, sessionSender, type Session } from "./session";
 import { OneUp, accountSender, normalizePrice, type Deployment } from "@oneup/sdk";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
@@ -21,6 +22,10 @@ interface Ctx {
   me: string;
   setMe: (id: string) => void;
   tx: ReturnType<OneUp["calls"]>;
+  /** The signed-in account with its main key (for adding and removing session keys). */
+  main: Account;
+  /** The trade-only session key, when one is on. */
+  session: Session | null;
   run: (label: string, f: () => Promise<unknown>) => Promise<boolean>;
   toasts: Toast[];
   /** Latest price per market (1e8 units) and recent history (USD). */
@@ -79,10 +84,22 @@ function Loaded({ d, children }: { d: Deployment; children: ReactNode }) {
     } catch {}
   }, []);
 
-  const tx = useMemo(() => {
+  // the main key (localnet dev wallet), and a session key for trades when one is on (lib/session.ts)
+  const main = useMemo(() => {
     const key = [d.demo, ...d.bots].find((a) => a.id === me)!.key as KeyPairString;
-    return o.calls(accountSender(new Account(me, o.provider, key)));
+    return new Account(me, o.provider, key);
   }, [d, o, me]);
+  const [session, setSession] = useState<Session | null>(null);
+  useEffect(() => {
+    const read = () => setSession(loadSession(me));
+    read();
+    window.addEventListener("oneup-session", read);
+    return () => window.removeEventListener("oneup-session", read);
+  }, [me]);
+  const tx = useMemo(() => {
+    const send = accountSender(main);
+    return o.calls(session ? sessionSender(me, o.provider, session, d.contracts.house, send) : send);
+  }, [d, o, me, main, session]);
 
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [version, setVersion] = useState(0);
@@ -150,7 +167,7 @@ function Loaded({ d, children }: { d: Deployment; children: ReactNode }) {
     };
   }, [o]);
 
-  const value: Ctx = { d, o, accounts, me, setMe, tx, run, toasts, prices, history, version };
+  const value: Ctx = { d, o, accounts, me, setMe, tx, main, session, run, toasts, prices, history, version };
   return <OneUpContext.Provider value={value}>{children}</OneUpContext.Provider>;
 }
 
