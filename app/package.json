@@ -11,6 +11,7 @@
     "test": "echo no tests"
   },
   "dependencies": {
+    "@defuse-protocol/intents-sdk": "0.92.0",
     "@oneup/sdk": "workspace:*",
     "borsh": "2.0.0",
     "near-api-js": "7.3.1",

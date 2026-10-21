@@ -14,6 +14,13 @@ const SWAP_USDC = 100_000n * USDC;
 const SWAP_ONEUP = 10_000_000n * ONEUP;
 const BOT_USDC = 50_000n * USDC;
 const BOTS = 6;
+const SOLVER_USDC = 2_000_000n * USDC;
+/** Bridged assets for the simulated bridge: PoA tokens named like the real ones' chains. */
+const BRIDGED = [
+  { id: "usdc-eth", chain: "Ethereum", symbol: "USDC", decimals: 6, solverInventory: 2_000_000n * 10n ** 6n },
+  { id: "usdc-sol", chain: "Solana", symbol: "USDC", decimals: 6, solverInventory: 2_000_000n * 10n ** 6n },
+  { id: "eth", chain: "Ethereum", symbol: "ETH", decimals: 18, solverInventory: 1_000n * 10n ** 18n },
+];
 
 export async function deploy(opts: { home: string; rpcUrl: string; epochLengthS: number }): Promise<Deployment> {
   const provider = new JsonRpcProvider({ url: opts.rpcUrl });
@@ -110,6 +117,77 @@ export async function deploy(opts: { home: string; rpcUrl: string; epochLengthS:
   await ftCall(root, id("usdc"), id("swap"), SWAP_USDC, JSON.stringify({ add_liquidity: {} }));
   await ftCall(root, id("oneup"), id("swap"), SWAP_ONEUP, JSON.stringify({ add_liquidity: {} }));
 
+  // D-21: NEAR Intents. The Verifier and PoA factory are the official near/intents v0.4.2 builds
+  // (contracts/vendor). PoA tokens stand in for bridged assets: a simulated bridge (the root account)
+  // mints them into the Verifier. A solver keeps USDC and the bridged assets there to fill swaps.
+  step("NEAR Intents: Verifier, PoA bridge tokens, solver");
+  const vendor = (f: string) => readFileSync(resolve(ROOT, "contracts/vendor", f));
+  const wrap = await create("wrap", "10");
+  await wrap.deployContract(vendor("wnear.wasm"));
+  await call(root, wrap.accountId, "new", {});
+  const intents = await create("intents", "100");
+  await intents.deployContract(vendor("intents_verifier_v0.4.2.wasm"));
+  await call(root, intents.accountId, "new", {
+    config: { wnear_id: wrap.accountId, fees: { fee: 0, fee_collector: rootId }, roles: { super_admins: [rootId] } },
+  });
+  const poa = await create("poa", "100");
+  await poa.deployContract(vendor("poa_factory_v0.4.2.wasm"));
+  await call(root, poa.accountId, "new", {
+    super_admins: [rootId],
+    admins: {},
+    grantees: { TokenDeployer: [rootId], TokenDepositer: [rootId] },
+  });
+  for (const a of BRIDGED) {
+    await call(root, poa.accountId, "deploy_token", {
+      token: a.id,
+      metadata: { spec: "ft-1.0.0", name: `${a.symbol} (${a.chain})`, symbol: a.symbol, decimals: a.decimals },
+    }, nearToYocto("4"));
+    await call(root, `${a.id}.${poa.accountId}`, "storage_deposit", { account_id: intents.accountId }, nearToYocto("0.01"));
+  }
+  await call(root, id("usdc"), "storage_deposit", { account_id: intents.accountId }, nearToYocto("0.01"));
+  const solver = await create("solver", "30");
+  await call(solver, intents.accountId, "add_public_key", { public_key: key.getPublicKey().toString() }, 1n);
+  await call(root, id("usdc"), "mint", { receiver_id: solver.accountId, amount: SOLVER_USDC.toString() });
+  await ftCall(solver, id("usdc"), intents.accountId, SOLVER_USDC, "");
+  for (const a of BRIDGED) {
+    await call(root, poa.accountId, "ft_deposit", {
+      token: a.id,
+      owner_id: intents.accountId,
+      amount: a.solverInventory.toString(),
+      msg: solver.accountId,
+    }, nearToYocto("0.004"));
+  }
+  await call(root, id("house"), "set_intents", { intents: intents.accountId });
+
+  // D-20: a Sputnik DAO (the exact code mainnet DAOs run, contracts/vendor) owns the house; the demo
+  // trader and two bots are its council. Routine buybacks stay with an operator (the root account the
+  // keeper uses), so the DAO only votes on markets and parameters.
+  step("Sputnik DAO takes over the house");
+  const dao = await create("dao", "30");
+  await dao.deployContract(readFileSync(resolve(ROOT, "contracts/vendor/sputnikdao2.wasm")));
+  const council = [demo.accountId, bots[3].accountId, bots[5].accountId];
+  await call(root, dao.accountId, "new", {
+    config: { name: "oneup-dao", purpose: "Governs the OneUp house: markets and their share of the pool", metadata: "" },
+    policy: {
+      roles: [
+        { name: "all", kind: "Everyone", permissions: ["*:AddProposal"], vote_policy: {} },
+        {
+          name: "council",
+          kind: { Group: council },
+          permissions: ["*:AddProposal", "*:VoteApprove", "*:VoteReject", "*:VoteRemove", "*:Finalize"],
+          vote_policy: {},
+        },
+      ],
+      default_vote_policy: { weight_kind: "RoleWeight", quorum: "0", threshold: [1, 2] },
+      proposal_bond: nearToYocto("0.1").toString(),
+      proposal_period: (3_600n * 1_000_000_000n).toString(), // an hour, for the demo
+      bounty_bond: nearToYocto("1").toString(),
+      bounty_forgiveness_period: (86_400n * 1_000_000_000n).toString(),
+    },
+  });
+  await call(root, id("house"), "set_operator", { operator: rootId });
+  await call(root, id("house"), "set_owner", { owner: dao.accountId });
+
   step("fund bots and demo trader");
   for (const t of [...bots, demo]) {
     await call(root, id("usdc"), "mint", { receiver_id: t.accountId, amount: BOT_USDC.toString() });
@@ -129,6 +207,13 @@ export async function deploy(opts: { home: string; rpcUrl: string; epochLengthS:
       oracle: id("oracle"),
       swap: id("swap"),
       market: id("market"),
+      dao: dao.accountId,
+    },
+    intents: {
+      verifier: intents.accountId,
+      poa: poa.accountId,
+      solver: { id: solver.accountId, key: keyString },
+      assets: BRIDGED.map((a) => ({ token: `${a.id}.${poa.accountId}`, chain: a.chain, symbol: a.symbol, decimals: a.decimals })),
     },
     owner: { id: rootId, key: validator.secret_key },
     keeper: { id: keeper.accountId, key: keyString },

@@ -141,9 +141,34 @@ they were paid, so later losers recovered less. Making lives expire after 13 epo
 | [`app`](app) | Next.js app: trade, Extra Lives, locks, market, solvency, fairness |
 | [`docs`](docs) | [Maths](docs/maths.md), [interfaces](docs/interfaces.md), [decisions](docs/decisions.md), [plan](PLAN.md) |
 
-Tests: 95 contract unit and property tests, 5 end-to-end sandbox tests, plus SDK and simulation tests.
+Tests: 103 contract unit and property tests, 5 end-to-end sandbox tests, plus SDK and simulation tests.
 The sandbox tests found two real bugs during the build (a u128 overflow in reward splits and a
 duplicate-registration panic), and running the demo found a third (the reserve floor; decision D-12).
+
+## Tracks and NEAR features
+
+Built for NEAR HACKATHON. The tracks it leans on, and the NEAR pieces it uses:
+
+- **Unstoppable DeFi.** A perps exchange; deposits and trades from other chains through **NEAR Intents**:
+  the official Verifier and PoA factory (release 0.4.2) run locally, intents are signed with the official
+  `@defuse-protocol/intents-sdk`, and OneUp's solver fills them with `execute_intents`
+  ([D-21](docs/decisions.md)). "Long NEAR with USDC on Solana" is one signature.
+- **NFTs That Do Something.** Extra Lives (**NEP-171**) earn USDC from the house's profit, carry their
+  unclaimed USDC when sold on the built-in market (**NEP-178** approvals), and are **dynamic**: their image
+  is a pixel heart drawn on chain, filling as they pay back.
+- **Social Money.** A **Sputnik DAO** (the code mainnet DAOs run) owns the house; markets and their share
+  of the pool are council votes ([D-20](docs/decisions.md)).
+- **AI Security & Defense.** One-tap trading uses a **function-call key** that can only open, close and
+  set TP/SL, with a gas budget; it can't attach deposits, so it can't move funds. The keeper's price feed
+  uses the same kind of key.
+- **Real-World Money.** Gasless trading: session-key trades go as **meta transactions** (NEP-366) to a
+  relayer that pays the gas.
+- **Games With Real Economies.** Rounds, leaderboards, achievements and a player market for Extra Lives
+  and locks.
+
+Also: **NEP-141** ($1UP, USDC), **NEP-245** (NEAR Intents balances), **NEP-297** events (the app's feed
+and history), named accounts. Not used: Chain Signatures, HOT, social login and the 1Click API need
+testnet or mainnet; Rhea's buyback swap is a local stand-in.
 
 ## What's mocked locally
 

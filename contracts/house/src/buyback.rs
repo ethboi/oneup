@@ -39,10 +39,11 @@ enum ProceedsMsg {
 
 #[near]
 impl House {
-    /// Swaps an epoch's buyback USDC. Owner only for now: `min_out` sets the worst acceptable price, and a
-    /// permissionless call would let anyone pass 0 and sandwich the swap (decision D-10).
+    /// Swaps an epoch's buyback USDC. The owner or the operator only: `min_out` sets the worst acceptable
+    /// price, and a permissionless call would let anyone pass 0 and sandwich the swap (decisions D-10, D-20).
     pub fn buyback(&mut self, epoch: u64, min_out: U128) {
-        require!(env::predecessor_account_id() == self.owner, "Only the owner");
+        let caller = env::predecessor_account_id();
+        require!(caller == self.owner || self.operator.as_ref() == Some(&caller), "Only the owner or operator");
         let swap = self.swap.clone().unwrap_or_else(|| env::panic_str("No swap set"));
         let b = self.buybacks.get_mut(&epoch).unwrap_or_else(|| env::panic_str("No buyback for epoch"));
         require!(b.status == BuybackStatus::Pending, "Buyback not pending");

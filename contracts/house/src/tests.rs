@@ -738,3 +738,82 @@ fn only_the_owner_sets_triggers() {
     ctx("mallory", T0 + 10);
     h.set_triggers(pos, None, Some(U128(499 * 1_000_000)));
 }
+
+/// Decision D-20: the house can be handed to a DAO; an operator keeps running buybacks.
+#[test]
+fn owner_hands_over_and_operator_stays() {
+    let mut h = setup(usd(100_000));
+    ctx("owner", T0);
+    h.set_operator(Some(acc("keeper")));
+    h.set_owner(acc("dao"));
+    assert_eq!(h.get_owner(), (acc("dao"), Some(acc("keeper"))));
+    ctx("dao", T0);
+    h.add_market("SOL-USD".into(), "sol".into(), 50);
+    assert!(h.get_markets().iter().any(|m| m.id == "SOL-USD"));
+}
+
+#[test]
+#[should_panic(expected = "Only the owner")]
+fn old_owner_loses_control() {
+    let mut h = setup(usd(100_000));
+    ctx("owner", T0);
+    h.set_owner(acc("dao"));
+    h.add_market("SOL-USD".into(), "sol".into(), 50);
+}
+
+#[test]
+#[should_panic(expected = "Only the owner or operator")]
+fn strangers_cannot_buy_back() {
+    let mut h = setup(usd(100_000));
+    ctx("mallory", T0);
+    h.buyback(1, U128(0));
+}
+
+/// Decision D-21: deposits delivered by the NEAR Intents Verifier credit the account they name, and an
+/// order they carry is never refused (the Verifier wouldn't return the tokens): it just isn't placed.
+fn intents_deposit(h: &mut House, amount: u128, msg: &str) {
+    ctx("usdc", T0);
+    let _ = h.ft_on_transfer(acc("intents"), U128(amount), msg.into());
+}
+
+#[test]
+fn intents_deposit_credits_the_named_account() {
+    let mut h = setup(usd(100_000));
+    ctx("owner", T0);
+    h.set_intents(Some(acc("intents")));
+    intents_deposit(&mut h, usd(500), r#"{"for":{"account_id":"alice"}}"#);
+    assert_eq!(h.get_balance(acc("alice")).0, usd(500));
+    assert_eq!(h.get_balance(acc("intents")).0, 0);
+}
+
+#[test]
+fn intents_deposit_and_open() {
+    let mut h = setup(usd(100_000));
+    ctx("owner", T0);
+    h.set_intents(Some(acc("intents")));
+    intents_deposit(&mut h, usd(500), r#"{"open":{"market_id":"NEAR-USD","side":"Long","margin":"500000000","leverage":10,"account_id":"alice"}}"#);
+    let orders = h.get_orders(acc("alice"));
+    assert_eq!(orders.len(), 1);
+    assert_eq!(h.get_balance(acc("alice")).0, 0);
+}
+
+#[test]
+fn intents_refused_open_keeps_the_deposit() {
+    let mut h = setup(usd(100_000));
+    ctx("owner", T0);
+    h.set_intents(Some(acc("intents")));
+    // 500× is over the market's 100× limit: no order, but the USDC is alice's, not lost
+    intents_deposit(&mut h, usd(500), r#"{"open":{"market_id":"NEAR-USD","side":"Long","margin":"500000000","leverage":500,"account_id":"alice"}}"#);
+    assert!(h.get_orders(acc("alice")).is_empty());
+    assert_eq!(h.get_balance(acc("alice")).0, usd(500));
+}
+
+#[test]
+#[should_panic(expected = "Only NEAR Intents deposits name an account")]
+fn others_cannot_deposit_for_someone_else() {
+    let mut h = setup(usd(100_000));
+    ctx("owner", T0);
+    h.set_intents(Some(acc("intents")));
+    ctx("usdc", T0);
+    let _ = h.ft_on_transfer(acc("mallory"), U128(usd(5)), r#"{"for":{"account_id":"alice"}}"#.into());
+}

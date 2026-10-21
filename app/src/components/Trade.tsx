@@ -25,6 +25,7 @@ import { PixelHeart } from "./Pixel";
 import { Icon } from "./Icon";
 import { Popover } from "./Popover";
 import { useTilt } from "@/lib/tilt";
+import { payFromChain } from "@/lib/intents";
 import { useRevengeFlash, useStreak } from "./Streaks";
 import { Burst, Gauge, MoodGlow, useCloseFx, useMood, useTensionSound } from "./Mood";
 import { ActivityList, useActivity } from "./Activity";
@@ -136,7 +137,11 @@ type Ticket = ReturnType<typeof useTicket>;
 
 /** The order ticket's state and what it would do, shared by the form and the phone trade bar. */
 function useTicket(market: string, maxLeverage: number) {
-  const { o, tx, run, prices, me } = useOneUp();
+  const { o, d, tx, run, prices, me, main, mainKey } = useOneUp();
+  // where the margin comes from: the wallet's USDC on NEAR, or a bridged asset via NEAR Intents (D-21)
+  const [payWith, setPayWith] = useState("wallet");
+  const [intentStep, setIntentStep] = useState<string | null>(null);
+  const viaAsset = d.intents?.assets.find((a) => a.token === payWith);
   const [side, setSide] = useState<Side>("Long");
   const [margin, setMargin] = useState("500");
   const [leverage, setLeverage] = useState(50);
@@ -159,14 +164,29 @@ function useTicket(market: string, maxLeverage: number) {
   const slAt = toPrice(sl);
   // a trigger already past the price would fire on the first price after the hold: refuse it here
   const badTrigger = !!price && ((!!tpAt && targetHit(side, price, tpAt)) || (!!slAt && stopHit(side, price, slAt)));
-  const blocked = !quote?.allowed || m === 0n || topUp > wallet || badTrigger;
-  const label = `${topUp > 0n ? `Deposit $${fmtUsdc(topUp, 0)} & ` : ""}${side} ${market}`;
+  const blocked = !quote?.allowed || m === 0n || (!viaAsset && topUp > wallet) || badTrigger || intentStep !== null;
+  const label = viaAsset
+    ? `${side} ${market} with ${viaAsset.symbol} on ${viaAsset.chain}`
+    : `${topUp > 0n ? `Deposit $${fmtUsdc(topUp, 0)} & ` : ""}${side} ${market}`;
   const triggers = { takeProfit: tpAt, stopLoss: slAt };
   const submit = () =>
-    run(`${side} ${market} ${leverage}× · $${margin}`, () =>
-      topUp > 0n ? tx.depositAndOpen(topUp, market, side, m, leverage, triggers) : tx.placeOpen(market, side, m, leverage, triggers),
-    );
-  return { market, maxLeverage, side, setSide, margin, setMargin, leverage, setLeverage, tp, setTp, sl, setSl, price, m, quote, free, wallet, pool, topUp, blocked, label, submit };
+    viaAsset
+      ? run(`${side} ${market} ${leverage}× · $${margin} via NEAR Intents`, () =>
+          payFromChain({
+            o,
+            d,
+            main,
+            keyString: mainKey,
+            asset: viaAsset,
+            usdc: m,
+            then: { kind: "open", market_id: market, side, margin: m, leverage, ...triggers },
+            onStep: setIntentStep,
+          }).finally(() => setIntentStep(null)),
+        )
+      : run(`${side} ${market} ${leverage}× · $${margin}`, () =>
+          topUp > 0n ? tx.depositAndOpen(topUp, market, side, m, leverage, triggers) : tx.placeOpen(market, side, m, leverage, triggers),
+        );
+  return { market, maxLeverage, side, setSide, margin, setMargin, leverage, setLeverage, tp, setTp, sl, setSl, price, m, quote, free, wallet, pool, topUp, blocked, label, submit, payWith, setPayWith, viaAsset, intentStep };
 }
 
 /** The handheld: plastic case, slate surround with stripes, the LCD with its readout, and the market buttons. */
@@ -271,6 +291,7 @@ function Console({
 }
 
 function OrderForm({ t }: { t: Ticket }) {
+  const { d } = useOneUp();
   const { side, setSide, margin, setMargin, leverage, setLeverage, maxLeverage, m, quote, free, wallet, pool, topUp, blocked, price } = t;
   const liq = quote?.liquidation_price ? BigInt(quote.liquidation_price) : null;
   // what a full loss would bring: an Extra Life of at most the loss × today's cap, and up to 20 $1UP per $1
@@ -312,11 +333,27 @@ function OrderForm({ t }: { t: Ticket }) {
           <span className="field-unit">USDC</span>
         </span>
         <span className="label num">
-          {topUp > 0n
-            ? `$${fmtUsdc(free, 0)} free + $${fmtUsdc(topUp, 0)} from your wallet in the same step`
-            : `$${fmtUsdc(free, 0)} free to trade`}
+          {t.viaAsset
+            ? `Paid from ${t.viaAsset.symbol} on ${t.viaAsset.chain}: bridged, swapped and deposited in one intent`
+            : topUp > 0n
+              ? `$${fmtUsdc(free, 0)} free + $${fmtUsdc(topUp, 0)} from your wallet in the same step`
+              : `$${fmtUsdc(free, 0)} free to trade`}
         </span>
       </label>
+
+      {d.intents && (
+        <label className="flex flex-col gap-1">
+          <span className="label">Pay with</span>
+          <select className="input" value={t.payWith} onChange={(e) => t.setPayWith(e.target.value)} aria-label="Pay with">
+            <option value="wallet">USDC on NEAR (wallet)</option>
+            {d.intents.assets.map((a) => (
+              <option key={a.token} value={a.token}>
+                {a.symbol} on {a.chain} · NEAR Intents
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       <label className="flex flex-col gap-1">
         <span className="label flex justify-between">
@@ -381,7 +418,17 @@ function OrderForm({ t }: { t: Ticket }) {
       >
         {t.label}
       </button>
-      <p className="label -mt-1 text-center">Fills at the next oracle price. No fees, no funding.</p>
+      {t.intentStep ? (
+        <p className="label -mt-1 flex items-center justify-center gap-2" role="status">
+          <Icon name="spinner" /> {t.intentStep}
+        </p>
+      ) : t.viaAsset ? (
+        <p className="label -mt-1 text-center">
+          Via NEAR Intents: a solver swaps your {t.viaAsset.symbol} for USDC on the Verifier. The bridge is simulated on this local chain.
+        </p>
+      ) : (
+        <p className="label -mt-1 text-center">Fills at the next oracle price. No fees, no funding.</p>
+      )}
     </div>
   );
 }

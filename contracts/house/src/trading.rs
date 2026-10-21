@@ -16,6 +16,7 @@ const GAS_WITHDRAW_CALLBACK: Gas = Gas::from_tgas(10);
 enum DepositMsg {
     Seed {},
     /// Deposit and place an open in one step; `margin` comes from the free balance after the deposit.
+    /// From the NEAR Intents Verifier, `account_id` names whose trade it is (D-21).
     Open {
         market_id: String,
         side: Side,
@@ -25,7 +26,11 @@ enum DepositMsg {
         take_profit: Option<U128>,
         #[serde(default)]
         stop_loss: Option<U128>,
+        #[serde(default)]
+        account_id: Option<AccountId>,
     },
+    /// From the NEAR Intents Verifier only: credit this account's free balance (D-21).
+    For { account_id: AccountId },
 }
 
 #[near]
@@ -54,11 +59,34 @@ impl House {
                     self.mint_lives(0, vec![(sender_id.clone(), amount.0, math::PPM)], false).detach();
                     Event::Seed { amount, pool: U128(self.pool) }.emit();
                 }
-                DepositMsg::Open { market_id, side, margin, leverage, take_profit, stop_loss } => {
-                    // a refused open (capacity, leverage) panics, so the whole transfer is refunded
-                    self.credit(&sender_id, amount.0);
-                    Event::Deposit { account_id: sender_id.clone(), amount }.emit();
-                    self.internal_place_open(sender_id, market_id, side, margin, leverage, Triggers { take_profit, stop_loss });
+                DepositMsg::Open { market_id, side, margin, leverage, take_profit, stop_loss, account_id } => {
+                    let triggers = Triggers { take_profit, stop_loss };
+                    if self.from_intents(&sender_id) {
+                        // the Verifier doesn't return tokens a receiver rejects, so never refuse: a
+                        // refused open leaves the deposit in the trader's free balance
+                        let who = account_id.unwrap_or_else(|| env::panic_str("Intents deposits name an account"));
+                        self.credit(&who, amount.0);
+                        Event::Deposit { account_id: who.clone(), amount }.emit();
+                        let refusal = self.open_refusal(&market_id, side, margin.0, leverage, math::max_liability(margin.0));
+                        match refusal {
+                            None if self.balance_of(&who) >= margin.0 => {
+                                self.internal_place_open(who, market_id, side, margin, leverage, triggers);
+                            }
+                            None => env::log_str("Order not placed: margin above the free balance; the deposit stays there"),
+                            Some(why) => env::log_str(&format!("Order not placed: {why}; the deposit stays in the free balance")),
+                        }
+                    } else {
+                        require!(account_id.is_none(), "Only NEAR Intents deposits name an account");
+                        // a refused open (capacity, leverage) panics, so the whole transfer is refunded
+                        self.credit(&sender_id, amount.0);
+                        Event::Deposit { account_id: sender_id.clone(), amount }.emit();
+                        self.internal_place_open(sender_id, market_id, side, margin, leverage, triggers);
+                    }
+                }
+                DepositMsg::For { account_id } => {
+                    require!(self.from_intents(&sender_id), "Only NEAR Intents deposits name an account");
+                    self.credit(&account_id, amount.0);
+                    Event::Deposit { account_id, amount }.emit();
                 }
             }
         }
@@ -213,6 +241,14 @@ fn log_result(r: Result<(), &'static str>) -> bool {
 }
 
 impl House {
+    fn from_intents(&self, sender_id: &AccountId) -> bool {
+        self.intents.as_ref() == Some(sender_id)
+    }
+
+    fn balance_of(&self, account: &AccountId) -> u128 {
+        self.balances.get(account).copied().unwrap_or(0)
+    }
+
     fn price_then(&mut self, position_id: u64, reason: CloseReason) -> Promise {
         let p = self.positions.get(&position_id).unwrap_or_else(|| env::panic_str("No such position"));
         let feed = self.market(&p.market_id).feed_id.clone();

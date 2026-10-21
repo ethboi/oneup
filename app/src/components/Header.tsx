@@ -9,6 +9,7 @@ import { Popover } from "./Popover";
 import { MuteButton } from "./Sounds";
 import { openBadges } from "./Achievements";
 import { endSession, saveSession, sessionAllowance, startSession } from "@/lib/session";
+import { intentsBalances, payFromChain } from "@/lib/intents";
 
 export interface NavTab {
   name: string;
@@ -151,6 +152,7 @@ function AccountMenu() {
             </button>
           </div>
           <p className="label">Optional: placing a trade moves what it needs from your wallet in the same step.</p>
+          <ChainDeposit />
           <FastTrading />
           <button className="btn btn-ghost justify-start" onClick={() => (close(), openBadges())}>
             <Icon name="trophy" />
@@ -160,6 +162,68 @@ function AccountMenu() {
         </div>
       )}
     </Popover>
+  );
+}
+
+/** Deposit from another chain with NEAR Intents (D-21), and what's held in the Verifier. */
+function ChainDeposit() {
+  const { o, d, me, main, mainKey, run } = useOneUp();
+  const assets = d.intents?.assets ?? [];
+  const [token, setToken] = useState(assets[0]?.token ?? "");
+  const [amount, setAmount] = useState("500");
+  const [step, setStep] = useState<string | null>(null);
+  const held = usePoll(() => intentsBalances(o, d, me), [me], 5000);
+  if (!d.intents) return null;
+  const a = assets.find((x) => x.token === token)!;
+  const usdc = BigInt(Math.floor(Number(amount) || 0)) * USDC;
+  const leftovers = Object.entries(held ?? {}).filter(([, v]) => v > 0n);
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-[var(--line)] p-3">
+      <div className="text-sm font-bold">Deposit from another chain</div>
+      <div className="flex gap-2">
+        <select className="input min-w-0 flex-1" value={token} onChange={(e) => setToken(e.target.value)} aria-label="Source asset">
+          {assets.map((x) => (
+            <option key={x.token} value={x.token}>
+              {x.symbol} on {x.chain}
+            </option>
+          ))}
+        </select>
+        <span className="field w-28">
+          <input className="input num" value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="USDC to receive" inputMode="decimal" />
+          <span className="field-unit">USD</span>
+        </span>
+      </div>
+      <button
+        className="btn btn-ghost"
+        disabled={usdc === 0n || step !== null}
+        onClick={() =>
+          run(`Deposit $${amount} from ${a.symbol} on ${a.chain}`, () =>
+            payFromChain({ o, d, main, keyString: mainKey, asset: a, usdc, then: { kind: "deposit" }, onStep: setStep }).finally(() => setStep(null)),
+          )
+        }
+      >
+        {step ? (
+          <>
+            <Icon name="spinner" /> {step}
+          </>
+        ) : (
+          "Deposit via NEAR Intents"
+        )}
+      </button>
+      <p className="label">The bridge is simulated on this local chain; the swap runs on the real NEAR Intents Verifier.</p>
+      {leftovers.length > 0 && (
+        <p className="label num">
+          Held in NEAR Intents:{" "}
+          {leftovers
+            .map(([t, v]) => {
+              const x = assets.find((y) => y.token === t);
+              const dec = x?.decimals ?? 6;
+              return `${(Number(v) / 10 ** dec).toLocaleString("en-US", { maximumFractionDigits: 4 })} ${x ? `${x.symbol} (${x.chain})` : "USDC"}`;
+            })
+            .join(", ")}
+        </p>
+      )}
+    </div>
   );
 }
 

@@ -39,5 +39,5 @@ When an epoch ends with the house in profit, its losers get Extra Lives: NFTs th
 
 Built on NEAR standards: NEP-141 tokens, NEP-171 NFTs listed with NEP-178 approvals, NEP-297 events. Orders fill at the next oracle price, so nobody trades on a price they already know; take-profits and stop-losses fire only on newer prices. A deposit and an order travel in one ft_transfer_call. The keeper anyone can run pushes prices on a function-call key limited to the oracle.
 
-What's in the repo: 8 Rust contracts with 100 tests (unit, property and sandbox end-to-end), a keeper, six trading bots, simulations of fairness and farming cost, and a Next.js app with live prices, history, shareable PnL cards and sound. One command (pnpm demo) starts a local NEAR chain with everything deployed. On mainnet the house reads Outlayer's Pyth oracle and buys back on Rhea.
+What's in the repo: 8 Rust contracts with 108 tests (unit, property and sandbox end-to-end), a keeper, six trading bots, simulations of fairness and farming cost, and a Next.js app with live prices, history, shareable PnL cards and sound. One command (pnpm demo) starts a local NEAR chain with everything deployed. On mainnet the house reads Outlayer's Pyth oracle and buys back on Rhea.
 ```

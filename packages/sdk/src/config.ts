@@ -21,6 +21,16 @@ export interface Deployment {
     oracle: string;
     swap: string;
     market: string;
+    /** The Sputnik DAO that owns the house (D-20). */
+    dao?: string;
+  };
+  /** NEAR Intents (D-21): the Verifier, the PoA factory behind the simulated bridge, the solver and the
+   *  bridged assets it trades. */
+  intents?: {
+    verifier: string;
+    poa: string;
+    solver: { id: string; key: string };
+    assets: BridgedAsset[];
   };
   /** Dev keys. Localnet only: one throwaway key for every account it creates. */
   owner: { id: string; key: string };
@@ -28,6 +38,14 @@ export interface Deployment {
   bots: { id: string; key: string }[];
   demo: { id: string; key: string };
   markets: MarketConfig[];
+}
+
+export interface BridgedAsset {
+  /** The PoA token on NEAR, e.g. usdc-sol.poa.test.near. */
+  token: string;
+  chain: string;
+  symbol: string;
+  decimals: number;
 }
 
 export const MARKETS: MarketConfig[] = [

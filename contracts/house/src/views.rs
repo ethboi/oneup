@@ -142,7 +142,7 @@ impl House {
         if self.seed > 0 { self.seed } else { math::MIN_RESERVE }
     }
 
-    fn open_refusal(&self, market_id: &str, side: Side, margin: u128, leverage: u32, liability: u128) -> Option<String> {
+    pub(crate) fn open_refusal(&self, market_id: &str, side: Side, margin: u128, leverage: u32, liability: u128) -> Option<String> {
         let m = match self.markets.get(market_id) {
             Some(m) => m,
             None => return Some("No such market".into()),

@@ -129,6 +129,7 @@ class Bot {
     if (m?.buy && Math.random() < m.buy.chance) await this.shop(m.buy.upTo);
     if (m?.makeLocks) await this.makeLock();
     if (m?.sell) await this.sell(m.sell);
+    await this.govern();
   }
 
   private async topUp() {
@@ -209,6 +210,23 @@ class Bot {
     if ((await o.locks(this.id)).some((l) => !l.from_loss)) return;
     await this.tx.lock(5_000n * ONEUP, 104);
     log(this.style.name, "locked 5,000 $1UP for 104 epochs");
+  }
+
+  /** A council member (D-20) approves the house proposals it sees after a short look (10 s). */
+  private async govern() {
+    if (!d.contracts.dao) return;
+    const policy = await o.daoPolicy().catch(() => null);
+    const council = policy?.roles.flatMap((r) => (typeof r.kind === "object" && r.kind.Group ? r.kind.Group : [])) ?? [];
+    if (!council.includes(this.id)) return;
+    const now = BigInt(Date.now()) * 1_000_000n;
+    for (const p of await o.daoProposals().catch(() => [])) {
+      if (p.status !== "InProgress" || p.votes[this.id] || now - BigInt(p.submission_time) < 10_000_000_000n) continue;
+      await this.tx.vote(p.id, "VoteApprove", p.kind).then(
+        () => log(this.style.name, `voted for DAO proposal #${p.id}: ${p.description}`),
+        (e) => log(this.style.name, `vote failed: ${short(e)}`),
+      );
+      return;
+    }
   }
 
   /** Now and then (about once every ten steps) locks 500–2,000 $1UP for 13–104 epochs, to sell the lock. */

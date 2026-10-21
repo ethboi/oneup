@@ -218,6 +218,10 @@ pub struct House {
     /// USDC → $1UP swap (Rhea on mainnet, `mock-swap` on testnet).
     swap: Option<AccountId>,
     buybacks: LookupMap<u64, Buyback>,
+    /// May run buybacks besides the owner (D-20).
+    operator: Option<AccountId>,
+    /// The NEAR Intents Verifier: deposits it delivers may name the account they're for (D-21).
+    intents: Option<AccountId>,
 }
 
 pub(crate) fn now_s() -> u64 {
@@ -255,7 +259,31 @@ impl House {
             emission_carry: 0,
             swap: None,
             buybacks: LookupMap::new(StorageKey::Buybacks),
+            operator: None,
+            intents: None,
         }
+    }
+
+    /// The NEAR Intents Verifier whose deposits may credit another account (D-21). The owner only.
+    pub fn set_intents(&mut self, intents: Option<AccountId>) {
+        self.assert_owner();
+        self.intents = intents;
+    }
+
+    /// Hands the house to a new owner, e.g. a Sputnik DAO (decision D-20). The current owner only.
+    pub fn set_owner(&mut self, owner: AccountId) {
+        self.assert_owner();
+        self.owner = owner;
+    }
+
+    /// The operator runs routine buybacks, so a DAO owner doesn't vote on each one. The owner only.
+    pub fn set_operator(&mut self, operator: Option<AccountId>) {
+        self.assert_owner();
+        self.operator = operator;
+    }
+
+    pub fn get_owner(&self) -> (AccountId, Option<AccountId>) {
+        (self.owner.clone(), self.operator.clone())
     }
 
     // Admin. The owner lists markets (D-14).

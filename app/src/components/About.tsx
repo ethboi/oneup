@@ -71,7 +71,7 @@ const LINEAGE: { row: string; papertrade: string; aerodrome: string; oneup: stri
 
 const BUILT: { icon: IconName; title: string; body: string }[] = [
   { icon: "shield", title: "8 Rust contracts", body: "House, Extra Life (NEP-171), $1UP (NEP-141), locks, market (NEP-178 approvals), and mock USDC, oracle and swap. Events follow NEP-297." },
-  { icon: "check", title: "100 contract tests", body: "Unit and property tests, plus end-to-end tests on a sandbox chain." },
+  { icon: "check", title: "108 contract tests", body: "Unit and property tests, plus end-to-end tests on a sandbox chain." },
   { icon: "demo", title: "Keeper and bots", body: "Anyone can run the keeper: it pushes prices, fills orders, liquidates, fires take-profits and stop-losses, and closes epochs. Six bots trade, lock and shop." },
   { icon: "scale", title: "Simulations", body: "Fairness to late players and the cost of farming $1UP, tested before the rules were fixed." },
 ];
@@ -183,17 +183,26 @@ export function About() {
           <h2 className="text-lg font-extrabold">Built on NEAR</h2>
           <ul className="mt-3 flex flex-col gap-2 text-sm text-[var(--muted)]">
             <li>
-              <b className="text-[var(--text)]">Standards all the way down.</b> USDC and $1UP are NEP-141 tokens; Extra Lives and
-              locks are NEP-171 NFTs, listed with NEP-178 approvals; every contract emits NEP-297 events, which the app
-              reads for its feed and your history.
+              <b className="text-[var(--text)]">NEAR Intents.</b> Pay from another chain in one signature: the official Verifier
+              and PoA factory (release 0.4.2) run here, intents are signed with the official SDK, and OneUp&apos;s solver fills
+              them with <code>execute_intents</code>. Only the bridge step is simulated on this local chain.
             </li>
             <li>
-              <b className="text-[var(--text)]">Access keys for the keeper.</b> Prices go out on a function-call key that can only call
-              the oracle&apos;s <code>push_prices</code>, so a price feed never holds a full-access key.
+              <b className="text-[var(--text)]">Dynamic NFTs.</b> An Extra Life&apos;s image is a pixel heart drawn on chain,
+              filling as it pays back; wallets and markets see it change.
             </li>
             <li>
-              <b className="text-[var(--text)]">One step to trade.</b> A deposit and an order travel together in one{" "}
-              <code>ft_transfer_call</code>; if the order is refused, the whole deposit comes back.
+              <b className="text-[var(--text)]">A Sputnik DAO owns the house.</b> The same code mainnet DAOs run; listing and
+              pausing markets are council votes.
+            </li>
+            <li>
+              <b className="text-[var(--text)]">Session keys and gasless trades.</b> One-tap trading uses a function-call key
+              that can only trade (it can&apos;t move funds), and its trades can go as meta transactions a relayer pays for.
+            </li>
+            <li>
+              <b className="text-[var(--text)]">Standards all the way down.</b> NEP-141 tokens, NEP-171 NFTs with NEP-178
+              approvals, NEP-245 balances in NEAR Intents, and NEP-297 events, which the app reads for its feed and your
+              history.
             </li>
           </ul>
         </section>

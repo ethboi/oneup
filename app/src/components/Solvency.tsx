@@ -6,6 +6,7 @@
 import { fmtUsdc, ppmToNumber, type EpochSummary } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { Icon } from "./Icon";
+import { Governance } from "./Governance";
 
 const big = (x?: string) => (x === undefined ? 0n : BigInt(x));
 const pct = (a: bigint, b: bigint) => (b === 0n ? 0 : Number((a * 10_000n) / b) / 100);
@@ -27,7 +28,8 @@ export function Solvency() {
   const used = pct(liability, pool);
 
   return (
-    <div className="panel p-5">
+    <div className="flex flex-col gap-4">
+      <div className="panel p-5">
         <p className="text-lg">
           If every open position hit its max win at once, the house would pay{" "}
           <span className="num font-bold">${fmtUsdc(liability, 0)}</span>:{" "}
@@ -121,43 +123,45 @@ export function Solvency() {
           })}
         </div>
 
-      <div className="-mx-5 mt-5 overflow-x-auto border-t border-[var(--line)] px-5 pt-5">
-        <div className="text-lg font-extrabold">Epochs</div>
-        {(history ?? []).length === 0 ? (
-          <p className="label mt-2">No closed epochs yet.</p>
-        ) : (
-          <table className="num mt-3 w-full min-w-[720px] text-sm">
-            <thead>
-              <tr className="label text-left">
-                <th className="pb-2 font-normal">Epoch</th>
-                <th className="pb-2 text-right font-normal">Traders lost</th>
-                <th className="pb-2 text-right font-normal">Winners took</th>
-                <th className="pb-2 text-right font-normal">House net</th>
-                <th className="pb-2 text-right font-normal">Extra Lives</th>
-                <th className="pb-2 text-right font-normal">Life cap</th>
-                <th className="pb-2 text-right font-normal">Paid to lives</th>
-                <th className="pb-2 text-right font-normal">Buyback</th>
-                <th className="pb-2 text-right font-normal">Pool after</th>
-              </tr>
-            </thead>
-            <tbody>
-              {history!.map((e) => (
-                <tr key={e.epoch} className="border-t border-[var(--line)]">
-                  <td className="py-2">{e.epoch}</td>
-                  <td className="text-right">${fmtUsdc(big(e.losses), 0)}</td>
-                  <td className="text-right">${fmtUsdc(big(e.payouts), 0)}</td>
-                  <td className="text-right">${fmtUsdc(big(e.house_net), 0)}</td>
-                  <td className="text-right">{e.lives_minted}</td>
-                  <td className="text-right">{ppmToNumber(big(e.cap_ppm)).toFixed(2)}×</td>
-                  <td className="text-right">${fmtUsdc(big(e.lives_pot), 0)}</td>
-                  <td className="text-right">${fmtUsdc(big(e.buyback_pot), 0)}</td>
-                  <td className="text-right">${fmtUsdc(big(e.pool), 0)}</td>
+        <div className="-mx-5 mt-5 overflow-x-auto border-t border-[var(--line)] px-5 pt-5">
+          <div className="text-lg font-extrabold">Epochs</div>
+          {(history ?? []).length === 0 ? (
+            <p className="label mt-2">No closed epochs yet.</p>
+          ) : (
+            <table className="num mt-3 w-full min-w-[720px] text-sm">
+              <thead>
+                <tr className="label text-left">
+                  <th className="pb-2 font-normal">Epoch</th>
+                  <th className="pb-2 text-right font-normal">Traders lost</th>
+                  <th className="pb-2 text-right font-normal">Winners took</th>
+                  <th className="pb-2 text-right font-normal">House net</th>
+                  <th className="pb-2 text-right font-normal">Extra Lives</th>
+                  <th className="pb-2 text-right font-normal">Life cap</th>
+                  <th className="pb-2 text-right font-normal">Paid to lives</th>
+                  <th className="pb-2 text-right font-normal">Buyback</th>
+                  <th className="pb-2 text-right font-normal">Pool after</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              </thead>
+              <tbody>
+                {history!.map((e) => (
+                  <tr key={e.epoch} className="border-t border-[var(--line)]">
+                    <td className="py-2">{e.epoch}</td>
+                    <td className="text-right">${fmtUsdc(big(e.losses), 0)}</td>
+                    <td className="text-right">${fmtUsdc(big(e.payouts), 0)}</td>
+                    <td className="text-right">${fmtUsdc(big(e.house_net), 0)}</td>
+                    <td className="text-right">{e.lives_minted}</td>
+                    <td className="text-right">{ppmToNumber(big(e.cap_ppm)).toFixed(2)}×</td>
+                    <td className="text-right">${fmtUsdc(big(e.lives_pot), 0)}</td>
+                    <td className="text-right">${fmtUsdc(big(e.buyback_pot), 0)}</td>
+                    <td className="text-right">${fmtUsdc(big(e.pool), 0)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
+      <Governance />
     </div>
   );
 }

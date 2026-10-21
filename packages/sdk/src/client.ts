@@ -1,7 +1,7 @@
 // Typed access to the OneUp contracts. Views need only RPC; calls need an Account (near-api-js) or, in the
 // browser, any signer passed as `send`.
 
-import { Account, JsonRpcProvider, teraToGas } from "near-api-js";
+import { Account, JsonRpcProvider, base64Encode, teraToGas } from "near-api-js";
 import type { Deployment } from "./config.ts";
 import type { Side } from "./maths.ts";
 
@@ -137,6 +137,26 @@ export interface EpochEmissions {
   carry: U128;
 }
 
+/** A Sputnik DAO proposal (the fields the app uses). */
+export interface DaoProposal {
+  id: number;
+  proposer: string;
+  description: string;
+  kind: Record<string, unknown>;
+  status: "InProgress" | "Approved" | "Rejected" | "Removed" | "Expired" | "Moved" | "Failed";
+  vote_counts: Record<string, [string, string, string]>;
+  votes: Record<string, "Approve" | "Reject" | "Remove">;
+  submission_time: string;
+}
+
+/** A DAO proposal that calls the house (the only kind OneUp's UI makes). */
+export const houseProposal = (house: string, method_name: string, args: Record<string, unknown>) => ({
+  FunctionCall: {
+    receiver_id: house,
+    actions: [{ method_name, args: base64Encode(new TextEncoder().encode(JSON.stringify(args))), deposit: "0", gas: "150000000000000" }],
+  },
+});
+
 export interface Listing {
   nft_contract: string;
   token_id: string;
@@ -235,6 +255,17 @@ export class OneUp {
   listings = () => this.view<Listing[]>(this.d.contracts.market, "get_listings", {});
   /** $1UP out for `usdc_in` on the swap (Rhea's stand-in). */
   swapQuote = (usdc_in: bigint) => this.view<U128>(this.d.contracts.swap, "get_quote", { usdc_in: usdc_in.toString() });
+  daoPolicy = () =>
+    this.view<{ roles: { name: string; kind: { Group?: string[] } | string }[]; proposal_bond: string; proposal_period: string }>(
+      this.d.contracts.dao!,
+      "get_policy",
+    );
+  daoProposals = async (): Promise<DaoProposal[]> => {
+    const last = await this.view<number>(this.d.contracts.dao!, "get_last_proposal_id");
+    const from = Math.max(0, last - 20);
+    return this.view<DaoProposal[]>(this.d.contracts.dao!, "get_proposals", { from_index: from, limit: 20 });
+  };
+  owner = () => this.house<[string, string | null]>("get_owner");
   usdcBalance = (account_id: string) => this.view<U128>(this.d.contracts.usdc, "ft_balance_of", { account_id });
   oneupBalance = (account_id: string) => this.view<U128>(this.d.contracts.oneup, "ft_balance_of", { account_id });
 
@@ -268,6 +299,12 @@ export class OneUp {
       expire: (order_id: number) => house<void>("expire", { order_id }),
       liquidate: (position_id: number) => house<boolean>("liquidate", { position_id }),
       takeProfit: (position_id: number) => house<boolean>("take_profit", { position_id }),
+      /** A DAO proposal; `bond` comes from the DAO's policy. */
+      propose: (description: string, kind: Record<string, unknown>, bond: bigint) =>
+        send<number>({ contractId: c.dao!, methodName: "add_proposal", args: { proposal: { description, kind } }, deposit: bond }),
+      /** Approve or reject; the kind is echoed back, as Sputnik requires, so a vote can't be swapped. */
+      vote: (id: number, action: "VoteApprove" | "VoteReject", proposal: Record<string, unknown>) =>
+        send<void>({ contractId: c.dao!, methodName: "act_proposal", args: { id, action, proposal }, gas: MAX_GAS }),
       hitTarget: (position_id: number) => house<boolean>("hit_target", { position_id }),
       hitStop: (position_id: number) => house<boolean>("hit_stop", { position_id }),
       closeEpoch: (limit = 10) => house<string>("close_epoch", { limit }, MAX_GAS),

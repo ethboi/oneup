@@ -24,6 +24,8 @@ interface Ctx {
   tx: ReturnType<OneUp["calls"]>;
   /** The signed-in account with its main key (for adding and removing session keys). */
   main: Account;
+  /** The main key itself (localnet dev wallet), for signing NEAR Intents. */
+  mainKey: string;
   /** The trade-only session key, when one is on. */
   session: Session | null;
   run: (label: string, f: () => Promise<unknown>) => Promise<boolean>;
@@ -85,10 +87,8 @@ function Loaded({ d, children }: { d: Deployment; children: ReactNode }) {
   }, []);
 
   // the main key (localnet dev wallet), and a session key for trades when one is on (lib/session.ts)
-  const main = useMemo(() => {
-    const key = [d.demo, ...d.bots].find((a) => a.id === me)!.key as KeyPairString;
-    return new Account(me, o.provider, key);
-  }, [d, o, me]);
+  const mainKey = useMemo(() => [d.demo, ...d.bots].find((a) => a.id === me)!.key, [d, me]);
+  const main = useMemo(() => new Account(me, o.provider, mainKey as KeyPairString), [o, me, mainKey]);
   const [session, setSession] = useState<Session | null>(null);
   useEffect(() => {
     const read = () => setSession(loadSession(me));
@@ -167,7 +167,7 @@ function Loaded({ d, children }: { d: Deployment; children: ReactNode }) {
     };
   }, [o]);
 
-  const value: Ctx = { d, o, accounts, me, setMe, tx, main, session, run, toasts, prices, history, version };
+  const value: Ctx = { d, o, accounts, me, setMe, tx, main, mainKey, session, run, toasts, prices, history, version };
   return <OneUpContext.Provider value={value}>{children}</OneUpContext.Provider>;
 }
 
