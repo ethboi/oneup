@@ -37,16 +37,20 @@ export function Trade() {
     ]);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
-      <div className="flex min-w-0 flex-col gap-4">
-        <LossBanner />
-        <div className="panel p-3">
-          <div className="mb-2 flex flex-wrap gap-2">
+    // Phones: one column in the order banner, chart, order form, positions (the left column dissolves via
+    // `contents` and `order` interleaves the form). Desktop: chart and positions left, form right.
+    <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[1fr_340px] lg:items-start">
+      <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
+        <div className="order-1 empty:hidden">
+          <LossBanner />
+        </div>
+        <div className="panel order-2 min-w-0 p-3">
+          <div className="-mx-3 mb-2 flex gap-2 overflow-x-auto px-3 sm:flex-wrap">
             {markets.filter((m) => m.live).map((m) => (
               <button
                 key={m.id}
                 onClick={() => setMarket(m.id)}
-                className={`btn ${m.id === market ? "btn-accent" : "btn-ghost"} num`}
+                className={`btn ${m.id === market ? "btn-accent" : "btn-ghost"} num shrink-0 whitespace-nowrap`}
               >
                 {m.id} {prices[m.id] ? fmtPrice(prices[m.id]) : ""}
               </button>
@@ -54,7 +58,9 @@ export function Trade() {
           </div>
           <PriceChart points={history[market] ?? []} marks={marks} />
         </div>
-        <Positions positions={positions} orders={orders} />
+        <div className="order-4 min-w-0">
+          <Positions positions={positions} orders={orders} />
+        </div>
       </div>
       <OrderForm market={market} maxLeverage={markets.find((m) => m.id === market)?.max_leverage ?? 100} />
     </div>
@@ -73,7 +79,7 @@ function OrderForm({ market, maxLeverage }: { market: string; maxLeverage: numbe
   const short = free !== undefined && BigInt(free) < m;
 
   return (
-    <div className="panel flex flex-col gap-4 p-4">
+    <div className="panel order-3 flex flex-col gap-4 p-4">
       <div className="grid grid-cols-2 gap-2">
         {(["Long", "Short"] as const).map((s) => (
           <button
@@ -92,7 +98,7 @@ function OrderForm({ market, maxLeverage }: { market: string; maxLeverage: numbe
 
       <label className="flex flex-col gap-1">
         <span className="label">Margin (USDC)</span>
-        <input className="input num" value={margin} onChange={(e) => setMargin(e.target.value)} />
+        <input className="input num" value={margin} onChange={(e) => setMargin(e.target.value)} inputMode="decimal" />
       </label>
 
       <label className="flex flex-col gap-1">
@@ -134,7 +140,7 @@ function OrderForm({ market, maxLeverage }: { market: string; maxLeverage: numbe
 }
 
 function Positions({ positions, orders }: { positions: Position[]; orders: Order[] }) {
-  const { tx, run, prices } = useOneUp();
+  const { prices } = useOneUp();
   const now = useNow();
   const rows = useMemo(
     () =>
@@ -147,11 +153,38 @@ function Positions({ positions, orders }: { positions: Position[]; orders: Order
   );
 
   return (
-    <div className="panel overflow-x-auto p-4">
+    <div className="panel p-4">
       <div className="mb-3 font-semibold">Positions</div>
       {rows.length === 0 && orders.length === 0 && <p className="label">No open positions.</p>}
+      <div className="flex flex-col gap-3 md:hidden">
+        {rows.map(({ p, mark, v, hold }) => (
+          <div key={p.id} className="num rounded-lg border border-[var(--line)] p-3 text-sm">
+            <div className="flex items-baseline justify-between gap-2">
+              <div className="font-semibold">
+                <span style={{ color: p.side === "Long" ? "var(--long)" : "var(--short)" }}>{p.side}</span> {p.market_id}{" "}
+                {p.leverage}×
+              </div>
+              <div className="text-base font-semibold" style={{ color: v >= 0n ? "var(--long)" : "var(--short)" }}>
+                {v >= 0n ? "+" : ""}
+                {fmtUsdc(v)}
+              </div>
+            </div>
+            <dl className="mt-2 grid grid-cols-4 gap-x-2">
+              <dt className="label">Size</dt>
+              <dt className="label">Entry</dt>
+              <dt className="label">Mark</dt>
+              <dt className="label">Liq.</dt>
+              <dd>${fmtUsdc(BigInt(p.margin) * BigInt(p.leverage), 0)}</dd>
+              <dd>{fmtPrice(BigInt(p.entry_price))}</dd>
+              <dd>{mark ? fmtPrice(mark) : "…"}</dd>
+              <dd>{fmtPrice(liquidationPrice(p.side, BigInt(p.entry_price), p.leverage))}</dd>
+            </dl>
+            <CloseButton p={p} hold={hold} wide />
+          </div>
+        ))}
+      </div>
       {rows.length > 0 && (
-        <table className="num w-full min-w-[640px] text-sm">
+        <table className="num hidden w-full text-sm md:table">
           <thead>
             <tr className="label text-left">
               <th className="pb-2 font-normal">Market</th>
@@ -179,17 +212,7 @@ function Positions({ positions, orders }: { positions: Position[]; orders: Order
                   {fmtUsdc(v)}
                 </td>
                 <td className="pl-3 text-right">
-                  {p.close_order !== null ? (
-                    <span className="label">closing…</span>
-                  ) : (
-                    <button
-                      className="btn btn-ghost py-1"
-                      disabled={hold > 0}
-                      onClick={() => run(`Close #${p.id}`, () => tx.placeClose(p.id))}
-                    >
-                      {hold > 0 ? `Close in ${hold}s` : "Close"}
-                    </button>
-                  )}
+                  <CloseButton p={p} hold={hold} />
                 </td>
               </tr>
             ))}
@@ -203,6 +226,20 @@ function Positions({ positions, orders }: { positions: Position[]; orders: Order
         </p>
       ))}
     </div>
+  );
+}
+
+function CloseButton({ p, hold, wide }: { p: Position; hold: number; wide?: boolean }) {
+  const { tx, run } = useOneUp();
+  if (p.close_order !== null) return <div className={`label ${wide ? "mt-3 text-center" : ""}`}>closing…</div>;
+  return (
+    <button
+      className={`btn btn-ghost ${wide ? "mt-3 w-full" : "py-1"}`}
+      disabled={hold > 0}
+      onClick={() => run(`Close #${p.id}`, () => tx.placeClose(p.id))}
+    >
+      {hold > 0 ? `Close in ${hold}s` : "Close"}
+    </button>
   );
 }
 
@@ -233,7 +270,7 @@ function LossBanner() {
   if (!loss) return null;
   const left = epoch ? Math.max(0, epoch.started_at + d.epochLengthS - now) : 0;
   return (
-    <div className="panel flex items-center gap-4 border-[var(--accent)] p-4" role="status">
+    <div className="panel flex items-start gap-3 border-[var(--accent)] p-4 sm:items-center sm:gap-4" role="status">
       <svg width="36" height="36" viewBox="0 0 24 24" aria-hidden className="shrink-0">
         <path d="M12 21s-7-4.5-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 6c-2.5 4.5-9.5 9-9.5 9z" fill="none" stroke="var(--accent)" strokeWidth="2" />
         <path d="M12 9v6M9 12h6" stroke="var(--accent)" strokeWidth="2" />

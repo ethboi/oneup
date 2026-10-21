@@ -1,21 +1,29 @@
 // `pnpm demo`: everything in one command. Builds the contracts if needed, runs the simulation if it has no
 // results yet, starts the local chain (deploying on first run), then the keeper, the bots and the app.
 // Ctrl-C stops it all; chain state persists in .localnet/ (`pnpm localnet:reset` for a fresh start).
+// `pnpm demo --lan` also serves the app to your local network, to try it on a phone. That page hands out
+// the localnet's throwaway dev keys, so only use it on a network you trust.
 
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
+import { networkInterfaces } from "node:os";
 import { resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const WASMS = ["oneup_house", "oneup_extra_life", "oneup_token", "oneup_ve", "mock_usdc", "mock_oracle", "mock_swap"];
 const APP_URL = "http://127.0.0.1:3020";
+const LAN = process.argv.includes("--lan");
+const LAN_URLS = Object.values(networkInterfaces())
+  .flat()
+  .filter((i) => i && i.family === "IPv4" && !i.internal)
+  .map((i) => `http://${i!.address}:3020`);
 const children: ChildProcess[] = [];
 
 const COLORS = { chain: 90, keeper: 36, bots: 35, app: 33 } as const;
 type Name = keyof typeof COLORS;
 
-function start(name: Name, cmd: string, args: string[], onLine?: (line: string) => void): ChildProcess {
-  const c = spawn(cmd, args, { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, FORCE_COLOR: "0" } });
+function start(name: Name, cmd: string, args: string[], onLine?: (line: string) => void, env: Record<string, string> = {}): ChildProcess {
+  const c = spawn(cmd, args, { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, FORCE_COLOR: "0", ...env } });
   const tag = `\x1b[${COLORS[name]}m${name.padEnd(6)}\x1b[0m│ `;
   let buf = "";
   const out = (chunk: Buffer) => {
@@ -70,7 +78,7 @@ start("chain", "pnpm", ["-s", "localnet"], (line) => {
   setTimeout(() => start("bots", "pnpm", ["-s", "--filter", "@oneup/bots", "start"]), 3000);
   start("app", "pnpm", ["-s", "--filter", "@oneup/app", "dev"], (l) => {
     if (l.includes("Ready")) {
-      console.log(`\n  OneUp is running at ${APP_URL}\n  Demo trader: demo.test.near (switch to the bots in the account menu)\n  Move a price: curl -XPOST localhost:8787/price -d '{"market":"NEAR-USD","movePct":-2}'\n  Ctrl-C to stop.\n`);
+      console.log(`\n  OneUp is running at ${APP_URL}${LAN ? `\n  On your phone (same Wi-Fi): ${LAN_URLS.join(" or ")}` : ""}\n  Demo trader: demo.test.near (switch to the bots in the account menu)\n  Move a price: curl -XPOST localhost:8787/price -d '{"market":"NEAR-USD","movePct":-2}'\n  Ctrl-C to stop.\n`);
     }
-  });
+  }, LAN ? { ONEUP_HOST: "0.0.0.0" } : {});
 });

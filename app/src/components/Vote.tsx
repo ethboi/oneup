@@ -49,8 +49,8 @@ function Shares() {
       <p className="label mb-3">Each market&apos;s share of the pool&apos;s capacity and of $1UP emissions, now and from next epoch.</p>
       <div className="flex flex-col gap-2">
         {[...rows.entries()].map(([m, r]) => (
-          <div key={m} className="grid grid-cols-[110px_1fr_110px] items-center gap-3 text-sm">
-            <span>{m}</span>
+          <div key={m} className="grid grid-cols-[72px_1fr_auto] items-center gap-2 text-xs sm:grid-cols-[110px_1fr_110px] sm:gap-3 sm:text-sm">
+            <span className="truncate">{m}</span>
             <div className="relative h-3 rounded-full bg-[var(--panel-2)]">
               <div className="absolute inset-y-0 left-0 rounded-full bg-[var(--accent)]" style={{ width: `${r.now}%` }} />
               <div className="absolute inset-y-0 left-0 rounded-full border-2 border-[var(--info)]" style={{ width: `${r.next}%` }} />
@@ -102,6 +102,7 @@ function LockCard({ l, choices }: { l: LockInfo; choices: string[] }) {
             <span>{m}</span>
             <span className="flex items-center gap-1">
               <input
+                inputMode="decimal"
                 className="input num w-20 text-right"
                 value={alloc[m] ?? ""}
                 placeholder="0"
@@ -113,18 +114,18 @@ function LockCard({ l, choices }: { l: LockInfo; choices: string[] }) {
         ))}
       </div>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <span className="label num" style={{ color: Math.abs(sum - 100) < 0.01 ? undefined : "var(--short)" }}>
+        <span className="label num w-full sm:w-auto" style={{ color: Math.abs(sum - 100) < 0.01 ? undefined : "var(--short)" }}>
           Total {sum.toFixed(1)}% · counts from next epoch
         </span>
-        <div className="flex gap-2">
+        <div className="flex w-full gap-2 sm:w-auto">
           <button
-            className="btn btn-ghost"
+            className="btn btn-ghost flex-1 sm:flex-none"
             disabled={claimable.length === 0}
             onClick={() => run(`Claim rewards #${l.token_id}`, () => tx.claimVe(l.token_id, pastEpochs))}
           >
             Claim {claimable.map(([t, a]) => (t === o.d.contracts.usdc ? `$${fmtUsdc(BigInt(a))}` : `${fmtOneup(a, 2)} 1UP`)).join(" + ") || "rewards"}
           </button>
-          <button className="btn btn-accent" disabled={Math.abs(sum - 100) > 0.01 || entries.length === 0} onClick={submit}>
+          <button className="btn btn-accent flex-1 sm:flex-none" disabled={Math.abs(sum - 100) > 0.01 || entries.length === 0} onClick={submit}>
             Vote
           </button>
         </div>
@@ -140,7 +141,7 @@ function LockForm() {
   return (
     <div className="panel flex flex-col gap-3 p-4">
       <div className="font-semibold">Lock $1UP</div>
-      <input className="input num" value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="$1UP amount" />
+      <input className="input num" value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="$1UP amount" inputMode="decimal" />
       <label className="flex flex-col gap-1">
         <span className="label flex justify-between">
           <span>Lock for</span>
@@ -209,7 +210,7 @@ function Bribe({ choices }: { choices: string[] }) {
         ))}
       </select>
       <div className="flex gap-2">
-        <input className="input num" value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="Bribe amount" />
+        <input className="input num" value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="Bribe amount" inputMode="decimal" />
         <select className="input w-28" value={token} onChange={(e) => setToken(e.target.value as "usdc" | "oneup")}>
           <option value="usdc">USDC</option>
           <option value="oneup">$1UP</option>

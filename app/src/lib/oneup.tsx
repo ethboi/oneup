@@ -43,13 +43,19 @@ export function OneUpProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     fetch("/api/config")
-      .then(async (r) => (r.ok ? setD(await r.json()) : setError((await r.json()).error)))
+      .then(async (r) => (r.ok ? setD(viaProxy(await r.json())) : setError((await r.json()).error)))
       .catch((e) => setError(String(e)));
   }, []);
 
   if (error) return <Splash text={error} />;
   if (!d) return <Splash text="Connecting to localnet…" />;
   return <Loaded d={d}>{children}</Loaded>;
+}
+
+/** Off this machine (a phone on the LAN), the chain's 127.0.0.1 RPC is unreachable: go through /api/rpc. */
+function viaProxy(d: Deployment): Deployment {
+  const local = ["127.0.0.1", "localhost", "[::1]"].includes(location.hostname);
+  return local ? d : { ...d, rpcUrl: `${location.origin}/api/rpc` };
 }
 
 function Loaded({ d, children }: { d: Deployment; children: ReactNode }) {

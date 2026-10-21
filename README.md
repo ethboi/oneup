@@ -31,6 +31,7 @@ bot in the account menu). Chain state persists in `.localnet/`.
 | Command | What it does |
 |---|---|
 | `pnpm demo` | Everything above, logs prefixed per process |
+| `pnpm demo --lan` | Same, and serves the app to your Wi-Fi so you can use it on a phone (it hands out the localnet's throwaway keys, so only on a network you trust) |
 | `pnpm stop` | Stops every OneUp process (and only those) |
 | `pnpm localnet:reset` | Wipes the local chain for a fresh deploy |
 | `pnpm test` | Contract unit + property tests, SDK and simulation tests |

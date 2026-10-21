@@ -86,8 +86,8 @@ export function Solvency() {
             const sw = w(big(m.short_liability));
             return (
               <div key={m.id}>
-                <div className="flex justify-between text-sm">
-                  <span>{m.id}</span>
+                <div className="flex flex-col text-sm sm:flex-row sm:justify-between">
+                  <span className="font-semibold sm:font-normal">{m.id}</span>
                   <span className="num label">
                     longs ${fmtUsdc(big(m.long_liability), 0)} · shorts ${fmtUsdc(big(m.short_liability), 0)} · capacity $
                     {fmtUsdc(big(m.capacity), 0)}

@@ -93,4 +93,15 @@ body {
     outline: 2px solid var(--info);
     outline-offset: -1px;
   }
+
+  /* touch screens: thumb-sized targets, and 16px inputs so iOS doesn't zoom on focus */
+  @media (pointer: coarse) {
+    .btn,
+    .input {
+      min-height: 44px;
+    }
+    .input {
+      font-size: 16px;
+    }
+  }
 }

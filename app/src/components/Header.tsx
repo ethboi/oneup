@@ -16,32 +16,40 @@ export function Header() {
   const [amount, setAmount] = useState("1000");
   const amt = BigInt(Math.floor(Number(amount) || 0)) * USDC;
 
+  const [open, setOpen] = useState(false);
+
   return (
-    <header className="flex flex-col gap-4 py-5 lg:flex-row lg:items-center lg:justify-between">
-      <div className="flex items-center gap-3">
+    // Phones: brand + Wallet button, stats, then the funds controls when opened.
+    // Desktop: brand and controls on one row, stats on the next.
+    <header className="flex flex-col gap-3 py-4 lg:grid lg:grid-cols-[1fr_auto] lg:items-center lg:gap-x-6 lg:gap-y-4 lg:py-5">
+      <div className="flex items-center gap-3 lg:col-start-1 lg:row-start-1">
         <Logo />
-        <div>
+        <div className="flex-1">
           <div className="text-xl font-extrabold tracking-tight">OneUp</div>
           <div className="label">Lose a trade, get a life.</div>
         </div>
+        {/* phones: the account and funds controls fold behind a button so the trade screen starts sooner */}
+        <button className="btn btn-ghost lg:hidden" onClick={() => setOpen(!open)} aria-expanded={open}>
+          {open ? "Done" : "Wallet"}
+        </button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:flex sm:flex-wrap sm:items-center sm:gap-x-8 lg:col-span-2 lg:row-start-2">
         <Stat label="House pool" value={pool ? `$${fmtUsdc(BigInt(pool), 0)}` : "…"} />
         <Stat label={`Epoch ${epoch?.id ?? "…"} ends in`} value={fmtClock(left)} />
         <Stat label="Free balance" value={free ? `$${fmtUsdc(BigInt(free))}` : "…"} />
         <Stat label="Wallet" value={wallet ? `$${fmtUsdc(BigInt(wallet), 0)} · ${fmtOneup(oneup)} 1UP` : "…"} />
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <select className="input w-auto" value={me} onChange={(e) => setMe(e.target.value)} aria-label="Account">
+      <div className={`${open ? "grid" : "hidden"} grid-cols-3 gap-2 lg:col-start-2 lg:row-start-1 lg:flex lg:items-center`}>
+        <select className="input col-span-3 lg:w-auto" value={me} onChange={(e) => setMe(e.target.value)} aria-label="Account">
           {accounts.map((a) => (
             <option key={a.id} value={a.id}>
-              {a.label} · {a.id}
+              {a.id}
             </option>
           ))}
         </select>
-        <input className="input num w-24" value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="USDC amount" />
+        <input className="input num col-span-3 lg:w-24" value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="USDC amount" inputMode="decimal" />
         <button className="btn btn-ghost" onClick={() => run(`Faucet ${amount} USDC`, () => tx.faucet(amt))}>
           Faucet
         </button>
@@ -58,9 +66,9 @@ export function Header() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <div className="label">{label}</div>
-      <div className="num text-lg font-semibold">{value}</div>
+    <div className="min-w-0">
+      <div className="label truncate">{label}</div>
+      <div className="num truncate text-base font-semibold sm:text-lg">{value}</div>
     </div>
   );
 }
