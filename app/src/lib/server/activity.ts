@@ -1,8 +1,11 @@
-// A small server-side indexer for the activity feed. It follows the local chain a few blocks behind the
-// head (so cross-contract calls have finished), reads each transaction's receipts and keeps the OneUp
-// events (NEP-297 logs) as plain feed items. Localnet only: it reads the RPC from localnet.json.
+// A small server-side indexer for the activity feed and each account's history. It follows the local chain
+// a few blocks behind the head (so cross-contract calls have finished), reads each transaction's receipts and
+// keeps the OneUp events (NEP-297 logs). On first start it scans from block 1, so history is complete; the
+// keeper's price pushes (most transactions) are skipped without being read. Localnet only: it reads the RPC
+// from localnet.json. What it has read is saved to .localnet/indexer.json (wiped with the chain by
+// `pnpm localnet:reset`), so an app restart carries on rather than relying on the node still having old blocks.
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 export interface ActivityItem {
@@ -15,16 +18,60 @@ export interface ActivityItem {
   text: string;
 }
 
+/** One closed trade: its open and close events joined by position id. */
+export interface TradeRecord {
+  position_id: number;
+  market_id: string;
+  side: "Long" | "Short";
+  leverage: number;
+  /** USDC, 6 decimals. */
+  margin: string;
+  /** 1e8 units. */
+  entry_price: string;
+  exit_price: string;
+  /** Signed USDC, 6 decimals. */
+  pnl: string;
+  reason: "Close" | "Liquidation" | "TakeProfit";
+  opened_t: number;
+  closed_t: number;
+}
+
+export type HistoryItem = HistoryEntry & { seq: number };
+type HistoryEntry = { t: number } & (
+  | { kind: "trade"; trade: TradeRecord }
+  | { kind: "deposit" | "withdraw" | "claim_usdc"; amount: string }
+  | { kind: "claim_oneup"; amount: string }
+  | { kind: "life" | "lock"; token_id: string }
+  | { kind: "bought" | "sold"; what: "Extra Life" | "$1UP lock"; price: string; other: string }
+);
+
+interface Opened {
+  market_id: string;
+  side: "Long" | "Short";
+  leverage: number;
+  margin: string;
+  entry_price: string;
+  t: number;
+}
+
 interface State {
+  genesis: string;
+  dirty: boolean;
   next: number | null;
+  head: number;
   items: ActivityItem[];
   seq: number;
   running: boolean;
+  history: Map<string, HistoryItem[]>;
+  opened: Map<number, Opened>;
 }
 
 /** Blocks behind the head before a block is read, so the receipts it started have run. */
 const LAG = 4;
 const KEEP = 200;
+const KEEP_PER_ACCOUNT = 1000;
+/** Blocks read at once while catching up. */
+const BATCH = 25;
 const short = (a: string) => a.replace(/\.test\.near$/, "");
 const usd = (raw: string | number) => {
   const v = Number(raw) / 1e6;
@@ -32,8 +79,39 @@ const usd = (raw: string | number) => {
   return `$${v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d })}`;
 };
 
-const g = globalThis as unknown as { __oneupActivity?: State };
-const state: State = (g.__oneupActivity ??= { next: null, items: [], seq: 0, running: false });
+const g = globalThis as unknown as { __oneupActivity2?: State };
+const state: State = (g.__oneupActivity2 ??= {
+  genesis: "",
+  dirty: false,
+  next: null,
+  head: 0,
+  items: [],
+  seq: 0,
+  running: false,
+  history: new Map(),
+  opened: new Map(),
+});
+
+const SAVE = resolve(process.cwd(), "../.localnet/indexer.json");
+
+function load(genesis: string) {
+  state.genesis = genesis;
+  if (!existsSync(SAVE)) return;
+  try {
+    const j = JSON.parse(readFileSync(SAVE, "utf8"));
+    if (j.genesis !== genesis) return; // a different chain
+    Object.assign(state, { next: j.next, items: j.items, seq: j.seq, history: new Map(j.history), opened: new Map(j.opened) });
+  } catch {
+    // unreadable: rescan
+  }
+}
+
+function save() {
+  if (!state.dirty) return;
+  state.dirty = false;
+  const { genesis, next, items, seq } = state;
+  writeFileSync(SAVE, JSON.stringify({ genesis, next, items, seq, history: [...state.history], opened: [...state.opened] }));
+}
 
 function config() {
   const d = JSON.parse(readFileSync(resolve(process.cwd(), "../localnet.json"), "utf8"));
@@ -53,24 +131,59 @@ interface Event {
   data: Record<string, unknown>[] | Record<string, unknown>;
 }
 
-function toItems(ev: Event, executor: string, t: number, c: Record<string, string>): Omit<ActivityItem, "seq">[] {
+type Out = { feed: Omit<ActivityItem, "seq">[]; history: [string, HistoryEntry][] };
+
+function toItems(ev: Event, executor: string, t: number, c: Record<string, string>, out: Out) {
   const rows = Array.isArray(ev.data) ? ev.data : [ev.data];
-  const out: Omit<ActivityItem, "seq">[] = [];
+  const mine = (account: string, item: HistoryEntry) => out.history.push([account, item]);
   for (const d of rows) {
     if (ev.standard === "oneup" && ev.event === "position_closed") {
-      const who = short(String(d.account_id));
+      const account = String(d.account_id);
+      const who = short(account);
       const pnl = Number(d.pnl);
-      if (d.reason === "Liquidation") out.push({ t, kind: "liquidated", who, text: `${who} was liquidated on ${d.market_id}` });
-      else if (pnl < 0) out.push({ t, kind: "lost", who, text: `${who} lost ${usd(-pnl)} on ${d.market_id}` });
-      else out.push({ t, kind: "won", who, text: `${who} won ${usd(pnl)} on ${d.market_id}` });
+      if (d.reason === "Liquidation") out.feed.push({ t, kind: "liquidated", who, text: `${who} was liquidated on ${d.market_id}` });
+      else if (pnl < 0) out.feed.push({ t, kind: "lost", who, text: `${who} lost ${usd(-pnl)} on ${d.market_id}` });
+      else out.feed.push({ t, kind: "won", who, text: `${who} won ${usd(pnl)} on ${d.market_id}` });
+      const id = Number(d.position_id);
+      const o = state.opened.get(id);
+      state.opened.delete(id);
+      if (o) {
+        mine(account, {
+          t,
+          kind: "trade",
+          trade: {
+            position_id: id,
+            market_id: o.market_id,
+            side: o.side,
+            leverage: o.leverage,
+            margin: o.margin,
+            entry_price: o.entry_price,
+            exit_price: String(d.price),
+            pnl: String(d.pnl),
+            reason: d.reason as TradeRecord["reason"],
+            opened_t: o.t,
+            closed_t: t,
+          },
+        });
+      }
     } else if (ev.standard === "oneup" && ev.event === "position_opened") {
       const who = short(String(d.account_id));
-      const side = String(d.side).toLowerCase();
-      out.push({ t, kind: "opened", who, text: `${who} opened a ${d.leverage}× ${side} on ${d.market_id}` });
+      const side = String(d.side) as Opened["side"];
+      state.opened.set(Number(d.position_id), {
+        market_id: String(d.market_id),
+        side,
+        leverage: Number(d.leverage),
+        margin: String(d.margin),
+        entry_price: String(d.entry_price),
+        t,
+      });
+      out.feed.push({ t, kind: "opened", who, text: `${who} opened a ${d.leverage}× ${side.toLowerCase()} on ${d.market_id}` });
+    } else if (ev.standard === "oneup" && (ev.event === "deposit" || ev.event === "withdraw")) {
+      mine(String(d.account_id), { t, kind: ev.event, amount: String(d.amount) });
     } else if (ev.standard === "oneup" && ev.event === "epoch_closed") {
       const s = d.summary as Record<string, string | number>;
       const lives = Number(s.lives_minted);
-      out.push({
+      out.feed.push({
         t,
         kind: "epoch",
         text: lives
@@ -78,58 +191,86 @@ function toItems(ev: Event, executor: string, t: number, c: Record<string, strin
           : `Epoch ${s.epoch} closed: the house didn't profit, no Extra Lives`,
       });
     } else if (ev.standard === "nep171" && ev.event === "nft_mint" && executor === c.life) {
-      const who = short(String(d.owner_id));
-      if (String((d.token_ids as string[])[0]).startsWith("0:")) continue; // the seed's life
-      out.push({ t, kind: "life", who, text: `${who} got an Extra Life` });
+      const owner = String(d.owner_id);
+      const token = String((d.token_ids as string[])[0]);
+      if (token.startsWith("0:")) continue; // the seed's life
+      out.feed.push({ t, kind: "life", who: short(owner), text: `${short(owner)} got an Extra Life` });
+      mine(owner, { t, kind: "life", token_id: token });
     } else if (ev.standard === "nep171" && ev.event === "nft_mint" && executor === c.ve) {
-      const who = short(String(d.owner_id));
-      out.push({ t, kind: "lock", who, text: `${who} got a $1UP lock` });
+      const owner = String(d.owner_id);
+      out.feed.push({ t, kind: "lock", who: short(owner), text: `${short(owner)} got a $1UP lock` });
+      mine(owner, { t, kind: "lock", token_id: String((d.token_ids as string[])[0]) });
     } else if (ev.standard === "oneup_market" && ev.event === "sold") {
       const what = d.nft_contract === c.life ? "Extra Life" : "$1UP lock";
-      out.push({ t, kind: "sold", who: short(String(d.buyer)), text: `${short(String(d.buyer))} bought ${short(String(d.seller))}'s ${what} for ${usd(String(d.price))}` });
+      const buyer = String(d.buyer);
+      const seller = String(d.seller);
+      out.feed.push({ t, kind: "sold", who: short(buyer), text: `${short(buyer)} bought ${short(seller)}'s ${what} for ${usd(String(d.price))}` });
+      mine(buyer, { t, kind: "bought", what, price: String(d.price), other: seller });
+      mine(seller, { t, kind: "sold", what, price: String(d.price), other: buyer });
+    } else if (ev.standard === "nep141" && ev.event === "ft_transfer") {
+      // payouts from the life and lock contracts are claims (a lock's unlock or early exit counts too)
+      if (executor === c.usdc && d.old_owner_id === c.life) mine(String(d.new_owner_id), { t, kind: "claim_usdc", amount: String(d.amount) });
+      if (executor === c.oneup && d.old_owner_id === c.ve) mine(String(d.new_owner_id), { t, kind: "claim_oneup", amount: String(d.amount) });
     }
   }
-  return out;
 }
 
-async function readBlock(url: string, height: number, c: Record<string, string>) {
+/** Reads one block's OneUp events, without recording them (blocks are read in parallel, recorded in order). */
+async function readBlock(url: string, height: number, c: Record<string, string>): Promise<{ t: number; logs: [string, string][] }> {
   const block = await rpc<{ header: { timestamp_nanosec: string }; chunks: { chunk_hash: string; tx_root: string }[] }>(url, "block", { block_id: height });
   const t = Math.floor(Number(block.header.timestamp_nanosec) / 1e6);
+  const logs: [string, string][] = [];
   for (const ch of block.chunks) {
     if (ch.tx_root === "11111111111111111111111111111111") continue; // no transactions
-    const chunk = await rpc<{ transactions: { hash: string; signer_id: string }[] }>(url, "chunk", { chunk_id: ch.chunk_hash });
+    const chunk = await rpc<{ transactions: { hash: string; signer_id: string; receiver_id: string }[] }>(url, "chunk", { chunk_id: ch.chunk_hash });
     for (const tx of chunk.transactions) {
+      if (tx.receiver_id === c.oracle) continue; // price pushes: no events
       const res = await rpc<{ receipts_outcome: { outcome: { logs: string[]; executor_id: string } }[] }>(url, "EXPERIMENTAL_tx_status", {
         tx_hash: tx.hash,
         sender_account_id: tx.signer_id,
         wait_until: "NONE",
       }).catch(() => null);
       for (const r of res?.receipts_outcome ?? []) {
-        for (const log of r.outcome.logs) {
-          if (!log.startsWith("EVENT_JSON:")) continue;
-          try {
-            for (const item of toItems(JSON.parse(log.slice(11)), r.outcome.executor_id, t, c)) {
-              state.items.push({ ...item, seq: ++state.seq });
-            }
-          } catch {
-            // not ours or malformed
-          }
-        }
+        for (const log of r.outcome.logs) if (log.startsWith("EVENT_JSON:")) logs.push([r.outcome.executor_id, log.slice(11)]);
       }
     }
+  }
+  return { t, logs };
+}
+
+function record(block: { t: number; logs: [string, string][] }, c: Record<string, string>) {
+  const out: Out = { feed: [], history: [] };
+  for (const [executor, json] of block.logs) {
+    try {
+      toItems(JSON.parse(json), executor, block.t, c, out);
+    } catch {
+      // not ours or malformed
+    }
+  }
+  for (const item of out.feed) state.items.push({ ...item, seq: ++state.seq });
+  for (const [account, item] of out.history) {
+    const list = state.history.get(account) ?? [];
+    list.push({ ...item, seq: ++state.seq } as HistoryItem);
+    if (list.length > KEEP_PER_ACCOUNT) list.splice(0, list.length - KEEP_PER_ACCOUNT);
+    state.history.set(account, list);
   }
   if (state.items.length > KEEP) state.items.splice(0, state.items.length - KEEP);
 }
 
 async function step() {
   const { rpc: url, c } = config();
+  if (!state.genesis) load((await rpc<{ genesis_hash: string }>(url, "status", [])).genesis_hash);
   const head = await rpc<{ header: { height: number } }>(url, "block", { finality: "final" });
   const target = head.header.height - LAG;
-  // start a few minutes back so the feed isn't empty on first load
-  state.next ??= Math.max(1, target - 300);
-  // catch up in bounded steps; a missing height (skipped block) is just passed over
-  for (let n = 0; state.next <= target && n < 50; n++, state.next++) {
-    await readBlock(url, state.next, c).catch(() => {});
+  state.head = target;
+  state.next ??= 1;
+  // catch up in parallel batches, recorded in block order; a missing height (skipped block) is passed over
+  for (let n = 0; state.next <= target && n < 20; n++) {
+    const heights = Array.from({ length: Math.min(BATCH, target - state.next + 1) }, (_, i) => state.next! + i);
+    const blocks = await Promise.all(heights.map((h) => readBlock(url, h, c).catch(() => null)));
+    for (const b of blocks) if (b) record(b, c);
+    state.next += heights.length;
+    state.dirty = true;
   }
 }
 
@@ -141,8 +282,25 @@ export function startActivity() {
     setTimeout(loop, 1000);
   };
   void loop();
+  setInterval(() => {
+    try {
+      save();
+    } catch {
+      // disk trouble: keep going in memory
+    }
+  }, 10_000);
 }
 
 export function activitySince(after: number): ActivityItem[] {
   return state.items.filter((i) => i.seq > after);
+}
+
+/** An account's history, newest first, and how far the scan has got (it starts from block 1). */
+export function historyFor(account: string): { items: HistoryItem[]; synced: boolean; progress: number } {
+  const done = (state.next ?? 1) - 1;
+  return {
+    items: [...(state.history.get(account) ?? [])].reverse(),
+    synced: state.head > 0 && done >= state.head - 10,
+    progress: state.head > 0 ? Math.min(1, done / state.head) : 0,
+  };
 }

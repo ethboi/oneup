@@ -53,8 +53,19 @@ async function deployed(): Promise<boolean> {
   return !(await r.json()).error;
 }
 
+/** Keep old blocks (the default keeps five 500-block epochs, about 40 minutes), so the app's history can be
+ *  rebuilt from the chain. Set on every start, so chains made before this pick it up too. */
+function keepBlocks() {
+  const cfgPath = resolve(HOME, "config.json");
+  const cfg = JSON.parse(readFileSync(cfgPath, "utf8"));
+  if (cfg.gc_num_epochs_to_keep === 100_000) return;
+  cfg.gc_num_epochs_to_keep = 100_000;
+  writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+}
+
 async function main() {
   if (!existsSync(resolve(HOME, "genesis.json"))) init();
+  keepBlocks();
 
   const log = createWriteStream(resolve(HOME, "node.log"), { flags: "a" });
   const node = spawn(BIN, ["--home", HOME, "run"], { stdio: ["ignore", "pipe", "pipe"] });

@@ -21,6 +21,8 @@ import { fmtClock, useNow } from "./Header";
 import { PixelHeart } from "./Pixel";
 import { Icon } from "./Icon";
 import { ActivityList, useActivity } from "./Activity";
+import { HistoryList } from "./History";
+import { ShareButton, type CardData } from "./PnlCard";
 
 /** Chart windows: the app keeps up to 30 minutes of prices it has seen. */
 const RANGES = [
@@ -84,7 +86,7 @@ export function Trade() {
 
 /** Positions and the live feed share one panel, switched by tabs. */
 function Below({ positions, orders }: { positions: Position[]; orders: Order[] }) {
-  const [view, setView] = useState<"positions" | "activity">("positions");
+  const [view, setView] = useState<"positions" | "history" | "activity">("positions");
   const feed = useActivity().filter((a) => a.kind !== "opened");
   return (
     <div className="panel p-4 pt-2">
@@ -93,6 +95,7 @@ function Below({ positions, orders }: { positions: Position[]; orders: Order[] }
           {(
             [
               ["positions", `Positions${positions.length ? ` (${positions.length})` : ""}`],
+              ["history", "History"],
               ["activity", "Activity"],
             ] as const
           ).map(([k, name]) => (
@@ -107,7 +110,9 @@ function Below({ positions, orders }: { positions: Position[]; orders: Order[] }
           </span>
         )}
       </div>
-      {view === "positions" ? <Positions positions={positions} orders={orders} /> : <ActivityList items={feed} />}
+      {view === "positions" && <Positions positions={positions} orders={orders} />}
+      {view === "history" && <HistoryList />}
+      {view === "activity" && <ActivityList items={feed} />}
     </div>
   );
 }
@@ -330,8 +335,21 @@ function TradeBar({ t }: { t: Ticket }) {
   );
 }
 
+/** A share card for an open position, at the current mark. */
+const openCard = (p: Position, mark: bigint | undefined, v: bigint, me: string): CardData => ({
+  market: p.market_id,
+  side: p.side,
+  leverage: p.leverage,
+  margin: BigInt(p.margin),
+  pnl: v,
+  entry: BigInt(p.entry_price),
+  exit: mark ?? BigInt(p.entry_price),
+  state: "open",
+  account: me,
+});
+
 function Positions({ positions, orders }: { positions: Position[]; orders: Order[] }) {
-  const { prices } = useOneUp();
+  const { prices, me } = useOneUp();
   const now = useNow();
   const rows = useMemo(
     () =>
@@ -370,7 +388,12 @@ function Positions({ positions, orders }: { positions: Position[]; orders: Order
               <dd>{mark ? fmtPrice(mark) : "…"}</dd>
               <dd>{fmtPrice(liquidationPrice(p.side, BigInt(p.entry_price), p.leverage))}</dd>
             </dl>
-            <CloseButton p={p} hold={hold} wide />
+            <div className="mt-3 flex gap-2">
+              <div className="flex-1">
+                <CloseButton p={p} hold={hold} wide />
+              </div>
+              <ShareButton data={() => openCard(p, mark, v, me)} />
+            </div>
           </div>
         ))}
       </div>
@@ -403,7 +426,10 @@ function Positions({ positions, orders }: { positions: Position[]; orders: Order
                   {fmtUsdc(v)}
                 </td>
                 <td className="pl-3 text-right">
-                  <CloseButton p={p} hold={hold} />
+                  <span className="inline-flex gap-2">
+                    <ShareButton compact data={() => openCard(p, mark, v, me)} />
+                    <CloseButton p={p} hold={hold} />
+                  </span>
                 </td>
               </tr>
             ))}
@@ -422,10 +448,10 @@ function Positions({ positions, orders }: { positions: Position[]; orders: Order
 
 function CloseButton({ p, hold, wide }: { p: Position; hold: number; wide?: boolean }) {
   const { tx, run } = useOneUp();
-  if (p.close_order !== null) return <div className={`label ${wide ? "mt-3 text-center" : ""}`}>closing…</div>;
+  if (p.close_order !== null) return <div className={`label ${wide ? "py-2 text-center" : ""}`}>closing…</div>;
   return (
     <button
-      className={`btn btn-ghost ${wide ? "mt-3 w-full" : "py-1"}`}
+      className={`btn btn-ghost ${wide ? "w-full" : "py-1"}`}
       disabled={hold > 0}
       onClick={() => run(`Close #${p.id}`, () => tx.placeClose(p.id))}
     >
