@@ -19,18 +19,14 @@ export default function Home() {
     <OneUpProvider>
       <div className="mx-auto max-w-[1280px] px-4 pb-16">
         <Header />
-        <nav className="mb-4 flex gap-1 overflow-x-auto border-b border-[var(--line)]">
-          {TABS.map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`whitespace-nowrap px-4 py-2.5 text-sm font-semibold ${
-                tab === t ? "border-b-2 border-[var(--accent)] text-[var(--text)]" : "text-[var(--muted)]"
-              }`}
-            >
-              {t}
-            </button>
-          ))}
+        <nav className="mb-4 overflow-x-auto" aria-label="Sections">
+          <div className="inline-flex gap-1 rounded-[14px] border-2 border-[var(--edge)] bg-[var(--bezel)] p-1" role="tablist">
+            {TABS.map((t) => (
+              <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className="tab">
+                {t}
+              </button>
+            ))}
+          </div>
         </nav>
         {tab === "Trade" && <Trade />}
         {tab === "Extra Lives" && <Lives />}

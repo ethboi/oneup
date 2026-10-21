@@ -51,7 +51,7 @@ export function Fairness() {
       </div>
 
       <div className="panel p-5">
-        <div className="font-semibold">USDC back within a year per $1 lost, by when the loss happened</div>
+        <div className="text-lg font-extrabold">USDC back within a year per $1 lost, by when the loss happened</div>
         {/* phones: periods down, rules across, so it fits without scrolling */}
         <table className="num mt-3 w-full text-sm md:hidden">
           <thead>

@@ -16,7 +16,7 @@ export function Vote() {
     <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
       <div className="flex min-w-0 flex-col gap-4">
         <Shares />
-        <div className="font-semibold">Your locks</div>
+        <div className="display text-lg">Your locks</div>
         {locks.length === 0 && <p className="label">No locks yet. Lock $1UP to vote and earn from the markets you back.</p>}
         {locks.map((l) => (
           <LockCard key={l.token_id} l={l} choices={choices} />
@@ -45,7 +45,7 @@ function Shares() {
   }
   return (
     <div className="panel p-4">
-      <div className="font-semibold">Where the house&apos;s money goes</div>
+      <div className="display text-lg">Where the house&apos;s money goes</div>
       <p className="label mb-3">Each market&apos;s share of the pool&apos;s capacity and of $1UP emissions, now and from next epoch.</p>
       <div className="flex flex-col gap-2">
         {[...rows.entries()].map(([m, r]) => (
@@ -140,14 +140,22 @@ function LockForm() {
   const [epochs, setEpochs] = useState(52);
   return (
     <div className="panel flex flex-col gap-3 p-4">
-      <div className="font-semibold">Lock $1UP</div>
+      <div className="display text-lg">Lock $1UP</div>
       <input className="input num" value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="$1UP amount" inputMode="decimal" />
       <label className="flex flex-col gap-1">
         <span className="label flex justify-between">
           <span>Lock for</span>
           <span className="num text-[var(--text)]">{epochs} epochs</span>
         </span>
-        <input type="range" min={1} max={52} value={epochs} onChange={(e) => setEpochs(Number(e.target.value))} />
+        <input
+          type="range"
+          className="slider"
+          min={1}
+          max={52}
+          value={epochs}
+          onChange={(e) => setEpochs(Number(e.target.value))}
+          style={{ "--fill": `${((epochs - 1) / 51) * 100}%` } as React.CSSProperties}
+        />
       </label>
       <p className="label num">Voting power {((Number(amount) || 0) * epochs / 52).toLocaleString("en-US", { maximumFractionDigits: 0 })}, shrinking each epoch.</p>
       <button
@@ -170,7 +178,7 @@ function Proposals() {
   const [feed, setFeed] = useState("");
   return (
     <div className="panel flex flex-col gap-3 p-4">
-      <div className="font-semibold">New markets</div>
+      <div className="display text-lg">New markets</div>
       {proposals.map((p) => (
         <div key={p.market_id} className="text-sm">
           <span className="font-semibold">{p.market_id}</span> <span className="label">needs 2% of votes · idle {p.idle}/4</span>
@@ -202,7 +210,7 @@ function Bribe({ choices }: { choices: string[] }) {
   const raw = BigInt(Math.floor(Number(amount) || 0)) * (token === "usdc" ? USDC : ONEUP);
   return (
     <div className="panel flex flex-col gap-3 p-4">
-      <div className="font-semibold">Bribe voters</div>
+      <div className="display text-lg">Bribe voters</div>
       <p className="label">Paid to next epoch&apos;s voters of the market, in proportion to their votes.</p>
       <select className="input" value={market} onChange={(e) => setMarket(e.target.value)}>
         {choices.map((m) => (

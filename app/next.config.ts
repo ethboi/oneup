@@ -8,6 +8,8 @@ const lanIps =
         .flat()
         .filter((i) => i && i.family === "IPv4" && !i.internal)
         .map((i) => i!.address)
+        // binding to every interface makes Next treat loopback as cross-origin too
+        .concat(["127.0.0.1", "localhost"])
     : [];
 
 const config: NextConfig = {

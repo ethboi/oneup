@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { USDC, fmtUsdc, ONEUP } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
+import { Logo, PixelCoin, PixelHeart } from "./Pixel";
 
 export function Header() {
   const { o, d, me, setMe, accounts, tx, run } = useOneUp();
@@ -11,37 +12,51 @@ export function Header() {
   const free = usePoll(() => o.balance(me), [me]);
   const wallet = usePoll(() => o.usdcBalance(me), [me]);
   const oneup = usePoll(() => o.oneupBalance(me), [me]);
+  const lives = usePoll(() => o.lives(me), [me]);
   const now = useNow();
   const left = epoch ? Math.max(0, epoch.started_at + d.epochLengthS - now) : 0;
   const [amount, setAmount] = useState("1000");
   const amt = BigInt(Math.floor(Number(amount) || 0)) * USDC;
-
   const [open, setOpen] = useState(false);
+  const alive = lives?.filter((l) => !l.expired && !l.full_heal).length;
 
   return (
-    // Phones: brand + Wallet button, stats, then the funds controls when opened.
-    // Desktop: brand and controls on one row, stats on the next.
+    // Phones: brand + Wallet button, the HUD, then the funds controls when opened.
+    // Desktop: brand and controls on one row, the HUD below.
     <header className="flex flex-col gap-3 py-4 lg:grid lg:grid-cols-[1fr_auto] lg:items-center lg:gap-x-6 lg:gap-y-4 lg:py-5">
       <div className="flex items-center gap-3 lg:col-start-1 lg:row-start-1">
-        <Logo />
+        <Logo size={40} />
         <div className="flex-1">
-          <div className="text-xl font-extrabold tracking-tight">OneUp</div>
-          <div className="label">Lose a trade, get a life.</div>
+          <div className="display text-[26px] leading-none">OneUp</div>
+          <div className="label mt-1">Lose a trade, get a life.</div>
         </div>
-        {/* phones: the account and funds controls fold behind a button so the trade screen starts sooner */}
         <button className="btn btn-ghost lg:hidden" onClick={() => setOpen(!open)} aria-expanded={open}>
           {open ? "Done" : "Wallet"}
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:flex sm:flex-wrap sm:items-center sm:gap-x-8 lg:col-span-2 lg:row-start-2">
+      <div className="panel grid grid-cols-2 gap-px overflow-hidden bg-[var(--edge)] sm:grid-cols-4 lg:col-span-2 lg:row-start-2">
         <Stat label="House pool" value={pool ? `$${fmtUsdc(BigInt(pool), 0)}` : "…"} />
         <Stat label={`Epoch ${epoch?.id ?? "…"} ends in`} value={fmtClock(left)} />
-        <Stat label="Free balance" value={free ? `$${fmtUsdc(BigInt(free))}` : "…"} />
-        <Stat label="Wallet" value={wallet ? `$${fmtUsdc(BigInt(wallet), 0)} · ${fmtOneup(oneup)} 1UP` : "…"} />
+        <Stat label="Free balance" value={free ? `$${fmtUsdc(BigInt(free))}` : "…"} icon={<PixelCoin size={16} />} />
+        <Stat
+          label="Extra Lives"
+          value={alive === undefined ? "…" : `×${alive}`}
+          icon={
+            <span className="flex gap-0.5">
+              {[0, 1, 2].map((i) => (
+                <PixelHeart key={i} size={16} fill={alive !== undefined && i < alive ? 1 : 0} />
+              ))}
+            </span>
+          }
+        />
       </div>
 
       <div className={`${open ? "grid" : "hidden"} grid-cols-3 gap-2 lg:col-start-2 lg:row-start-1 lg:flex lg:items-center`}>
+        <div className="label col-span-3 num lg:mr-2 lg:text-right">
+          Wallet ${wallet ? fmtUsdc(BigInt(wallet), 0) : "…"} USDC
+          <br className="hidden lg:block" /> and {fmtOneup(oneup)} $1UP
+        </div>
         <select className="input col-span-3 lg:w-auto" value={me} onChange={(e) => setMe(e.target.value)} aria-label="Account">
           {accounts.map((a) => (
             <option key={a.id} value={a.id}>
@@ -64,11 +79,14 @@ export function Header() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
   return (
-    <div className="min-w-0">
+    <div className="min-w-0 bg-[var(--panel)] px-4 py-2.5">
       <div className="label truncate">{label}</div>
-      <div className="num truncate text-base font-semibold sm:text-lg">{value}</div>
+      <div className="mt-0.5 flex items-center gap-2">
+        {icon}
+        <span className="display num truncate text-xl leading-tight">{value}</span>
+      </div>
     </div>
   );
 }
@@ -85,15 +103,3 @@ export function useNow(ms = 1000) {
 export const fmtClock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 export const fmtOneup = (x?: string, digits = 0) =>
   x === undefined ? "…" : (Number(BigInt(x) / (ONEUP / 1000n)) / 1000).toLocaleString("en-US", { maximumFractionDigits: digits });
-
-function Logo() {
-  return (
-    <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden>
-      <rect width="40" height="40" rx="10" fill="var(--accent)" />
-      <path d="M8 22a12 12 0 0 1 24 0v2H8z" fill="#111" />
-      <circle cx="15" cy="17" r="3" fill="var(--accent)" />
-      <circle cx="25" cy="17" r="3" fill="var(--accent)" />
-      <rect x="13" y="24" width="14" height="8" rx="2" fill="#111" />
-    </svg>
-  );
-}

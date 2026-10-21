@@ -69,7 +69,7 @@ export function Solvency() {
 
       <div className="panel p-5">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <div className="font-semibold">Per market: max wins against vote-set capacity</div>
+          <div className="text-lg font-extrabold">Per market: max wins against vote-set capacity</div>
           <div className="flex gap-4 text-sm">
             <Legend color="var(--series-long)" label="Longs" />
             <Legend color="var(--series-short)" label="Shorts" />
@@ -116,7 +116,7 @@ export function Solvency() {
       </div>
 
       <div className="panel overflow-x-auto p-5">
-        <div className="font-semibold">Epochs</div>
+        <div className="display text-lg">Epochs</div>
         {(history ?? []).length === 0 ? (
           <p className="label mt-2">No closed epochs yet.</p>
         ) : (

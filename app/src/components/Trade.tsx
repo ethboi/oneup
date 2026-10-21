@@ -15,11 +15,12 @@ import {
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { PriceChart, type Mark } from "./PriceChart";
 import { fmtClock, useNow } from "./Header";
+import { PixelHeart } from "./Pixel";
 
 const MIN_HOLD_S = 60;
 
 export function Trade() {
-  const { o, me, prices, history } = useOneUp();
+  const { o, me } = useOneUp();
   const markets = usePoll(() => o.markets(), [], 5000) ?? [];
   const [market, setMarket] = useState("NEAR-USD");
   const positions = usePoll(() => o.positions(me), [me]) ?? [];
@@ -28,11 +29,11 @@ export function Trade() {
   const marks: Mark[] = positions
     .filter((p) => p.market_id === market)
     .flatMap((p) => [
-      { price: priceToNumber(BigInt(p.entry_price)), label: `#${p.id} entry`, color: "var(--info)" },
+      { price: priceToNumber(BigInt(p.entry_price)), label: `#${p.id} entry`, kind: "entry" as const },
       {
         price: priceToNumber(liquidationPrice(p.side, BigInt(p.entry_price), p.leverage)),
         label: `#${p.id} liq`,
-        color: "var(--short)",
+        kind: "liq" as const,
       },
     ]);
 
@@ -44,25 +45,45 @@ export function Trade() {
         <div className="order-1 empty:hidden">
           <LossBanner />
         </div>
-        <div className="panel order-2 min-w-0 p-3">
-          <div className="-mx-3 mb-2 flex gap-2 overflow-x-auto px-3 sm:flex-wrap">
-            {markets.filter((m) => m.live).map((m) => (
-              <button
-                key={m.id}
-                onClick={() => setMarket(m.id)}
-                className={`btn ${m.id === market ? "btn-accent" : "btn-ghost"} num shrink-0 whitespace-nowrap`}
-              >
-                {m.id} {prices[m.id] ? fmtPrice(prices[m.id]) : ""}
-              </button>
-            ))}
-          </div>
-          <PriceChart points={history[market] ?? []} marks={marks} />
-        </div>
+        <Console market={market} setMarket={setMarket} markets={markets.filter((m) => m.live).map((m) => m.id)} marks={marks} />
         <div className="order-4 min-w-0">
           <Positions positions={positions} orders={orders} />
         </div>
       </div>
       <OrderForm market={market} maxLeverage={markets.find((m) => m.id === market)?.max_leverage ?? 100} />
+    </div>
+  );
+}
+
+/** The handheld: market readout on the bezel, the LCD, and market buttons underneath. */
+function Console({ market, setMarket, markets, marks }: { market: string; setMarket: (m: string) => void; markets: string[]; marks: Mark[] }) {
+  const { prices, history } = useOneUp();
+  const pts = history[market] ?? [];
+  const change = pts.length > 1 ? (pts[pts.length - 1].p / pts[0].p - 1) * 100 : 0;
+  return (
+    <div className="bezel order-2 min-w-0 p-3 sm:p-4">
+      <div className="mb-2 flex items-center justify-between gap-3 px-1">
+        <div className="flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-[var(--heart)] shadow-[0_0_8px_var(--heart)]" aria-hidden />
+          <span className="display text-lg">{market}</span>
+        </div>
+        <div className="display num flex items-baseline gap-2">
+          <span className="text-lg">{prices[market] ? fmtPrice(prices[market]) : "…"}</span>
+          {pts.length > 1 && (
+            <span className="text-sm" style={{ color: change >= 0 ? "var(--long)" : "var(--short)" }}>
+              {change >= 0 ? "▲" : "▼"} {Math.abs(change).toFixed(2)}%
+            </span>
+          )}
+        </div>
+      </div>
+      <PriceChart points={pts} marks={marks} />
+      <div className="-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pt-0.5" role="group" aria-label="Market">
+        {markets.map((m) => (
+          <button key={m} aria-pressed={m === market} onClick={() => setMarket(m)} className="bezel-btn num shrink-0 whitespace-nowrap">
+            {m} {prices[m] ? fmtPrice(prices[m]) : ""}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -80,18 +101,20 @@ function OrderForm({ market, maxLeverage }: { market: string; maxLeverage: numbe
 
   return (
     <div className="panel order-3 flex flex-col gap-4 p-4">
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-3" role="radiogroup" aria-label="Side">
         {(["Long", "Short"] as const).map((s) => (
           <button
             key={s}
+            role="radio"
+            aria-checked={side === s}
             onClick={() => setSide(s)}
-            className="btn"
+            className="btn display rounded-full py-2 text-lg"
             style={{
               background: side === s ? (s === "Long" ? "var(--long)" : "var(--short)") : "var(--panel-2)",
-              color: side === s ? "#0b0d10" : "var(--muted)",
+              color: side === s ? "var(--on-color)" : "var(--muted)",
             }}
           >
-            {s}
+            {s === "Long" ? "▲ Long" : "▼ Short"}
           </button>
         ))}
       </div>
@@ -104,9 +127,17 @@ function OrderForm({ market, maxLeverage }: { market: string; maxLeverage: numbe
       <label className="flex flex-col gap-1">
         <span className="label flex justify-between">
           <span>Leverage</span>
-          <span className="num text-[var(--text)]">{leverage}×</span>
+          <span className="display num text-base text-[var(--text)]">{leverage}×</span>
         </span>
-        <input type="range" min={1} max={maxLeverage} value={leverage} onChange={(e) => setLeverage(Number(e.target.value))} />
+        <input
+          type="range"
+          className="slider"
+          min={1}
+          max={maxLeverage}
+          value={leverage}
+          onChange={(e) => setLeverage(Number(e.target.value))}
+          style={{ "--fill": `${((leverage - 1) / Math.max(1, maxLeverage - 1)) * 100}%` } as React.CSSProperties}
+        />
       </label>
 
       <dl className="grid grid-cols-2 gap-y-2 text-sm">
@@ -124,8 +155,8 @@ function OrderForm({ market, maxLeverage }: { market: string; maxLeverage: numbe
       {short && <p className="text-sm text-[var(--short)]">Not enough free balance. Deposit first.</p>}
 
       <button
-        className="btn py-3"
-        style={{ background: side === "Long" ? "var(--long)" : "var(--short)", color: "#0b0d10" }}
+        className="btn display py-3 text-lg"
+        style={{ background: side === "Long" ? "var(--long)" : "var(--short)", color: "var(--on-color)" }}
         disabled={!quote?.allowed || short || m === 0n}
         onClick={() => run(`${side} ${market} ${leverage}× · $${margin}`, () => tx.placeOpen(market, side, m, leverage))}
       >
@@ -154,7 +185,7 @@ function Positions({ positions, orders }: { positions: Position[]; orders: Order
 
   return (
     <div className="panel p-4">
-      <div className="mb-3 font-semibold">Positions</div>
+      <div className="display mb-3 text-lg">Positions</div>
       {rows.length === 0 && orders.length === 0 && <p className="label">No open positions.</p>}
       <div className="flex flex-col gap-3 md:hidden">
         {rows.map(({ p, mark, v, hold }) => (
@@ -270,21 +301,20 @@ function LossBanner() {
   if (!loss) return null;
   const left = epoch ? Math.max(0, epoch.started_at + d.epochLengthS - now) : 0;
   return (
-    <div className="panel flex items-start gap-3 border-[var(--accent)] p-4 sm:items-center sm:gap-4" role="status">
-      <svg width="36" height="36" viewBox="0 0 24 24" aria-hidden className="shrink-0">
-        <path d="M12 21s-7-4.5-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 6c-2.5 4.5-9.5 9-9.5 9z" fill="none" stroke="var(--accent)" strokeWidth="2" />
-        <path d="M12 9v6M9 12h6" stroke="var(--accent)" strokeWidth="2" />
-      </svg>
+    <div className="panel flex items-center gap-4 p-4" role="status" style={{ borderColor: "var(--heart)" }}>
+      {/* keyed by the running total so the pop replays on every new loss */}
+      <span key={loss.total.toString()} className="relative shrink-0">
+        <PixelHeart size={44} className="heart-pop" />
+        <span className="display plus-one absolute -top-3 left-1/2 -translate-x-1/2 text-lg text-[var(--heart)]">+1</span>
+      </span>
       <div className="flex-1">
-        <div className="font-semibold">
-          You lost ${fmtUsdc(loss.amount)}. That&apos;s an Extra Life in the making.
-        </div>
-        <div className="label num">
-          ${fmtUsdc(loss.total)} lost this epoch. Your Extra Life is minted when the epoch ends in {fmtClock(left)}, sized
-          from what the house made.
+        <div className="display text-lg leading-tight">Extra Life incoming</div>
+        <div className="label num mt-1">
+          You lost ${fmtUsdc(loss.amount)} (${fmtUsdc(loss.total)} this epoch). Your Extra Life mints when the epoch ends
+          in {fmtClock(left)}, sized from what the house made.
         </div>
       </div>
-      <button className="btn btn-ghost" onClick={() => setLoss(null)} aria-label="Dismiss">
+      <button className="btn btn-ghost px-3" onClick={() => setLoss(null)} aria-label="Dismiss">
         ✕
       </button>
     </div>

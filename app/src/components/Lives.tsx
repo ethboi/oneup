@@ -3,6 +3,7 @@
 import { fmtUsdc, ppmToNumber, type LifeInfo } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { fmtClock, useNow } from "./Header";
+import { HealthBar, PixelHeart } from "./Pixel";
 
 export function Lives() {
   const { o, d, me, tx, run } = useOneUp();
@@ -18,7 +19,7 @@ export function Lives() {
     <div className="flex flex-col gap-4">
       <div className="panel flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="font-semibold">Pending Extra Life · epoch {epoch?.id ?? "…"}</div>
+          <div className="display text-lg">Next Extra Life, epoch <span className="num">{epoch?.id ?? "…"}</span></div>
           <p className="label mt-1 max-w-xl">
             Your losses this epoch. When the epoch ends, the house&apos;s profit is split across its losers in proportion
             to what they lost: that share is your Extra Life&apos;s face value. If the house didn&apos;t make money, no
@@ -26,13 +27,13 @@ export function Lives() {
           </p>
         </div>
         <div className="text-right">
-          <div className="num text-2xl font-bold">${pending ? fmtUsdc(BigInt(pending)) : "…"}</div>
-          <div className="label num">lost · mints in {fmtClock(left)}</div>
+          <div className="display num text-2xl">${pending ? fmtUsdc(BigInt(pending)) : "…"}</div>
+          <div className="label num">lost so far, mints in {fmtClock(left)}</div>
         </div>
       </div>
 
       <div className="flex items-center justify-between">
-        <div className="font-semibold">Your Extra Lives ({lives.length})</div>
+        <div className="display text-lg">Your Extra Lives <span className="num">({lives.length})</span></div>
         <button
           className="btn btn-accent"
           disabled={claimable === 0n}
@@ -57,48 +58,42 @@ export function Lives() {
 function LifeCard({ l, expiry }: { l: LifeInfo; expiry?: number }) {
   const owed = BigInt(l.owed);
   const paid = BigInt(l.paid);
-  const pct = owed === 0n ? 0 : Number((paid * 10_000n) / owed) / 100;
+  const progress = owed === 0n ? 0 : Number((paid * 10_000n) / owed) / 10_000;
+  const state = l.full_heal ? "Full Heal" : l.expired ? "Expired" : "Extra Life";
   return (
-    <div className="panel relative overflow-hidden p-4">
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="label">{l.epoch === 0 ? "Seed" : `Epoch ${l.epoch}`}</div>
-          <div className="text-lg font-bold">{l.full_heal ? "Full Heal" : l.expired ? "Expired" : "Extra Life"}</div>
+    <div className="panel p-4" style={l.expired && !l.full_heal ? { opacity: 0.7 } : undefined}>
+      <div className="flex items-center gap-3">
+        <PixelHeart size={44} fill={l.full_heal ? 1 : Math.max(0.12, progress)} label={`${state}, ${(progress * 100).toFixed(0)}% paid`} />
+        <div className="flex-1">
+          <div className="display text-lg leading-tight">{state}</div>
+          <div className="label">{l.epoch === 0 ? "Seed life" : `From epoch ${l.epoch}`}</div>
         </div>
-        <Heart full={l.full_heal} />
+        <div className="text-right">
+          <div className="display num text-xl">${fmtUsdc(BigInt(l.claimable))}</div>
+          <div className="label">to claim</div>
+        </div>
       </div>
-      <dl className="num mt-3 grid grid-cols-2 gap-y-1 text-sm">
+      <div className="mt-3">
+        <HealthBar value={progress} label="Paid toward Full Heal" />
+        <div className="label num mt-1.5 flex justify-between">
+          <span>
+            ${fmtUsdc(paid)} of ${fmtUsdc(owed)}
+          </span>
+          <span>{(progress * 100).toFixed(1)}% to Full Heal</span>
+        </div>
+      </div>
+      <dl className="num mt-3 grid grid-cols-2 gap-y-1 border-t-2 border-dashed border-[var(--line)] pt-3 text-sm">
         <dt className="label">Face value</dt>
         <dd className="text-right">${fmtUsdc(BigInt(l.face))}</dd>
         <dt className="label">Cap</dt>
         <dd className="text-right">{ppmToNumber(BigInt(l.cap_ppm)).toFixed(2)}×</dd>
-        <dt className="label">Earns up to</dt>
-        <dd className="text-right">${fmtUsdc(owed)}</dd>
-        <dt className="label">Paid so far</dt>
-        <dd className="text-right">${fmtUsdc(paid)}</dd>
-        <dt className="label">Claimable</dt>
-        <dd className="text-right font-semibold">${fmtUsdc(BigInt(l.claimable))}</dd>
+        {l.epoch > 0 && expiry !== undefined && !l.full_heal && (
+          <>
+            <dt className="label">{l.expired ? "Stopped earning" : "Earns through"}</dt>
+            <dd className="text-right">epoch {l.epoch + expiry}</dd>
+          </>
+        )}
       </dl>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--panel-2)]" role="progressbar" aria-valuenow={pct}>
-        <div className="h-full rounded-full bg-[var(--accent)] transition-all" style={{ width: `${pct}%` }} />
-      </div>
-      <div className="label num mt-1">
-        {pct.toFixed(1)}% to Full Heal
-        {l.epoch > 0 && expiry !== undefined && !l.full_heal && (l.expired ? " · stopped earning" : ` · earns through epoch ${l.epoch + expiry}`)}
-      </div>
     </div>
-  );
-}
-
-function Heart({ full }: { full: boolean }) {
-  return (
-    <svg width="32" height="32" viewBox="0 0 24 24" aria-hidden>
-      <path
-        d="M12 21s-7-4.5-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 6c-2.5 4.5-9.5 9-9.5 9z"
-        fill={full ? "var(--accent)" : "none"}
-        stroke="var(--accent)"
-        strokeWidth="2"
-      />
-    </svg>
   );
 }
