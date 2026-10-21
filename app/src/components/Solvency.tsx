@@ -5,6 +5,7 @@
 
 import { fmtUsdc, ppmToNumber, type EpochSummary } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
+import { Icon } from "./Icon";
 
 const big = (x?: string) => (x === undefined ? 0n : BigInt(x));
 const pct = (a: bigint, b: bigint) => (b === 0n ? 0 : Number((a * 10_000n) / b) / 100);
@@ -37,6 +38,15 @@ export function Solvency() {
           Every trade that would push this past 100% is refused, so there is never a payout queue. Both sides of each market
           are counted, because positions close at different times.
         </p>
+        {pool < big(s.seed) && (
+          <p className="mt-3 flex items-center gap-2 rounded-lg bg-[var(--panel-2)] px-3 py-2 text-sm">
+            <Icon name="info" />
+            <span>
+              No payouts until the pool is back above its <b className="num">${fmtUsdc(big(s.seed), 0)}</b> seed. It&apos;s{" "}
+              <b className="num">${fmtUsdc(big(s.seed) - pool, 0)}</b> short, so this epoch&apos;s Extra Lives and buyback wait for profit.
+            </span>
+          </p>
+        )}
 
         <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <Tile label="Pool" value={pool} />

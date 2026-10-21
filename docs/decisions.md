@@ -160,6 +160,14 @@ seller is paid in the same flow; if the NFT can't move (sold or given away elsew
 buyer is refunded and the stale listing removed. No fees. Only the Extra Life and ve contracts are
 accepted.
 
+## D-18 · Merging locks · **Decided (21 Oct 2026)**
+
+Every profitable epoch gives each loser a new lock, so active traders collect many small ones. `merge`
+combines 2 to 30 running locks into one: the amounts add up and it ends at the latest end (so nobody's
+$1UP unlocks earlier than it would have). The new lock counts from the next epoch, like any new lock. The
+old locks are closed but still earn the current epoch (their weight was fixed for it), and anything they
+earned and didn't claim is paid through the new lock; what they already claimed isn't paid twice.
+
 ## D-11 · Known POC limits · **Noted**
 
 - Rounding dust from sharing buybacks by weight stays in `ve` (no sweep).

@@ -165,6 +165,15 @@ Run: `cd contracts && cargo test -p oneup-math -p oneup-house` · `./build.sh &&
 - [x] Locks and Market tabs, Sell on cards; bots sell and buy on the market
 - [x] Update the spec doc for D-14 to D-17
 
+### Stage 8c — UX pass · ✅
+
+- [x] Polish: softer panels, standard buttons in the heart magenta, readable type, line icons, fields
+- [x] Order form shows what a loss brings; "Deposit & Long" from the wallet in one transaction
+- [x] Header: Demo menu (accounts, faucet), account chip, Funds pop-over; "Trading balance"
+- [x] Live activity feed from contract events (`/api/activity`), recent sales on the Market tab
+- [x] Extra Lives and Locks: summary bars, Claim all, merge loss-locks (D-18), rows, finished ones folded
+- [x] Phones: bottom tab bar, fixed trade bar; chart ranges and price grid; first-visit strip
+
 ### Stage 9 — Ship (12–14 Nov)
 
 - [x] README: pitch, money-flow diagram (mermaid), rules, fairness chart + table, repo map, what's mocked

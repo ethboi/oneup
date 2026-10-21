@@ -30,6 +30,8 @@ const GAS_FT_TRANSFER: Gas = Gas::from_tgas(15);
 const GAS_CALLBACK: Gas = Gas::from_tgas(10);
 /// Locks the house can create in one `lock_for` transfer.
 const MAX_LOCKS_PER_TRANSFER: usize = 30;
+/// Locks claimed or merged in one call.
+const MAX_LOCKS_PER_CALL: usize = 30;
 
 #[near(serializers = [borsh])]
 #[derive(Clone, Debug)]
@@ -40,9 +42,13 @@ pub struct Lock {
     pub end: u64,
     /// Made by the house from a loss (D-16) rather than locked by hand.
     pub from_loss: bool,
-    /// Left early in this epoch: earns for epochs up to and including it.
+    /// Left early (or merged away) in this epoch: earns for epochs up to and including it.
     pub exited: Option<u64>,
     pub withdrawn: bool,
+    /// Locks merged into this one; their unclaimed rewards are claimed through it.
+    pub merged_from: Vec<TokenId>,
+    /// This lock was merged into another and can no longer be claimed directly.
+    pub merged_into: Option<TokenId>,
 }
 
 #[near(serializers = [json])]
@@ -59,6 +65,8 @@ pub struct LockInfo {
     pub exit_penalty: U128,
     pub exited: Option<u64>,
     pub withdrawn: bool,
+    /// How many locks were merged into this one.
+    pub merged: u32,
 }
 
 #[near(serializers = [json])]
@@ -185,22 +193,62 @@ impl Ve {
 
     /// Pays a lock's rewards for finished epochs. Rewards that arrive late can be claimed later.
     pub fn claim(&mut self, token_id: TokenId, epochs: Vec<u64>) {
-        let account = self.assert_lock_owner(&token_id);
-        let lock = self.locks.get(&token_id).unwrap().clone();
+        self.claim_many(vec![token_id], epochs);
+    }
+
+    /// Pays several locks' rewards in one transfer.
+    pub fn claim_many(&mut self, token_ids: Vec<TokenId>, epochs: Vec<u64>) {
+        require!(!token_ids.is_empty() && token_ids.len() <= MAX_LOCKS_PER_CALL, "Claim 1 to 30 locks");
+        let mut account = None;
         let mut pay = 0;
-        for e in epochs {
-            require!(e < self.epoch, "Epoch not finished");
-            let due = self.entitled(&lock, e);
-            let key = (token_id.clone(), e);
-            let claimed = self.claimed.get(&key).copied().unwrap_or(0);
-            if due > claimed {
-                pay += due - claimed;
-                self.claimed.insert(key, due);
+        for token_id in token_ids {
+            account = Some(self.assert_lock_owner(&token_id));
+            let lock = self.locks.get(&token_id).unwrap();
+            require!(lock.merged_into.is_none(), "Merged into another lock: claim that one");
+            for e in &epochs {
+                require!(*e < self.epoch, "Epoch not finished");
+                let key = (token_id.clone(), *e);
+                let due = self.available(&token_id, *e);
+                let claimed = self.claimed.get(&key).copied().unwrap_or(0);
+                if due > claimed {
+                    pay += due - claimed;
+                    self.claimed.insert(key, due);
+                }
             }
         }
+        let account = account.unwrap();
         pay += self.owed.remove(&account).unwrap_or(0);
         require!(pay > 0, "Nothing to claim");
         self.send(account, pay);
+    }
+
+    /// Merges running locks you own into one new lock: the amounts add up and it ends at the latest
+    /// end. It counts from the next epoch; the old locks earn through this one, claimed through the new
+    /// lock. Returns the new lock's id.
+    pub fn merge(&mut self, token_ids: Vec<TokenId>) -> TokenId {
+        require!((2..=MAX_LOCKS_PER_CALL).contains(&token_ids.len()), "Merge 2 to 30 locks");
+        let epoch = self.epoch;
+        let mut owner = None;
+        let (mut amount, mut end, mut from_loss) = (0u128, 0u64, true);
+        for id in &token_ids {
+            owner = Some(self.assert_lock_owner(id));
+            let mut lock = self.locks.get(id).unwrap().clone();
+            require!(!lock.withdrawn && lock.merged_into.is_none(), "Lock already closed");
+            require!(epoch < lock.end, "Lock has ended: unlock it instead");
+            require!(token_ids.iter().filter(|x| *x == id).count() == 1, "Lock listed twice");
+            self.tally.remove(lock.amount, lock.end);
+            amount += lock.amount;
+            end = end.max(lock.end);
+            from_loss &= lock.from_loss;
+            lock.exited = Some(epoch);
+            lock.withdrawn = true;
+            self.locks.insert(id.clone(), lock);
+        }
+        let new_id = self.mint(owner.unwrap(), amount, end, from_loss, token_ids.clone());
+        for id in token_ids {
+            self.locks.get_mut(&id).unwrap().merged_into = Some(new_id.clone());
+        }
+        new_id
     }
 
     /// Returns the locked $1UP once the lock has ended. The NFT stays (it can still claim past epochs).
@@ -210,6 +258,7 @@ impl Ve {
         let lock = self.locks.get_mut(&token_id).unwrap();
         require!(epoch >= lock.end, "Lock still running");
         require!(!lock.withdrawn, "Already unlocked");
+        require!(lock.merged_into.is_none(), "Merged into another lock");
         lock.withdrawn = true;
         let amount = lock.amount;
         self.send(account, amount);
@@ -264,7 +313,7 @@ impl Ve {
         self.tokens
             .nft_tokens_for_owner(account_id, None, Some(100))
             .into_iter()
-            .filter_map(|t| self.locks.get(&t.token_id).map(|l| self.info(t.token_id.clone(), t.owner_id, l)))
+            .filter_map(|t| self.locks.get(&t.token_id).filter(|l| l.merged_into.is_none()).map(|l| self.info(t.token_id.clone(), t.owner_id, l)))
             .collect()
     }
 
@@ -284,10 +333,13 @@ impl Ve {
 
     pub fn get_claimable(&self, token_id: TokenId, epochs: Vec<u64>) -> U128 {
         let Some(lock) = self.locks.get(&token_id) else { return U128(0) };
+        if lock.merged_into.is_some() {
+            return U128(0);
+        }
         let total = epochs
             .into_iter()
             .filter(|e| *e < self.epoch)
-            .map(|e| self.entitled(lock, e).saturating_sub(self.claimed.get(&(token_id.clone(), e)).copied().unwrap_or(0)))
+            .map(|e| self.available(&token_id, e).saturating_sub(self.claimed.get(&(token_id.clone(), e)).copied().unwrap_or(0)))
             .sum();
         U128(total)
     }
@@ -302,11 +354,18 @@ impl Ve {
 
     fn mint_lock(&mut self, owner: AccountId, amount: u128, epochs: u64, from_loss: bool) {
         require!(amount > 0, "Nothing to lock");
+        let end = self.epoch + 1 + epochs;
+        self.mint(owner, amount, end, from_loss, vec![]);
+    }
+
+    fn mint(&mut self, owner: AccountId, amount: u128, end: u64, from_loss: bool, merged_from: Vec<TokenId>) -> TokenId {
         let id = self.next_lock.to_string();
         self.next_lock += 1;
-        let end = self.epoch + 1 + epochs;
         self.tally.add(amount, end);
-        self.locks.insert(id.clone(), Lock { amount, created: self.epoch, end, from_loss, exited: None, withdrawn: false });
+        self.locks.insert(
+            id.clone(),
+            Lock { amount, created: self.epoch, end, from_loss, exited: None, withdrawn: false, merged_from, merged_into: None },
+        );
         let metadata = TokenMetadata {
             title: Some(format!("ve1UP #{id}")),
             description: Some(format!("{} $1UP locked until epoch {end}", amount / math::ONEUP)),
@@ -315,6 +374,7 @@ impl Ve {
         };
         self.tokens.internal_mint_with_refund(id.clone(), owner.clone(), Some(metadata), None);
         NftMint { owner_id: &owner, token_ids: &[&id], memo: None }.emit();
+        id
     }
 
     fn add_reward(&mut self, epoch: u64, amount: u128) {
@@ -332,6 +392,18 @@ impl Ve {
         math::pro_rata(reward, power(lock.amount, lock.end, e), total)
     }
 
+    /// What can be paid through a lock for epoch `e`: its own share plus whatever the locks merged into it
+    /// earned and didn't claim before the merge.
+    fn available(&self, token_id: &TokenId, e: u64) -> u128 {
+        let lock = self.locks.get(token_id).unwrap();
+        let mut due = self.entitled(lock, e);
+        for from in &lock.merged_from {
+            let claimed = self.claimed.get(&(from.clone(), e)).copied().unwrap_or(0);
+            due += self.available(from, e).saturating_sub(claimed);
+        }
+        due
+    }
+
     fn info(&self, token_id: TokenId, owner_id: AccountId, lock: &Lock) -> LockInfo {
         let running = !lock.withdrawn && self.epoch < lock.end;
         LockInfo {
@@ -345,6 +417,7 @@ impl Ve {
             exit_penalty: U128(if running { math::exit_penalty(lock.amount, lock.end - self.epoch - 1) } else { 0 }),
             exited: lock.exited,
             withdrawn: lock.withdrawn,
+            merged: lock.merged_from.len() as u32,
         }
     }
 

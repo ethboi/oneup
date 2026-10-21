@@ -311,6 +311,30 @@ fn close_epoch_fully(h: &mut House) -> u32 {
 }
 
 #[test]
+fn deposit_and_open_in_one_transfer() {
+    let mut h = setup(usd(25_000));
+    deposit(&mut h, "alice", usd(200));
+    // 300 arrives with an open for 500: the 200 already there covers the rest
+    ctx("usdc", T0);
+    let msg = format!(r#"{{"open":{{"market_id":"{MARKET}","side":"Long","margin":"{}","leverage":10}}}}"#, usd(500));
+    let _ = h.ft_on_transfer(acc("alice"), U128(usd(300)), msg);
+    assert_eq!(h.get_balance(acc("alice")).0, 0);
+    let orders = h.get_orders(acc("alice"));
+    assert_eq!(orders.len(), 1);
+    assert!(matches!(orders[0].kind, OrderKind::Open { margin, .. } if margin.0 == usd(500)));
+}
+
+#[test]
+#[should_panic(expected = "Not enough free balance")]
+fn deposit_and_open_refuses_as_a_whole() {
+    let mut h = setup(usd(25_000));
+    // the panic rolls back the credit too, so the token contract refunds the transfer
+    ctx("usdc", T0);
+    let msg = format!(r#"{{"open":{{"market_id":"{MARKET}","side":"Long","margin":"{}","leverage":10}}}}"#, usd(500));
+    let _ = h.ft_on_transfer(acc("alice"), U128(usd(300)), msg);
+}
+
+#[test]
 #[should_panic(expected = "Epoch not over yet")]
 fn epoch_runs_its_length() {
     let mut h = setup(usd(25_000));

@@ -15,6 +15,8 @@ const GAS_WITHDRAW_CALLBACK: Gas = Gas::from_tgas(10);
 #[serde(rename_all = "snake_case")]
 enum DepositMsg {
     Seed {},
+    /// Deposit and place an open in one step; `margin` comes from the free balance after the deposit.
+    Open { market_id: String, side: Side, margin: U128, leverage: u32 },
 }
 
 #[near]
@@ -42,6 +44,12 @@ impl House {
                     // The seed provider's Extra Life: 1.0× cap, so the seed is paid back like any claim.
                     self.mint_lives(0, vec![(sender_id.clone(), amount.0, math::PPM)], false).detach();
                     Event::Seed { amount, pool: U128(self.pool) }.emit();
+                }
+                DepositMsg::Open { market_id, side, margin, leverage } => {
+                    // a refused open (capacity, leverage) panics, so the whole transfer is refunded
+                    self.credit(&sender_id, amount.0);
+                    Event::Deposit { account_id: sender_id.clone(), amount }.emit();
+                    self.internal_place_open(sender_id, market_id, side, margin, leverage);
                 }
             }
         }
@@ -76,30 +84,8 @@ impl House {
     /// Moves `margin` from the free balance into a pending open. The solvency rule and the market's
     /// capacity are checked now, with the order counted, so the fill can't be refused for room.
     pub fn place_open(&mut self, market_id: String, side: Side, margin: U128, leverage: u32) -> u64 {
-        let account = env::predecessor_account_id();
-        let m = self.market(&market_id);
-        require!(m.live, "Market is not live");
-        require!(leverage >= 1 && leverage <= m.max_leverage, "Leverage out of range");
-        require!(margin.0 >= self.params.min_margin.0, "Margin below minimum");
-        self.debit(&account, margin.0);
-        let liability = math::max_liability(margin.0);
-        self.change_liability(&market_id, side, liability, true);
-        let cut_ppm = U128(math::cut_ppm(liability, self.pool));
-        let id = self.take_id();
-        self.orders.insert(
-            id,
-            Order {
-                id,
-                owner: account.clone(),
-                market_id: market_id.clone(),
-                kind: OrderKind::Open { side, margin, leverage, cut_ppm },
-                placed_at: now_s(),
-            },
-        );
-        Event::OrderPlaced { order_id: id, account_id: account, market_id, position_id: None }.emit();
-        id
+        self.internal_place_open(env::predecessor_account_id(), market_id, side, margin, leverage)
     }
-
     pub fn place_close(&mut self, position_id: u64) -> u64 {
         let account = env::predecessor_account_id();
         let now = now_s();
@@ -319,5 +305,31 @@ impl House {
             pool: U128(self.pool),
         }
         .emit();
+    }
+}
+
+impl House {
+    pub(crate) fn internal_place_open(&mut self, account: AccountId, market_id: String, side: Side, margin: U128, leverage: u32) -> u64 {
+        let m = self.market(&market_id);
+        require!(m.live, "Market is not live");
+        require!(leverage >= 1 && leverage <= m.max_leverage, "Leverage out of range");
+        require!(margin.0 >= self.params.min_margin.0, "Margin below minimum");
+        self.debit(&account, margin.0);
+        let liability = math::max_liability(margin.0);
+        self.change_liability(&market_id, side, liability, true);
+        let cut_ppm = U128(math::cut_ppm(liability, self.pool));
+        let id = self.take_id();
+        self.orders.insert(
+            id,
+            Order {
+                id,
+                owner: account.clone(),
+                market_id: market_id.clone(),
+                kind: OrderKind::Open { side, margin, leverage, cut_ppm },
+                placed_at: now_s(),
+            },
+        );
+        Event::OrderPlaced { order_id: id, account_id: account, market_id, position_id: None }.emit();
+        id
     }
 }

@@ -352,7 +352,15 @@ body {
     outline-offset: 2px;
   }
 
-  /* the cartridge tab strip */
+  /* desktop tabs: a light segmented control, so the console stays the one dark element */
+  .tabs {
+    display: inline-flex;
+    gap: 2px;
+    padding: 4px;
+    border-radius: 12px;
+    background: var(--panel-2);
+    border: 1px solid var(--panel-edge);
+  }
   .tab {
     display: inline-flex;
     align-items: center;
@@ -360,13 +368,45 @@ body {
     font-weight: 800;
     font-size: 14px;
     padding: 6px 14px;
-    border-radius: 10px;
-    color: #b9bbd0; /* the strip is always dark */
+    border-radius: 9px;
+    color: var(--muted);
     white-space: nowrap;
+    transition: color 0.15s;
+  }
+  .tab:hover {
+    color: var(--text);
   }
   .tab[aria-selected="true"] {
-    background: #f7f8fb; /* lit in both themes */
-    color: #1c1b29;
+    background: var(--panel);
+    color: var(--text);
+    box-shadow: 0 1px 3px rgb(28 27 41 / 0.14);
+  }
+
+  /* phones: a bottom tab bar */
+  .bottom-nav {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 40;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    height: 60px;
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--panel);
+    border-top: 1px solid var(--panel-edge);
+  }
+  .bottom-nav > button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--muted);
+  }
+  .bottom-nav > button[aria-current="page"] {
+    color: var(--primary);
   }
 
   /* touch screens: thumb-sized targets, and 16px inputs so iOS doesn't zoom on focus */

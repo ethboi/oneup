@@ -29,11 +29,13 @@ interface SpriteProps {
   /** Fraction of the shape filled from the bottom up; the rest draws in `empty`. */
   fill?: number;
   empty?: string;
+  /** Outline colour (ink by default). */
+  edge?: string;
   label?: string;
   className?: string;
 }
 
-function Sprite({ rows, colors, size, fill = 1, empty = "var(--panel-2)", label, className }: SpriteProps) {
+function Sprite({ rows, colors, size, fill = 1, empty = "var(--panel-2)", edge = "var(--edge)", label, className }: SpriteProps) {
   const h = rows.length;
   const w = rows[0].length;
   const on = (x: number, y: number) => y >= 0 && y < h && x >= 0 && x < w && rows[y][x] !== ".";
@@ -42,7 +44,7 @@ function Sprite({ rows, colors, size, fill = 1, empty = "var(--panel-2)", label,
   for (let y = -1; y <= h; y++)
     for (let x = -1; x <= w; x++)
       if (!on(x, y) && (on(x - 1, y) || on(x + 1, y) || on(x, y - 1) || on(x, y + 1)))
-        cells.push(<rect key={`o${x},${y}`} x={x + 1} y={y + 1} width="1.02" height="1.02" fill="var(--edge)" />);
+        cells.push(<rect key={`o${x},${y}`} x={x + 1} y={y + 1} width="1.02" height="1.02" fill={edge} />);
   const firstFilledRow = h - Math.round(fill * h);
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
@@ -68,9 +70,21 @@ function Sprite({ rows, colors, size, fill = 1, empty = "var(--panel-2)", label,
 }
 
 /** A heart, optionally part-filled from the bottom (a life's progress to Full Heal). */
-export function PixelHeart({ size = 24, fill = 1, className, label }: { size?: number; fill?: number; className?: string; label?: string }) {
+/** `live`: outlined in the heart colour, for a life that's still earning. */
+export function PixelHeart({ size = 24, fill = 1, live, className, label }: { size?: number; fill?: number; live?: boolean; className?: string; label?: string }) {
   const rows = HEART.map((r, y) => (y === 1 ? r.slice(0, 1) + "#" + "*" + r.slice(3) : r));
-  return <Sprite rows={rows} colors={{ "#": "var(--heart)", "*": "#fff" }} size={size} fill={fill} className={className} label={label} />;
+  return (
+    <Sprite
+      rows={rows}
+      colors={{ "#": "var(--heart)", "*": "#fff" }}
+      size={size}
+      fill={fill}
+      edge={live ? "var(--heart)" : undefined}
+      empty={live ? "color-mix(in srgb, var(--heart) 14%, var(--panel))" : undefined}
+      className={className}
+      label={label}
+    />
+  );
 }
 
 export function PixelCoin({ size = 18 }: { size?: number }) {

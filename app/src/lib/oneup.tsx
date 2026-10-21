@@ -104,7 +104,7 @@ function Loaded({ d, children }: { d: Deployment; children: ReactNode }) {
     }
   }, []);
 
-  // Prices: poll the oracle every second and keep the last 300 updates per market. A point is added only
+  // Prices: poll the oracle every second and keep the last 1,800 updates (30 minutes) per market. A point is added only
   // when the oracle publishes a new price, at the moment it arrives, so the chart moves with real updates
   // instead of repeating the same price on every poll.
   const [prices, setPrices] = useState<Record<string, bigint>>({});
@@ -134,7 +134,7 @@ function Loaded({ d, children }: { d: Deployment; children: ReactNode }) {
       const t = Date.now();
       setHistory((h) => {
         const out = { ...h };
-        for (const [k, p] of Object.entries(fresh)) out[k] = (out[k] ?? []).concat({ t, p }).slice(-300);
+        for (const [k, p] of Object.entries(fresh)) out[k] = (out[k] ?? []).concat({ t, p }).slice(-1800);
         return out;
       });
     };

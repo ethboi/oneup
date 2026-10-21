@@ -12,7 +12,9 @@ export function useListings() {
   return usePoll(() => o.listings(), [], 5000) ?? [];
 }
 
-export function Sell({ nft, tokenId, suggested, listings }: { nft: string; tokenId: string; suggested: bigint; listings: Listing[] }) {
+/** `compact`: no top margin, for use inside a row. */
+export function Sell({ nft, tokenId, suggested, listings, compact }: { nft: string; tokenId: string; suggested: bigint; listings: Listing[]; compact?: boolean }) {
+  const mt = compact ? "" : "mt-3";
   const { tx, run } = useOneUp();
   const listing = listings.find((l) => l.nft_contract === nft && l.token_id === tokenId);
   const [open, setOpen] = useState(false);
@@ -20,7 +22,7 @@ export function Sell({ nft, tokenId, suggested, listings }: { nft: string; token
 
   if (listing) {
     return (
-      <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-dashed border-[var(--line)] px-3 py-2 text-sm">
+      <div className={`${mt} flex items-center justify-between gap-2 rounded-lg border border-dashed border-[var(--line)] px-3 py-2 text-sm`}>
         <span className="num">For sale at ${fmtUsdc(BigInt(listing.price))}</span>
         <button className="btn btn-ghost px-3 py-1" onClick={() => run("Take down listing", () => tx.delist(nft, tokenId))}>
           Take down
@@ -30,7 +32,7 @@ export function Sell({ nft, tokenId, suggested, listings }: { nft: string; token
   }
   if (!open) {
     return (
-      <button className="btn btn-ghost mt-3 w-full" onClick={() => setOpen(true)}>
+      <button className={`btn btn-ghost ${mt} w-full`} onClick={() => setOpen(true)}>
         <Icon name="tag" />
         Sell
       </button>
@@ -38,7 +40,7 @@ export function Sell({ nft, tokenId, suggested, listings }: { nft: string; token
   }
   const raw = BigInt(Math.floor(Number(price) || 0)) * USDC;
   return (
-    <div className="mt-3 flex items-center gap-2">
+    <div className={`${mt} flex items-center gap-2`}>
       <span className="field flex-1">
         <input className="input num" value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal" aria-label="Price in USDC" />
         <span className="field-unit">USDC</span>

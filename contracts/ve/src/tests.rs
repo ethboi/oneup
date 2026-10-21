@@ -190,3 +190,72 @@ fn only_oneup_is_accepted() {
     ctx("usdc");
     let _ = v.ft_on_transfer(acc("alice"), U128(1), r#"{"lock":{"epochs":10}}"#.into());
 }
+
+#[test]
+fn claim_many_pays_once_across_locks() {
+    let mut v = setup();
+    let a = lock(&mut v, "alice", 1_000, 104);
+    let b = lock(&mut v, "alice", 1_040, 52);
+    checkpoint(&mut v, 2);
+    buyback(&mut v, 2, 300);
+    checkpoint(&mut v, 3);
+    // weights 1_000 : 520
+    let (ca, cb) = (claimable(&v, &a, &[2]), claimable(&v, &b, &[2]));
+    assert_eq!(ca + cb, oneup_math::pro_rata(300 * ONEUP, 1_000 * ONEUP, 1_520 * ONEUP) + oneup_math::pro_rata(300 * ONEUP, 520 * ONEUP, 1_520 * ONEUP));
+    ctx("alice");
+    v.claim_many(vec![a.clone(), b.clone()], vec![2]);
+    assert_eq!(claimable(&v, &a, &[2]) + claimable(&v, &b, &[2]), 0);
+}
+
+#[test]
+fn merge_combines_and_routes_unclaimed_rewards() {
+    let mut v = setup();
+    let a = lock(&mut v, "alice", 1_000, 104); // ends 106
+    let b = lock(&mut v, "alice", 1_040, 52); // ends 54, weighs 520 at epoch 2
+    checkpoint(&mut v, 2);
+    buyback(&mut v, 2, 300);
+    checkpoint(&mut v, 3);
+    let share_a = claimable(&v, &a, &[2]);
+    let share_b = claimable(&v, &b, &[2]);
+    // Alice claims A's epoch-2 share, then merges A and B in epoch 3
+    ctx("alice");
+    v.claim(a.clone(), vec![2]);
+    let c = v.merge(vec![a.clone(), b.clone()]);
+    let info = v.lock_info(c.clone()).unwrap();
+    assert_eq!((info.amount.0, info.end, info.merged), (2_040 * ONEUP, 106, 2));
+    // only the merged lock is listed; B's unclaimed epoch-2 share comes through it, A's isn't paid twice
+    let mine: Vec<String> = v.locks_for_owner(acc("alice")).into_iter().map(|l| l.token_id).collect();
+    assert_eq!(mine, vec![c.clone()]);
+    assert_eq!(claimable(&v, &c, &[2]), share_b);
+    assert!(share_a > 0);
+    // the old locks still earn epoch 3 (their weight was fixed for it); C counts from epoch 4
+    buyback(&mut v, 3, 100);
+    checkpoint(&mut v, 4);
+    assert!(claimable(&v, &c, &[3]) > 99 * ONEUP);
+    // and the next epoch's total has only C in it, at its full weight
+    assert_eq!(v.get_total_power(4).0, oneup_math::ve_power(2_040 * ONEUP, 102));
+}
+
+#[test]
+#[should_panic(expected = "Merged into another lock")]
+fn merged_locks_cannot_be_claimed_directly() {
+    let mut v = setup();
+    let a = lock(&mut v, "alice", 1_000, 104);
+    let b = lock(&mut v, "alice", 1_000, 104);
+    checkpoint(&mut v, 2);
+    ctx("alice");
+    v.merge(vec![a.clone(), b]);
+    checkpoint(&mut v, 3);
+    ctx("alice");
+    v.claim(a, vec![2]);
+}
+
+#[test]
+#[should_panic(expected = "Not your lock")]
+fn cannot_merge_someone_elses_lock() {
+    let mut v = setup();
+    let a = lock(&mut v, "alice", 1_000, 104);
+    let b = lock(&mut v, "bob", 1_000, 104);
+    ctx("alice");
+    v.merge(vec![a, b]);
+}

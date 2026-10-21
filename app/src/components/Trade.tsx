@@ -2,10 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ONEUP_PER_USDC,
   USDC,
   fmtUsdc,
+  lifeCapPpm,
   liquidationPrice,
   maxLiability,
+  owed,
   pnl,
   priceToNumber,
   type Order,
@@ -17,6 +20,15 @@ import { PriceChart, type Mark } from "./PriceChart";
 import { fmtClock, useNow } from "./Header";
 import { PixelHeart } from "./Pixel";
 import { Icon } from "./Icon";
+import { ActivityPanel } from "./Activity";
+import { Section } from "./ui";
+
+/** Chart windows: the app keeps up to 30 minutes of prices it has seen. */
+const RANGES = [
+  ["1m", 60_000],
+  ["5m", 300_000],
+  ["30m", 1_800_000],
+] as const;
 
 const MIN_HOLD_S = 60;
 
@@ -24,9 +36,9 @@ export function Trade() {
   const { o, me } = useOneUp();
   const markets = usePoll(() => o.markets(), [], 5000) ?? [];
   const [market, setMarket] = useState("NEAR-USD");
-  const [side, setSide] = useState<Side>("Long");
   const positions = usePoll(() => o.positions(me), [me]) ?? [];
   const orders = usePoll(() => o.orders(me), [me]) ?? [];
+  const ticket = useTicket(market, markets.find((m) => m.id === market)?.max_leverage ?? 100);
 
   const marks: Mark[] = positions
     .filter((p) => p.market_id === market)
@@ -40,41 +52,68 @@ export function Trade() {
     ]);
 
   return (
-    // Phones: one column in the order banner, chart, order form, positions (the left column dissolves via
-    // `contents` and `order` interleaves the form). Desktop: chart and positions left, form right.
-    <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[1fr_340px] lg:items-start">
+    // Phones: one column in the order banner, chart, order form, positions, feed (both columns dissolve via
+    // `contents` and `order` interleaves them), with a trade bar fixed at the bottom. Desktop: chart and
+    // positions left, form and feed right.
+    <div className="flex flex-col gap-4 pb-24 lg:grid lg:grid-cols-[1fr_340px] lg:items-start lg:pb-0">
       <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
         <div className="order-1 empty:hidden">
           <LossBanner />
         </div>
-        <Console
-          market={market}
-          setMarket={setMarket}
-          markets={markets.filter((m) => m.live).map((m) => m.id)}
-          marks={marks}
-        />
+        <Console market={market} setMarket={setMarket} markets={markets.filter((m) => m.live).map((m) => m.id)} marks={marks} />
         <div className="order-4 min-w-0">
           <Positions positions={positions} orders={orders} />
         </div>
       </div>
-      <OrderForm
-        market={market}
-        maxLeverage={markets.find((m) => m.id === market)?.max_leverage ?? 100}
-        side={side}
-        setSide={setSide}
-      />
+      <div className="contents lg:flex lg:flex-col lg:gap-4">
+        <div id="order-form" className="order-3">
+          <OrderForm t={ticket} />
+        </div>
+        <div className="order-5">
+          <ActivityPanel />
+        </div>
+      </div>
+      <TradeBar t={ticket} />
     </div>
   );
+}
+
+type Ticket = ReturnType<typeof useTicket>;
+
+/** The order ticket's state and what it would do, shared by the form and the phone trade bar. */
+function useTicket(market: string, maxLeverage: number) {
+  const { o, tx, run, prices, me } = useOneUp();
+  const [side, setSide] = useState<Side>("Long");
+  const [margin, setMargin] = useState("500");
+  const [leverage, setLeverage] = useState(50);
+  const m = BigInt(Math.floor(Number(margin) || 0)) * USDC;
+  const price = prices[market];
+  const quote = usePoll(() => o.quoteOpen(market, side, m, leverage, price), [market, side, margin, leverage, price?.toString()]);
+  const free = BigInt(usePoll(() => o.balance(me), [me]) ?? "0");
+  const wallet = BigInt(usePoll(() => o.usdcBalance(me), [me]) ?? "0");
+  const pool = BigInt(usePoll(() => o.pool(), []) ?? "0");
+  // short of free balance: top up from the wallet in the same transaction
+  const topUp = m > free ? m - free : 0n;
+  const blocked = !quote?.allowed || m === 0n || topUp > wallet;
+  const label = `${topUp > 0n ? `Deposit $${fmtUsdc(topUp, 0)} & ` : ""}${side} ${market}`;
+  const submit = () =>
+    run(`${side} ${market} ${leverage}× · $${margin}`, () =>
+      topUp > 0n ? tx.depositAndOpen(topUp, market, side, m, leverage) : tx.placeOpen(market, side, m, leverage),
+    );
+  return { market, maxLeverage, side, setSide, margin, setMargin, leverage, setLeverage, m, quote, free, wallet, pool, topUp, blocked, label, submit };
 }
 
 /** The handheld: plastic case, slate surround with stripes, the LCD with its readout, and the market buttons. */
 function Console({ market, setMarket, markets, marks }: { market: string; setMarket: (m: string) => void; markets: string[]; marks: Mark[] }) {
   const { prices, history } = useOneUp();
-  const pts = history[market] ?? [];
+  const [range, setRange] = useState<number>(RANGES[1][1]);
+  const now = useNow();
+  const pts = (history[market] ?? []).filter((p, i, a) => p.t >= now * 1000 - range || i === a.length - 1);
   const change = pts.length > 1 ? (pts[pts.length - 1].p / pts[0].p - 1) * 100 : 0;
   return (
     <div className="case order-2 min-w-0 p-3 sm:p-5">
-      <div className="-mx-1 mb-3 flex gap-1.5 overflow-x-auto px-1 pb-1 pt-0.5" role="group" aria-label="Market">
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
+      <div className="-mx-1 flex min-w-0 flex-1 gap-1.5 overflow-x-auto px-1 pb-1 pt-0.5" role="group" aria-label="Market">
         {markets.map((m) => {
           const h = history[m] ?? [];
           const ch = h.length > 1 ? (h[h.length - 1].p / h[0].p - 1) * 100 : null;
@@ -92,6 +131,14 @@ function Console({ market, setMarket, markets, marks }: { market: string; setMar
             </button>
           );
         })}
+      </div>
+      <div className="flex shrink-0 gap-1 sm:pt-2" role="group" aria-label="Chart range">
+        {RANGES.map(([name, ms]) => (
+          <button key={name} type="button" className="chip num" aria-pressed={range === ms} onClick={() => setRange(ms)}>
+            {name}
+          </button>
+        ))}
+      </div>
       </div>
       <div className="bezel px-3 pb-5 pt-3 sm:px-5">
         <div className="stripes mb-3" aria-hidden />
@@ -117,19 +164,14 @@ function Console({ market, setMarket, markets, marks }: { market: string; setMar
   );
 }
 
-function OrderForm(props: { market: string; maxLeverage: number; side: Side; setSide: (s: Side) => void }) {
-  const { market, maxLeverage, side, setSide } = props;
-  const { o, tx, run, prices, me } = useOneUp();
-  const [margin, setMargin] = useState("500");
-  const [leverage, setLeverage] = useState(50);
-  const m = BigInt(Math.floor(Number(margin) || 0)) * USDC;
-  const price = prices[market];
-  const quote = usePoll(() => o.quoteOpen(market, side, m, leverage, price), [market, side, margin, leverage, price?.toString()]);
-  const free = usePoll(() => o.balance(me), [me]);
-  const short = free !== undefined && BigInt(free) < m;
+function OrderForm({ t }: { t: Ticket }) {
+  const { side, setSide, margin, setMargin, leverage, setLeverage, maxLeverage, m, quote, free, wallet, pool, topUp, blocked } = t;
+  // what a full loss would bring: an Extra Life of at most the loss × today's cap, and up to 20 $1UP per $1
+  const lifeUpTo = owed(m, lifeCapPpm(pool));
+  const oneupUpTo = Number(m / USDC) * Number(ONEUP_PER_USDC);
 
   return (
-    <div className="panel order-3 flex flex-col gap-4 p-4">
+    <div className="panel flex flex-col gap-4 p-4">
       <div className="grid grid-cols-2 gap-3" role="radiogroup" aria-label="Side">
         {(["Long", "Short"] as const).map((s) => (
           <button
@@ -150,11 +192,11 @@ function OrderForm(props: { market: string; maxLeverage: number; side: Side; set
       </div>
 
       <label className="flex flex-col gap-1">
-        <span className="label flex justify-between">
+        <span className="label flex items-center justify-between">
           <span>Margin</span>
-          {free !== undefined && BigInt(free) >= USDC && (
-            <button type="button" className="chip" onClick={() => setMargin(String(Math.floor(Number(BigInt(free) / USDC))))}>
-              Max ${fmtUsdc(BigInt(free), 0)}
+          {free + wallet >= USDC && (
+            <button type="button" className="chip" onClick={() => setMargin(String(Math.floor(Number((free + wallet) / USDC))))}>
+              Max ${fmtUsdc(free + wallet, 0)}
             </button>
           )}
         </span>
@@ -162,12 +204,17 @@ function OrderForm(props: { market: string; maxLeverage: number; side: Side; set
           <input className="input num" value={margin} onChange={(e) => setMargin(e.target.value)} inputMode="decimal" aria-label="Margin" />
           <span className="field-unit">USDC</span>
         </span>
+        <span className="label num">
+          {topUp > 0n
+            ? `$${fmtUsdc(free, 0)} free + $${fmtUsdc(topUp, 0)} from your wallet in the same step`
+            : `$${fmtUsdc(free, 0)} free to trade`}
+        </span>
       </label>
 
       <label className="flex flex-col gap-1">
         <span className="label flex justify-between">
           <span>Leverage</span>
-          <span className="display num text-base text-[var(--text)]">{leverage}×</span>
+          <span className="num text-base font-extrabold text-[var(--text)]">{leverage}×</span>
         </span>
         <input
           type="range"
@@ -200,21 +247,55 @@ function OrderForm(props: { market: string; maxLeverage: number; side: Side; set
         <dd className="num text-right">{quote?.liquidation_price ? fmtPrice(BigInt(quote.liquidation_price)) : "…"}</dd>
       </dl>
 
+      {/* the promise, where the decision is made */}
+      {m > 0n && (
+        <div className="flex gap-3 rounded-lg bg-[color-mix(in_srgb,var(--heart)_8%,transparent)] p-3 text-sm">
+          <PixelHeart size={22} className="mt-0.5 shrink-0" />
+          <p>
+            <b>If it loses</b>, you get an Extra Life that can pay back up to <b className="num">${fmtUsdc(lifeUpTo, 0)}</b>, plus up to{" "}
+            <b className="num">{oneupUpTo.toLocaleString("en-US")} $1UP</b> locked for 2 years. Both are sized from the house&apos;s profit.
+          </p>
+        </div>
+      )}
+
       {quote && !quote.allowed && <p className="text-sm text-[var(--short)]">{quote.reason}</p>}
-      {short && <p className="text-sm text-[var(--short)]">Not enough free balance. Deposit first.</p>}
+      {topUp > wallet && <p className="text-sm text-[var(--short)]">Not enough USDC in your wallet. Get some from the faucet in the Demo menu.</p>}
 
       <button
         className="btn py-3 text-base"
         style={{ "--btn-bg": side === "Long" ? "var(--long-fill)" : "var(--short-fill)", color: "var(--on-fill)" } as React.CSSProperties}
-        disabled={!quote?.allowed || short || m === 0n}
-        onClick={() => run(`${side} ${market} ${leverage}× · $${margin}`, () => tx.placeOpen(market, side, m, leverage))}
+        disabled={blocked}
+        onClick={t.submit}
       >
-        {side} {market}
+        {t.label}
       </button>
-      <p className="label">
-        Fills at the first oracle price after you place the order, so nobody trades on a price they already know. No
-        fees, no funding. Lose and you get an Extra Life.
-      </p>
+      <p className="label">Fills at the first oracle price after you place it, so nobody trades on a price they already know. No fees, no funding.</p>
+    </div>
+  );
+}
+
+/** Phones: the ticket's main action stays in reach while you scroll the chart and positions. */
+function TradeBar({ t }: { t: Ticket }) {
+  return (
+    <div className="fixed inset-x-0 bottom-[60px] z-30 border-t border-[var(--panel-edge)] bg-[var(--panel)] px-4 py-2.5 lg:hidden">
+      <div className="mx-auto flex max-w-[1280px] items-center gap-3">
+        <a href="#order-form" className="num min-w-0 flex-1 text-sm">
+          <span className="block truncate font-extrabold">
+            {t.side} {t.leverage}× · ${t.margin}
+          </span>
+          <span className="label">Edit order</span>
+        </a>
+        <button
+          className="btn shrink-0 px-5 py-2.5"
+          style={{ "--btn-bg": t.side === "Long" ? "var(--long-fill)" : "var(--short-fill)", color: "var(--on-fill)" } as React.CSSProperties}
+          disabled={t.blocked}
+          onClick={t.submit}
+        >
+          <Icon name={t.side === "Long" ? "up" : "down"} />
+          {t.topUp > 0n ? "Deposit & " : ""}
+          {t.side}
+        </button>
+      </div>
     </div>
   );
 }
@@ -232,10 +313,11 @@ function Positions({ positions, orders }: { positions: Position[]; orders: Order
     [positions, prices, now],
   );
 
+  const pending = orders.filter((x) => "Open" in x.kind);
   return (
+    <Section title={`Positions${rows.length ? ` (${rows.length})` : ""}`}>
     <div className="panel p-4">
-      <div className="mb-3 text-lg font-extrabold">Positions</div>
-      {rows.length === 0 && orders.length === 0 && <p className="label">No open positions.</p>}
+      {rows.length === 0 && pending.length === 0 && <p className="label">No open positions. Pick a side and a size to open one.</p>}
       <div className="flex flex-col gap-3 md:hidden">
         {rows.map(({ p, mark, v, hold }) => (
           <div key={p.id} className="num rounded-lg border border-[var(--line)] p-3 text-sm">
@@ -299,13 +381,14 @@ function Positions({ positions, orders }: { positions: Position[]; orders: Order
           </tbody>
         </table>
       )}
-      {orders.filter((x) => "Open" in x.kind).map((x) => (
-        <p key={x.id} className="label mt-2">
-          Order {x.id}: {"Open" in x.kind && `${x.kind.Open.side} ${x.market_id} ${x.kind.Open.leverage}×`}, waiting for the
-          next oracle price…
+      {pending.map((x) => (
+        <p key={x.id} className="mt-2 flex items-center gap-2 text-sm text-[var(--muted)]">
+          <Icon name="spinner" />
+          {"Open" in x.kind && `${x.kind.Open.side} ${x.market_id} ${x.kind.Open.leverage}×`}: filling at the next oracle price
         </p>
       ))}
     </div>
+    </Section>
   );
 }
 

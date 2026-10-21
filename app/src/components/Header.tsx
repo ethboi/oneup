@@ -5,9 +5,10 @@ import { USDC, fmtUsdc, ONEUP } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { Logo, PixelCoin, PixelHeart } from "./Pixel";
 import { Icon } from "./Icon";
+import { Popover } from "./Popover";
 
 export function Header() {
-  const { o, d, me, setMe, accounts, tx, run } = useOneUp();
+  const { o, d, me } = useOneUp();
   const pool = usePoll(() => o.pool(), []);
   const epoch = usePoll(() => o.epoch(), []);
   const free = usePoll(() => o.balance(me), [me]);
@@ -16,31 +17,31 @@ export function Header() {
   const lives = usePoll(() => o.lives(me), [me]);
   const now = useNow();
   const left = epoch ? Math.max(0, epoch.started_at + d.epochLengthS - now) : 0;
-  const [amount, setAmount] = useState("1000");
-  const amt = BigInt(Math.floor(Number(amount) || 0)) * USDC;
-  const [open, setOpen] = useState(false);
   const alive = lives?.filter((l) => !l.expired && !l.full_heal).length;
 
   return (
-    // Phones: brand + Wallet button, the HUD, then the funds controls when opened.
-    // Desktop: brand and controls on one row, the HUD below.
-    <header className="flex flex-col gap-3 py-4 lg:grid lg:grid-cols-[1fr_auto] lg:items-center lg:gap-x-6 lg:gap-y-4 lg:py-5">
-      <div className="flex items-center gap-3 lg:col-start-1 lg:row-start-1">
+    // One row: brand, then three controls (Demo, account, Funds); the HUD below. Same on phones.
+    <header className="flex flex-col gap-3 py-4 lg:py-5">
+      <div className="flex items-center gap-2 sm:gap-3">
         <Logo size={40} />
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <div className="display text-[26px] leading-none">OneUp</div>
-          <div className="label mt-1">Lose a trade, get a life.</div>
+          <div className="label mt-1 hidden sm:block">Lose a trade, get a life.</div>
         </div>
-        <button className="btn btn-ghost lg:hidden" onClick={() => setOpen(!open)} aria-expanded={open}>
-          <Icon name={open ? "x" : "wallet"} />
-          {open ? "Done" : "Wallet"}
-        </button>
+        <DemoMenu />
+        <div className="hidden min-w-0 rounded-[10px] border border-[var(--panel-edge)] bg-[var(--panel)] px-3 py-1.5 text-right sm:block">
+          <div className="truncate text-sm font-extrabold">{me.replace(/\.test\.near$/, "")}</div>
+          <div className="label num">
+            ${wallet ? fmtUsdc(BigInt(wallet), 0) : "…"} USDC · {fmtOneup(oneup)} $1UP
+          </div>
+        </div>
+        <Funds free={free} wallet={wallet} />
       </div>
 
-      <div className="panel grid grid-cols-2 gap-px overflow-hidden bg-[var(--line)] sm:grid-cols-4 lg:col-span-2 lg:row-start-2">
+      <div className="panel grid grid-cols-2 gap-px overflow-hidden bg-[var(--line)] sm:grid-cols-4">
         <Stat label="House pool" value={pool ? `$${fmtUsdc(BigInt(pool), 0)}` : "…"} />
         <Stat label={`Epoch ${epoch?.id ?? "…"} ends in`} value={fmtClock(left)} />
-        <Stat label="Free balance" value={free ? `$${fmtUsdc(BigInt(free))}` : "…"} icon={<PixelCoin size={16} />} />
+        <Stat label="Trading balance" value={free ? `$${fmtUsdc(BigInt(free))}` : "…"} icon={<PixelCoin size={16} />} />
         <Stat
           label="Extra Lives"
           value={alive === undefined ? "…" : `×${alive}`}
@@ -53,37 +54,95 @@ export function Header() {
           }
         />
       </div>
-
-      <div className={`${open ? "grid" : "hidden"} grid-cols-3 gap-2 lg:col-start-2 lg:row-start-1 lg:flex lg:items-center`}>
-        <div className="label col-span-3 num lg:mr-2 lg:text-right">
-          Wallet ${wallet ? fmtUsdc(BigInt(wallet), 0) : "…"} USDC
-          <br className="hidden lg:block" /> and {fmtOneup(oneup)} $1UP
-        </div>
-        <select className="input col-span-3 lg:w-auto" value={me} onChange={(e) => setMe(e.target.value)} aria-label="Account">
-          {accounts.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.id}
-            </option>
-          ))}
-        </select>
-        <span className="field col-span-3 lg:w-36">
-          <input className="input num" value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="USDC amount" inputMode="decimal" />
-          <span className="field-unit">USDC</span>
-        </span>
-        <button className="btn btn-ghost" onClick={() => run(`Faucet ${amount} USDC`, () => tx.faucet(amt))}>
-          <Icon name="faucet" />
-          Faucet
-        </button>
-        <button className="btn btn-accent" disabled={amt === 0n} onClick={() => run(`Deposit ${amount} USDC`, () => tx.deposit(amt))}>
-          <Icon name="deposit" />
-          Deposit
-        </button>
-        <button className="btn btn-ghost" disabled={amt === 0n} onClick={() => run(`Withdraw ${amount} USDC`, () => tx.withdraw(amt))}>
-          <Icon name="withdraw" />
-          Withdraw
-        </button>
-      </div>
     </header>
+  );
+}
+
+/** Localnet tools: act as any demo account, and get test USDC. */
+function DemoMenu() {
+  const { me, setMe, accounts, tx, run } = useOneUp();
+  const [amount, setAmount] = useState("10000");
+  const amt = BigInt(Math.floor(Number(amount) || 0)) * USDC;
+  return (
+    <Popover
+      label="Demo tools"
+      button={
+        <>
+          <Icon name="demo" />
+          <span className="hidden sm:inline">Demo</span>
+        </>
+      }
+    >
+      {(close) => (
+        <div className="flex flex-col gap-3">
+          <div className="label">Local demo: switch accounts and get test USDC.</div>
+          <label className="flex flex-col gap-1">
+            <span className="label">Act as</span>
+            <select className="input" value={me} onChange={(e) => (setMe(e.target.value), close())} aria-label="Account">
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.id}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="flex gap-2">
+            <span className="field flex-1">
+              <input className="input num" value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="Faucet amount" inputMode="decimal" />
+              <span className="field-unit">USDC</span>
+            </span>
+            <button className="btn btn-ghost" disabled={amt === 0n} onClick={() => run(`Faucet ${amount} USDC`, () => tx.faucet(amt))}>
+              <Icon name="faucet" />
+              Faucet
+            </button>
+          </div>
+        </div>
+      )}
+    </Popover>
+  );
+}
+
+/** Move USDC between the wallet and the trading balance. Trades top themselves up, so this is optional. */
+function Funds({ free, wallet }: { free?: string; wallet?: string }) {
+  const { tx, run } = useOneUp();
+  const [amount, setAmount] = useState("1000");
+  const amt = BigInt(Math.floor(Number(amount) || 0)) * USDC;
+  return (
+    <Popover
+      label="Funds"
+      button={
+        <>
+          <Icon name="wallet" />
+          <span className="hidden sm:inline">Funds</span>
+        </>
+      }
+    >
+      {() => (
+        <div className="flex flex-col gap-3">
+          <dl className="num grid grid-cols-2 gap-y-1 text-sm">
+            <dt className="label">Wallet</dt>
+            <dd className="text-right font-bold">${wallet ? fmtUsdc(BigInt(wallet)) : "…"}</dd>
+            <dt className="label">Trading balance</dt>
+            <dd className="text-right font-bold">${free ? fmtUsdc(BigInt(free)) : "…"}</dd>
+          </dl>
+          <span className="field">
+            <input className="input num" value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="USDC amount" inputMode="decimal" />
+            <span className="field-unit">USDC</span>
+          </span>
+          <div className="grid grid-cols-2 gap-2">
+            <button className="btn btn-accent" disabled={amt === 0n} onClick={() => run(`Deposit ${amount} USDC`, () => tx.deposit(amt))}>
+              <Icon name="deposit" />
+              Deposit
+            </button>
+            <button className="btn btn-ghost" disabled={amt === 0n} onClick={() => run(`Withdraw ${amount} USDC`, () => tx.withdraw(amt))}>
+              <Icon name="withdraw" />
+              Withdraw
+            </button>
+          </div>
+          <p className="label">Optional: placing a trade moves what it needs from your wallet in the same step.</p>
+        </div>
+      )}
+    </Popover>
   );
 }
 

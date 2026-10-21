@@ -35,7 +35,7 @@ buyer  ──ft_transfer_call──▶ usdc ──▶ market ──▶ life|ve.n
 
 | Method | Caller | Does |
 |---|---|---|
-| `ft_on_transfer(sender_id, amount, msg)` | USDC contract | `msg = ""` credits the sender's free balance; `{"seed":{}}` (owner) adds to pool and mints the seed Extra Life |
+| `ft_on_transfer(sender_id, amount, msg)` | USDC contract | `msg = ""` credits the sender's free balance; `{"open":{market_id, side, margin, leverage}}` credits it and places an open in the same step (a refused open refunds the whole transfer); `{"seed":{}}` (owner) adds to pool and mints the seed Extra Life |
 | `withdraw(amount)` | trader | sends free balance; refunds on failed transfer |
 | `place_open(market_id, side, margin, leverage) → order_id` | trader | moves margin from free balance into the order; pre-checks solvency and capacity with the order counted |
 | `place_close(position_id) → order_id` | owner | only after the 60 s minimum hold |
@@ -106,6 +106,8 @@ account, 50M to the treasury. No mint function after that, so the supply is fixe
 | `ft_on_transfer` from $1UP, sender `house`, `{"buyback":{"epoch":e}}` | `house` | rewards for epoch `e`'s lockers |
 | `checkpoint(epoch)` | `house` | fixes the total weight for `epoch` |
 | `claim(token_id, epochs)` | lock owner | the lock's share of each finished epoch's rewards |
+| `claim_many(token_ids, epochs)` | lock owner | the same for up to 30 locks, in one transfer |
+| `merge(token_ids) → token_id` | lock owner | 2 to 30 running locks into one new lock: amounts add up, it ends at the latest end and counts from the next epoch; the old locks earn through the current epoch, claimed through the new one (D-18) |
 | `exit_early(token_id) → penalty` | lock owner | returns the lock less the penalty (maths §9); the penalty goes to the next epoch's lockers |
 | `unlock(token_id)` | lock owner | after the lock ends |
 

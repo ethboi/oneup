@@ -97,6 +97,19 @@ export function PriceChart({ points, marks = [] }: { points: { t: number; p: num
         onPointerLeave={() => setHover(null)}
         onPointerCancel={() => setHover(null)}
       >
+        {/* a faint price grid: four levels across the range */}
+        {[0.2, 0.4, 0.6, 0.8].map((f) => {
+          const v = lo + (hi - lo) * f;
+          return (
+            <g key={f}>
+              <line x1={PAD.l} x2={W - PAD.r} y1={y(v)} y2={y(v)} stroke="var(--lcd-2)" strokeWidth="1" opacity="0.6" />
+              {/* on the left, so they never collide with the price and the entry/liq labels on the right */}
+              <text x={PAD.l + 4} y={y(v) - 4} fontSize="10" fill="var(--lcd-3)" className="num">
+                {v.toFixed(digits)}
+              </text>
+            </g>
+          );
+        })}
         <path d={`${line} L${x(t1)} ${H - PAD.b} L${x(t0)} ${H - PAD.b} Z`} fill="var(--lcd-2)" opacity="0.45" />
         <path d={line} fill="none" stroke="var(--lcd-ink)" strokeWidth="2.5" strokeLinejoin="round" />
         {marks.map((m) => (

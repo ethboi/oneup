@@ -116,6 +116,8 @@ export interface LockInfo {
   exit_penalty: U128;
   exited: number | null;
   withdrawn: boolean;
+  /** How many locks were merged into this one. */
+  merged: number;
 }
 
 export interface EpochEmissions {
@@ -243,6 +245,9 @@ export class OneUp {
     return {
       faucet: (amount: bigint) => send<void>({ contractId: c.usdc, methodName: "faucet", args: { amount: amount.toString() } }),
       deposit: (amount: bigint) => ftCall(c.usdc, c.house, amount, ""),
+      /** Deposits `amount` from the wallet and places an open for `margin` in one transaction. */
+      depositAndOpen: (amount: bigint, market_id: string, side: Side, margin: bigint, leverage: number) =>
+        ftCall(c.usdc, c.house, amount, JSON.stringify({ open: { market_id, side, margin: margin.toString(), leverage } })),
       withdraw: (amount: bigint) =>
         send<boolean>({ contractId: c.house, methodName: "withdraw", args: { amount: amount.toString() }, deposit: ONE_YOCTO }),
       placeOpen: (market_id: string, side: Side, margin: bigint, leverage: number) =>
@@ -257,6 +262,9 @@ export class OneUp {
       claimLives: (token_ids: string[]) => send<void>({ contractId: c.life, methodName: "claim", args: { token_ids } }),
       lock: (amount: bigint, epochs: number) => ftCall(c.oneup, c.ve, amount, JSON.stringify({ lock: { epochs } })),
       claimVe: (token_id: string, epochs: number[]) => send<void>({ contractId: c.ve, methodName: "claim", args: { token_id, epochs } }),
+      claimVeMany: (token_ids: string[], epochs: number[]) =>
+        send<void>({ contractId: c.ve, methodName: "claim_many", args: { token_ids, epochs }, gas: MAX_GAS }),
+      mergeLocks: (token_ids: string[]) => send<string>({ contractId: c.ve, methodName: "merge", args: { token_ids }, gas: MAX_GAS }),
       unlock: (token_id: string) => send<void>({ contractId: c.ve, methodName: "unlock", args: { token_id } }),
       exitEarly: (token_id: string) => send<U128>({ contractId: c.ve, methodName: "exit_early", args: { token_id } }),
       /** Lists an Extra Life or a lock: `nft` is the life or ve contract, `price` in USDC units (1e6). */

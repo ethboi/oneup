@@ -21,6 +21,10 @@ const PATHS = {
   store: "M4 9.5L5.5 4h13L20 9.5M4 9.5V20h16V9.5M4 9.5h16M9.5 20v-5.5h5V20",
   shield: "M12 3l8 3v6c0 4.4-3.4 8-8 9-4.6-1-8-4.6-8-9V6zM9 12l2 2 4-4",
   scale: "M12 4v16M6 20h12M4.5 8h15M7 8l-3 6.5a3 3 0 0 0 6 0zM17 8l-3 6.5a3 3 0 0 0 6 0z",
+  more: "M5 12h.01M12 12h.01M19 12h.01",
+  merge: "M6 4v5a5 5 0 0 0 5 5h7M6 20v-5M15 11l3 3-3 3",
+  info: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01",
+  demo: "M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.7 3h10.6a2 2 0 0 0 1.7-3l-5-9V3M7.5 14h9",
 } as const;
 
 export type IconName = keyof typeof PATHS | "spinner";
