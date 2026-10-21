@@ -24,7 +24,7 @@ import { fmtClock, useNow } from "./Header";
 import { PixelHeart } from "./Pixel";
 import { Icon } from "./Icon";
 import { Popover } from "./Popover";
-import { Burst, HpHearts, MoodGlow, useCloseFx, useMood, useTensionSound } from "./Mood";
+import { Burst, HpBar, MoodGlow, useCloseFx, useMood, useTensionSound } from "./Mood";
 import { ActivityList, useActivity } from "./Activity";
 import { HistoryList } from "./History";
 import { ShareButton, type CardData } from "./PnlCard";
@@ -227,7 +227,7 @@ function Console({
           {fx && <Burst fx={fx} />}
           {mood.state !== "none" && (
             <div className="pointer-events-none absolute right-3 top-2.5">
-              <HpHearts health={mood.health} />
+              <HpBar health={mood.health} />
             </div>
           )}
           {/* the readout is printed on the screen, in LCD ink */}

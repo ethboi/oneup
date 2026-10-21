@@ -1,6 +1,6 @@
 "use client";
 
-// The console's mood: your margin as health. Hearts on the screen drain toward liquidation; near it the
+// The console's mood: your margin as health. An HP bar on the screen drains toward liquidation; near it the
 // screen pulses red with a heartbeat that quickens (and a low-HP beep at the end). Near a take-profit (or the
 // 9× cap) it glows and a shimmer climbs. A win bursts coins; a liquidation shakes the case. Sound follows
 // the mute button; motion follows reduced-motion.
@@ -78,14 +78,19 @@ export function useTensionSound(mood: Mood) {
   }, [active]);
 }
 
-/** Five hearts for your health, drawn on the screen. */
-export function HpHearts({ health }: { health: number }) {
-  const hp = health * 5;
+/** Your health as an HP bar printed on the screen: segments in LCD ink, red once in danger. Hearts stay for
+ *  Extra Lives, so the two never read as the same thing. */
+export function HpBar({ health }: { health: number }) {
+  const lit = Math.ceil(Math.max(0, Math.min(1, health)) * 10);
+  const danger = health < DANGER;
   return (
-    <span className="flex gap-0.5" role="img" aria-label={`Health ${Math.round(health * 100)}%`}>
-      {[0, 1, 2, 3, 4].map((i) => (
-        <PixelHeart key={i} size={16} fill={Math.min(1, Math.max(0, hp - i))} />
-      ))}
+    <span className="flex items-center gap-1.5" role="meter" aria-label="Health: margin left before liquidation" aria-valuenow={Math.round(health * 100)} aria-valuemin={0} aria-valuemax={100}>
+      <span className="display text-sm text-[var(--lcd-ink)]">HP</span>
+      <span className="flex gap-[2px] rounded-[3px] border-2 border-[var(--lcd-ink)] p-[2px]">
+        {Array.from({ length: 10 }, (_, i) => (
+          <span key={i} className="h-2.5 w-2" style={{ background: i < lit ? (danger ? "#c43636" : "var(--lcd-ink)") : "transparent" }} />
+        ))}
+      </span>
     </span>
   );
 }
