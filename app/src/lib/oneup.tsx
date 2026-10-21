@@ -4,6 +4,7 @@
 // and a `run` helper that shows each transaction's progress.
 
 import { Account, type KeyPairString } from "near-api-js";
+import { sfx } from "./sound";
 import { OneUp, accountSender, normalizePrice, type Deployment } from "@oneup/sdk";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
@@ -88,6 +89,7 @@ function Loaded({ d, children }: { d: Deployment; children: ReactNode }) {
   const nextId = useRef(1);
   const run = useCallback(async (label: string, f: () => Promise<unknown>) => {
     const id = nextId.current++;
+    sfx("send");
     setToasts((t) => [...t, { id, text: label, kind: "pending" }]);
     const done = (kind: Toast["kind"], text: string) => {
       setToasts((t) => t.map((x) => (x.id === id ? { ...x, kind, text } : x)));
@@ -95,10 +97,12 @@ function Loaded({ d, children }: { d: Deployment; children: ReactNode }) {
     };
     try {
       await f();
+      if (/^Claim/.test(label)) sfx("claim");
       done("ok", label);
       setVersion((v) => v + 1);
       return true;
     } catch (e) {
+      sfx("error");
       done("error", `${label}: ${cleanError(e)}`);
       return false;
     }

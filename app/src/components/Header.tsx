@@ -6,6 +6,7 @@ import { useOneUp, usePoll } from "@/lib/oneup";
 import { Logo, PixelCoin } from "./Pixel";
 import { Icon } from "./Icon";
 import { Popover } from "./Popover";
+import { MuteButton } from "./Sounds";
 
 export interface NavTab {
   name: string;
@@ -48,6 +49,7 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
           <dd className="font-extrabold leading-tight">{fmtClock(left)}</dd>
         </div>
       </dl>
+      <MuteButton />
       <DemoMenu />
       <AccountMenu />
     </header>
