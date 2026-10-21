@@ -2637,6 +2637,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "oneup-market"
+version = "0.1.0"
+dependencies = [
+ "near-contract-standards",
+ "near-sdk",
+]
+
+[[package]]
 name = "oneup-math"
 version = "0.1.0"
 dependencies = [

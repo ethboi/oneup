@@ -1,8 +1,10 @@
-//! ve1UP: lock $1UP as a veNFT, vote each epoch on which markets get the house's capacity and emissions,
-//! and earn that market's buybacks and bribes (spec "ve1UP"; maths §7, §9).
+//! ve1UP: lock $1UP for 1 to 104 epochs as a transferable NFT and earn the house's $1UP buybacks, shared
+//! each epoch by lock weight (amount × epochs left ÷ 104). Leaving early costs up to half the lock, in
+//! proportion to the time left, and the penalty goes to the lockers who stay. Losers' $1UP arrives here as
+//! 104-epoch locks (decisions D-15, D-16; maths §9).
 //!
-//! Epochs follow the house: at each epoch start the house calls `checkpoint(e)`, which fixes the votes for
-//! `e` and sends the shares back. Votes cast during epoch `k` count from `k + 1`.
+//! Epochs follow the house: at each epoch start the house calls `checkpoint(e)`, which fixes the total
+//! weight for `e`. A lock counts from the epoch after it's made.
 
 use near_contract_standards::non_fungible_token::approval::NonFungibleTokenApproval;
 use near_contract_standards::non_fungible_token::core::{NonFungibleTokenCore, NonFungibleTokenResolver};
@@ -19,48 +21,28 @@ use near_sdk::{
     PromiseError, PromiseOrValue,
 };
 use oneup_math as math;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
 pub mod tally;
-use tally::{power, Alloc, Tally};
+use tally::{power, Tally};
 
-const MAX_MARKETS_PER_VOTE: usize = 10;
-const LISTING_BOND: u128 = 500 * math::USDC;
-const LISTING_SHARE_PPM: u128 = 20_000;
-const LISTING_MAX_IDLE_EPOCHS: u32 = 4;
-const LISTING_MAX_LEVERAGE: u32 = 100;
-const GAS_ADD_MARKET: Gas = Gas::from_tgas(15);
 const GAS_FT_TRANSFER: Gas = Gas::from_tgas(15);
 const GAS_CALLBACK: Gas = Gas::from_tgas(10);
-const GAS_SET_SHARES: Gas = Gas::from_tgas(30);
+/// Locks the house can create in one `lock_for` transfer.
+const MAX_LOCKS_PER_TRANSFER: usize = 30;
 
 #[near(serializers = [borsh])]
 #[derive(Clone, Debug)]
 pub struct Lock {
     pub amount: u128,
     pub created: u64,
-    /// First epoch with zero power.
+    /// First epoch with zero weight.
     pub end: u64,
-    /// (first epoch it counts for, allocation in ppm)
-    pub votes: Vec<(u64, Alloc)>,
+    /// Made by the house from a loss (D-16) rather than locked by hand.
+    pub from_loss: bool,
+    /// Left early in this epoch: earns for epochs up to and including it.
+    pub exited: Option<u64>,
     pub withdrawn: bool,
-}
-
-impl Lock {
-    fn alloc_at(&self, e: u64) -> Option<&Alloc> {
-        self.votes.iter().rev().find(|(from, _)| *from <= e).map(|(_, a)| a)
-    }
-}
-
-#[near(serializers = [json, borsh])]
-#[derive(Clone, Debug)]
-pub struct Proposal {
-    pub market_id: String,
-    pub feed_id: String,
-    pub proposer: AccountId,
-    pub created: u64,
-    /// Checkpoints in a row with no votes.
-    pub idle: u32,
 }
 
 #[near(serializers = [json])]
@@ -70,9 +52,12 @@ pub struct LockInfo {
     pub amount: U128,
     pub created: u64,
     pub end: u64,
-    /// Power for the next epoch, when current votes count.
+    pub from_loss: bool,
+    /// Weight for the next epoch.
     pub power: U128,
-    pub votes: Vec<(String, U128)>,
+    /// What leaving now would cost (0 once the lock has ended).
+    pub exit_penalty: U128,
+    pub exited: Option<u64>,
     pub withdrawn: bool,
 }
 
@@ -80,9 +65,10 @@ pub struct LockInfo {
 #[serde(rename_all = "snake_case")]
 enum TransferMsg {
     Lock { epochs: u64 },
-    Bribe { market_id: String },
-    Buyback { epoch: u64, per_market: Vec<(String, U128)> },
-    Propose { market_id: String, feed_id: String },
+    /// House only: one max-length lock per loser.
+    LockFor { items: Vec<(AccountId, U128)> },
+    /// House only: an epoch's buyback, for that epoch's lockers.
+    Buyback { epoch: u64 },
 }
 
 #[derive(BorshStorageKey)]
@@ -105,42 +91,32 @@ trait FungibleToken {
     fn ft_transfer(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>);
 }
 
-#[allow(dead_code)]
-#[ext_contract(ext_house)]
-trait House {
-    fn set_vote_shares(&mut self, epoch: u64, shares: Vec<(String, U128)>);
-    fn add_market(&mut self, market_id: String, feed_id: String, max_leverage: u32);
-}
-
 #[near(contract_state)]
 #[derive(PanicOnDefault)]
 pub struct Ve {
     owner: AccountId,
     house: AccountId,
     oneup: AccountId,
-    usdc: AccountId,
-    treasury: AccountId,
-    proposals: Vec<Proposal>,
     /// The house's current epoch, as of its last checkpoint.
     epoch: u64,
     tally: Tally,
     tokens: NonFungibleToken,
     locks: LookupMap<TokenId, Lock>,
     next_lock: u64,
-    /// Votes per market fixed at each epoch's checkpoint.
-    totals: LookupMap<u64, Vec<(String, U128)>>,
-    /// (epoch, market) → reward token → amount, for that epoch's voters of that market.
-    rewards: LookupMap<(u64, String), BTreeMap<AccountId, u128>>,
-    /// (lock, epoch) → reward token → amount already claimed.
-    claimed: LookupMap<(TokenId, u64), BTreeMap<AccountId, u128>>,
-    /// (account, reward token) → amount owed after a failed transfer.
-    owed: LookupMap<(AccountId, AccountId), u128>,
+    /// Total weight fixed at each epoch's checkpoint.
+    totals: LookupMap<u64, u128>,
+    /// $1UP for each epoch's lockers: buybacks, and penalties from early exits.
+    rewards: LookupMap<u64, u128>,
+    /// (lock, epoch) → $1UP already claimed.
+    claimed: LookupMap<(TokenId, u64), u128>,
+    /// $1UP owed after a failed transfer.
+    owed: LookupMap<AccountId, u128>,
 }
 
 #[near]
 impl Ve {
     #[init]
-    pub fn new(owner: AccountId, house: AccountId, oneup: AccountId, usdc: AccountId, treasury: AccountId) -> Self {
+    pub fn new(owner: AccountId, house: AccountId, oneup: AccountId) -> Self {
         Self {
             tokens: NonFungibleToken::new(
                 StorageKey::OwnerById,
@@ -152,9 +128,6 @@ impl Ve {
             owner,
             house,
             oneup,
-            usdc,
-            treasury,
-            proposals: vec![],
             epoch: 1,
             tally: Tally { processed: 1, ..Default::default() },
             locks: LookupMap::new(StorageKey::Locks),
@@ -166,134 +139,110 @@ impl Ve {
         }
     }
 
-    /// Token deposits: `{"lock":{"epochs":n}}` ($1UP) mints a veNFT; `{"bribe":{"market_id"}}` (any token)
-    /// rewards next epoch's voters of that market; `{"buyback":{…}}` ($1UP from the house) rewards an
-    /// epoch's voters by market.
+    /// $1UP deposits: `{"lock":{"epochs":n}}` mints a lock NFT for the sender; from the house,
+    /// `{"lock_for":{"items":[[owner, amount], …]}}` mints max-length locks for losers and
+    /// `{"buyback":{"epoch":e}}` rewards epoch `e`'s lockers.
     pub fn ft_on_transfer(&mut self, sender_id: AccountId, amount: U128, msg: String) -> PromiseOrValue<U128> {
-        let token = env::predecessor_account_id();
+        require!(env::predecessor_account_id() == self.oneup, "Only $1UP");
         let msg: TransferMsg = near_sdk::serde_json::from_str(&msg).unwrap_or_else(|_| env::panic_str("Bad message"));
         match msg {
             TransferMsg::Lock { epochs } => {
-                require!(token == self.oneup, "Only $1UP can be locked");
-                require!((1..=math::VE_MAX_EPOCHS).contains(&epochs), "Lock 1 to 52 epochs");
-                self.mint_lock(sender_id, amount.0, epochs);
+                require!((1..=math::VE_MAX_EPOCHS).contains(&epochs), "Lock 1 to 104 epochs");
+                self.mint_lock(sender_id, amount.0, epochs, false);
             }
-            TransferMsg::Bribe { market_id } => {
-                require!(amount.0 > 0, "Empty bribe");
-                self.add_reward(self.epoch + 1, market_id, token, amount.0);
-            }
-            TransferMsg::Buyback { epoch, per_market } => {
-                require!(token == self.oneup && sender_id == self.house, "Only house buybacks");
-                let sum: u128 = per_market.iter().map(|(_, a)| a.0).sum();
-                require!(sum == amount.0, "Buyback split doesn't add up");
-                for (m, a) in per_market {
-                    self.add_reward(epoch, m, token.clone(), a.0);
+            TransferMsg::LockFor { items } => {
+                require!(sender_id == self.house, "Only the house");
+                require!(items.len() <= MAX_LOCKS_PER_TRANSFER, "Too many locks in one transfer");
+                require!(items.iter().map(|(_, a)| a.0).sum::<u128>() == amount.0, "Locks don't add up");
+                for (owner, a) in items {
+                    self.mint_lock(owner, a.0, math::VE_MAX_EPOCHS, true);
                 }
             }
-            TransferMsg::Propose { market_id, feed_id } => {
-                require!(token == self.usdc && amount.0 == LISTING_BOND, "The bond is 500 USDC");
-                require!(!market_id.is_empty() && market_id.len() <= 32, "Bad market id");
-                require!(!self.proposals.iter().any(|p| p.market_id == market_id), "Already proposed");
-                self.proposals.push(Proposal { market_id, feed_id, proposer: sender_id, created: self.epoch, idle: 0 });
+            TransferMsg::Buyback { epoch } => {
+                require!(sender_id == self.house, "Only the house");
+                // an epoch nobody was locked for passes its buyback to the next open epoch
+                let e = if self.totals.get(&epoch).copied().unwrap_or(0) > 0 { epoch } else { self.epoch + 1 };
+                self.add_reward(e, amount.0);
             }
         }
         PromiseOrValue::Value(U128(0))
     }
 
-    /// Spread a lock's votes across markets (ppm, summing to 100%). Counts from the next epoch and stays
-    /// until changed.
-    pub fn vote(&mut self, token_id: TokenId, allocations: Vec<(String, U128)>) {
-        self.assert_lock_owner(&token_id);
-        let next = self.epoch + 1;
-        let mut lock = self.locks.get(&token_id).unwrap().clone();
-        require!(lock.end > next, "Lock has ended");
-        require!(!allocations.is_empty() && allocations.len() <= MAX_MARKETS_PER_VOTE, "Vote for 1 to 10 markets");
-        let mut alloc: Alloc = vec![];
-        for (m, a) in allocations {
-            require!(a.0 > 0, "Zero allocation");
-            require!(!alloc.iter().any(|(x, _)| *x == m), "Market listed twice");
-            alloc.push((m, a.0));
-        }
-        require!(alloc.iter().map(|(_, a)| a).sum::<u128>() == math::PPM, "Allocations must sum to 1000000");
-
-        if let Some(old) = lock.alloc_at(u64::MAX).cloned() {
-            self.tally.remove(lock.amount, lock.end, &old);
-        }
-        self.tally.add(lock.amount, lock.end, &alloc);
-        match lock.votes.last_mut() {
-            Some((from, a)) if *from == next => *a = alloc,
-            _ => lock.votes.push((next, alloc)),
-        }
-        self.locks.insert(token_id, lock);
-    }
-
-    /// House only, at each epoch start: fixes votes for `epoch` and sends the shares back.
+    /// House only, at each epoch start: fixes the total weight for `epoch`.
     pub fn checkpoint(&mut self, epoch: u64) {
         require!(env::predecessor_account_id() == self.house, "Only the house");
         require!(epoch > self.epoch, "Epoch already checkpointed");
-        let votes = self.tally.checkpoint(epoch);
-        self.epoch = epoch;
-        let total: u128 = votes.iter().map(|(_, v)| v).sum();
-        let shares: Vec<(String, U128)> = if total == 0 {
-            vec![]
-        } else {
-            votes.iter().map(|(m, v)| (m.clone(), U128(v * math::PPM / total))).collect()
-        };
-        // Listings first, so the house knows a new market before its share arrives.
-        let listed = self.settle_proposals(&votes, total);
-        self.totals.insert(epoch, votes.into_iter().map(|(m, v)| (m, U128(v))).collect());
-        let set = ext_house::ext(self.house.clone()).with_static_gas(GAS_SET_SHARES);
-        match listed {
-            Some(adds) => adds.then(set.set_vote_shares(epoch, shares)).detach(),
-            None => set.set_vote_shares(epoch, shares).detach(),
+        let total = self.tally.checkpoint(epoch);
+        self.totals.insert(epoch, total);
+        // rewards waiting for an epoch nobody is locked for move on to the next one
+        if total == 0 {
+            if let Some(r) = self.rewards.remove(&epoch) {
+                self.add_reward(epoch + 1, r);
+            }
         }
+        self.epoch = epoch;
     }
 
-    /// Pays a lock's buybacks and bribes for finished epochs. Late rewards can be claimed later.
+    /// Pays a lock's rewards for finished epochs. Rewards that arrive late can be claimed later.
     pub fn claim(&mut self, token_id: TokenId, epochs: Vec<u64>) {
         let account = self.assert_lock_owner(&token_id);
         let lock = self.locks.get(&token_id).unwrap().clone();
-        let mut pay: BTreeMap<AccountId, u128> = BTreeMap::new();
+        let mut pay = 0;
         for e in epochs {
             require!(e < self.epoch, "Epoch not finished");
             let due = self.entitled(&lock, e);
             let key = (token_id.clone(), e);
-            let mut claimed = self.claimed.get(&key).cloned().unwrap_or_default();
-            for (t, amount) in due {
-                let c = claimed.entry(t.clone()).or_default();
-                if amount > *c {
-                    *pay.entry(t).or_default() += amount - *c;
-                    *c = amount;
-                }
+            let claimed = self.claimed.get(&key).copied().unwrap_or(0);
+            if due > claimed {
+                pay += due - claimed;
+                self.claimed.insert(key, due);
             }
-            self.claimed.insert(key, claimed);
         }
-        for (t, amount) in pay.iter_mut() {
-            *amount += self.owed.remove(&(account.clone(), t.clone())).unwrap_or(0);
-        }
-        require!(!pay.is_empty(), "Nothing to claim");
-        for (t, amount) in pay {
-            self.send(t, account.clone(), amount);
-        }
+        pay += self.owed.remove(&account).unwrap_or(0);
+        require!(pay > 0, "Nothing to claim");
+        self.send(account, pay);
     }
 
-    /// Returns the locked $1UP once the lock has ended. The veNFT stays (it can still claim past epochs).
+    /// Returns the locked $1UP once the lock has ended. The NFT stays (it can still claim past epochs).
     pub fn unlock(&mut self, token_id: TokenId) {
         let account = self.assert_lock_owner(&token_id);
+        let epoch = self.epoch;
         let lock = self.locks.get_mut(&token_id).unwrap();
-        require!(self.epoch >= lock.end, "Lock still running");
+        require!(epoch >= lock.end, "Lock still running");
         require!(!lock.withdrawn, "Already unlocked");
         lock.withdrawn = true;
         let amount = lock.amount;
-        self.send(self.oneup.clone(), account, amount);
+        self.send(account, amount);
+    }
+
+    /// Leaves a running lock now, paying `exit_penalty` (up to half, by time left) to the lockers who stay.
+    /// The lock still earns for the current epoch and before.
+    pub fn exit_early(&mut self, token_id: TokenId) -> U128 {
+        let account = self.assert_lock_owner(&token_id);
+        let epoch = self.epoch;
+        let mut lock = self.locks.get(&token_id).unwrap().clone();
+        require!(!lock.withdrawn, "Already unlocked");
+        require!(epoch < lock.end, "Lock has ended: unlock it instead");
+        let penalty = math::exit_penalty(lock.amount, lock.end - epoch - 1);
+        self.tally.remove(lock.amount, lock.end);
+        lock.exited = Some(epoch);
+        lock.withdrawn = true;
+        let amount = lock.amount;
+        self.locks.insert(token_id, lock);
+        if penalty > 0 {
+            self.add_reward(epoch + 1, penalty);
+        }
+        if amount > penalty {
+            self.send(account, amount - penalty);
+        }
+        U128(penalty)
     }
 
     #[private]
-    pub fn on_send(&mut self, token: AccountId, account_id: AccountId, amount: U128, #[callback_result] r: Result<(), PromiseError>) -> bool {
+    pub fn on_send(&mut self, account_id: AccountId, amount: U128, #[callback_result] r: Result<(), PromiseError>) -> bool {
         if r.is_err() {
-            let key = (account_id, token);
-            let o = self.owed.get(&key).copied().unwrap_or(0);
-            self.owed.insert(key, o + amount.0);
+            let o = self.owed.get(&account_id).copied().unwrap_or(0);
+            self.owed.insert(account_id, o + amount.0);
             return false;
         }
         true
@@ -319,35 +268,28 @@ impl Ve {
             .collect()
     }
 
-    /// Votes per market fixed for `epoch`.
-    pub fn get_votes(&self, epoch: u64) -> Vec<(String, U128)> {
-        self.totals.get(&epoch).cloned().unwrap_or_default()
+    /// Total weight fixed for `epoch`.
+    pub fn get_total_power(&self, epoch: u64) -> U128 {
+        U128(self.totals.get(&epoch).copied().unwrap_or(0))
     }
 
-    /// Votes per market as they stand for the next epoch.
-    pub fn get_pending_votes(&self) -> Vec<(String, U128)> {
-        let mut t = self.tally.clone();
-        t.checkpoint(self.epoch + 1).into_iter().map(|(m, v)| (m, U128(v))).collect()
+    /// Total weight as it stands for the next epoch.
+    pub fn get_pending_power(&self) -> U128 {
+        U128(self.tally.clone().checkpoint(self.epoch + 1))
     }
 
-    pub fn get_proposals(&self) -> Vec<Proposal> {
-        self.proposals.clone()
+    pub fn get_rewards(&self, epoch: u64) -> U128 {
+        U128(self.rewards.get(&epoch).copied().unwrap_or(0))
     }
 
-    pub fn get_rewards(&self, epoch: u64, market_id: String) -> Vec<(AccountId, U128)> {
-        self.rewards.get(&(epoch, market_id)).map(|r| r.iter().map(|(t, a)| (t.clone(), U128(*a))).collect()).unwrap_or_default()
-    }
-
-    pub fn get_claimable(&self, token_id: TokenId, epochs: Vec<u64>) -> Vec<(AccountId, U128)> {
-        let Some(lock) = self.locks.get(&token_id) else { return vec![] };
-        let mut out: BTreeMap<AccountId, u128> = BTreeMap::new();
-        for e in epochs.into_iter().filter(|e| *e < self.epoch) {
-            let claimed = self.claimed.get(&(token_id.clone(), e)).cloned().unwrap_or_default();
-            for (t, amount) in self.entitled(lock, e) {
-                *out.entry(t.clone()).or_default() += amount.saturating_sub(claimed.get(&t).copied().unwrap_or(0));
-            }
-        }
-        out.into_iter().filter(|(_, a)| *a > 0).map(|(t, a)| (t, U128(a))).collect()
+    pub fn get_claimable(&self, token_id: TokenId, epochs: Vec<u64>) -> U128 {
+        let Some(lock) = self.locks.get(&token_id) else { return U128(0) };
+        let total = epochs
+            .into_iter()
+            .filter(|e| *e < self.epoch)
+            .map(|e| self.entitled(lock, e).saturating_sub(self.claimed.get(&(token_id.clone(), e)).copied().unwrap_or(0)))
+            .sum();
+        U128(total)
     }
 }
 
@@ -358,12 +300,13 @@ impl Ve {
         account
     }
 
-    fn mint_lock(&mut self, owner: AccountId, amount: u128, epochs: u64) {
+    fn mint_lock(&mut self, owner: AccountId, amount: u128, epochs: u64, from_loss: bool) {
         require!(amount > 0, "Nothing to lock");
         let id = self.next_lock.to_string();
         self.next_lock += 1;
         let end = self.epoch + 1 + epochs;
-        self.locks.insert(id.clone(), Lock { amount, created: self.epoch, end, votes: vec![], withdrawn: false });
+        self.tally.add(amount, end);
+        self.locks.insert(id.clone(), Lock { amount, created: self.epoch, end, from_loss, exited: None, withdrawn: false });
         let metadata = TokenMetadata {
             title: Some(format!("ve1UP #{id}")),
             description: Some(format!("{} $1UP locked until epoch {end}", amount / math::ONEUP)),
@@ -374,81 +317,48 @@ impl Ve {
         NftMint { owner_id: &owner, token_ids: &[&id], memo: None }.emit();
     }
 
-    /// Lists proposals with ≥ 2% of votes (bond back) and drops ones idle for 4 checkpoints (bond to the
-    /// treasury). Returns the house calls for the listings.
-    fn settle_proposals(&mut self, votes: &[(String, u128)], total: u128) -> Option<Promise> {
-        let mut adds: Option<Promise> = None;
-        let mut keep = vec![];
-        for mut p in std::mem::take(&mut self.proposals) {
-            let v = votes.iter().find(|(m, _)| *m == p.market_id).map(|(_, v)| *v).unwrap_or(0);
-            if total > 0 && v * math::PPM / total >= LISTING_SHARE_PPM {
-                let add = ext_house::ext(self.house.clone())
-                    .with_static_gas(GAS_ADD_MARKET)
-                    .add_market(p.market_id.clone(), p.feed_id.clone(), LISTING_MAX_LEVERAGE);
-                adds = Some(match adds {
-                    Some(a) => a.and(add),
-                    None => add,
-                });
-                self.send(self.usdc.clone(), p.proposer.clone(), LISTING_BOND);
-            } else if v == 0 && p.idle + 1 >= LISTING_MAX_IDLE_EPOCHS {
-                self.send(self.usdc.clone(), self.treasury.clone(), LISTING_BOND);
-            } else {
-                p.idle = if v == 0 { p.idle + 1 } else { 0 };
-                keep.push(p);
-            }
-        }
-        self.proposals = keep;
-        adds
+    fn add_reward(&mut self, epoch: u64, amount: u128) {
+        let r = self.rewards.get(&epoch).copied().unwrap_or(0);
+        self.rewards.insert(epoch, r + amount);
     }
 
-    fn add_reward(&mut self, epoch: u64, market_id: String, token: AccountId, amount: u128) {
-        let key = (epoch, market_id);
-        let mut r = self.rewards.get(&key).cloned().unwrap_or_default();
-        *r.entry(token).or_default() += amount;
-        self.rewards.insert(key, r);
-    }
-
-    /// Everything a lock has earned for epoch `e`, by reward token.
-    fn entitled(&self, lock: &Lock, e: u64) -> BTreeMap<AccountId, u128> {
-        let mut out = BTreeMap::new();
-        let (Some(alloc), Some(totals)) = (lock.alloc_at(e), self.totals.get(&e)) else { return out };
-        for (m, a) in alloc {
-            let Some((_, total)) = totals.iter().find(|(x, _)| x == m) else { continue };
-            let p = power(lock.amount, *a, lock.end, e);
-            if let Some(r) = self.rewards.get(&(e, m.clone())) {
-                for (t, amount) in r {
-                    *out.entry(t.clone()).or_default() += math::pro_rata(*amount, p, total.0);
-                }
-            }
+    /// What a lock has earned for epoch `e`: its share of the epoch's rewards by weight.
+    fn entitled(&self, lock: &Lock, e: u64) -> u128 {
+        if e <= lock.created || lock.exited.is_some_and(|x| e > x) {
+            return 0;
         }
-        out
+        let total = self.totals.get(&e).copied().unwrap_or(0);
+        let reward = self.rewards.get(&e).copied().unwrap_or(0);
+        math::pro_rata(reward, power(lock.amount, lock.end, e), total)
     }
 
     fn info(&self, token_id: TokenId, owner_id: AccountId, lock: &Lock) -> LockInfo {
-        let votes = lock.alloc_at(u64::MAX).cloned().unwrap_or_default();
+        let running = !lock.withdrawn && self.epoch < lock.end;
         LockInfo {
             token_id,
             owner_id,
             amount: U128(lock.amount),
             created: lock.created,
             end: lock.end,
-            power: U128(power(lock.amount, math::PPM, lock.end, self.epoch + 1)),
-            votes: votes.into_iter().map(|(m, a)| (m, U128(a))).collect(),
+            from_loss: lock.from_loss,
+            power: U128(if lock.withdrawn { 0 } else { power(lock.amount, lock.end, self.epoch + 1) }),
+            exit_penalty: U128(if running { math::exit_penalty(lock.amount, lock.end - self.epoch - 1) } else { 0 }),
+            exited: lock.exited,
             withdrawn: lock.withdrawn,
         }
     }
 
-    fn send(&self, token: AccountId, account: AccountId, amount: u128) {
-        ext_ft::ext(token.clone())
+    fn send(&self, account: AccountId, amount: u128) {
+        ext_ft::ext(self.oneup.clone())
             .with_attached_deposit(NearToken::from_yoctonear(1))
             .with_static_gas(GAS_FT_TRANSFER)
             .ft_transfer(account.clone(), U128(amount), None)
-            .then(Self::ext(env::current_account_id()).with_static_gas(GAS_CALLBACK).on_send(token, account, U128(amount)))
+            .then(Self::ext(env::current_account_id()).with_static_gas(GAS_CALLBACK).on_send(account, U128(amount)))
             .detach();
     }
 }
 
-// NEP-171 plumbing (veNFTs are transferable; rewards go to the current owner)
+// NEP-171 plumbing (locks are transferable; rewards go to the current owner)
 
 #[near]
 impl NonFungibleTokenCore for Ve {

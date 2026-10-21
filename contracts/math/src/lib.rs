@@ -28,7 +28,12 @@ pub const ONEUP: u128 = 1_000_000_000_000_000_000;
 pub const SUPPLY: u128 = 1_000_000_000 * ONEUP;
 pub const EMISSIONS_TOTAL: u128 = 900_000_000 * ONEUP;
 pub const EMISSION_EPOCHS: u64 = 208;
-pub const VE_MAX_EPOCHS: u64 = 52;
+/// Longest lock: two years of weekly epochs (D-15). Losers' $1UP arrives locked this long (D-16).
+pub const VE_MAX_EPOCHS: u64 = 104;
+/// Exiting a lock early costs up to half of it, in proportion to the time left (D-15).
+pub const EXIT_PENALTY_MAX_PPM: u128 = 500_000;
+/// $1UP released per USDC of house profit (D-16), before the cap of schedule + carry.
+pub const ONEUP_PER_USDC: u128 = 20;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Side {
@@ -226,10 +231,24 @@ pub fn emissions_for_epoch(e: u64) -> u128 {
     }
 }
 
+/// $1UP released to an epoch's losers (D-16): `rate` $1UP per USDC of house profit, capped by what's
+/// available (this epoch's schedule plus anything unreleased before). The rest carries forward.
+pub fn released_emissions(available: u128, house_net: u128, rate: u128) -> u128 {
+    // house_net is 1e6 USDC; $1UP is 1e18
+    let wanted = house_net.saturating_mul(rate).saturating_mul(ONEUP / USDC);
+    wanted.min(available)
+}
+
 // §9 ve1UP
 
 pub fn ve_power(amount: u128, epochs_left: u64) -> u128 {
-    amount * epochs_left.min(VE_MAX_EPOCHS) as u128 / VE_MAX_EPOCHS as u128
+    mul_div(amount, epochs_left.min(VE_MAX_EPOCHS) as u128, VE_MAX_EPOCHS as u128)
+}
+
+/// Cost of leaving a lock with `epochs_left` to run: up to 50% at the full 104, rounded up (it's kept by
+/// the remaining lockers).
+pub fn exit_penalty(amount: u128, epochs_left: u64) -> u128 {
+    mul_div_ceil(amount, EXIT_PENALTY_MAX_PPM * epochs_left.min(VE_MAX_EPOCHS) as u128, PPM * VE_MAX_EPOCHS as u128)
 }
 
 /// `floor(a × b / c)` with a 256-bit intermediate. Panics if the result doesn't fit in u128.
@@ -403,9 +422,30 @@ mod tests {
     #[test]
     fn v7_ve_power() {
         let a = 1_000 * ONEUP;
-        assert_eq!(ve_power(a, 52), a);
-        assert_eq!(ve_power(a, 26), a / 2);
-        assert_eq!(ve_power(a, 13), a / 4);
+        assert_eq!(ve_power(a, 104), a);
+        assert_eq!(ve_power(a, 52), a / 2);
+        assert_eq!(ve_power(a, 26), a / 4);
+        assert_eq!(ve_power(a, 500), a);
+    }
+
+    #[test]
+    fn v8_exit_penalty() {
+        let a = 1_000 * ONEUP;
+        assert_eq!(exit_penalty(a, 104), a / 2);
+        assert_eq!(exit_penalty(a, 52), a / 4);
+        assert_eq!(exit_penalty(a, 0), 0);
+        // rounds up: 1 wei locked with 1 epoch left still pays 1
+        assert_eq!(exit_penalty(1, 1), 1);
+    }
+
+    #[test]
+    fn v9_release() {
+        let sched = emissions_for_epoch(1);
+        // $1,000 of house profit releases 20,000 $1UP
+        assert_eq!(released_emissions(sched, 1_000 * USDC, ONEUP_PER_USDC), 20_000 * ONEUP);
+        // capped by what's available
+        assert_eq!(released_emissions(sched, 10_000_000 * USDC, ONEUP_PER_USDC), sched);
+        assert_eq!(released_emissions(sched, 0, ONEUP_PER_USDC), 0);
     }
 
     use proptest::prelude::*;

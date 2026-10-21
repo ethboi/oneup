@@ -1,0 +1,89 @@
+//! Sandbox: the marketplace (D-17). A loser lists their Extra Life and their $1UP lock; a buyer pays
+//! USDC and gets each NFT, with change back; a stale listing refunds the buyer.
+
+mod common;
+use common::*;
+use near_workspaces::types::NearToken;
+use near_workspaces::Account;
+use serde_json::json;
+
+async fn usdc(e: &Env, a: &Account) -> anyhow::Result<u128> {
+    Ok(view(&e.usdc, "ft_balance_of", json!({"account_id": a.id()})).await?.as_str().unwrap().parse()?)
+}
+
+async fn list(e: &Env, seller: &Account, nft: &near_workspaces::Contract, token_id: &str, price: u128) -> anyhow::Result<()> {
+    seller
+        .call(nft.id(), "nft_approve")
+        .args_json(json!({"token_id": token_id, "account_id": e.market.id(), "msg": format!(r#"{{"price":"{}"}}"#, price * USDC)}))
+        .deposit(NearToken::from_millinear(10))
+        .max_gas()
+        .transact()
+        .await?
+        .into_result()?;
+    Ok(())
+}
+
+async fn buy(e: &Env, buyer: &Account, nft: &near_workspaces::Contract, token_id: &str, pay: u128) -> anyhow::Result<()> {
+    let msg = json!({"buy": {"nft_contract": nft.id(), "token_id": token_id}}).to_string();
+    transfer_call(buyer, &e.usdc, e.market.id().as_str(), usd(pay), &msg).await
+}
+
+async fn owner_of(nft: &near_workspaces::Contract, token_id: &str) -> anyhow::Result<String> {
+    Ok(view(nft, "nft_token", json!({"token_id": token_id})).await?["owner_id"].as_str().unwrap().to_string())
+}
+
+#[tokio::test]
+async fn sell_an_extra_life_and_a_lock() -> anyhow::Result<()> {
+    let e = setup(5).await?;
+
+    // Bob loses 500 and the epoch closes: an Extra Life and a $1UP lock
+    let bob = trader(&e, "bob", 500).await?;
+    let (pos, placed_at) = open(&e, &bob, "Long", 500, 50, 500).await?;
+    push(&e, 490, placed_at + 2).await?;
+    let ok: bool = e.keeper.call(e.house.id(), "liquidate").args_json(json!({"position_id": pos})).max_gas().transact().await?.json()?;
+    assert!(ok);
+    e.worker.fast_forward(10).await?;
+    close_epoch(&e).await?;
+    let life_id = format!("1:{}", bob.id());
+    let lock_id = view(&e.ve, "locks_for_owner", json!({"account_id": bob.id()})).await?[0]["token_id"].as_str().unwrap().to_string();
+
+    // Dave has USDC in his wallet
+    let dave = e.owner.create_subaccount("dave").initial_balance(NearToken::from_near(5)).transact().await?.into_result()?;
+    dave.call(e.usdc.id(), "faucet").args_json(json!({"amount": usd(1_000)})).transact().await?.into_result()?;
+
+    // Bob lists the life for 300 and Dave pays 320: the life moves, Bob gets 300, Dave 20 change
+    list(&e, &bob, &e.life, &life_id, 300).await?;
+    let l = view(&e.market, "get_listing", json!({"nft_contract": e.life.id(), "token_id": life_id})).await?;
+    assert_eq!(l["price"], json!(usd(300)));
+    let bob_before = usdc(&e, &bob).await?;
+    buy(&e, &dave, &e.life, &life_id, 320).await?;
+    assert_eq!(owner_of(&e.life, &life_id).await?, dave.id().to_string());
+    assert_eq!(usdc(&e, &bob).await? - bob_before, 300 * USDC);
+    assert_eq!(usdc(&e, &dave).await?, 700 * USDC);
+    assert_eq!(view(&e.market, "get_listings", json!({})).await?, json!([]));
+    // the life's USDC claims go to its new owner
+    assert_eq!(view(&e.life, "life_info", json!({"token_id": life_id})).await?["owner_id"], json!(dave.id()));
+
+    // Bob lists the lock for 200, then gives it away before anyone buys: the listing is stale
+    list(&e, &bob, &e.ve, &lock_id, 200).await?;
+    let carol = e.owner.create_subaccount("carol").initial_balance(NearToken::from_near(5)).transact().await?.into_result()?;
+    bob.call(e.ve.id(), "nft_transfer")
+        .args_json(json!({"receiver_id": carol.id(), "token_id": lock_id}))
+        .deposit(NearToken::from_yoctonear(1))
+        .transact()
+        .await?
+        .into_result()?;
+    // Dave tries to buy it: the NFT can't move, so his 200 comes back and the listing is gone
+    buy(&e, &dave, &e.ve, &lock_id, 200).await?;
+    assert_eq!(owner_of(&e.ve, &lock_id).await?, carol.id().to_string());
+    assert_eq!(usdc(&e, &dave).await?, 700 * USDC);
+    assert!(view(&e.market, "get_listing", json!({"nft_contract": e.ve.id(), "token_id": lock_id})).await?.is_null());
+
+    // Carol lists it herself and Dave buys it: the lock is his
+    list(&e, &carol, &e.ve, &lock_id, 150).await?;
+    buy(&e, &dave, &e.ve, &lock_id, 150).await?;
+    assert_eq!(owner_of(&e.ve, &lock_id).await?, dave.id().to_string());
+    assert_eq!(usdc(&e, &dave).await?, 550 * USDC);
+    assert_eq!(view(&e.ve, "locks_for_owner", json!({"account_id": dave.id()})).await?[0]["token_id"], json!(lock_id));
+    Ok(())
+}

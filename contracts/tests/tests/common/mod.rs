@@ -1,4 +1,4 @@
-//! Shared sandbox setup: mock USDC, mock oracle, Extra Life and the house, with a 100K seed.
+//! Shared sandbox setup: every contract deployed and wired, NEAR-USD listed, and a 100K seed.
 #![allow(dead_code)]
 
 use near_workspaces::types::NearToken;
@@ -22,6 +22,7 @@ pub struct Env {
     pub oneup: Contract,
     pub ve: Contract,
     pub swap: Contract,
+    pub market: Contract,
     pub owner: Account,
     pub keeper: Account,
 }
@@ -45,6 +46,7 @@ pub async fn setup_with(epoch_length_s: u64, life_expiry_epochs: u64) -> anyhow:
     let oneup = worker.dev_deploy(&wasm("oneup_token")).await?;
     let ve = worker.dev_deploy(&wasm("oneup_ve")).await?;
     let swap = worker.dev_deploy(&wasm("mock_swap")).await?;
+    let market = worker.dev_deploy(&wasm("oneup_market")).await?;
 
     usdc.call("new").args_json(json!({"owner": owner.id()})).transact().await?.into_result()?;
     oracle.call("new").args_json(json!({"owner": owner.id(), "pusher": keeper.id()})).transact().await?.into_result()?;
@@ -56,7 +58,8 @@ pub async fn setup_with(epoch_length_s: u64, life_expiry_epochs: u64) -> anyhow:
     let params = json!({
         "leverage_hard_limit": 250, "min_margin": usd(1), "min_hold_s": 60, "fill_window_s": 30,
         "max_price_age_s": 60, "max_conf_ppm": "10000", "solvency_both_sides": true,
-        "epoch_length_s": epoch_length_s, "life_expiry_epochs": life_expiry_epochs
+        "epoch_length_s": epoch_length_s, "life_expiry_epochs": life_expiry_epochs,
+        "market_capacity_ppm": "500000", "oneup_per_usdc": 20
     });
     house
         .call("new")
@@ -73,7 +76,7 @@ pub async fn setup_with(epoch_length_s: u64, life_expiry_epochs: u64) -> anyhow:
         .await?
         .into_result()?;
     ve.call("new")
-        .args_json(json!({"owner": owner.id(), "house": house.id(), "oneup": oneup.id(), "usdc": usdc.id(), "treasury": owner.id()}))
+        .args_json(json!({"owner": owner.id(), "house": house.id(), "oneup": oneup.id()}))
         .transact()
         .await?
         .into_result()?;
@@ -91,6 +94,12 @@ pub async fn setup_with(epoch_length_s: u64, life_expiry_epochs: u64) -> anyhow:
         .into_result()?;
     register(&owner, &oneup, swap.id().as_str()).await?;
     owner.call(house.id(), "set_swap").args_json(json!({"swap": swap.id()})).transact().await?.into_result()?;
+    market
+        .call("new")
+        .args_json(json!({"usdc": usdc.id(), "nft_contracts": [life.id(), ve.id()]}))
+        .transact()
+        .await?
+        .into_result()?;
     owner
         .call(house.id(), "add_market")
         .args_json(json!({"market_id": "NEAR-USD", "feed_id": FEED, "max_leverage": 100}))
@@ -99,7 +108,7 @@ pub async fn setup_with(epoch_length_s: u64, life_expiry_epochs: u64) -> anyhow:
         .into_result()?;
 
     // register the contracts on USDC, then seed the pool with 100K
-    for id in [house.id(), life.id(), ve.id(), swap.id()] {
+    for id in [house.id(), life.id(), ve.id(), swap.id(), market.id()] {
         owner.call(usdc.id(), "mint").args_json(json!({"receiver_id": id, "amount": "0"})).transact().await?.into_result()?;
     }
     owner.call(usdc.id(), "mint").args_json(json!({"receiver_id": owner.id(), "amount": usd(100_000)})).transact().await?.into_result()?;
@@ -112,7 +121,7 @@ pub async fn setup_with(epoch_length_s: u64, life_expiry_epochs: u64) -> anyhow:
         .await?
         .into_result()?;
 
-    Ok(Env { worker, usdc, oracle, life, house, oneup, ve, swap, owner, keeper })
+    Ok(Env { worker, usdc, oracle, life, house, oneup, ve, swap, market, owner, keeper })
 }
 
 pub async fn push(e: &Env, cents: i64, publish_time: u64) -> anyhow::Result<()> {
@@ -180,7 +189,7 @@ pub async fn close_epoch(e: &Env) -> anyhow::Result<Vec<String>> {
     loop {
         let r: String = e.keeper.call(e.house.id(), "close_epoch").args_json(json!({})).max_gas().transact().await?.into_result()?.json()?;
         steps.push(r.clone());
-        if r == "closed" || steps.len() > 10 {
+        if r == "closed" || steps.len() > 30 {
             return Ok(steps);
         }
     }

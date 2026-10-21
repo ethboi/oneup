@@ -1,12 +1,11 @@
-//! Buybacks (maths §7): each epoch's buyback USDC is swapped for $1UP and sent to `ve`, split by each
-//! market's house profit, for that epoch's voters of the market.
+//! Buybacks (maths §7): each epoch's buyback USDC is swapped for $1UP and sent to `ve` for that epoch's
+//! lockers, shared by lock weight (D-15).
 //!
-//! close_epoch records the USDC and the split → `buyback(epoch)` sends it to the swap → the swap pays the
-//! $1UP back with `{"buyback_proceeds":{"epoch":e}}` → the house forwards it to `ve`.
+//! close_epoch records the USDC → `buyback(epoch)` sends it to the swap → the swap pays the $1UP back with
+//! `{"buyback_proceeds":{"epoch":e}}` → the house forwards it to `ve`.
 
 use near_sdk::json_types::U128;
 use near_sdk::{env, near, require, AccountId, Gas, NearToken, PromiseError, PromiseOrValue};
-use oneup_math as math;
 
 use crate::oracle::ext_ft;
 use crate::{Epoch, House, HouseExt};
@@ -28,8 +27,6 @@ pub enum BuybackStatus {
 pub struct Buyback {
     pub epoch: u64,
     pub usdc: U128,
-    /// ppm per market: positive house profit, or vote shares if no market made any.
-    pub weights: Vec<(String, U128)>,
     pub status: BuybackStatus,
     pub oneup: U128,
 }
@@ -85,25 +82,10 @@ impl House {
 
 impl House {
     pub(crate) fn record_buyback(&mut self, epoch: &Epoch, usdc: u128) {
-        let profits: Vec<(String, u128)> = epoch
-            .markets
-            .iter()
-            .map(|t| (t.market_id.clone(), t.losses.0.saturating_sub(t.payouts.0)))
-            .filter(|(_, p)| *p > 0)
-            .collect();
-        let total: u128 = profits.iter().map(|(_, p)| p).sum();
-        let weights = if total > 0 {
-            profits.into_iter().map(|(m, p)| (m, U128(p * math::PPM / total))).collect()
-        } else {
-            self.effective_shares()
-        };
-        self.buybacks.insert(
-            epoch.id,
-            Buyback { epoch: epoch.id, usdc: U128(usdc), weights, status: BuybackStatus::Pending, oneup: U128(0) },
-        );
+        self.buybacks.insert(epoch.id, Buyback { epoch: epoch.id, usdc: U128(usdc), status: BuybackStatus::Pending, oneup: U128(0) });
     }
 
-    /// $1UP from the swap: split by the epoch's weights and forward to `ve` for that epoch's voters.
+    /// $1UP from the swap: forward to `ve` for that epoch's lockers.
     pub(crate) fn on_buyback_proceeds(&mut self, sender_id: AccountId, amount: U128, msg: String) -> PromiseOrValue<U128> {
         require!(Some(&sender_id) == self.swap.as_ref(), "Only swap proceeds");
         let ProceedsMsg::BuybackProceeds { epoch } =
@@ -112,16 +94,8 @@ impl House {
         require!(b.status == BuybackStatus::Swapping, "Buyback not swapping");
         b.status = BuybackStatus::Done;
         b.oneup = amount;
-        let mut per_market: Vec<(String, U128)> = vec![];
-        let mut left = amount.0;
-        let n = b.weights.len();
-        for (i, (m, w)) in b.weights.iter().enumerate() {
-            let a = if i + 1 == n { left } else { amount.0 * w.0 / math::PPM };
-            left -= a;
-            per_market.push((m.clone(), U128(a)));
-        }
         let ve = self.ve.clone().unwrap_or_else(|| env::panic_str("No ve set"));
-        let msg = near_sdk::serde_json::json!({"buyback": {"epoch": epoch, "per_market": per_market}}).to_string();
+        let msg = near_sdk::serde_json::json!({"buyback": {"epoch": epoch}}).to_string();
         ext_ft::ext(self.oneup.clone().expect("oneup"))
             .with_attached_deposit(NearToken::from_yoctonear(1))
             .with_static_gas(GAS_FORWARD)

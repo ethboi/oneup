@@ -18,7 +18,7 @@ mod views;
 mod tests;
 
 pub use buyback::{Buyback, BuybackStatus};
-pub use emissions::{Activity, EpochEmissions, MarketEmission};
+pub use emissions::EpochEmissions;
 pub use epochs::{Closing, EpochSummary};
 pub use events::Event;
 pub use oracle::OraclePrice;
@@ -42,7 +42,7 @@ impl From<Side> for math::Side {
 #[near(serializers = [json, borsh])]
 #[derive(Clone, Debug)]
 pub struct Params {
-    /// Hard ceiling for any market's max leverage (votes can't exceed it).
+    /// Hard ceiling for any market's max leverage.
     pub leverage_hard_limit: u32,
     pub min_margin: U128,
     pub min_hold_s: u64,
@@ -55,6 +55,10 @@ pub struct Params {
     pub epoch_length_s: u64,
     /// D-13: an Extra Life shares the pots of the epoch it's minted in and this many after, then expires.
     pub life_expiry_epochs: u64,
+    /// D-14: the share of the pool a newly listed market may use (ppm).
+    pub market_capacity_ppm: U128,
+    /// D-16: $1UP released to losers per USDC of house profit.
+    pub oneup_per_usdc: u32,
 }
 
 impl Default for Params {
@@ -69,6 +73,8 @@ impl Default for Params {
             solvency_both_sides: true,
             epoch_length_s: 7 * 24 * 3600,
             life_expiry_epochs: 13,
+            market_capacity_ppm: U128(500_000),
+            oneup_per_usdc: math::ONEUP_PER_USDC as u32,
         }
     }
 }
@@ -84,7 +90,7 @@ pub struct Market {
     /// Σ 9 × margin over open longs (and pending long opens).
     pub long_liability: U128,
     pub short_liability: U128,
-    /// Share of the pool this market may use, ppm. Set by ve votes; 100% until then.
+    /// Share of the pool this market may use, ppm (D-14).
     pub capacity_ppm: U128,
 }
 
@@ -137,7 +143,7 @@ pub struct Epoch {
     pub markets: Vec<MarketTotals>,
 }
 
-/// One market's results in an epoch: buybacks (§7) and emissions (§8) are split by these.
+/// One market's results in an epoch.
 #[near(serializers = [json, borsh])]
 #[derive(Clone, Debug, Default)]
 pub struct MarketTotals {
@@ -156,9 +162,7 @@ enum StorageKey {
     Positions,
     EpochLosses { epoch: u64 },
     Epochs,
-    Activity,
     Emissions,
-    OneupOwed,
     Buybacks,
 }
 
@@ -196,15 +200,9 @@ pub struct House {
     /// $1UP token and ve contracts.
     oneup: Option<AccountId>,
     ve: Option<AccountId>,
-    /// Vote shares in force (ppm), set by `ve` each epoch. Empty: live markets share equally.
-    vote_shares: Vec<(String, U128)>,
-    /// Each wallet's cut paid and losses per market, per epoch, until it claims emissions.
-    activity: LookupMap<(u64, AccountId), Vec<Activity>>,
     emissions: LookupMap<u64, EpochEmissions>,
-    /// $1UP owed after a failed claim transfer.
-    oneup_owed: LookupMap<AccountId, u128>,
-    /// Emissions nobody could earn (a market with no winners and no Extra Lives).
-    treasury_oneup: u128,
+    /// Scheduled $1UP not yet released by house profit (D-16).
+    emission_carry: u128,
     /// USDC → $1UP swap (Rhea on mainnet, `mock-swap` on testnet).
     swap: Option<AccountId>,
     buybacks: LookupMap<u64, Buyback>,
@@ -241,22 +239,17 @@ impl House {
             epochs: LookupMap::new(StorageKey::Epochs),
             oneup: None,
             ve: None,
-            vote_shares: vec![],
-            activity: LookupMap::new(StorageKey::Activity),
             emissions: LookupMap::new(StorageKey::Emissions),
-            oneup_owed: LookupMap::new(StorageKey::OneupOwed),
-            treasury_oneup: 0,
+            emission_carry: 0,
             swap: None,
             buybacks: LookupMap::new(StorageKey::Buybacks),
         }
     }
 
-    // Admin. Market listing moves to `ve` in stage 4; until then the owner lists markets.
+    // Admin. The owner lists markets (D-14).
 
-    /// Owner, or `ve` when a proposed market reaches 2% of votes.
     pub fn add_market(&mut self, market_id: String, feed_id: String, max_leverage: u32) {
-        let caller = env::predecessor_account_id();
-        require!(caller == self.owner || Some(caller) == self.ve, "Only the owner or ve");
+        self.assert_owner();
         require!(!self.markets.contains_key(&market_id), "Market exists");
         require!(
             (1..=self.params.leverage_hard_limit).contains(&max_leverage),
@@ -271,7 +264,7 @@ impl House {
                 live: true,
                 long_liability: U128(0),
                 short_liability: U128(0),
-                capacity_ppm: U128(math::PPM),
+                capacity_ppm: self.params.market_capacity_ppm,
             },
         );
     }

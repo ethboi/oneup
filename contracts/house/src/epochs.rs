@@ -2,8 +2,9 @@
 //! returns "closed". Trading never pauses; the next epoch starts at the first call.
 //!
 //! 1. begin: freeze the epoch's counters and its losers; start the next epoch
-//! 2. mint: one Extra Life per loser, `limit` per call, sized from the house's net result
-//! 3. wait: until every mint has landed, so this epoch's lives share this epoch's pot (D-4)
+//! 2. mint: one Extra Life per loser, `limit` per call, sized from the house's net result, and the
+//!    loser's share of the epoch's $1UP release as a max-length lock (D-16)
+//! 3. wait: until every mint and lock has landed, so this epoch's lives share this epoch's pot (D-4)
 //! 4. expire: lives past their window stop earning (D-13); the life contract returns what's still owed
 //! 5. pay: the surplus above the reserve → Extra Life pot + buyback USDC; record the summary
 
@@ -23,8 +24,9 @@ const GAS_FT_TRANSFER_CALL: Gas = Gas::from_tgas(60);
 const GAS_POT_CALLBACK: Gas = Gas::from_tgas(15);
 const GAS_EXPIRE: Gas = Gas::from_tgas(30);
 const GAS_EXPIRE_CALLBACK: Gas = Gas::from_tgas(10);
-const DEFAULT_BATCH: u32 = 20;
-const MAX_BATCH: u32 = 30;
+// each batch mints up to this many lives and as many locks, so it has to fit one transaction's gas
+const DEFAULT_BATCH: u32 = 10;
+const MAX_BATCH: u32 = 15;
 
 #[near(serializers = [json])]
 pub struct MintItem {
@@ -51,6 +53,9 @@ pub struct Closing {
     pub pending_mints: u32,
     pub expiring: bool,
     pub expired: bool,
+    /// $1UP released to this epoch's losers, and how much has been handed out so far.
+    pub oneup_release: u128,
+    pub oneup_assigned: u128,
 }
 
 #[near(serializers = [json, borsh])]
@@ -107,15 +112,29 @@ impl House {
             }
             if c.house_net > 0 {
                 let losses = c.epoch.losses.0;
+                let batch_losses = batch.clone();
                 let items: Vec<(AccountId, u128, u128)> = batch
                     .into_iter()
                     .map(|(owner, loss)| (owner, math::face_value(c.house_net, loss, losses), c.cap_ppm))
                     .filter(|(_, face, _)| *face > 0)
                     .collect();
+                let locks: Vec<(AccountId, u128)> = items
+                    .iter()
+                    .map(|(owner, _, _)| {
+                        let loss = batch_losses.iter().find(|(o, _)| o == owner).map(|(_, l)| *l).unwrap_or(0);
+                        (owner.clone(), math::pro_rata(c.oneup_release, loss, losses))
+                    })
+                    .filter(|(_, a)| *a > 0)
+                    .collect();
                 if !items.is_empty() {
                     c.lives_minted += items.len() as u32;
                     c.pending_mints += 1;
                     self.mint_lives(c.epoch.id, items, true).detach();
+                }
+                if !locks.is_empty() {
+                    c.oneup_assigned += locks.iter().map(|(_, a)| a).sum::<u128>();
+                    c.pending_mints += 1;
+                    self.lock_for_losers(c.epoch.id, locks).detach();
                 }
             }
             "minting"
@@ -234,7 +253,7 @@ impl House {
         );
         let finished = std::mem::replace(&mut self.epoch, Epoch { id: next, started_at: now, ..Default::default() });
         let house_net = finished.losses.0.saturating_sub(finished.payouts.0);
-        self.record_emissions(&finished, house_net > 0);
+        let oneup_release = self.release_emissions(&finished, house_net);
         self.checkpoint_ve(next);
         self.closing = Some(Closing {
             house_net,
@@ -246,6 +265,8 @@ impl House {
             pending_mints: 0,
             expiring: false,
             expired: false,
+            oneup_release,
+            oneup_assigned: 0,
         });
     }
 
@@ -266,6 +287,7 @@ impl House {
     }
 
     fn pay(&mut self, c: Closing) {
+        self.settle_release(c.epoch.id, c.oneup_release, c.oneup_assigned);
         let p = math::epoch_payout(self.pool, self.liability, self.lives_owed, self.reserve_floor());
         self.pool -= p.lives_pot + p.buyback_pot;
         self.buyback_usdc += p.buyback_pot;

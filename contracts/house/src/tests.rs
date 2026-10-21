@@ -1,7 +1,7 @@
 use near_sdk::json_types::U128;
 use near_sdk::test_utils::VMContextBuilder;
 use near_sdk::{testing_env, AccountId, NearToken};
-use oneup_math::USDC;
+use oneup_math::{ONEUP, USDC};
 
 use crate::events::CloseReason;
 use crate::{House, OraclePrice, OrderKind, Side};
@@ -33,7 +33,8 @@ fn ctx(predecessor: &str, t: u64) {
 fn setup(seed: u128) -> House {
     ctx("owner", T0);
     near_sdk::mock::with_mocked_blockchain(|b| drop(b.take_storage()));
-    let params = crate::Params { epoch_length_s: 600, ..Default::default() };
+    // full capacity per market, so these tests exercise the pool-wide rule; D-14's 50% has its own test
+    let params = crate::Params { epoch_length_s: 600, market_capacity_ppm: U128(oneup_math::PPM), ..Default::default() };
     let mut h = House::new(acc("owner"), acc("usdc"), acc("oracle"), Some(params));
     h.add_market(MARKET.into(), "feed".into(), 100);
     h.set_life(acc("life"));
@@ -294,6 +295,7 @@ fn close_epoch_fully(h: &mut House) -> u32 {
         match h.close_epoch(Some(2)).as_str() {
             "closed" => return steps,
             "waiting for mints" => {
+                // lives and loser locks both land through a callback that counts one pending batch down
                 for _ in 0..h.get_closing().unwrap().pending_mints {
                     let _ = h.on_minted(U128(0), true, Ok(vec![]));
                 }
@@ -350,8 +352,12 @@ fn epoch_close_mints_and_pays() {
     assert_eq!(h.close_epoch(Some(1)), "waiting for mints");
     // faces 900 (Bob) and 450 (Carol) at 1.97892×
     assert_eq!(h.lives_owed, usd(25_000) + 1_781_028_000 + 890_514_000);
+    // two life batches and two lock batches: 20 $1UP per $1 of the 1_350 profit, by loss 1_000 : 500
+    assert_eq!(h.get_closing().unwrap().pending_mints, 4);
     let _ = h.on_minted(U128(0), true, Ok(vec![]));
     let _ = h.on_minted(U128(0), true, Ok(vec![]));
+    let _ = h.on_locks(1, U128(18_000 * ONEUP), Ok(U128(18_000 * ONEUP)));
+    let _ = h.on_locks(1, U128(9_000 * ONEUP), Ok(U128(9_000 * ONEUP)));
     assert_eq!(h.close_epoch(None), "expiring");
     assert_eq!(h.close_epoch(None), "waiting for expiry");
     // the life contract reports what's still owed; the house takes its number
@@ -393,16 +399,12 @@ fn failed_mint_is_not_owed() {
 }
 
 #[test]
-fn emissions_split_winners_and_losers() {
+fn losers_get_oneup_by_house_profit() {
     let mut h = setup(usd(25_000));
-    ctx("owner", T0);
-    h.add_market("BTC-USD".into(), "btc".into(), 100);
-    ctx("ve", T0);
-    h.set_vote_shares(1, vec![(MARKET.into(), U128(600_000)), ("BTC-USD".into(), U128(400_000))]);
-    deposit(&mut h, "alice", usd(1_000));
-    deposit(&mut h, "bob", usd(1_000));
-    deposit(&mut h, "carol", usd(1_000));
-    // NEAR-USD: Alice wins (cut 50), Bob and Carol lose 500 and 250
+    for w in ["alice", "bob", "carol"] {
+        deposit(&mut h, w, usd(1_000));
+    }
+    // Alice wins 200, cut 25% → pool pays 150; Bob and Carol lose 500 and 240 → house profit 590
     let a = open(&mut h, "alice", Side::Long, usd(1_000), 10, 500, T0);
     close(&mut h, "alice", a, 510, T0 + 100);
     let b = open(&mut h, "bob", Side::Short, usd(1_000), 10, 500, T0 + 200);
@@ -412,65 +414,82 @@ fn emissions_split_winners_and_losers() {
     ctx("keeper", T0 + 600);
     close_epoch_fully(&mut h);
 
-    let per = oneup_math::emissions_for_epoch(1);
-    let near = per * 6 / 10;
+    let sched = oneup_math::emissions_for_epoch(1);
     let e = h.get_emissions(1).unwrap();
-    assert!(e.lives);
-    assert_eq!(e.markets[0].winners.0, near / 2);
-    // BTC-USD had no trades: its 40% goes to the treasury
-    assert_eq!(h.get_treasury_oneup().0, per - near);
-    assert_eq!(h.get_claimable_emissions(acc("alice"), vec![1]).0, near / 2);
-    let losers = near - near / 2;
-    assert_eq!(h.get_claimable_emissions(acc("bob"), vec![1]).0, losers * 500 / 740);
-    assert_eq!(h.get_claimable_emissions(acc("carol"), vec![1]).0, losers * 240 / 740);
-    // claiming clears the activity
-    ctx("alice", T0 + 700);
-    let _ = h.claim_emissions(vec![1]);
-    assert_eq!(h.get_claimable_emissions(acc("alice"), vec![1]).0, 0);
+    assert_eq!(e.released.0, 590 * 20 * ONEUP);
+    // shared 500 : 240 and floored; the dust goes back to the carry
+    let bob = e.released.0 * 500 / 740;
+    let carol = e.released.0 * 240 / 740;
+    assert_eq!(e.locked.0, bob + carol);
+    assert_eq!(h.get_emission_carry().0, sched - bob - carol);
+    assert_eq!(e.carry.0, h.get_emission_carry().0);
 }
 
 #[test]
-fn votes_set_capacity() {
-    let mut h = setup(usd(100_000));
-    ctx("owner", T0);
-    h.add_market("BTC-USD".into(), "btc".into(), 100);
-    assert_eq!(h.get_vote_shares().len(), 2); // equal before any votes
-    ctx("ve", T0);
-    h.set_vote_shares(1, vec![("BTC-USD".into(), U128(1_000_000))]);
-    let q = h.quote_open(MARKET.into(), Side::Long, U128(usd(10)), 10, None);
-    assert_eq!(q.reason.as_deref(), Some("Market capacity reached"));
-}
-
-#[test]
-#[should_panic(expected = "Only ve")]
-fn only_ve_sets_shares() {
-    let mut h = setup(usd(100_000));
-    ctx("alice", T0);
-    h.set_vote_shares(1, vec![]);
-}
-
-#[test]
-fn buyback_split_by_market_profit() {
+fn no_release_when_the_house_loses() {
     let mut h = setup(usd(25_000));
+    deposit(&mut h, "alice", usd(1_000));
+    let a = open(&mut h, "alice", Side::Long, usd(1_000), 10, 500, T0);
+    close(&mut h, "alice", a, 520, T0 + 100);
+    ctx("keeper", T0 + 600);
+    close_epoch_fully(&mut h);
+    // the whole schedule waits for profit
+    assert_eq!(h.get_emissions(1).unwrap().released.0, 0);
+    assert_eq!(h.get_emission_carry().0, oneup_math::emissions_for_epoch(1));
+}
+
+#[test]
+fn failed_locks_go_back_to_the_carry() {
+    let mut h = setup(usd(25_000));
+    deposit(&mut h, "bob", usd(1_000));
+    let b = open(&mut h, "bob", Side::Short, usd(1_000), 10, 500, T0);
+    close(&mut h, "bob", b, 525, T0 + 100); // −500
+    ctx("keeper", T0 + 600);
+    assert_eq!(h.close_epoch(None), "begun");
+    assert_eq!(h.close_epoch(None), "minting");
+    let carry = h.get_emission_carry().0;
+    let _ = h.on_locks(1, U128(10_000 * ONEUP), Ok(U128(0)));
+    assert_eq!(h.get_emission_carry().0, carry + 10_000 * ONEUP);
+    assert_eq!(h.get_emissions(1).unwrap().locked.0, 0);
+}
+
+#[test]
+fn new_markets_get_half_the_pool() {
     ctx("owner", T0);
-    h.add_market("BTC-USD".into(), "btc".into(), 100);
-    deposit(&mut h, "bob", usd(2_000));
-    // NEAR-USD: Bob's short loses 740 (+7.4% × 10); BTC-USD: his long loses 500
+    near_sdk::mock::with_mocked_blockchain(|b| drop(b.take_storage()));
+    let mut h = House::new(acc("owner"), acc("usdc"), acc("oracle"), None);
+    h.add_market(MARKET.into(), "feed".into(), 100);
+    h.set_life(acc("life"));
+    ctx("usdc", T0);
+    let _ = h.ft_on_transfer(acc("owner"), U128(usd(100_000)), r#"{"seed":{}}"#.into());
+    assert_eq!(h.get_markets()[0].capacity_ppm.0, 500_000);
+    // 6_000 margin → 54K of max wins, past half of the 100K pool
+    let q = h.quote_open(MARKET.into(), Side::Long, U128(usd(6_000)), 2, Some(U128(500_000_000)));
+    assert_eq!(q.reason.as_deref(), Some("Market capacity reached"));
+    let q = h.quote_open(MARKET.into(), Side::Long, U128(usd(5_000)), 2, Some(U128(500_000_000)));
+    assert!(q.allowed);
+}
+
+#[test]
+#[should_panic(expected = "Only the owner")]
+fn only_the_owner_lists_markets() {
+    let mut h = setup(usd(25_000));
+    ctx("ve", T0);
+    h.add_market("MEME-USD".into(), "meme".into(), 100);
+}
+
+#[test]
+fn buyback_goes_to_lockers() {
+    let mut h = setup(usd(25_000));
+    deposit(&mut h, "bob", usd(1_000));
     let b = open(&mut h, "bob", Side::Short, usd(1_000), 10, 500, T0);
     close(&mut h, "bob", b, 537, T0 + 100);
-    ctx("bob", T0 + 200);
-    let o = h.place_open("BTC-USD".into(), Side::Long, U128(usd(1_000)), 10);
-    ctx("keeper", T0 + 201);
-    h.internal_fill(o, px(500, T0 + 201), T0 + 201).unwrap();
-    close_btc(&mut h, T0 + 300);
     ctx("keeper", T0 + 600);
     close_epoch_fully(&mut h);
 
     let bb = h.get_buyback(1).unwrap();
     assert_eq!(bb.status, crate::BuybackStatus::Pending);
     assert_eq!(bb.usdc.0, h.get_epoch_summary(1).unwrap().buyback_pot.0);
-    // 740 and 500 of house profit → 740/1_240 and 500/1_240
-    assert_eq!(bb.weights, vec![(MARKET.to_string(), U128(596_774)), ("BTC-USD".to_string(), U128(403_225))]);
 
     ctx("owner", T0 + 700);
     h.buyback(1, U128(0));
@@ -479,19 +498,11 @@ fn buyback_split_by_market_profit() {
     let held = h.buyback_usdc;
     let _ = h.on_buyback_sent(1, bb.usdc, Ok(bb.usdc));
     assert_eq!(h.buyback_usdc, held - bb.usdc.0);
-    // proceeds arrive and are forwarded
+    // proceeds arrive and are forwarded to ve
     ctx("oneup", T0 + 701);
     let _ = h.ft_on_transfer(acc("swap"), U128(1_000_000), r#"{"buyback_proceeds":{"epoch":1}}"#.into());
     let bb = h.get_buyback(1).unwrap();
     assert_eq!((bb.status, bb.oneup.0), (crate::BuybackStatus::Done, 1_000_000));
-}
-
-fn close_btc(h: &mut House, t: u64) {
-    let id = h.positions.values().find(|p| p.market_id == "BTC-USD").unwrap().id;
-    ctx("bob", t);
-    let o = h.place_close(id);
-    ctx("keeper", t + 1);
-    h.internal_fill(o, px(475, t + 1), t + 1).unwrap(); // −5% × 10 = −500
 }
 
 #[test]
