@@ -16,7 +16,8 @@
     "sim": "pnpm --filter @oneup/sim start",
     "demo": "tsx scripts/demo.ts",
     "test:sandbox": "contracts/build.sh && PATH=\"$HOME/.cargo/bin:$PATH\" cargo test --manifest-path contracts/Cargo.toml -p oneup-integration",
-    "stop": "tsx scripts/stop.ts"
+    "stop": "tsx scripts/stop.ts",
+    "farm": "pnpm --filter @oneup/sim exec tsx src/farm.ts"
   },
   "devDependencies": {
     "@types/node": "24.19.1",

@@ -114,12 +114,62 @@ Also worth knowing for the pitch: with Papertrade's real parameters (flat 100 PA
 capped at $5M) the first 10% of losses hold ~10.5% of PAPER, so its early-holder problem is milder than the
 pitch implies. Its weak point in this model is the perpetual claim, not the mint rate.
 
+## D-14 · No market voting; markets get half the pool · **Decided (21 Oct 2026)**
+
+Voting on which markets get the house's capacity and emissions was the hardest part to explain and not
+needed for the core idea. Removed: votes, bribes and vote-listed markets. Now each new market may use up to
+`market_capacity_ppm` of the pool (default 50%, owner-adjustable per market with `set_capacity`), with the
+pool-wide solvency rule (D-1) still on top, so busy markets get more capacity and no single market can take
+it all. The owner lists markets, like the owner-only buybacks (D-10).
+
+## D-15 · ve1UP is a lock that earns buybacks, up to two years · **Decided (21 Oct 2026)**
+
+Lock $1UP for 1 to 104 epochs as a transferable NFT. Weight = amount × epochs left ÷ 104 (decaying, from
+the epoch after locking; one O(1) tally of Σ A and Σ A·end). Each epoch's buyback $1UP is shared across
+that epoch's lockers by weight; an epoch with nobody locked passes its buyback to the next. Leaving early
+costs `50% × epochs left ÷ 104` (rounded up), and the penalty goes to the next epoch's lockers: a flat 50%
+would make someone two weeks from the end wait instead. Or sell the lock on the market (D-17), where
+buyers set the real discount and the penalty is just the floor.
+
+## D-16 · Only losers earn $1UP, released by house profit, as locks · **Decided (21 Oct 2026)**
+
+Winners are paid in USDC and earn no $1UP. Each epoch releases `oneup_per_usdc` (20) $1UP per USDC of house
+profit, capped by the epoch's share of the 4-year schedule plus anything unreleased before; the rest
+carries forward. The release is shared across the epoch's losers by loss and arrives as 104-epoch locks,
+minted in the same close batches as their Extra Lives (batches of 10 so both fit one transaction).
+
+Why: a long and a short on yourself costs only the winner's 10% cut. Paying emissions by raw loss let a
+farmer buy $1UP far below any sensible price. `pnpm farm` (sim/src/farm.ts) gives the $1UP fully diluted
+value above which farming pays:
+
+| Rules | First 13 weeks, farming = 1× real volume | Year 2, 1× |
+|---|---|---|
+| Before: half to losers by loss, half to winners by cut, liquid | $3.3M | $76M |
+| Losers only, 100 $1UP per $1 of profit, locked | $12M | $161M |
+| **Losers only, 20 per $1, locked** | **$62M** | **$97M** |
+| Losers only, 10 per $1, locked | $123M | $139M |
+
+20 per $1 releases ~98% of the 900M within the 4 years on the simulation's volume path (10 per $1 only
+60%). The rate is a parameter, so it can be tuned once real volume is known.
+
+## D-17 · A marketplace for Extra Lives and locks · **Decided (21 Oct 2026)**
+
+`contracts/market`: list with the NFT standard's `nft_approve(token, market, msg = {"price"})`, buy with
+one USDC `ft_transfer_call`. The NFT moves straight from seller to buyer through the approval and the
+seller is paid in the same flow; if the NFT can't move (sold or given away elsewhere, approval revoked) the
+buyer is refunded and the stale listing removed. No fees. Only the Extra Life and ve contracts are
+accepted.
+
 ## D-11 · Known POC limits · **Noted**
 
-- Rewards for a (market, epoch) with no voters stay in `ve` (no sweep yet).
+- Rounding dust from sharing buybacks by weight stays in `ve` (no sweep).
 - `mock-swap` updates reserves before its payout lands; a failed payout isn't rolled back.
-- ve vote sums use `amount × ppm × end epoch`; fine for weekly epochs, revisit before running 10-minute
-  epochs for years.
+- ve weight sums use `amount × end epoch`; fine for weekly epochs, revisit before running 10-minute epochs
+  for years.
+- Loser locks are one NFT per loser per profitable epoch, with storage paid by `ve`; a minimum lock size
+  would bound that.
+- A full close batch (10 lives + 10 locks) hasn't been gas-tested at the limit; the demo has ≤ 7 losers
+  per epoch.
 - House storage is paid by the contract (min margin 1 USDC bounds spam); no per-user storage deposits.
 
 ## Research (20 Oct 2026)

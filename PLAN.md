@@ -156,6 +156,15 @@ Run: `cd contracts && cargo test -p oneup-math -p oneup-house` · `./build.sh &&
 - [x] `pnpm stop`: stops only processes whose cwd is inside the repo
 - [x] `pnpm test` / `pnpm test:sandbox` work from a clean shell
 
+### Stage 8b — Redesign: locks, losers-only $1UP, market, console · ✅
+
+- [x] Mobile layout, `pnpm demo --lan`; handheld-console restyle (LCD chart, D-pad markets, A/B sides)
+- [x] D-14 no market voting (50% per-market cap); D-15 locks up to 104 epochs earning buybacks, early
+  exit penalty to stayers; D-16 losers-only $1UP, 20 per $1 of house profit, as locks (`pnpm farm`);
+  D-17 marketplace contract for Extra Lives and locks
+- [x] Locks and Market tabs, Sell on cards; bots sell and buy on the market
+- [ ] Update the spec doc for D-14 to D-17
+
 ### Stage 9 — Ship (12–14 Nov)
 
 - [x] README: pitch, money-flow diagram (mermaid), rules, fairness chart + table, repo map, what's mocked

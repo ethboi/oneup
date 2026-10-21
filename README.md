@@ -4,8 +4,8 @@
 
 OneUp is a perpetuals exchange on NEAR where every trade is against one USDC house pool, at the oracle
 price, with no fees, funding or slippage. When you lose, you get an **Extra Life**: a capped, tradeable NFT
-that earns USDC back from the house's real profit. Extra profit buys back **$1UP**, and people who lock $1UP
-vote on which markets get the house's capacity and emissions.
+that earns USDC back from the house's real profit, plus **$1UP** locked for two years that earns the house's
+buybacks. Sell either one on the built-in market whenever you like.
 
 Built at NEAR HACKATHON. Rust contracts on NEAR (near-sdk), a TypeScript keeper, bots and simulation, and a
 Next.js app, all running on a local NEAR chain with one command.
@@ -24,7 +24,7 @@ pnpm demo
 ```
 
 `pnpm demo` builds the contracts if needed, starts a local NEAR node (near-sandbox, like `hardhat node`),
-deploys and wires all seven contracts, seeds the pool, then starts the keeper, six trading bots and the app
+deploys and wires all eight contracts, seeds the pool, then starts the keeper, six trading bots and the app
 at **http://127.0.0.1:3020**. Epochs are 10 minutes. The app signs as a funded demo trader (switch to any
 bot in the account menu). Chain state persists in `.localnet/`.
 
@@ -38,6 +38,8 @@ bot in the account menu). Chain state persists in `.localnet/`.
 | `pnpm test:sandbox` | Builds the wasm and runs end-to-end tests on a sandbox chain |
 | `pnpm smoke` | Against a running demo: deposit → 50× long → fill → −2% → liquidation |
 | `pnpm sim` | Re-runs the early-vs-late simulation |
+| `pnpm farm` | Wash-trading break-even: the $1UP price at which trading against yourself would pay |
+| `pnpm demo --lan` | Same as `pnpm demo`, served to your Wi-Fi so you can use it on a phone |
 
 Move a price during the demo:
 `curl -XPOST localhost:8787/price -d '{"market":"NEAR-USD","movePct":-2}'`
@@ -51,10 +53,11 @@ flowchart LR
   P --> R{{"Reserve<br/>1.2× worst case,<br/>never below the seed"}}
   P -- "half the surplus<br/>above the reserve" --> S((Epoch payout))
   S -- 60% --> L[Extra Lives<br/>NFT holders]
-  S -- 30% --> B[Buy back $1UP] --> V[ve1UP voters<br/>by market profit]
+  S -- 30% --> B[Buy back $1UP] --> V[$1UP lockers<br/>by weight]
   S -- 10% --> P
-  V -. "votes set each market's<br/>capacity + emissions" .-> P
-  E[$1UP emissions] -- "50% winners by cut paid<br/>50% losers by loss" --> T
+  E[$1UP emissions] -- "20 per $1 of house profit<br/>to losers, as 2-year locks" --> V
+  L <-. "sell" .-> M[(Market)]
+  V <-. "sell" .-> M
 ```
 
 ## The rules
@@ -81,11 +84,19 @@ to what each is still owed (O(1) per claim via a product accumulator). A life ea
 minted in and 13 after, then stops and keeps what it earned. Lives are NEP-171 NFTs: sell one and its
 unclaimed USDC goes with it.
 
-**$1UP and ve1UP.** 1B fixed supply, minted once: 900M as emissions over 208 epochs (flat), 50M to seed a
-spot pool, 50M treasury. No team or VC allocation. Each epoch's emissions are split across markets by vote
-share, then half to winners by cut paid and half to losers by loss. Lock $1UP for 1–52 epochs as a veNFT;
-votes decay linearly and decide each market's share of pool capacity and emissions. Voters earn their
-markets' buybacks and any bribes. Anyone can list a market with a 500 USDC bond; it goes live at 2% of votes.
+**$1UP: only losers earn it.** 1B fixed supply, minted once: 900M for emissions over 208 epochs, 50M to seed a
+spot pool, 50M treasury. No team or VC allocation. Each epoch releases 20 $1UP per $1 of house profit (at most
+that epoch's schedule plus anything unreleased before), shared across the epoch's losers by loss and delivered as
+**two-year locks**. Winners are paid in USDC instead. Releasing by house profit, and locking it, is what stops
+farming: a long and a short on yourself costs only the 10% cut, and `pnpm farm` shows it only pays once $1UP is
+worth tens of millions (it paid at $3M under the first design).
+
+**Locks.** Lock $1UP for up to 104 epochs. Each epoch's buyback is shared by weight: amount × epochs left ÷ 104.
+Leaving early costs up to half, less as the lock runs down, and the penalty goes to the people still locked. Or
+sell the lock on the market: it's an NFT.
+
+**Market.** List an Extra Life or a lock for a USDC price; the buyer pays and the NFT moves in one step. Each
+market can use up to half the pool, so no single market takes all the capacity. The owner lists markets.
 
 ## Fair to late players
 
@@ -113,31 +124,32 @@ they were paid, so later losers recovered less. Making lives expire after 13 epo
 | [`contracts/house`](contracts/house) | Pool, orders, delayed fills, solvency, cut, liquidation, epoch close, emissions, buybacks |
 | [`contracts/extra-life`](contracts/extra-life) | Extra Life NFTs (NEP-171), payout accumulator, expiry, claims |
 | [`contracts/oneup-token`](contracts/oneup-token) | $1UP (NEP-141), fixed supply |
-| [`contracts/ve`](contracts/ve) | veNFT locks, decaying votes (O(1) tallies), bribes, buyback rewards, market listing |
+| [`contracts/ve`](contracts/ve) | $1UP locks (NFTs), decaying weight (O(1) tally), buyback rewards, early exit, losers' locks |
+| [`contracts/market`](contracts/market) | Marketplace for Extra Lives and locks, priced in USDC |
 | [`contracts/math`](contracts/math) | Every formula, with the worked vectors from [`docs/maths.md`](docs/maths.md) |
 | `contracts/mock-*` | Local-chain USDC with a faucet, a Pyth-compatible oracle, a constant-product swap |
 | [`contracts/tests`](contracts/tests) | End-to-end tests on a sandbox chain |
 | [`packages/sdk`](packages/sdk) | TypeScript port of the maths (same vectors) and typed contract calls |
 | [`keeper`](keeper) | Pushes prices, fills, liquidates, takes profit at cap, closes epochs, runs buybacks |
-| [`bots`](bots) | Six rule-based trading agents for demo volume |
-| [`sim`](sim) | Early-vs-late simulation |
-| [`app`](app) | Next.js app: trade, Extra Lives, vote, solvency, fairness |
+| [`bots`](bots) | Six rule-based trading agents for demo volume; one sells its lives and locks, one buys bargains |
+| [`sim`](sim) | Early-vs-late simulation and the farming break-even |
+| [`app`](app) | Next.js app: trade, Extra Lives, locks, market, solvency, fairness |
 | [`docs`](docs) | [Maths](docs/maths.md), [interfaces](docs/interfaces.md), [decisions](docs/decisions.md), [plan](PLAN.md) |
 
-Tests: 75 contract unit and property tests, 5 end-to-end sandbox tests, plus SDK and simulation tests.
-The sandbox tests found two real bugs during the build (a u128 overflow in voter reward splits and a
+Tests: 84 contract unit and property tests, 5 end-to-end sandbox tests, plus SDK and simulation tests.
+The sandbox tests found two real bugs during the build (a u128 overflow in reward splits and a
 duplicate-registration panic), and running the demo found a third (the reserve floor; decision D-12).
 
 ## What's mocked locally
 
 - **Prices** come from the keeper, which pushes a steerable random walk (or live Pyth prices with
   `--prices hermes`, which needs a `PYTH_API_KEY`: Hermes now refuses unauthenticated requests) to a
-  Pyth-compatible oracle. Markets listed by vote are priced automatically. On mainnet the house points at Outlayer's
+  Pyth-compatible oracle. Newly listed markets are priced automatically. On mainnet the house points at Outlayer's
   `price-oracle-pyth.near` with the same calls. Outlayer's testnet feed was stale when checked.
 - **USDC** is a local token with a faucet. **Buybacks** swap on a local constant-product pool standing in
   for Rhea.
 - **NEAR Intents** deposits aren't integrated: Intents has no testnet or local deployment.
 - Buybacks are triggered by the owner key for now, so nobody can sandwich them with a zero minimum
-  (decision D-10).
+  (decision D-10). The owner also lists markets (D-14).
 
 See [`docs/decisions.md`](docs/decisions.md) for every design decision and known limit.

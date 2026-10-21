@@ -64,7 +64,7 @@ liab_m = max(long_liab_m, short_liab_m)       # spec as written (sound only if b
 
 E = Σ_m liab_m
 open allowed only if   E_after ≤ pool   and   liab_m_after ≤ capacity_m
-capacity_m = vote_share_m × pool
+capacity_m = cap_m × pool                     # cap_m = 50% by default (D-14)
 ```
 
 `pool` = house-owned USDC: seed + realised trader losses − realised winner payouts − Extra Life payouts −
@@ -137,45 +137,39 @@ expires. Without this, unpaid claims grow without bound and later losers recover
 
 After payout `pool' ≥ pool − 0.9 × 0.5 × (pool − R) > R ≥ 1.2 × E`, so the solvency rule still holds.
 
-## 7. Buybacks to voters
+## 7. Buybacks to lockers
 
 ```
-market_net_m = losses_e,m − payouts_e,m         # per-market version of §5
-weight_m     = max(0, market_net_m) / Σ max(0, market_net)
-                                                # if no market is positive: weight_m = vote_share_m
-usdc_m       = bb_pot × weight_m                # swapped to $1UP on Rhea
-voter v gets   oneup_m × votes_v,m / votes_m
+usdc_e   = bb_pot_e                              # swapped to $1UP (Rhea; mock-swap locally)
+lock l gets   oneup_e × weight_l,e / Σ weight_e  # §9; an epoch with Σ weight = 0 passes it to the next
 ```
 
-## 8. $1UP emissions
+## 8. $1UP emissions (losers only, D-16)
 
 ```
 SUPPLY        = 1_000_000_000 $1UP
 EMISSIONS     = 900_000_000 over 208 epochs
 per_epoch     = floor(EMISSIONS / 208)          # = 4_326_923.076923076923076923 $1UP in base units
                                                 # epoch 208 also gets the remainder
-market_m      = per_epoch × vote_share_m
-winners_m     = market_m / 2   → winner w gets  winners_m × cut_w,m / Σ cut_m
-losers_m      = market_m / 2   → loser i gets   losers_m × face_i,m / Σ face_m
-face_i,m      = face_i × loss_i,m / loss_i      # loser's face value attributed to market m
+available_e   = carry_{e−1} + per_epoch
+release_e     = min(available_e, RATE × house_net_e)      # RATE = 20 $1UP per USDC
+carry_e       = available_e − release_e (+ rounding and failed locks)
+loser i gets  release_e × loss_i / losses_e, as a 104-epoch lock (§9)
 ```
 
-If a market has no winners, the winners' half goes to its losers, and the reverse. A market with neither, or an
-epoch with `house_net ≤ 0` and no winners, sends its emissions to the treasury.
+Winners earn USDC, not $1UP. With `house_net ≤ 0` nothing is released and the whole schedule carries.
+After epoch 208 the schedule is 0 but the carry keeps releasing.
 
-## 9. ve1UP
+## 9. Locks (ve1UP, D-15)
 
-Lock `A` $1UP for `n` epochs (1 ≤ n ≤ 52; one epoch = one week, 10 min in the demo):
+Lock `A` $1UP for `n` epochs (1 ≤ n ≤ 104; one epoch = one week, 10 min in the demo). Made in epoch `c`,
+it counts from `c + 1` and ends at `end = c + 1 + n`:
 
 ```
-power(t) = A × epochs_left(t) / 52
+weight(e) = A × (end − e) / 104                 # for c < e < end
+Σ weight(e) = (S1 − e × S0) / 104               # S0 = Σ A, S1 = Σ A × end over running locks
+exit penalty = ceil(A × 50% × (end − e − 1) / 104)   # leaving in epoch e; goes to epoch e+1's lockers
 ```
-
-Vote allocations persist across epochs until changed; each epoch's shares are taken from a snapshot at epoch
-close: `vote_share_m = Σ_v power_v × alloc_v,m / Σ_v power_v`. Before any votes, live markets share equally.
-
-Market listing: proposal + $500 bond; goes live at the first epoch close where `vote_share_m ≥ 2%`
-(bond refunded); after 4 epoch closes with zero votes the bond goes to the treasury.
 
 ## Test vectors
 
@@ -209,8 +203,14 @@ pool = 200_000, E = 50_000 → R = 60_000, S = 140_000, P = 70_000.
   bb_pot = **9_000**.
 
 ### V6 — Emissions
-per_epoch = 4_326_923.0769…; votes A 60% / B 40% → A gets 2_596_153.846…, winners half 1_298_076.923….
-Winners in A paid cuts 600 and 200 → **973_557.692…** and **324_519.230…**.
+per_epoch = 4_326_923.0769…. house_net = 1_350 USDC → release = min(4_326_923.08, 20 × 1_350) =
+**27_000**; losses Bob 1_000, Carol 500 → locks of **18_000** and **9_000**; carry = **4_299_923.0769…**.
 
-### V7 — ve power
-Lock 1_000 for 52 epochs → power **1_000**; after 26 epochs **500**. Lock 1_000 for 13 → **250**.
+### V7 — Lock weight
+Lock 1_000 for 104 epochs → weight **1_000**; after 52 epochs **500**. Lock 1_000 for 26 → **250**.
+
+### V8 — Exit penalty
+1_000 locked, 104 epochs left → **500**; 52 left → **250**; 1 unit with 1 left → **1** (rounded up).
+
+### V9 — Release cap
+house_net = 10_000_000 USDC → 20 × that is 200M, capped at available = **per_epoch** (+ carry).

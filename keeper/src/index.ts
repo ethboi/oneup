@@ -118,7 +118,7 @@ async function runBuyback(epoch: number) {
   const quote = BigInt(await oneup.view<string>(d.contracts.swap, "get_quote", { usdc_in: b.usdc }));
   if (quote === 0n) return log(`buyback ${epoch}: swap has no liquidity`);
   await owner.buyback(epoch, (quote * 98n) / 100n);
-  log(`buyback ${epoch}: ${fmt(b.usdc)} USDC → $1UP for voters`);
+  log(`buyback ${epoch}: ${fmt(b.usdc)} USDC → $1UP for lockers`);
 }
 
 const fmt = (x?: string) => (x === undefined ? "-" : (Number(x) / 1e6).toLocaleString("en-US", { maximumFractionDigits: 2 }));

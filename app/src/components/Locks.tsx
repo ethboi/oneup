@@ -17,7 +17,11 @@ export function Locks() {
   const locks = usePoll(() => o.locks(me), [me]) ?? [];
   const epoch = usePoll(() => o.epoch(), []);
   const pending = usePoll(() => o.pendingPower(), []);
-  const lastRewards = usePoll(() => (epoch && epoch.id > 1 ? o.lockRewards(epoch.id - 1) : Promise.resolve("0")), [epoch?.id]);
+  // buybacks land after their epoch ends; an epoch nobody was locked for passes its buyback to the next
+  const recent = usePoll(
+    async () => (epoch ? (await Promise.all([epoch.id - 1, epoch.id].filter((e) => e > 0).map((e) => o.lockRewards(e)))).reduce((a, x) => a + BigInt(x), 0n) : 0n),
+    [epoch?.id],
+  );
   const listings = useListings();
   const px = useOneupPrice();
   const mine = locks.filter((l) => !l.withdrawn).reduce((s, l) => s + BigInt(l.power), 0n);
@@ -37,7 +41,7 @@ export function Locks() {
           <dl className="num mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
             <Stat label="Your weight next epoch" value={fmtOneup(mine.toString())} />
             <Stat label="Your share" value={`${share.toFixed(2)}%`} />
-            <Stat label="Last epoch's buyback" value={`${fmtOneup(lastRewards ?? "0")} $1UP`} />
+            <Stat label="Buybacks, last and this epoch" value={`${fmtOneup((recent ?? 0n).toString())} $1UP`} />
           </dl>
         </div>
 
@@ -77,7 +81,7 @@ function LockCard({ l, epoch, px, listings }: { l: LockInfo; epoch: number; px: 
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="display text-lg leading-tight">
-            {fmtOneup(l.amount)} <span className="text-base">$1UP</span>
+            <span className="num">{fmtOneup(l.amount)}</span> <span className="text-base">$1UP</span>
           </div>
           <div className="label">{l.from_loss ? `From a loss in epoch ${l.created - 1}` : `Locked by you in epoch ${l.created}`}</div>
         </div>
