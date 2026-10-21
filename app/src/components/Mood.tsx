@@ -1,9 +1,9 @@
 "use client";
 
-// The console's mood: your margin as health. An HP bar on the screen drains toward liquidation; near it the
-// screen pulses red with a heartbeat that quickens (and a low-HP beep at the end). Near a take-profit (or the
-// 9× cap) it glows and a shimmer climbs. A win bursts coins; a liquidation shakes the case. Sound follows
-// the mute button; motion follows reduced-motion.
+// The console's mood: a gauge on the screen shows how far the price is from liquidation and from your
+// take-profit. Near liquidation the screen pulses red with a heartbeat that quickens (and a warning beep at
+// the end). Near a take-profit (or the 9× cap) it glows and a shimmer climbs. A win bursts coins; a
+// liquidation shakes the case. Sound follows the mute button; motion follows reduced-motion.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { liquidationPrice, type Position } from "@oneup/sdk";
@@ -17,6 +17,8 @@ export interface Mood {
   health: number;
   /** 0 at entry, 1 at the take-profit (or the 9× cap). */
   progress: number;
+  /** The position the gauge shows (the most endangered): its liquidation, entry and target prices. */
+  gauge?: { liq: number; entry: number; target: number; mark: number; capped: boolean };
 }
 
 const DANGER = 0.3;
@@ -34,16 +36,19 @@ export function useMood(positions: Position[], mark?: bigint): Mood {
     const m = Number(mark);
     let health = 1;
     let progress = 0;
+    let gauge: Mood["gauge"];
     for (const p of live) {
       const entry = Number(p.entry_price);
       const liq = Number(liquidationPrice(p.side, BigInt(p.entry_price), p.leverage));
-      health = Math.min(health, 1 - along(entry, liq, m));
+      const h = 1 - along(entry, liq, m);
       const cap = entry * (1 + ((p.side === "Long" ? 1 : -1) * 9) / p.leverage);
       const target = p.triggers.take_profit ? Number(p.triggers.take_profit) : cap;
       progress = Math.max(progress, along(entry, target, m));
+      if (!gauge || h < health) gauge = { liq, entry, target, mark: m, capped: !p.triggers.take_profit };
+      health = Math.min(health, h);
     }
     const state = health < CRITICAL ? "critical" : health < DANGER ? "danger" : progress > HOT ? "hot" : "calm";
-    return { state, health, progress };
+    return { state, health, progress, gauge };
   }, [positions, mark]);
 }
 
@@ -78,18 +83,32 @@ export function useTensionSound(mood: Mood) {
   }, [active]);
 }
 
-/** Your health as an HP bar printed on the screen: segments in LCD ink, red once in danger. Hearts stay for
- *  Extra Lives, so the two never read as the same thing. */
-export function HpBar({ health }: { health: number }) {
-  const lit = Math.ceil(Math.max(0, Math.min(1, health)) * 10);
-  const danger = health < DANGER;
+/** Distance to liquidation and to the take-profit (or the 9× cap), on a gauge printed on the screen:
+ *  liquidation at the left end, the target at the right, a tick at entry and a dot at the price. */
+export function Gauge({ mood }: { mood: Mood }) {
+  const g = mood.gauge;
+  if (!g) return null;
+  const pct = (to: number) => `${((Math.abs(to - g.mark) / g.mark) * 100).toFixed(1)}%`;
+  const at = (x: number) => `${along(g.liq, g.target, x) * 100}%`;
+  const danger = mood.state === "danger" || mood.state === "critical";
+  const hot = mood.state === "hot";
   return (
-    <span className="flex items-center gap-1.5" role="meter" aria-label="Health: margin left before liquidation" aria-valuenow={Math.round(health * 100)} aria-valuemin={0} aria-valuemax={100}>
-      <span className="display text-sm text-[var(--lcd-ink)]">HP</span>
-      <span className="flex gap-[2px] rounded-[3px] border-2 border-[var(--lcd-ink)] p-[2px]">
-        {Array.from({ length: 10 }, (_, i) => (
-          <span key={i} className="h-2.5 w-2" style={{ background: i < lit ? (danger ? "#c43636" : "var(--lcd-ink)") : "transparent" }} />
-        ))}
+    <span
+      className="display num flex items-center gap-2 text-sm text-[var(--lcd-ink)]"
+      role="img"
+      aria-label={`Liquidation ${pct(g.liq)} away, ${g.capped ? "profit cap" : "take profit"} ${pct(g.target)} away`}
+    >
+      <span style={danger ? { color: "#c43636" } : undefined}>LIQ {pct(g.liq)}</span>
+      <span className="relative h-3 w-28 sm:w-40">
+        <span className="absolute inset-x-0 top-1/2 h-[3px] -translate-y-1/2 bg-[var(--lcd-3)]" />
+        <span className="absolute top-0 h-3 w-[2px] bg-[var(--lcd-3)]" style={{ left: at(g.entry) }} />
+        <span
+          className="absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 border-2 border-[var(--lcd-ink)]"
+          style={{ left: at(g.mark), background: danger ? "#c43636" : hot ? "#f2b705" : "var(--lcd-ink)" }}
+        />
+      </span>
+      <span style={hot ? { color: "#7a5a00" } : undefined}>
+        {g.capped ? "MAX" : "TP"} {pct(g.target)}
       </span>
     </span>
   );
