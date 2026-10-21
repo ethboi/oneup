@@ -24,6 +24,7 @@ import { fmtClock, useNow } from "./Header";
 import { PixelHeart } from "./Pixel";
 import { Icon } from "./Icon";
 import { Popover } from "./Popover";
+import { Burst, HpHearts, MoodGlow, useCloseFx, useMood, useTensionSound } from "./Mood";
 import { ActivityList, useActivity } from "./Activity";
 import { HistoryList } from "./History";
 import { ShareButton, type CardData } from "./PnlCard";
@@ -64,6 +65,8 @@ export function Trade() {
         label: `#${p.id} liq`,
         kind: "liq" as const,
       },
+      ...(p.triggers.take_profit ? [{ price: priceToNumber(BigInt(p.triggers.take_profit)), label: `#${p.id} TP`, kind: "tp" as const }] : []),
+      ...(p.triggers.stop_loss ? [{ price: priceToNumber(BigInt(p.triggers.stop_loss)), label: `#${p.id} SL`, kind: "sl" as const }] : []),
     ]);
 
   return (
@@ -75,7 +78,13 @@ export function Trade() {
         <div className="order-1 empty:hidden">
           <LossBanner />
         </div>
-        <Console market={market} setMarket={setMarket} markets={markets.filter((m) => m.live).map((m) => m.id)} marks={marks} />
+        <Console
+          market={market}
+          setMarket={setMarket}
+          markets={markets.filter((m) => m.live).map((m) => m.id)}
+          marks={marks}
+          mine={positions.filter((p) => p.market_id === market)}
+        />
         <div className="order-4 min-w-0">
           <Below positions={positions} orders={orders} />
         </div>
@@ -159,14 +168,29 @@ function useTicket(market: string, maxLeverage: number) {
 }
 
 /** The handheld: plastic case, slate surround with stripes, the LCD with its readout, and the market buttons. */
-function Console({ market, setMarket, markets, marks }: { market: string; setMarket: (m: string) => void; markets: string[]; marks: Mark[] }) {
+function Console({
+  market,
+  setMarket,
+  markets,
+  marks,
+  mine,
+}: {
+  market: string;
+  setMarket: (m: string) => void;
+  markets: string[];
+  marks: Mark[];
+  mine: Position[];
+}) {
   const { prices, history } = useOneUp();
+  const mood = useMood(mine, prices[market]);
+  useTensionSound(mood);
+  const fx = useCloseFx(market);
   const [range, setRange] = useState<number>(RANGES[1][1]);
   const now = useNow();
   const pts = (history[market] ?? []).filter((p, i, a) => p.t >= now * 1000 - range || i === a.length - 1);
   const change = pts.length > 1 ? (pts[pts.length - 1].p / pts[0].p - 1) * 100 : 0;
   return (
-    <div className="case order-2 min-w-0 p-3 sm:p-5">
+    <div key={fx?.kind === "liquidated" ? fx.id : "case"} className={`case order-2 min-w-0 p-3 sm:p-5 ${fx?.kind === "liquidated" ? "shake" : ""}`}>
       <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
       <div className="-mx-1 flex min-w-0 flex-1 gap-1.5 overflow-x-auto px-1 pb-1 pt-0.5" role="group" aria-label="Market">
         {markets.map((m) => {
@@ -198,7 +222,14 @@ function Console({ market, setMarket, markets, marks }: { market: string; setMar
       <div className="bezel px-3 pb-5 pt-3 sm:px-5">
         <div className="stripes mb-3" aria-hidden />
         <div className="relative">
-          <PriceChart points={pts} marks={marks} />
+          <PriceChart points={pts} marks={marks} alarm={mood.state === "danger" || mood.state === "critical"} />
+          <MoodGlow mood={mood} />
+          {fx && <Burst fx={fx} />}
+          {mood.state !== "none" && (
+            <div className="pointer-events-none absolute right-3 top-2.5">
+              <HpHearts health={mood.health} />
+            </div>
+          )}
           {/* the readout is printed on the screen, in LCD ink */}
           <div className="display num pointer-events-none absolute left-3 top-2 flex items-baseline gap-2 text-[var(--lcd-ink)]">
             <span className="font-[family-name:var(--font-display)] text-base">{market}</span>

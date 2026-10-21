@@ -1,7 +1,8 @@
 "use client";
 
-// The console's LCD: price line from the app's polled history, in four shades of green, with entry and
-// liquidation marks told apart by dash pattern (the screen has no colours to spare). Drawn at the
+// The console's LCD: price line from the app's polled history, in four shades of green, with entry,
+// liquidation, take-profit and stop-loss marks told apart by dash pattern and label (the screen has no
+// colours to spare). Drawn at the
 // container's real width with a crosshair readout that follows a mouse or a finger. The time axis slides
 // with the clock and each new price eases in, so the line moves steadily between oracle updates.
 
@@ -11,10 +12,10 @@ import { useWidth } from "@/lib/useWidth";
 export interface Mark {
   price: number;
   label: string;
-  kind: "entry" | "liq";
+  kind: "entry" | "liq" | "tp" | "sl";
 }
 
-const DASH = { entry: "6 4", liq: "2 3" } as const;
+const DASH = { entry: "6 4", liq: "2 3", tp: "10 3 2 3", sl: "10 3 2 3" } as const;
 /** How long a new price takes to ease in. */
 const EASE_MS = 500;
 
@@ -38,7 +39,8 @@ function useClock(): number | null {
   return now;
 }
 
-export function PriceChart({ points, marks = [] }: { points: { t: number; p: number }[]; marks?: Mark[] }) {
+/** `alarm`: a position here is near liquidation, so its liquidation line blinks. */
+export function PriceChart({ points, marks = [], alarm }: { points: { t: number; p: number }[]; marks?: Mark[]; alarm?: boolean }) {
   const [ref, W] = useWidth();
   const narrow = W < 480;
   const H = narrow ? 210 : 250;
@@ -113,7 +115,7 @@ export function PriceChart({ points, marks = [] }: { points: { t: number; p: num
         <path d={`${line} L${x(t1)} ${H - PAD.b} L${x(t0)} ${H - PAD.b} Z`} fill="var(--lcd-2)" opacity="0.45" />
         <path d={line} fill="none" stroke="var(--lcd-ink)" strokeWidth="2.5" strokeLinejoin="round" />
         {marks.map((m) => (
-          <g key={m.label}>
+          <g key={m.label} className={alarm && m.kind === "liq" ? "blink" : undefined}>
             <line
               x1={PAD.l}
               x2={W - PAD.r}

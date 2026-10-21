@@ -111,3 +111,34 @@ export function sfx(name: Sfx) {
     // no audio here: carry on silently
   }
 }
+
+// Tension cues for the chart, played on a loop by the console while a position is near liquidation or its
+// take-profit (components/Mood.tsx). Each call is one beat.
+
+/** Lub-dub: two low thumps. */
+export function heartbeat() {
+  try {
+    play([
+      { freq: 62, to: 40, at: 0, len: 0.11, wave: "sine", gain: 3.5 },
+      { freq: 55, to: 36, at: 0.16, len: 0.13, wave: "sine", gain: 2.8 },
+    ]);
+  } catch {}
+}
+
+/** The low-HP alarm: a short high beep. */
+export function lowHpBeep() {
+  try {
+    play([{ note: "B5", at: 0, len: 0.07, gain: 0.45 }]);
+  } catch {}
+}
+
+/** A bright tick that climbs as the price nears the target (`progress` 0–1). */
+export function shimmer(progress: number) {
+  try {
+    const base = 880 * 2 ** (progress * 1.5);
+    play([
+      { freq: base, at: 0, len: 0.05, wave: "triangle", gain: 0.7 },
+      { freq: base * 1.5, at: 0.05, len: 0.06, wave: "triangle", gain: 0.5 },
+    ]);
+  } catch {}
+}

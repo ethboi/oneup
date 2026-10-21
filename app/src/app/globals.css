@@ -502,7 +502,125 @@ body {
 .plus-one {
   animation: rise-fade 1.4s 0.35s ease-out both;
 }
+/* the console's mood (components/Mood.tsx) */
+.mood-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  pointer-events: none;
+  animation: mood-pulse var(--beat, 1s) ease-in-out infinite;
+}
+.mood-danger,
+.mood-critical {
+  box-shadow: inset 0 0 0 3px rgb(210 58 58 / 0.55), inset 0 0 48px rgb(210 58 58 / 0.55);
+}
+.mood-critical {
+  background: rgb(210 58 58 / 0.1);
+}
+.mood-hot {
+  box-shadow: inset 0 0 0 3px rgb(242 183 5 / 0.6), inset 0 0 56px rgb(242 183 5 / 0.5);
+}
+@keyframes mood-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  15% {
+    opacity: 1;
+  }
+}
+.blink {
+  animation: blink 0.5s steps(1) infinite;
+}
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+.shake {
+  animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+@keyframes shake {
+  10%,
+  90% {
+    transform: translateX(-2px);
+  }
+  20%,
+  80% {
+    transform: translateX(4px);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translateX(-8px) rotate(-0.4deg);
+  }
+  40%,
+  60% {
+    transform: translateX(8px) rotate(0.4deg);
+  }
+}
+.coin-fly {
+  animation: coin-fly 1.1s cubic-bezier(0.2, 0.7, 0.4, 1) both;
+}
+@keyframes coin-fly {
+  0% {
+    transform: translate(0, 20px) scale(0.4);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--dx), calc(var(--dy) + 60px)) scale(1);
+    opacity: 0;
+  }
+}
+.heart-crack {
+  animation: heart-crack 0.7s ease-out both;
+}
+@keyframes heart-crack {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  30% {
+    transform: scale(1.1) rotate(-6deg);
+  }
+  100% {
+    transform: scale(0.6) rotate(12deg) translateY(30px);
+    opacity: 0;
+  }
+}
+.heart-plus {
+  animation: heart-plus 1.5s cubic-bezier(0.3, 1.4, 0.5, 1) both;
+}
+@keyframes heart-plus {
+  0%,
+  40% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  85% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) translateY(-16px);
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .mood-glow,
+  .blink,
+  .shake,
+  .coin-fly,
+  .heart-crack,
+  .heart-plus,
   .heart-pop,
   .plus-one,
   .boot-logo,
@@ -512,5 +630,10 @@ body {
   }
   .btn {
     transition: none;
+  }
+  /* bursts are motion: without it, just the +1 heart */
+  .coin-fly,
+  .heart-crack {
+    display: none;
   }
 }
