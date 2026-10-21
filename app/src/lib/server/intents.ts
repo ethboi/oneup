@@ -1,16 +1,13 @@
-// Server side of NEAR Intents (D-21): the simulated bridge and OneUp's solver. Localnet only: the bridge
-// is the root account (it holds the PoA factory's depositer role) and the solver's key is in
-// localnet.json. Intents are signed with the official @defuse-protocol/intents-sdk.
+// Server side of NEAR Intents (D-21): the simulated bridge and OneUp's solver. Localnet only (deployment()
+// checks): the bridge is the root account (it holds the PoA factory's depositer role) and the solver's key
+// is in localnet.json. Intents are signed with the official @defuse-protocol/intents-sdk.
 
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { createIntentSignerNEP413, VersionedNonceBuilder } from "@defuse-protocol/intents-sdk";
 import { Account, JsonRpcProvider, KeyPair, actions, nearToYocto, teraToGas, type KeyPairString } from "near-api-js";
 import { normalizePrice, type BridgedAsset, type Deployment } from "@oneup/sdk";
+import { deployment } from "./localnet";
 
-export function deployment(): Deployment {
-  return JSON.parse(readFileSync(resolve(process.cwd(), "../localnet.json"), "utf8"));
-}
+export { deployment };
 
 const provider = (d: Deployment) => new JsonRpcProvider({ url: d.rpcUrl });
 
@@ -20,11 +17,18 @@ export function asset(d: Deployment, token: string): BridgedAsset {
   return a;
 }
 
+/** Most the bridge mints per call: 100,000 of a stablecoin, 50 of anything else, in whole tokens. */
+export const MAX_BRIDGE = (a: BridgedAsset) => (a.symbol === "USDC" ? 100_000n : 50n) * 10n ** BigInt(a.decimals);
+
+/** Most USDC (6 decimals) one swap may buy. */
+export const MAX_SWAP_USDC = 100_000n * 1_000_000n;
+
 /** The simulated bridge: mints `amount` of a bridged asset into the Verifier for `account`, as a real
  *  bridge would after seeing a deposit on the source chain. */
 export async function bridgeIn(account: string, token: string, amount: bigint) {
   const d = deployment();
-  asset(d, token);
+  const a = asset(d, token);
+  if (amount <= 0n || amount > MAX_BRIDGE(a)) throw new Error(`Bridge between 0 and ${MAX_BRIDGE(a) / 10n ** BigInt(a.decimals)} ${a.symbol}`);
   const root = new Account(d.owner.id, provider(d), d.owner.key as KeyPairString);
   await root.callFunction({
     contractId: d.intents!.poa,
@@ -36,10 +40,11 @@ export async function bridgeIn(account: string, token: string, amount: bigint) {
 }
 
 /** Spreads the solver charges: 5 bps on stablecoins, 30 bps on ETH. */
-const FEE_BPS = (a: BridgedAsset) => (a.symbol === "USDC" ? 5n : 30n);
+export const FEE_BPS = (a: BridgedAsset) => (a.symbol === "USDC" ? 5n : 30n);
 
 /** How much of `token` buys `usdcOut` USDC (6 decimals), from the oracle's ETH price where needed. */
 export async function quoteExactOut(token: string, usdcOut: bigint): Promise<{ amountIn: bigint; price: number }> {
+  if (usdcOut <= 0n || usdcOut > MAX_SWAP_USDC) throw new Error("Swap between 0 and 100,000 USDC");
   const d = deployment();
   const a = asset(d, token);
   let usdPerUnit = 1;
@@ -67,22 +72,62 @@ interface MultiPayload {
   signature: string;
 }
 
+type Intent = { intent: string; diff?: Record<string, string>; msg?: string };
+
+/** The account a deposit or open message to the house is for. */
+const msgAccount = (msg: string) => {
+  const m = JSON.parse(msg) as { for?: { account_id?: string }; open?: { account_id?: string } };
+  return m.for?.account_id ?? m.open?.account_id;
+};
+
+/**
+ * Checks a user's signed swap message against the quote: exactly one token_diff paying `token` for exactly
+ * `usdcOut` USDC, at least `needed` less the solver's fee (the price may have moved since the quote), and
+ * only ft_withdraws for the signer's own account besides. Returns what the user pays.
+ */
+export function checkFill(d: Deployment, message: string, token: string, usdcOut: bigint, needed: bigint): bigint {
+  const a = asset(d, token);
+  if (usdcOut <= 0n || usdcOut > MAX_SWAP_USDC) throw new Error("Swap between 0 and 100,000 USDC");
+  const usdcId = `nep141:${d.contracts.usdc}`;
+  const tokenId = `nep141:${a.token}`;
+  const msg = JSON.parse(message) as { signer_id: string; intents: Intent[] };
+  const diffs = msg.intents.filter((x) => x.intent === "token_diff");
+  const diff = diffs.length === 1 ? diffs[0].diff : undefined;
+  const exact = Object.keys(diff ?? {}).sort().join() === [usdcId, tokenId].sort().join();
+  if (!diff || !exact || BigInt(diff[usdcId]) !== usdcOut) throw new Error("The intent doesn't match the quote");
+  const amountIn = -BigInt(diff[tokenId]);
+  if (amountIn <= 0n) throw new Error("The intent doesn't match the quote");
+  for (const x of msg.intents) {
+    if (x.intent === "token_diff") continue;
+    if (x.intent !== "ft_withdraw" || (x.msg !== undefined && msgAccount(x.msg) !== msg.signer_id)) throw new Error("The solver only fills a swap and your own deposit");
+  }
+  if (amountIn * 10_000n < needed * (10_000n - FEE_BPS(a))) throw new Error("Price moved: ask for a new quote");
+  return amountIn;
+}
+
+/** One fill at a time: the solver's key has one nonce. */
+const g = globalThis as unknown as { __oneupFills?: Promise<unknown> };
+function serial<T>(f: () => Promise<T>): Promise<T> {
+  const p = (g.__oneupFills ?? Promise.resolve()).then(f, f);
+  g.__oneupFills = p.catch(() => {});
+  return p;
+}
+
 /**
  * Fills a user's signed swap: checks it pays `amountIn` of `token` for exactly the quoted USDC, signs the
  * mirror token_diff as the solver and executes both in one execute_intents call.
  */
-export async function fill(user: MultiPayload, token: string, usdcOut: bigint) {
+export function fill(user: MultiPayload, token: string, usdcOut: bigint) {
+  return serial(() => fillNow(user, token, usdcOut));
+}
+
+async function fillNow(user: MultiPayload, token: string, usdcOut: bigint) {
   const d = deployment();
   const i = d.intents!;
   const usdcId = `nep141:${d.contracts.usdc}`;
   const tokenId = `nep141:${token}`;
-  const msg = JSON.parse(user.payload.message) as { signer_id: string; intents: { intent: string; diff?: Record<string, string> }[] };
-  const diff = msg.intents.find((x) => x.intent === "token_diff")?.diff;
-  if (!diff || BigInt(diff[usdcId] ?? "0") !== usdcOut) throw new Error("The intent doesn't match the quote");
-  const amountIn = -BigInt(diff[tokenId] ?? "0");
   const { amountIn: needed } = await quoteExactOut(token, usdcOut);
-  // the price may have moved since the quote: allow 1%
-  if (amountIn * 100n < needed * 99n) throw new Error("Price moved: ask for a new quote");
+  const amountIn = checkFill(d, user.payload.message, token, usdcOut, needed);
 
   const kp = KeyPair.fromString(i.solver.key as KeyPairString);
   const signer = createIntentSignerNEP413({

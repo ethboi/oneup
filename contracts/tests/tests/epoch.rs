@@ -8,9 +8,11 @@ use serde_json::json;
 async fn lose_close_epoch_claim() -> anyhow::Result<()> {
     let e = setup(5).await?;
 
-    // The seed provider holds the seed's Extra Life: 100K owed at 1.0×
-    let seed = view(&e.life, "life_info", json!({"token_id": format!("0:{}", e.owner.id())})).await?;
+    // The seed provider holds the seed's Backer Life: 100K owed at 1.0×, never expiring (D-22)
+    let seed = view(&e.life, "life_info", json!({"token_id": "b1"})).await?;
     assert_eq!(seed["owed"], json!(usd(100_000)));
+    assert_eq!(seed["owner_id"], json!(e.owner.id()));
+    assert_eq!(seed["backer"], json!(true));
 
     // Bob loses 500 by liquidation
     let bob = trader(&e, "bob", 500).await?;

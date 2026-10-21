@@ -12,7 +12,7 @@ export interface ActivityItem {
   seq: number;
   /** ms since epoch, from the block. */
   t: number;
-  kind: "liquidated" | "lost" | "won" | "opened" | "life" | "lock" | "epoch" | "sold";
+  kind: "liquidated" | "lost" | "won" | "opened" | "life" | "lock" | "epoch" | "sold" | "backed";
   /** Short account names: "bot3", "demo". */
   who?: string;
   text: string;
@@ -40,6 +40,7 @@ export type HistoryItem = HistoryEntry & { seq: number };
 type HistoryEntry = { t: number } & (
   | { kind: "trade"; trade: TradeRecord }
   | { kind: "deposit" | "withdraw" | "claim_usdc"; amount: string }
+  | { kind: "backed"; amount: string; cap_ppm: string }
   | { kind: "claim_oneup"; amount: string }
   | { kind: "life" | "lock"; token_id: string }
   | { kind: "bought" | "sold"; what: "Extra Life" | "$1UP lock"; price: string; other: string }
@@ -131,9 +132,18 @@ interface Event {
   data: Record<string, unknown>[] | Record<string, unknown>;
 }
 
-type Out = { feed: Omit<ActivityItem, "seq">[]; history: [string, HistoryEntry][] };
+export type Out = { feed: Omit<ActivityItem, "seq">[]; history: [string, HistoryEntry][] };
 
-function toItems(ev: Event, executor: string, t: number, c: Record<string, string>, out: Out) {
+/** Whether an event comes from the contract that owns its standard: anyone can deploy a contract that logs
+ *  `oneup` events, so only the house's count (and the market's `oneup_market` ones). */
+export function trusted(ev: Pick<Event, "standard">, executor: string, c: Record<string, string>): boolean {
+  if (ev.standard === "oneup") return executor === c.house;
+  if (ev.standard === "oneup_market") return executor === c.market;
+  return true; // nep171/nep141: each branch below checks its executor
+}
+
+export function toItems(ev: Event, executor: string, t: number, c: Record<string, string>, out: Out) {
+  if (!trusted(ev, executor, c)) return;
   const rows = Array.isArray(ev.data) ? ev.data : [ev.data];
   const mine = (account: string, item: HistoryEntry) => out.history.push([account, item]);
   for (const d of rows) {
@@ -180,6 +190,10 @@ function toItems(ev: Event, executor: string, t: number, c: Record<string, strin
       out.feed.push({ t, kind: "opened", who, text: `${who} opened a ${d.leverage}× ${side.toLowerCase()} on ${d.market_id}` });
     } else if (ev.standard === "oneup" && (ev.event === "deposit" || ev.event === "withdraw")) {
       mine(String(d.account_id), { t, kind: ev.event, amount: String(d.amount) });
+    } else if (ev.standard === "oneup" && ev.event === "backed") {
+      const who = short(String(d.account_id));
+      mine(String(d.account_id), { t, kind: "backed", amount: String(d.amount), cap_ppm: String(d.cap_ppm) });
+      out.feed.push({ t, kind: "backed", who, text: `${who} backed the house with ${usd(String(d.amount))}` });
     } else if (ev.standard === "oneup" && ev.event === "epoch_closed") {
       const s = d.summary as Record<string, string | number>;
       const lives = Number(s.lives_minted);

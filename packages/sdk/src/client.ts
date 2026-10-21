@@ -43,7 +43,7 @@ export interface Triggers {
 
 export type OrderKind =
   | { Open: { side: Side; margin: U128; leverage: number; cut_ppm: U128; triggers: Triggers } }
-  | { Close: { position_id: number } };
+  | { Close: { position_id: number; reason: "Close" | "Target" | "Stop" } };
 
 export interface Order {
   id: number;
@@ -108,6 +108,19 @@ export interface LifeInfo {
   claimable: U128;
   full_heal: boolean;
   expired: boolean;
+  /** A Backer Life: backed the house pool (D-22); never expires. */
+  backer: boolean;
+}
+
+export interface Backing {
+  /** Total seeded and backed so far, and the round's target (USDC units). */
+  backed: U128;
+  target: U128;
+  open: boolean;
+  min: U128;
+  /** For the quoted amount: the cap (ppm) and what the Backer Life would be owed. */
+  cap_ppm: U128;
+  owed: U128;
 }
 
 export interface LockInfo {
@@ -266,6 +279,8 @@ export class OneUp {
     return this.view<DaoProposal[]>(this.d.contracts.dao!, "get_proposals", { from_index: from, limit: 20 });
   };
   owner = () => this.house<[string, string | null]>("get_owner");
+  /** The bootstrap round (D-22), with what backing `amount` now earns. */
+  backing = (amount?: bigint) => this.house<Backing>("get_backing", { amount: amount?.toString() ?? null });
   usdcBalance = (account_id: string) => this.view<U128>(this.d.contracts.usdc, "ft_balance_of", { account_id });
   oneupBalance = (account_id: string) => this.view<U128>(this.d.contracts.oneup, "ft_balance_of", { account_id });
 
@@ -309,7 +324,9 @@ export class OneUp {
       hitStop: (position_id: number) => house<boolean>("hit_stop", { position_id }),
       closeEpoch: (limit = 10) => house<string>("close_epoch", { limit }, MAX_GAS),
       buyback: (epoch: number, min_out: bigint) => house<void>("buyback", { epoch, min_out: min_out.toString() }, MAX_GAS),
-      claimLives: (token_ids: string[]) => send<void>({ contractId: c.life, methodName: "claim", args: { token_ids } }),
+      /** At most 30 lives per call. */
+      claimLives: (token_ids: string[]) =>
+        send<void>({ contractId: c.life, methodName: "claim", args: { token_ids: token_ids.slice(0, 30) }, gas: MAX_GAS }),
       lock: (amount: bigint, epochs: number) => ftCall(c.oneup, c.ve, amount, JSON.stringify({ lock: { epochs } })),
       claimVe: (token_id: string, epochs: number[]) => send<void>({ contractId: c.ve, methodName: "claim", args: { token_id, epochs } }),
       claimVeMany: (token_ids: string[], epochs: number[]) =>
@@ -329,7 +346,9 @@ export class OneUp {
       delist: (nft: string, token_id: string) =>
         send<void>({ contractId: c.market, methodName: "delist", args: { nft_contract: nft, token_id } }),
       buy: (nft: string, token_id: string, price: bigint) =>
-        ftCall(c.usdc, c.market, price, JSON.stringify({ buy: { nft_contract: nft, token_id } })),
+        ftCall(c.usdc, c.market, price, JSON.stringify({ buy: { nft_contract: nft, token_id, price: price.toString() } })),
+      /** Backs the house pool during the bootstrap round for a Backer Life (D-22). */
+      back: (amount: bigint) => ftCall(c.usdc, c.house, amount, JSON.stringify({ back: {} })),
       pushPrices: (updates: { feed_id: string; price: number; conf: number; expo: number; publish_time: number }[]) =>
         send<number>({ contractId: c.oracle, methodName: "push_prices", args: { updates } }),
     };

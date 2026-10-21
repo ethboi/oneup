@@ -23,8 +23,9 @@ async fn list(e: &Env, seller: &Account, nft: &near_workspaces::Contract, token_
     Ok(())
 }
 
-async fn buy(e: &Env, buyer: &Account, nft: &near_workspaces::Contract, token_id: &str, pay: u128) -> anyhow::Result<()> {
-    let msg = json!({"buy": {"nft_contract": nft.id(), "token_id": token_id}}).to_string();
+/// Buys at the listing `price` the buyer saw, sending `pay` (any extra comes back as change).
+async fn buy(e: &Env, buyer: &Account, nft: &near_workspaces::Contract, token_id: &str, price: u128, pay: u128) -> anyhow::Result<()> {
+    let msg = json!({"buy": {"nft_contract": nft.id(), "token_id": token_id, "price": usd(price).to_string()}}).to_string();
     transfer_call(buyer, &e.usdc, e.market.id().as_str(), usd(pay), &msg).await
 }
 
@@ -56,7 +57,7 @@ async fn sell_an_extra_life_and_a_lock() -> anyhow::Result<()> {
     let l = view(&e.market, "get_listing", json!({"nft_contract": e.life.id(), "token_id": life_id})).await?;
     assert_eq!(l["price"], json!(usd(300)));
     let bob_before = usdc(&e, &bob).await?;
-    buy(&e, &dave, &e.life, &life_id, 320).await?;
+    buy(&e, &dave, &e.life, &life_id, 300, 320).await?;
     assert_eq!(owner_of(&e.life, &life_id).await?, dave.id().to_string());
     assert_eq!(usdc(&e, &bob).await? - bob_before, 300 * USDC);
     assert_eq!(usdc(&e, &dave).await?, 700 * USDC);
@@ -74,16 +75,53 @@ async fn sell_an_extra_life_and_a_lock() -> anyhow::Result<()> {
         .await?
         .into_result()?;
     // Dave tries to buy it: the NFT can't move, so his 200 comes back and the listing is gone
-    buy(&e, &dave, &e.ve, &lock_id, 200).await?;
+    buy(&e, &dave, &e.ve, &lock_id, 200, 200).await?;
     assert_eq!(owner_of(&e.ve, &lock_id).await?, carol.id().to_string());
     assert_eq!(usdc(&e, &dave).await?, 700 * USDC);
     assert!(view(&e.market, "get_listing", json!({"nft_contract": e.ve.id(), "token_id": lock_id})).await?.is_null());
 
     // Carol lists it herself and Dave buys it: the lock is his
     list(&e, &carol, &e.ve, &lock_id, 150).await?;
-    buy(&e, &dave, &e.ve, &lock_id, 150).await?;
+    buy(&e, &dave, &e.ve, &lock_id, 150, 150).await?;
     assert_eq!(owner_of(&e.ve, &lock_id).await?, dave.id().to_string());
     assert_eq!(usdc(&e, &dave).await?, 550 * USDC);
     assert_eq!(view(&e.ve, "locks_for_owner", json!({"account_id": dave.id()})).await?[0]["token_id"], json!(lock_id));
+    Ok(())
+}
+
+/// Security review fixes: a listing can't be emptied, re-priced or closed under a buyer.
+#[tokio::test]
+async fn a_listing_cannot_change_under_the_buyer() -> anyhow::Result<()> {
+    let e = setup(5).await?;
+    let bob = trader(&e, "bob", 500).await?;
+    let dave = e.owner.create_subaccount("dave").initial_balance(NearToken::from_near(5)).transact().await?.into_result()?;
+    dave.call(e.usdc.id(), "faucet").args_json(json!({"amount": usd(1_000)})).transact().await?.into_result()?;
+    let up = |x: u128| (x * 10u128.pow(18)).to_string();
+    register(&e.owner, &e.oneup, bob.id().as_str()).await?;
+    transfer(&e.owner, &e.oneup, bob.id().as_str(), up(1_001)).await?;
+    let lock = |amount: u128| {
+        let (bob, e, up) = (&bob, &e, &up);
+        async move {
+            transfer_call(bob, &e.oneup, e.ve.id().as_str(), up(amount), r#"{"lock":{"epochs":52}}"#).await?;
+            let locks = view(&e.ve, "locks_for_owner", json!({"account_id": bob.id()})).await?;
+            anyhow::Ok(locks.as_array().unwrap().last().unwrap()["token_id"].as_str().unwrap().to_string())
+        }
+    };
+
+    // Bob locks $1UP and lists the lock, then exits early: the lock is empty, so the sale must fail
+    let lock_id = lock(1_000).await?;
+    list(&e, &bob, &e.ve, &lock_id, 100).await?;
+    bob.call(e.ve.id(), "exit_early").args_json(json!({"token_id": lock_id})).max_gas().transact().await?.into_result()?;
+    buy(&e, &dave, &e.ve, &lock_id, 100, 100).await?;
+    assert_eq!(owner_of(&e.ve, &lock_id).await?, bob.id().to_string());
+    assert_eq!(usdc(&e, &dave).await?, 1_000 * USDC, "refunded in full");
+
+    // A re-price after the buyer looked: the buy carries the price it saw, so it's refused
+    let lock2 = lock(1).await?;
+    list(&e, &bob, &e.ve, &lock2, 50).await?;
+    list(&e, &bob, &e.ve, &lock2, 90).await?; // re-approve at a higher price
+    buy(&e, &dave, &e.ve, &lock2, 50, 90).await?;
+    assert_eq!(owner_of(&e.ve, &lock2).await?, bob.id().to_string());
+    assert_eq!(usdc(&e, &dave).await?, 1_000 * USDC);
     Ok(())
 }

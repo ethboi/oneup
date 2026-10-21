@@ -15,6 +15,8 @@ const GAS_WITHDRAW_CALLBACK: Gas = Gas::from_tgas(10);
 #[serde(rename_all = "snake_case")]
 enum DepositMsg {
     Seed {},
+    /// D-22: anyone backs the pool during the bootstrap round and gets a Backer Life.
+    Back {},
     /// Deposit and place an open in one step; `margin` comes from the free balance after the deposit.
     /// From the NEAR Intents Verifier, `account_id` names whose trade it is (D-21).
     Open {
@@ -37,7 +39,8 @@ enum DepositMsg {
 impl House {
     // Deposits and withdrawals
 
-    /// USDC in. `msg = ""` credits the sender's free balance; `{"seed":{}}` from the owner adds to the pool.
+    /// USDC in. `msg = ""` credits the sender's free balance; `{"seed":{}}` from the owner and `{"back":{}}`
+    /// from anyone add to the pool.
     pub fn ft_on_transfer(&mut self, sender_id: AccountId, amount: U128, msg: String) -> PromiseOrValue<U128> {
         let token = env::predecessor_account_id();
         if Some(&token) == self.oneup.as_ref() {
@@ -45,6 +48,7 @@ impl House {
         }
         require!(token == self.usdc, "Only USDC deposits");
         if msg.is_empty() {
+            self.require_new_balance_min(&sender_id, amount.0);
             self.credit(&sender_id, amount.0);
             Event::Deposit { account_id: sender_id, amount }.emit();
         } else {
@@ -53,11 +57,15 @@ impl House {
             match parsed {
                 DepositMsg::Seed {} => {
                     require!(sender_id == self.owner, "Only the owner seeds the pool");
-                    self.pool += amount.0;
-                    self.seed += amount.0;
-                    // The seed provider's Extra Life: 1.0× cap, so the seed is paid back like any claim.
-                    self.mint_lives(0, vec![(sender_id.clone(), amount.0, math::PPM)], false).detach();
+                    // The seed's Backer Life is capped at 1.0×, so the seed is only ever paid back
+                    self.back(sender_id, amount.0, math::PPM);
                     Event::Seed { amount, pool: U128(self.pool) }.emit();
+                }
+                DepositMsg::Back {} => {
+                    require!(amount.0 >= math::MIN_BACKING, "Back with at least 10 USDC");
+                    require!(self.seed + amount.0 <= self.params.backing_target.0, "Backing round is full");
+                    let cap = math::backer_cap_ppm(self.pool, amount.0);
+                    self.back(sender_id, amount.0, cap);
                 }
                 DepositMsg::Open { market_id, side, margin, leverage, take_profit, stop_loss, account_id } => {
                     let triggers = Triggers { take_profit, stop_loss };
@@ -65,10 +73,16 @@ impl House {
                         // the Verifier doesn't return tokens a receiver rejects, so never refuse: a
                         // refused open leaves the deposit in the trader's free balance
                         let who = account_id.unwrap_or_else(|| env::panic_str("Intents deposits name an account"));
+                        self.require_new_balance_min(&who, amount.0);
                         self.credit(&who, amount.0);
                         Event::Deposit { account_id: who.clone(), amount }.emit();
                         let refusal = self.open_refusal(&market_id, side, margin.0, leverage, math::max_liability(margin.0));
                         match refusal {
+                            // only the funds this deposit brought: the sender names the account, so it
+                            // must not be able to trade someone else's balance
+                            None if margin.0 > amount.0 => {
+                                env::log_str("Order not placed: margin above the deposit; the deposit stays in the free balance")
+                            }
                             None if self.balance_of(&who) >= margin.0 => {
                                 self.internal_place_open(who, market_id, side, margin, leverage, triggers);
                             }
@@ -78,6 +92,7 @@ impl House {
                     } else {
                         require!(account_id.is_none(), "Only NEAR Intents deposits name an account");
                         // a refused open (capacity, leverage) panics, so the whole transfer is refunded
+                        self.require_new_balance_min(&sender_id, amount.0);
                         self.credit(&sender_id, amount.0);
                         Event::Deposit { account_id: sender_id.clone(), amount }.emit();
                         self.internal_place_open(sender_id, market_id, side, margin, leverage, triggers);
@@ -85,6 +100,7 @@ impl House {
                 }
                 DepositMsg::For { account_id } => {
                     require!(self.from_intents(&sender_id), "Only NEAR Intents deposits name an account");
+                    self.require_new_balance_min(&account_id, amount.0);
                     self.credit(&account_id, amount.0);
                     Event::Deposit { account_id, amount }.emit();
                 }
@@ -146,27 +162,16 @@ impl House {
         Event::TriggersSet { position_id, account_id: account, take_profit, stop_loss }.emit();
     }
     pub fn place_close(&mut self, position_id: u64) -> u64 {
-        let account = env::predecessor_account_id();
-        let now = now_s();
-        let min_hold = self.params.min_hold_s;
-        let id = self.next_id;
-        let p = self.positions.get_mut(&position_id).unwrap_or_else(|| env::panic_str("No such position"));
-        require!(p.owner == account, "Not your position");
+        let p = self.positions.get(&position_id).unwrap_or_else(|| env::panic_str("No such position"));
+        require!(p.owner == env::predecessor_account_id(), "Not your position");
         require!(p.close_order.is_none(), "Close already pending");
-        require!(now >= p.opened_at + min_hold, "Minimum hold not reached");
-        p.close_order = Some(id);
-        let market_id = p.market_id.clone();
-        self.next_id += 1;
-        self.orders.insert(
-            id,
-            Order { id, owner: account.clone(), market_id: market_id.clone(), kind: OrderKind::Close { position_id }, placed_at: now },
-        );
-        Event::OrderPlaced { order_id: id, account_id: account, market_id, position_id: Some(position_id) }.emit();
-        id
+        require!(now_s() >= p.opened_at + self.params.min_hold_s, "Minimum hold not reached");
+        self.internal_place_close(position_id, CloseReason::Close, now_s())
     }
 
-    /// Anyone (keeper). Fills at the first oracle price published after the order (maths §2).
+    /// The keeper (decision D-2). Fills at an oracle price published after the order, within the window.
     pub fn fill(&mut self, order_id: u64) -> Promise {
+        self.assert_keeper();
         let order = self.orders.get(&order_id).unwrap_or_else(|| env::panic_str("No such order"));
         let feed = self.market(&order.market_id).feed_id.clone();
         ext_oracle::ext(self.oracle.clone())
@@ -190,7 +195,7 @@ impl House {
                 self.change_liability(&order.market_id, side, math::max_liability(margin.0), false);
                 self.credit(&order.owner, margin.0);
             }
-            OrderKind::Close { position_id } => {
+            OrderKind::Close { position_id, .. } => {
                 if let Some(p) = self.positions.get_mut(&position_id) {
                     p.close_order = None;
                 }
@@ -205,16 +210,19 @@ impl House {
         self.price_then(position_id, CloseReason::Liquidation)
     }
 
+    /// The keeper: at the cap a newer price can't pay more, so this settles at the latest price.
     pub fn take_profit(&mut self, position_id: u64) -> Promise {
+        self.assert_keeper();
         self.price_then(position_id, CloseReason::TakeProfit)
     }
 
-    /// The trader's take-profit price was reached.
+    /// The trader's take-profit price was reached: places a close that fills at the next price (D-19).
+    /// Anyone may call it; it only does what the trader asked for.
     pub fn hit_target(&mut self, position_id: u64) -> Promise {
         self.price_then(position_id, CloseReason::Target)
     }
 
-    /// The trader's stop-loss price was reached.
+    /// The trader's stop-loss price was reached: places a close that fills at the next price (D-19).
     pub fn hit_stop(&mut self, position_id: u64) -> Promise {
         self.price_then(position_id, CloseReason::Stop)
     }
@@ -309,10 +317,10 @@ impl House {
                 }
                 .emit();
             }
-            OrderKind::Close { position_id } => {
+            OrderKind::Close { position_id, reason } => {
                 // Liquidated or taken at cap while the close was pending: nothing left to do.
                 if self.positions.contains_key(&position_id) {
-                    self.close_position(position_id, p.price, CloseReason::Close);
+                    self.close_position(position_id, p.price, reason);
                 }
             }
         }
@@ -345,8 +353,48 @@ impl House {
         if !ok {
             return Err("Position is not eligible");
         }
-        self.close_position(position_id, p.price, reason);
+        match reason {
+            // A trigger can be set at any price, so settling at the price that crossed it would let a
+            // trader close whenever the on-chain price lags the market in their favour. It places a
+            // close instead, filled at the next price like the trader's own.
+            CloseReason::Target | CloseReason::Stop => {
+                if pos.close_order.is_some() {
+                    return Err("Close already pending");
+                }
+                self.internal_place_close(position_id, reason, now);
+            }
+            _ => self.close_position(position_id, p.price, reason),
+        }
         Ok(())
+    }
+
+    fn internal_place_close(&mut self, position_id: u64, reason: CloseReason, now: u64) -> u64 {
+        let id = self.take_id();
+        let p = self.positions.get_mut(&position_id).expect("position");
+        p.close_order = Some(id);
+        let (owner, market_id) = (p.owner.clone(), p.market_id.clone());
+        self.orders.insert(
+            id,
+            Order { id, owner: owner.clone(), market_id: market_id.clone(), kind: OrderKind::Close { position_id, reason }, placed_at: now },
+        );
+        Event::OrderPlaced { order_id: id, account_id: owner, market_id, position_id: Some(position_id) }.emit();
+        id
+    }
+
+    /// A new free-balance entry costs the house storage, so it needs at least the minimum margin.
+    fn require_new_balance_min(&self, account: &AccountId, amount: u128) {
+        require!(self.balances.contains_key(account) || amount >= self.params.min_margin.0, "Deposit below the minimum");
+    }
+
+    /// Adds `amount` to the pool and the seed (so it only comes back from profit, D-12) and mints its
+    /// Backer Life owed `cap_ppm` × `amount` (D-22).
+    fn back(&mut self, account: AccountId, amount: u128, cap_ppm: u128) {
+        self.pool += amount;
+        self.seed += amount;
+        let owed = math::owed(amount, cap_ppm);
+        self.lives_owed += owed;
+        self.mint_backer(account.clone(), amount, cap_ppm).detach();
+        Event::Backed { account_id: account, amount: U128(amount), cap_ppm: U128(cap_ppm), owed: U128(owed), pool: U128(self.pool) }.emit();
     }
 
     /// Settles a position at `price`: pays the trader's free balance, moves the pool, frees the liability
@@ -372,10 +420,11 @@ impl House {
         self.epoch.losses.0 += s.pool_taken;
         self.epoch.payouts.0 += s.pool_paid;
         self.epoch.cuts.0 += s.cut;
-        if s.pool_taken > 0 {
-            let l = self.epoch_losses.get(&pos.owner).copied().unwrap_or(0);
-            self.epoch_losses.insert(pos.owner.clone(), l + s.pool_taken);
-        }
+        // Extra Lives go by each wallet's net loss, so a long and a short on yourself earn nothing extra
+        let before = self.epoch_losses.get(&pos.owner).copied().unwrap_or(0);
+        let after = before + s.pool_taken as i128 - s.pool_paid as i128;
+        self.epoch_losses.insert(pos.owner.clone(), after);
+        self.epoch.net_losses.0 = self.epoch.net_losses.0 + after.max(0) as u128 - before.max(0) as u128;
         self.record_market_totals(&pos.market_id, s);
 
         Event::PositionClosed {

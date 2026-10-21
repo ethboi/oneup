@@ -22,6 +22,7 @@ Account names are placeholders until `oneup.testnet` is created.
 trader ──ft_transfer_call──▶ usdc ──ft_on_transfer──▶ house        deposit
 trader ─▶ house.place_open / place_close / withdraw
 keeper ─▶ house.fill / liquidate / take_profit / hit_target / hit_stop ──▶ oracle.get_price (cross-contract)
+backer ──ft_transfer_call {"back":{}}──▶ usdc ──▶ house ──▶ life.mint_backer
 keeper ─▶ house.close_epoch ──▶ ve.checkpoint, life.mint_batch, $1UP→ve (loser locks), usdc→life (pot)
 owner  ─▶ house.buyback ──▶ swap ──▶ house ──$1UP──▶ ve (lockers)
 holder ──ft_transfer_call──▶ token ──ft_on_transfer──▶ ve           lock
@@ -35,18 +36,19 @@ buyer  ──ft_transfer_call──▶ usdc ──▶ market ──▶ life|ve.n
 
 | Method | Caller | Does |
 |---|---|---|
-| `ft_on_transfer(sender_id, amount, msg)` | USDC contract | `msg = ""` credits the sender's free balance; `{"open":{market_id, side, margin, leverage, take_profit?, stop_loss?}}` credits it and places an open in the same step (a refused open refunds the whole transfer); `{"seed":{}}` (owner) adds to pool and mints the seed Extra Life |
+| `ft_on_transfer(sender_id, amount, msg)` | USDC contract | `msg = ""` credits the sender's free balance; `{"open":{market_id, side, margin, leverage, take_profit?, stop_loss?}}` credits it and places an open in the same step (a refused open refunds the whole transfer); `{"seed":{}}` (owner) adds to the pool and mints a 1.0× Backer Life; `{"back":{}}` (anyone, ≥ 10 USDC, until the total seeded reaches `backing_target`) adds to the pool and mints a Backer Life owed `backer_cap_ppm(pool, amount)` (D-22); from the Intents Verifier only, `{"for":{account_id}}` and `open` with `account_id` credit that account, and an open may not exceed the deposit (D-21). A new balance needs at least `min_margin` |
 | `withdraw(amount)` | trader | sends free balance; refunds on failed transfer |
 | `place_open(market_id, side, margin, leverage, take_profit?, stop_loss?) → order_id` | trader | moves margin from free balance into the order; pre-checks solvency and capacity with the order counted; optional trigger prices go with the position (D-19) |
 | `set_triggers(position_id, take_profit?, stop_loss?)` | owner of the position | sets or clears them; they fire only on prices published after this call |
 | `place_close(position_id) → order_id` | owner | only after the 60 s minimum hold |
-| `fill(order_id)` | anyone (keeper) | reads oracle; applies the fill rules in maths §2; opens or closes the position |
+| `fill(order_id)` | keeper, owner or operator once `set_keeper` is called (D-23) | reads oracle; applies the fill rules in maths §2; opens or closes the position |
 | `expire(order_id)` | anyone | after `FILL_WINDOW` with no valid price; refunds margin |
 | `liquidate(position_id)` | anyone | latest price; pnl ≤ −0.9M → margin to pool |
 | `take_profit(position_id)` | anyone | latest price; pnl at cap → close |
-| `hit_target(position_id)` / `hit_stop(position_id)` | anyone | latest price past the trader's trigger, after the minimum hold and newer than the trigger → close at that price (reason `Target` / `Stop`) |
+| `hit_target(position_id)` / `hit_stop(position_id)` | anyone | latest price past the trader's trigger, after the minimum hold and newer than the trigger → places a close (reason `Target` / `Stop`) that fills at the next price (D-19) |
 | `close_epoch(limit)` | anyone | resumable: first call freezes epoch `e`, fixes its $1UP release (maths §8), checkpoints `ve` and starts `e+1` ("begun"); then mints Extra Lives and loser locks, `limit` (≤ 15) losers per call ("minting"), waits for both to land ("waiting for mints"), expires lives past their window ("expiring"), pays the pot and sets aside buyback USDC ("closed") |
-| `buyback(epoch, min_out)` | owner (D-10) | swaps the epoch's buyback USDC; the $1UP goes to `ve` for that epoch's lockers |
+| `set_keeper(keeper)` / `set_operator(operator)` / `set_owner(owner)` / `set_intents(intents)` | owner | roles (D-20, D-21, D-23) |
+| `buyback(epoch, min_out)` | owner or operator (D-10) | swaps the epoch's buyback USDC; the $1UP goes to `ve` for that epoch's lockers |
 | `add_market(market_id, feed_id, max_leverage)` | owner | new markets get `market_capacity_ppm` of the pool (D-14) |
 | `set_capacity(market_id, ppm)` | owner | |
 
@@ -59,7 +61,8 @@ buyer  ──ft_transfer_call──▶ usdc ──▶ market ──▶ life|ve.n
 short_liab, capacity}]}`, `get_epoch()` → `{id, started_at, ends_at, losses, payouts, close_state}`,
 `get_pending_life(account_id)` → losses so far this epoch, `quote_open(market_id, side, margin, leverage)`
 → `{allowed, reason?, cut_rate, liq_price, max_profit}`, `get_emissions(epoch)` → `{scheduled, released,
-locked, carry}`, `get_emission_carry()`, `get_buyback(epoch)`, `get_params()`.
+locked, carry}`, `get_emission_carry()`, `get_buyback(epoch)`, `get_params()`, `get_backing(amount?)` → `{backed, target,
+open, min, cap_ppm, owed}` for backing `amount` now, `get_owner()` → `(owner, operator)`, `get_keeper()`.
 
 ### Events
 
@@ -85,9 +88,10 @@ Heals.
 | Method | Caller | Does |
 |---|---|---|
 | `mint_batch(epoch, items: [{owner, face, cap_ppm}])` | `house` | one token per loser; `ACC_at_mint` = current ACC, so the same epoch's pot pays them (D-4) |
+| `mint_backer(owner, face, cap_ppm) → "b<n>"` | `house` | a Backer Life (D-22): never expires, shares pots from the moment it's minted |
 | `ft_on_transfer(sender_id, amount, msg)` | USDC, sender `house` | `{"epoch_pot":{"epoch":e}}` → applies `r_e` |
 | `expire(through_epoch) → U128` | `house` | lives minted in `through_epoch` or earlier stop earning (D-13); returns the total still owed, which the house mirrors |
-| `claim(token_ids)` | token owner | sends claimable USDC |
+| `claim(token_ids)` | token owner | sends claimable USDC (1–30 tokens); a token that pays out loses its market approvals, so a listing can't be emptied before it sells |
 | `nft_transfer…` | standard | unclaimed USDC moves with the token |
 
 Views: `life_info(token_id)` → `{epoch, face, cap, owed, paid, claimable, full_heal}`,
@@ -124,7 +128,7 @@ Views: `lock_info(token_id)` → `{amount, created, end, from_loss, power, exit_
 | Method | Caller | Does |
 |---|---|---|
 | `nft_on_approve(token_id, owner_id, approval_id, msg)` | the life or ve contract, from `nft_approve` | lists the NFT; `msg = {"price":"<USDC>"}`; approving again re-prices |
-| `ft_on_transfer` from USDC, `{"buy":{"nft_contract","token_id"}}` | buyer | moves the NFT to the buyer through the approval, pays the seller, refunds change; refunds everything if the NFT can't move |
+| `ft_on_transfer` from USDC, `{"buy":{"nft_contract","token_id","price"}}` | buyer | `price` must equal the listing (else a full refund); moves the NFT to the buyer through the approval, pays the seller, refunds change; refunds everything if the NFT can't move |
 | `delist(nft_contract, token_id)` | seller | |
 | `withdraw_owed()` | seller | USDC whose payout failed |
 

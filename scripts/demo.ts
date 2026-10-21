@@ -78,7 +78,7 @@ start("chain", "pnpm", ["-s", "localnet"], (line) => {
   setTimeout(() => start("bots", "pnpm", ["-s", "--filter", "@oneup/bots", "start"]), 3000);
   start("app", "pnpm", ["-s", "--filter", "@oneup/app", "dev"], (l) => {
     if (l.includes("Ready")) {
-      console.log(`\n  OneUp is running at ${APP_URL}${LAN ? `\n  On your phone (same Wi-Fi): ${LAN_URLS.join(" or ")}` : ""}\n  Demo trader: demo.test.near (switch to the bots in the account menu)\n  Move a price: curl -XPOST localhost:8787/price -d '{"market":"NEAR-USD","movePct":-2}'\n  Ctrl-C to stop.\n`);
+      console.log(`\n  OneUp is running at ${APP_URL}${LAN ? `\n  On your phone (same Wi-Fi): ${LAN_URLS.join(" or ")}` : ""}\n  Demo trader: demo.test.near (switch to the bots in the account menu)\n  Move a price: curl -XPOST localhost:8787/price -H 'content-type: application/json' -d '{"market":"NEAR-USD","movePct":-2}'\n  Ctrl-C to stop.\n`);
     }
   }, LAN ? { ONEUP_HOST: "0.0.0.0" } : {});
 });

@@ -5,11 +5,12 @@
 //   pnpm --filter @oneup/keeper start [--prices live|sim|hermes] [--tick 3000] [--price-tick 1000] [--control 8787]
 //
 // With live or sim prices, a control port on 127.0.0.1 lets a demo steer a market:
-//   curl -XPOST localhost:8787/price -d '{"market":"NEAR-USD","price":2.45}'
+//   curl -XPOST localhost:8787/price -H 'content-type: application/json' -d '{"market":"NEAR-USD","price":2.45}'
+// (JSON only, no browser Origin, moves within ±50%: see control.ts)
 
 import { createServer } from "node:http";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { Account, KeyPair, actions, type KeyPairString } from "near-api-js";
 import {
@@ -24,7 +25,8 @@ import {
   type Deployment,
   type Position,
 } from "@oneup/sdk";
-import { HermesSource, LiveSource, SimSource, type PriceSource, type Steerable } from "./prices.ts";
+import { HermesSource, LiveSource, SimSource, sane, type PriceSource, type Steerable } from "./prices.ts";
+import { validSteer } from "./control.ts";
 
 const { values: args } = parseArgs({
   options: {
@@ -43,20 +45,32 @@ const owner = oneup.calls(accountSender(new Account(d.owner.id, oneup.provider, 
 const FILL_WINDOW_S = 30;
 const minHoldS = (await oneup.params()).min_hold_s;
 
+const log = (...m: unknown[]) => console.log(new Date().toISOString().slice(11, 19), ...m);
+const nowS = () => Math.floor(Date.now() / 1000);
+
 const source: PriceSource =
-  args.prices === "hermes" ? new HermesSource() : args.prices === "sim" ? new SimSource(d.markets) : new LiveSource();
+  args.prices === "hermes" ? new HermesSource() : args.prices === "sim" ? new SimSource(d.markets) : new LiveSource(log);
 /** Markets as listed on chain (refreshed every tick, so markets listed by vote get prices too). */
 let feeds = new Map<string, string>(d.markets.map((m) => [m.id, m.feedId]));
 /** Latest pushed price per feed, 1e8 units, and its publish time. */
 const latest = new Map<string, { price: bigint; time: number }>();
-
-const log = (...m: unknown[]) => console.log(new Date().toISOString().slice(11, 19), ...m);
-const nowS = () => Math.floor(Date.now() / 1000);
+/** Ticks in a row a feed's price has jumped: a jump that holds this long is the market, not a bad print. */
+const jumps = new Map<string, number>();
+const JUMP_TICKS = 10;
 
 async function pushPrices(pusher: ReturnType<OneUp["calls"]>) {
   const listed = (await oneup.markets()).filter((m) => m.live);
   feeds = new Map(listed.map((m) => [m.id, m.feed_id]));
-  const updates = await source.next(listed.map((m) => ({ id: m.id, feedId: m.feed_id })));
+  const updates = (await source.next(listed.map((m) => ({ id: m.id, feedId: m.feed_id })))).filter((u) => {
+    const last = latest.get(u.feed_id);
+    const why = sane(last && Number(last.price) / 1e8, u.price * 10 ** u.expo);
+    const n = why?.startsWith("jump") ? (jumps.get(u.feed_id) ?? 0) + 1 : 0;
+    jumps.set(u.feed_id, n);
+    if (!why || n > JUMP_TICKS) return true;
+    log(`price for ${listed.find((m) => m.feed_id === u.feed_id)?.id ?? u.feed_id} not pushed: ${why}`);
+    return false;
+  });
+  if (!updates.length) return;
   await pusher.pushPrices(updates);
   for (const u of updates) {
     const p = normalizePrice(BigInt(u.price), u.expo);
@@ -66,7 +80,7 @@ async function pushPrices(pusher: ReturnType<OneUp["calls"]>) {
 
 async function handleOrders() {
   for (const o of await oneup.listOrders(0, 200)) {
-    const label = "Open" in o.kind ? `open ${o.kind.Open.side} ${o.market_id}` : `close #${o.kind.Close.position_id}`;
+    const label = "Open" in o.kind ? `open ${o.kind.Open.side} ${o.market_id}` : `${o.kind.Close.reason === "Close" ? "close" : o.kind.Close.reason.toLowerCase()} #${o.kind.Close.position_id}`;
     if (nowS() > o.placed_at + FILL_WINDOW_S) {
       await keeper.expire(o.id);
       log(`expired order ${o.id} (${label})`);
@@ -97,15 +111,16 @@ async function handlePositions() {
     } else if (atProfitCap(v, margin)) {
       const ok = await keeper.takeProfit(p.id);
       log(`${ok ? "took profit at cap" : "could not take profit"} #${p.id} ${p.owner}`);
-    } else if (nowS() >= p.opened_at + minHoldS && px.time > p.triggers_set_at) {
-      // the trader's own triggers: after the minimum hold, on a price newer than when they were set
+    } else if (p.close_order === null && nowS() >= p.opened_at + minHoldS && px.time > p.triggers_set_at) {
+      // the trader's own triggers: after the minimum hold, on a price newer than when they were set. A hit
+      // places a close, which handleOrders fills at the next price (D-19)
       const { take_profit: tp, stop_loss: sl } = p.triggers;
       if (tp && targetHit(p.side, px.price, BigInt(tp))) {
         const ok = await keeper.hitTarget(p.id);
-        log(`${ok ? "hit take-profit" : "could not hit take-profit"} #${p.id} ${p.owner}`);
+        log(`${ok ? "take-profit hit, close placed for" : "could not hit take-profit"} #${p.id} ${p.owner}`);
       } else if (sl && stopHit(p.side, px.price, BigInt(sl))) {
         const ok = await keeper.hitStop(p.id);
-        log(`${ok ? "hit stop-loss" : "could not hit stop-loss"} #${p.id} ${p.owner}`);
+        log(`${ok ? "stop-loss hit, close placed for" : "could not hit stop-loss"} #${p.id} ${p.owner}`);
       }
     }
   }
@@ -148,9 +163,13 @@ function controlServer(port: number) {
         res.end(JSON.stringify(Object.fromEntries(sim.prices)));
       } else if (req.method === "POST" && req.url === "/price") {
         let body = "";
-        for await (const chunk of req) body += chunk;
-        const { market, price, movePct } = JSON.parse(body);
-        const target = price ?? sim.prices.get(market)! * (1 + movePct / 100);
+        for await (const chunk of req) if ((body += chunk).length > 1024) throw new Error("too large");
+        const v = validSteer(body, req.headers, sim.prices);
+        if ("error" in v) {
+          res.statusCode = v.status;
+          return void res.end(v.error);
+        }
+        const { market, target } = v;
         sim.steer(market, target);
         log(`steering ${market} → ${target}`);
         res.end(JSON.stringify({ market, target }));
@@ -173,13 +192,31 @@ function controlServer(port: number) {
  * loops don't fight over one key's nonce.
  */
 async function priceSender() {
-  const kp = KeyPair.fromRandom("ed25519");
-  const main = new Account(d.keeper.id, oneup.provider, d.keeper.key as KeyPairString);
-  // no allowance: a capped key (the library's default is 0.25 NEAR) runs dry after about an hour of pushes
-  await main.signAndSendTransaction({
-    receiverId: d.keeper.id,
-    actions: [actions.addFunctionCallAccessKey(kp.getPublicKey(), d.contracts.oracle, ["push_prices"])],
-  });
+  // the key is kept beside the chain's state (.localnet/, wiped with it), so a restart reuses it rather than
+  // adding another
+  const saved = resolve(dirname(args.config!), ".localnet/keeper-price-key");
+  let kp: KeyPair | null = null;
+  try {
+    kp = KeyPair.fromString(readFileSync(saved, "utf8").trim() as KeyPairString);
+    await oneup.provider.viewAccessKey({ accountId: d.keeper.id, publicKey: kp.getPublicKey().toString() });
+  } catch {
+    kp = null; // none saved, or not on this chain
+  }
+  const onChain = !!kp;
+  kp ??= KeyPair.fromRandom("ed25519");
+  if (!onChain) {
+    const main = new Account(d.keeper.id, oneup.provider, d.keeper.key as KeyPairString);
+    // no allowance: a capped key (the library's default is 0.25 NEAR) runs dry after about an hour of pushes
+    await main.signAndSendTransaction({
+      receiverId: d.keeper.id,
+      actions: [actions.addFunctionCallAccessKey(kp.getPublicKey(), d.contracts.oracle, ["push_prices"])],
+    });
+    try {
+      if (existsSync(dirname(saved))) writeFileSync(saved, kp.toString(), { mode: 0o600 });
+    } catch {
+      // can't save: a new key next start
+    }
+  }
   return oneup.calls(accountSender(new Account(d.keeper.id, oneup.provider, kp.toString() as KeyPairString)));
 }
 

@@ -39,6 +39,7 @@ pub struct MintItem {
 #[ext_contract(ext_life)]
 trait ExtraLife {
     fn mint_batch(&mut self, epoch: u64, items: Vec<MintItem>) -> Vec<String>;
+    fn mint_backer(&mut self, owner: AccountId, face: U128, cap_ppm: U128) -> String;
     fn expire(&mut self, through_epoch: u64) -> U128;
 }
 
@@ -48,7 +49,8 @@ pub struct Closing {
     pub ended_at: u64,
     pub house_net: u128,
     pub cap_ppm: u128,
-    pub losers: IterableMap<AccountId, u128>,
+    /// Net loss per wallet (losses − profit paid); only those above zero get a life.
+    pub losers: IterableMap<AccountId, i128>,
     pub lives_minted: u32,
     pub pending_mints: u32,
     pub expiring: bool,
@@ -106,12 +108,14 @@ impl House {
         };
         let result = if !c.losers.is_empty() {
             let n = limit.unwrap_or(DEFAULT_BATCH).clamp(1, MAX_BATCH) as usize;
-            let batch: Vec<(AccountId, u128)> = c.losers.iter().take(n).map(|(k, v)| (k.clone(), *v)).collect();
-            for (k, _) in &batch {
+            let taken: Vec<(AccountId, i128)> = c.losers.iter().take(n).map(|(k, v)| (k.clone(), *v)).collect();
+            for (k, _) in &taken {
                 c.losers.remove(k);
             }
+            // net winners and wallets that broke even get nothing
+            let batch: Vec<(AccountId, u128)> = taken.into_iter().filter(|(_, v)| *v > 0).map(|(k, v)| (k, v as u128)).collect();
             if c.house_net > 0 {
-                let losses = c.epoch.losses.0;
+                let losses = c.epoch.net_losses.0;
                 let batch_losses = batch.clone();
                 let items: Vec<(AccountId, u128, u128)> = batch
                     .into_iter()
@@ -172,7 +176,7 @@ impl House {
         }
         if r.is_err() {
             // The lives weren't created, so nothing is owed for them.
-            self.lives_owed -= owed.0;
+            self.lives_owed = self.lives_owed.saturating_sub(owed.0);
             env::log_str(&format!("Extra Life mint failed; {} no longer owed", owed.0));
             return false;
         }
@@ -196,11 +200,25 @@ impl House {
         }
     }
 
+    /// If the Backer Life couldn't be minted, the backing is undone into the backer's free balance.
+    #[private]
+    pub fn on_backer_minted(&mut self, account_id: AccountId, amount: U128, owed: U128, #[callback_result] r: Result<String, PromiseError>) -> bool {
+        if r.is_ok() {
+            return true;
+        }
+        self.lives_owed = self.lives_owed.saturating_sub(owed.0);
+        self.pool = self.pool.saturating_sub(amount.0);
+        self.seed = self.seed.saturating_sub(amount.0);
+        self.credit(&account_id, amount.0);
+        env::log_str("Backer Life mint failed; the backing is in your free balance");
+        false
+    }
+
     #[private]
     pub fn on_pot(&mut self, amount: U128, #[callback_result] used: Result<U128, PromiseError>) -> bool {
         match used {
             Ok(used) if used.0 == amount.0 => true,
-            Ok(used) => {
+            Ok(used) if used.0 > 0 => {
                 // The life contract was owed less than we thought: everything is paid.
                 let back = amount.0 - used.0;
                 self.pool += back;
@@ -208,7 +226,8 @@ impl House {
                 self.lives_owed = 0;
                 false
             }
-            Err(_) => {
+            // refused or failed: the pot came back and is still owed
+            _ => {
                 self.pool += amount.0;
                 self.lives_paid -= amount.0;
                 self.lives_owed += amount.0;
@@ -284,6 +303,16 @@ impl House {
             .with_static_gas(gas)
             .mint_batch(epoch, items)
             .then(Self::ext(env::current_account_id()).with_static_gas(GAS_MINT_CALLBACK).on_minted(U128(owed), for_close))
+    }
+
+    /// Mints a Backer Life (D-22). The caller has already counted what it's owed.
+    pub(crate) fn mint_backer(&mut self, owner: AccountId, amount: u128, cap_ppm: u128) -> Promise {
+        let life = self.life.clone().unwrap_or_else(|| env::panic_str("Set the Extra Life contract first"));
+        let owed = math::owed(amount, cap_ppm);
+        ext_life::ext(life)
+            .with_static_gas(GAS_MINT_BASE.saturating_add(GAS_MINT_PER_LIFE))
+            .mint_backer(owner.clone(), U128(amount), U128(cap_ppm))
+            .then(Self::ext(env::current_account_id()).with_static_gas(GAS_MINT_CALLBACK).on_backer_minted(owner, U128(amount), U128(owed)))
     }
 
     fn pay(&mut self, c: Closing) {

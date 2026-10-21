@@ -10,6 +10,7 @@
     "deploy:local": "tsx scripts/deploy.ts",
     "test": "PATH=\"$HOME/.cargo/bin:$PATH\" cargo test --manifest-path contracts/Cargo.toml --workspace --exclude oneup-integration && pnpm -r --filter=!@oneup/app test",
     "typecheck": "tsc -b",
+    "test:ts": "node --import tsx --test app/test/*.ts keeper/test/*.ts",
     "smoke": "tsx scripts/smoke.ts",
     "keeper": "pnpm --filter @oneup/keeper start",
     "bots": "pnpm --filter @oneup/bots start",

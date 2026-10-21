@@ -20,7 +20,7 @@ mod tests;
 pub use buyback::{Buyback, BuybackStatus};
 pub use emissions::EpochEmissions;
 pub use epochs::{Closing, EpochSummary};
-pub use events::Event;
+pub use events::{CloseReason, Event};
 pub use oracle::OraclePrice;
 
 #[near(serializers = [json, borsh])]
@@ -59,6 +59,13 @@ pub struct Params {
     pub market_capacity_ppm: U128,
     /// D-16: $1UP released to losers per USDC of house profit.
     pub oneup_per_usdc: u32,
+    /// D-22: anyone may back the pool until the total seeded reaches this.
+    #[serde(default = "default_backing_target")]
+    pub backing_target: U128,
+}
+
+fn default_backing_target() -> U128 {
+    U128(math::LIFE_CAP_POOL)
 }
 
 impl Default for Params {
@@ -75,6 +82,7 @@ impl Default for Params {
             life_expiry_epochs: 13,
             market_capacity_ppm: U128(500_000),
             oneup_per_usdc: math::ONEUP_PER_USDC as u32,
+            backing_target: default_backing_target(),
         }
     }
 }
@@ -98,7 +106,8 @@ pub struct Market {
 #[derive(Clone, Debug)]
 pub enum OrderKind {
     Open { side: Side, margin: U128, leverage: u32, cut_ppm: U128, triggers: Triggers },
-    Close { position_id: u64 },
+    /// `reason` is Close for the trader's own close, Target or Stop when a trigger placed it (D-19).
+    Close { position_id: u64, reason: CloseReason },
 }
 
 #[near(serializers = [json, borsh])]
@@ -133,8 +142,8 @@ pub struct Position {
     pub triggers_set_at: u64,
 }
 
-/// Take-profit and stop-loss prices (1e8 units). The keeper closes the position at the oracle price that
-/// crosses one, like a liquidation (decision D-19).
+/// Take-profit and stop-loss prices (1e8 units). When the oracle price crosses one, the keeper places a
+/// close that fills at the next price, like the trader's own close (decision D-19).
 #[near(serializers = [json, borsh])]
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Triggers {
@@ -152,6 +161,8 @@ pub struct Epoch {
     /// Σ profit paid out after the cut.
     pub payouts: U128,
     pub cuts: U128,
+    /// Σ over wallets of max(0, losses − profit paid): what the epoch's Extra Lives and $1UP are shared by.
+    pub net_losses: U128,
     pub markets: Vec<MarketTotals>,
 }
 
@@ -197,8 +208,8 @@ pub struct House {
     positions: IterableMap<u64, Position>,
     next_id: u64,
     epoch: Epoch,
-    /// Each wallet's losses in the current epoch: its pending Extra Life.
-    epoch_losses: IterableMap<AccountId, u128>,
+    /// Each wallet's losses minus profit paid in the current epoch; above zero, its pending Extra Life.
+    epoch_losses: IterableMap<AccountId, i128>,
     /// The Extra Life NFT contract.
     life: Option<AccountId>,
     /// Σ still owed to Extra Lives (mirrors the life contract's total).
@@ -222,6 +233,8 @@ pub struct House {
     operator: Option<AccountId>,
     /// The NEAR Intents Verifier: deposits it delivers may name the account they're for (D-21).
     intents: Option<AccountId>,
+    /// Fills orders and fires take-profits and triggers. None = anyone may (tests, a keeperless setup).
+    keeper: Option<AccountId>,
 }
 
 pub(crate) fn now_s() -> u64 {
@@ -261,6 +274,7 @@ impl House {
             buybacks: LookupMap::new(StorageKey::Buybacks),
             operator: None,
             intents: None,
+            keeper: None,
         }
     }
 
@@ -284,6 +298,17 @@ impl House {
 
     pub fn get_owner(&self) -> (AccountId, Option<AccountId>) {
         (self.owner.clone(), self.operator.clone())
+    }
+
+    /// Only the keeper fills orders and fires take-profits and triggers, so a trader can't choose the
+    /// moment, and so the price, they settle at. Liquidations stay open to anyone. The owner only.
+    pub fn set_keeper(&mut self, keeper: Option<AccountId>) {
+        self.assert_owner();
+        self.keeper = keeper;
+    }
+
+    pub fn get_keeper(&self) -> Option<AccountId> {
+        self.keeper.clone()
     }
 
     // Admin. The owner lists markets (D-14).
@@ -343,8 +368,10 @@ impl House {
 
     pub fn set_params(&mut self, params: Params) {
         self.assert_owner();
-        require!(params.solvency_both_sides == self.params.solvency_both_sides || self.positions.is_empty(),
-            "Change the solvency rule only with no open positions");
+        require!(
+            params.solvency_both_sides == self.params.solvency_both_sides || (self.positions.is_empty() && self.orders.is_empty()),
+            "Change the solvency rule only with no open positions or orders"
+        );
         self.params = params;
     }
 }
@@ -352,6 +379,13 @@ impl House {
 impl House {
     fn assert_owner(&self) {
         require!(env::predecessor_account_id() == self.owner, "Only the owner");
+    }
+
+    pub(crate) fn assert_keeper(&self) {
+        if let Some(k) = &self.keeper {
+            let caller = env::predecessor_account_id();
+            require!(&caller == k || caller == self.owner || self.operator.as_ref() == Some(&caller), "Only the keeper");
+        }
     }
 
     pub(crate) fn market(&self, id: &str) -> &Market {

@@ -9,7 +9,15 @@ import { MARKETS, type Deployment, ONEUP, USDC } from "@oneup/sdk";
 const ROOT = resolve(import.meta.dirname, "..");
 const WASM = (name: string) => readFileSync(resolve(ROOT, `contracts/target/near/${name}/${name}.wasm`));
 
-const SEED_USDC = 1_000_000n * USDC; // D-1: both-sides solvency needs a deep pool for bot volume
+const SEED_USDC = 250_000n * USDC; // the house's own seed, owed back at 1.0×
+/** D-22: bots back the rest of the round at the curve's price, leaving room for the demo trader. D-1's
+ *  both-sides solvency needs a deep pool for bot volume. */
+const BACKERS: [number, bigint][] = [
+  [3, 250_000n * USDC],
+  [1, 150_000n * USDC],
+  [5, 100_000n * USDC],
+  [0, 50_000n * USDC],
+];
 const SWAP_USDC = 100_000n * USDC;
 const SWAP_ONEUP = 10_000_000n * ONEUP;
 const BOT_USDC = 50_000n * USDC;
@@ -28,16 +36,20 @@ export async function deploy(opts: { home: string; rpcUrl: string; epochLengthS:
   const rootId: string = validator.account_id;
   const root = new Account(rootId, provider, validator.secret_key as KeyPairString);
 
-  // One throwaway key for every account this script creates.
-  const key = KeyPair.fromRandom("ed25519");
-  const keyString = key.toString() as KeyPairString;
+  // Each account gets its own key: the demo and bot keys go to the browser, so they must not open the
+  // keeper, the solver or any contract. Contract accounts' keys are deleted once they're set up.
+  const keys = new Map<string, KeyPairString>();
   const sub = (name: string) => `${name}.${rootId}`;
 
   const step = (msg: string) => console.log(`  · ${msg}`);
   const create = async (name: string, near: `${number}`) => {
+    const key = KeyPair.fromRandom("ed25519");
     await root.createSubAccount({ accountOrPrefix: name, publicKey: key.getPublicKey(), nearToTransfer: nearToYocto(near) });
-    return new Account(sub(name), provider, keyString);
+    keys.set(sub(name), key.toString() as KeyPairString);
+    return new Account(sub(name), provider, key.toString() as KeyPairString);
   };
+  const keyOf = (a: Account) => keys.get(a.accountId)!;
+  const publicKeyOf = (a: Account) => KeyPair.fromString(keyOf(a)).getPublicKey();
   const call = (from: Account, contractId: string, methodName: string, args: Record<string, unknown>, deposit = 0n) =>
     from.callFunction({ contractId, methodName, args, gas: teraToGas("300"), deposit });
   const ftCall = (from: Account, token: string, receiver: string, amount: bigint, msg: string) =>
@@ -112,6 +124,14 @@ export async function deploy(opts: { home: string; rpcUrl: string; epochLengthS:
   step(`seed pool ${SEED_USDC / USDC} USDC`);
   await call(root, id("usdc"), "mint", { receiver_id: rootId, amount: (SEED_USDC + SWAP_USDC).toString() });
   await ftCall(root, id("usdc"), id("house"), SEED_USDC, JSON.stringify({ seed: {} }));
+  // only the keeper fills orders and fires triggers, so no trader picks their own fill price (D-2, D-19)
+  await call(root, id("house"), "set_keeper", { keeper: keeper.accountId });
+
+  step("bootstrap round: bots back the pool (D-22)");
+  for (const [i, amount] of BACKERS) {
+    await call(root, id("usdc"), "mint", { receiver_id: bots[i].accountId, amount: amount.toString() });
+    await ftCall(bots[i], id("usdc"), id("house"), amount, JSON.stringify({ back: {} }));
+  }
 
   step("swap liquidity");
   await ftCall(root, id("usdc"), id("swap"), SWAP_USDC, JSON.stringify({ add_liquidity: {} }));
@@ -146,7 +166,7 @@ export async function deploy(opts: { home: string; rpcUrl: string; epochLengthS:
   }
   await call(root, id("usdc"), "storage_deposit", { account_id: intents.accountId }, nearToYocto("0.01"));
   const solver = await create("solver", "30");
-  await call(solver, intents.accountId, "add_public_key", { public_key: key.getPublicKey().toString() }, 1n);
+  await call(solver, intents.accountId, "add_public_key", { public_key: publicKeyOf(solver).toString() }, 1n);
   await call(root, id("usdc"), "mint", { receiver_id: solver.accountId, amount: SOLVER_USDC.toString() });
   await ftCall(solver, id("usdc"), intents.accountId, SOLVER_USDC, "");
   for (const a of BRIDGED) {
@@ -194,6 +214,11 @@ export async function deploy(opts: { home: string; rpcUrl: string; epochLengthS:
     await call(root, id("oneup"), "ft_transfer", { receiver_id: t.accountId, amount: (10_000n * ONEUP).toString() }, 1n);
   }
 
+  step("lock the contract accounts (delete their keys)");
+  for (const a of [...names.map((n) => c[n]), wrap, intents, poa, dao]) {
+    await a.deleteKey(publicKeyOf(a));
+  }
+
   return {
     network: "localnet",
     rpcUrl: opts.rpcUrl,
@@ -212,13 +237,13 @@ export async function deploy(opts: { home: string; rpcUrl: string; epochLengthS:
     intents: {
       verifier: intents.accountId,
       poa: poa.accountId,
-      solver: { id: solver.accountId, key: keyString },
+      solver: { id: solver.accountId, key: keyOf(solver) },
       assets: BRIDGED.map((a) => ({ token: `${a.id}.${poa.accountId}`, chain: a.chain, symbol: a.symbol, decimals: a.decimals })),
     },
     owner: { id: rootId, key: validator.secret_key },
-    keeper: { id: keeper.accountId, key: keyString },
-    bots: bots.map((b) => ({ id: b.accountId, key: keyString })),
-    demo: { id: demo.accountId, key: keyString },
+    keeper: { id: keeper.accountId, key: keyOf(keeper) },
+    bots: bots.map((b) => ({ id: b.accountId, key: keyOf(b) })),
+    demo: { id: demo.accountId, key: keyOf(demo) },
     markets: MARKETS,
   };
 }

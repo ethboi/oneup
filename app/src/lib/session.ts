@@ -1,7 +1,8 @@
 // One-tap trading. A session key on this device is a NEAR function-call access key that may only call the
-// house's place_open, place_close and set_triggers, with a 0.25 NEAR gas budget. It can't attach a
-// deposit, so it can't deposit, withdraw or move tokens: trades only. With "gas paid by OneUp" its trades
-// go as meta transactions (NEP-366) to /api/relay, and the relayer pays the gas instead.
+// house's place_open, place_close and set_triggers. It can't attach a deposit, so it can't deposit,
+// withdraw or move tokens: trades only. With "gas paid by OneUp" its trades go as meta transactions
+// (NEP-366) to /api/relay and the relayer pays the gas: the key's 0.25 NEAR gas budget only applies to
+// trades it sends itself (not gasless), since a signed delegate action never spends the key's allowance.
 // The key lives in this browser's storage, per account; turning it off deletes it from the account.
 
 import {

@@ -71,8 +71,19 @@ impl House {
             self.buyback_usdc -= amount.0;
             return true;
         }
-        // Refused (e.g. min_out): the USDC came back; try again later.
-        b.status = BuybackStatus::Pending;
+        if used == 0 {
+            // Refused (e.g. min_out): the USDC came back; try again later.
+            b.status = BuybackStatus::Pending;
+            return false;
+        }
+        // Partly swapped: what's left goes back to the pool rather than being swapped twice
+        let left = amount.0 - used;
+        b.usdc = U128(used);
+        if b.status == BuybackStatus::Swapping {
+            b.status = BuybackStatus::Done;
+        }
+        self.buyback_usdc -= amount.0;
+        self.pool += left;
         false
     }
 

@@ -5,6 +5,18 @@ use oneup_math as math;
 use crate::{Epoch, House, HouseExt, Market, Order, Params, Position, Side};
 
 #[near(serializers = [json])]
+pub struct Backing {
+    /// Total seeded and backed so far.
+    pub backed: U128,
+    pub target: U128,
+    pub open: bool,
+    pub min: U128,
+    /// What the quoted amount would be owed, × 1e6, and in USDC.
+    pub cap_ppm: U128,
+    pub owed: U128,
+}
+
+#[near(serializers = [json])]
 pub struct MarketSolvency {
     pub id: String,
     pub long_liability: U128,
@@ -86,9 +98,24 @@ impl House {
         self.epoch.clone()
     }
 
-    /// Losses so far this epoch: the wallet's pending Extra Life. Face value is set at epoch close.
+    /// Net loss so far this epoch (losses − profit paid): the wallet's pending Extra Life. Face value is
+    /// set at epoch close.
     pub fn get_pending_life(&self, account_id: AccountId) -> U128 {
-        U128(self.epoch_losses.get(&account_id).copied().unwrap_or(0))
+        U128(self.epoch_losses.get(&account_id).copied().unwrap_or(0).max(0) as u128)
+    }
+
+    /// The bootstrap round (D-22): how much is backed, the target, and what backing `amount` now earns.
+    pub fn get_backing(&self, amount: Option<U128>) -> Backing {
+        let amount = amount.map_or(math::USDC, |a| a.0.max(1));
+        let cap_ppm = math::backer_cap_ppm(self.pool, amount);
+        Backing {
+            backed: U128(self.seed),
+            target: self.params.backing_target,
+            open: self.seed + math::MIN_BACKING <= self.params.backing_target.0,
+            min: U128(math::MIN_BACKING),
+            cap_ppm: U128(cap_ppm),
+            owed: U128(math::owed(amount, cap_ppm)),
+        }
     }
 
     pub fn get_solvency(&self) -> Solvency {

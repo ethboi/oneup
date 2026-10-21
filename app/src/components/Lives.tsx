@@ -121,14 +121,20 @@ function LifeRow({ l, expiry, listings }: { l: LifeInfo; expiry?: number; listin
   const paid = BigInt(l.paid);
   const progress = owed === 0n ? 0 : Number((paid * 10_000n) / owed) / 10_000;
   const earning = !l.expired && !l.full_heal;
-  const state = l.full_heal ? "Full Heal" : l.expired ? "Expired" : `Earning through epoch ${l.epoch + (expiry ?? 13)}`;
+  const state = l.full_heal
+    ? "Full Heal"
+    : l.expired
+      ? "Expired"
+      : l.backer
+        ? "Earning until paid in full"
+        : `Earning through epoch ${l.epoch + (expiry ?? 13)}`;
   const value = lifeValue(l);
   return (
     <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-2 p-3 sm:grid-cols-[auto_1.2fr_1fr_auto_auto] sm:p-4" style={earning ? undefined : { opacity: 0.75 }}>
       {/* while earning the heart stays pink, filling as it pays out; finished ones go grey */}
       <PixelHeart size={34} fill={l.full_heal ? 1 : earning ? progress : 0} live={earning} label={`${state}, ${(progress * 100).toFixed(0)}% paid`} />
       <div className="min-w-0">
-        <div className="font-extrabold">{l.epoch === 0 ? "Seed life" : `From epoch ${l.epoch}`}</div>
+        <div className="font-extrabold">{l.backer ? `Backer Life #${l.token_id.slice(1)}` : `From epoch ${l.epoch}`}</div>
         <div className="label truncate">{state}</div>
       </div>
       <div className="col-span-3 row-start-2 sm:col-span-1 sm:row-start-1 sm:col-start-3">

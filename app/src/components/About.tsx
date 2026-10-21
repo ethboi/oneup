@@ -71,7 +71,7 @@ const LINEAGE: { row: string; papertrade: string; aerodrome: string; oneup: stri
 
 const BUILT: { icon: IconName; title: string; body: string }[] = [
   { icon: "shield", title: "8 Rust contracts", body: "House, Extra Life (NEP-171), $1UP (NEP-141), locks, market (NEP-178 approvals), and mock USDC, oracle and swap. Events follow NEP-297." },
-  { icon: "check", title: "108 contract tests", body: "Unit and property tests, plus end-to-end tests on a sandbox chain." },
+  { icon: "check", title: "158 contract tests", body: "Unit and property tests, end-to-end tests on a sandbox chain, and a security review whose 21 fixes each have a test." },
   { icon: "demo", title: "Keeper and bots", body: "Anyone can run the keeper: it pushes prices, fills orders, liquidates, fires take-profits and stop-losses, and closes epochs. Six bots trade, lock and shop." },
   { icon: "scale", title: "Simulations", body: "Fairness to late players and the cost of farming $1UP, tested before the rules were fixed." },
 ];

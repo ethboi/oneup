@@ -1,15 +1,16 @@
-// Serves localnet.json to the browser. Localnet only: it carries the throwaway dev keys `pnpm localnet`
-// generated, which is what lets the app sign as the demo trader and the bots without a wallet.
+// Serves the browser's part of localnet.json (publicConfig: no root, keeper or solver key). Localnet only:
+// it carries the demo trader's and the bots' throwaway dev keys, which is what lets the app sign as them
+// without a wallet.
 
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { deployment, guard, publicConfig } from "@/lib/server/localnet";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: Request) {
+  const no = guard(req);
+  if (no) return no;
   try {
-    const raw = await readFile(resolve(process.cwd(), "../localnet.json"), "utf8");
-    return new Response(raw, { headers: { "content-type": "application/json" } });
+    return Response.json(publicConfig(deployment()));
   } catch {
     return Response.json({ error: "No localnet.json. Run `pnpm localnet` first." }, { status: 503 });
   }

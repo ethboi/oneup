@@ -42,11 +42,14 @@ pub enum Event {
     },
     #[event_version("1.0.0")]
     EpochClosed { summary: EpochSummary },
+    /// D-22: someone backed the pool and got a Backer Life owed `owed` (`cap_ppm` × the amount).
+    #[event_version("1.0.0")]
+    Backed { account_id: AccountId, amount: U128, cap_ppm: U128, owed: U128, pool: U128 },
     #[event_version("1.0.0")]
     TriggersSet { position_id: u64, account_id: AccountId, take_profit: Option<U128>, stop_loss: Option<U128> },
 }
 
-#[near(serializers = [json])]
+#[near(serializers = [json, borsh])]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CloseReason {
     Close,

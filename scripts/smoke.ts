@@ -34,7 +34,7 @@ const pos = await until("fill", async () => (await o.positions(me)).find((p) => 
 console.log(`filled #${pos.id} at ${Number(pos.entry_price) / 1e8}`);
 
 const entry = Number(pos.entry_price) / 1e8;
-await fetch(`${CONTROL}/price`, { method: "POST", body: JSON.stringify({ market: "NEAR-USD", price: entry * 0.98 }) });
+await fetch(`${CONTROL}/price`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ market: "NEAR-USD", price: entry * 0.98 }) });
 console.log(`steering NEAR-USD to ${(entry * 0.98).toFixed(4)} (−2%); waiting for liquidation`);
 await until("liquidation", async () => !(await o.positions(me)).some((p) => p.id === pos.id));
 console.log(`liquidated. pending Extra Life: ${fmtUsdc(BigInt(await o.pendingLife(me)))} of losses this epoch`);

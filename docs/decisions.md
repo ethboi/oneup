@@ -171,17 +171,93 @@ earned and didn't claim is paid through the new lock; what they already claimed 
 ## D-19 · Take-profit and stop-loss · **Decided (21 Oct 2026)**
 
 A position can carry a take-profit and a stop-loss price, set with the order or changed later
-(`set_triggers`). They work like liquidation: the keeper sees the price cross, calls `hit_target` or
-`hit_stop`, and the house checks the trigger against the oracle and closes **at that oracle price**, not
-at the trigger, so a gap past it is neither a gift nor a theft. Two rules keep it from becoming a way
+(`set_triggers`). The keeper sees the price cross and calls `hit_target` or `hit_stop`; the house checks
+the trigger against the oracle and **places a close**, which fills at the next price published after the
+hit, exactly like the trader's own close (a stop-market order). Three rules keep it from becoming a way
 round delayed fills (D-2):
 
+- **A hit never settles at a price already on chain.** The first version closed at the oracle price that
+  crossed the trigger. The security review (21 Oct) showed why that's wrong: a trigger may be set at any
+  price (a stop at `u128::MAX` is always "hit"), so a trader could call `hit_stop` whenever the on-chain
+  price lagged the market in their favour, up to ~1% for up to 60 s on Outlayer, or 100%+ of margin at
+  high leverage. Placing a close for the next price makes a hit worth exactly a manual close.
 - **Only newer prices fire it.** A trigger fires only on a price published after it was set (for one set
-  with the order, after the order). Setting a stop across the current price can't close at a price the
-  trader already saw.
+  with the order, after the order).
 - **The minimum hold applies**, as for a manual close.
 
-A loss closed by a stop counts toward an Extra Life like any other. The app warns about, and the order
+The close records why it was placed (`Close`, `Target` or `Stop`) and the trade history shows it.
+
+A loss closed by a stop counts toward an Extra Life like any other.
+
+## D-20 · A Sputnik DAO owns the house · **Decided (21 Oct 2026)**
+
+The house's owner lists markets, pauses them and sets their share of the pool (D-14). On localnet the
+owner is a Sputnik v2 DAO running the exact code mainnet Sputnik DAOs run (`contracts/vendor`, hash checked
+against the mainnet factory). The council is the demo trader and two bots; 2 of 3 approve a proposal,
+which calls the house. Routine buybacks (D-10) go through an `operator` role instead, so the DAO doesn't
+vote every epoch, and order fills go through a `keeper` role (D-23). The owner can still change the
+oracle, the swap and the params, so whoever owns the house is trusted; the DAO is how that trust is spread.
+
+## D-21 · NEAR Intents deposits · **Decided (21 Oct 2026)**
+
+Supersedes D-7. The official Verifier and PoA token factory (`defuse/v0.4.2`, sha256-checked; mainnet runs
+0.4.5, which has no published build) run on localnet, signed with the official
+`@defuse-protocol/intents-sdk`. A user pays from another chain in one signed intent: a token_diff swapping
+the bridged asset for USDC with a solver, and an `ft_withdraw` of the USDC to the house whose message
+credits them (`{"for":…}`) or opens their trade (`{"open":…}`). Only the bridge is simulated (the root
+account mints the PoA token into the Verifier, as a real bridge would after a deposit).
+
+The house accepts a message naming an account only from the Verifier, and never refuses one: the Verifier
+doesn't return tokens a receiver rejects, so a refused open leaves the deposit in the named account's free
+balance. Since whoever withdraws writes the message, an Intents open may only trade the USDC that deposit
+brought, never the named account's existing balance (security review, 21 Oct).
+
+## D-22 · Backer Lives bootstrap the pool · **Decided (21 Oct 2026)**
+
+D-1 needs a deep pool: with both sides counted, a $25K seed allows ~$2.8K of total margin. Before, only
+the owner could seed, and the seed got a 1.0× Extra Life: money back from profit, never anything more.
+Nobody else had a reason to fund the house.
+
+Now anyone can **back** the pool (`{"back":{}}`, at least 10 USDC) until the total seeded reaches
+`backing_target` ($1M by default). A backing:
+
+- **joins the pool for good and raises the reserve floor** (D-12), so it is only ever repaid from house
+  profit, never paid out as surplus;
+- **mints a Backer Life**: an Extra Life that never expires, paid from the same pots as losers' lives, pro
+  rata to what it is still owed;
+- **is owed the curve's average over the backing**: losers' lives are capped at 2.0× at an empty pool,
+  falling to 1.2× at $1M (`life_cap_ppm`); a backing of `x` into a pool of `p` is owed the average of that
+  curve over `[p, p + x]` (`backer_cap_ppm`). Early dollars earn more, and splitting a backing into pieces
+  earns the same (to within 2 ppm, a property test);
+- **exits through the market**: a Backer Life is an NFT like any other and sells on the marketplace (D-17).
+
+Why this and not an LP vault (deposit, get shares, withdraw against free capital, as GMX does): LP shares
+would compete with Extra Lives and buybacks for the same house profit and need a new profit split; a
+withdrawable pool also shrinks exactly when traders are winning. Backer Lives reuse the existing pieces and
+tell one story: backers are losers by choice, early ones are paid most, and everyone is paid from the same
+profit. The cost is that backers share pots with losers, so a big round dilutes the losers' lives until
+it's repaid; the round's target bounds that.
+
+The owner's own seed is a Backer Life at 1.0×. On localnet the owner seeds $250K and four bots back $550K
+at deploy, leaving $200K of the round for the demo trader; the collector bot backs now and then.
+
+## D-23 · Only the keeper fills · **Decided (21 Oct 2026)**
+
+D-2 let anyone fill an order with any price inside the 30 s window, so a trader running their own keeper
+could pick the price, and let an open expire for free if nothing suited them. With a `keeper` set
+(`set_keeper`), only the keeper (or the owner or operator) may `fill` orders and `take_profit` at the cap.
+`hit_target`/`hit_stop` stay open to anyone, since they now only place a close (D-19), and liquidations stay
+open to anyone, since they only ever help the pool. The keeper is trusted to fill promptly at the first
+price after the order; on mainnet that trust could move to a fill rule checked against the oracle's
+history.
+
+## D-24 · Extra Lives and $1UP go by net loss · **Decided (21 Oct 2026)**
+
+Lives were sized by each wallet's gross losses in the epoch. A long and a short on yourself loses one side
+and wins the other, minus the winner's cut, yet the losing leg counted in full: a cheap way to take most of
+an epoch's lives and $1UP. Now each wallet's epoch total is losses minus profit paid, and only wallets above
+zero share the epoch's face value and $1UP, by net loss. Splitting the legs across two wallets still works,
+but then the winning wallet's cut (10–25%) is the cost, which D-16's farming numbers already price in. The app warns about, and the order
 form refuses, a trigger already past the price; the contract allows it, since the newer-price rule makes
 it harmless.
 

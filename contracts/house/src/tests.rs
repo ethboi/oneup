@@ -369,8 +369,10 @@ fn epoch_close_mints_and_pays() {
     let v = h.get_closing().unwrap();
     assert_eq!(v.house_net.0, usd(1_350)); // 1_500 lost − 150 paid
     assert_eq!(v.cap_ppm.0, 1_978_920); // 2.0 − 0.8 × 26_350 / 1M
-    assert_eq!(v.losers_left, 2);
+    // Alice is listed too (a net winner) but gets nothing
+    assert_eq!(v.losers_left, 3);
 
+    assert_eq!(h.close_epoch(Some(1)), "minting");
     assert_eq!(h.close_epoch(Some(1)), "minting");
     assert_eq!(h.close_epoch(Some(1)), "minting");
     assert_eq!(h.close_epoch(Some(1)), "waiting for mints");
@@ -564,6 +566,10 @@ mod invariants {
         Keeper { pick: usize },
         Expire { pick: usize },
         CloseEpoch,
+        /// D-19: set a trigger anywhere (even across the price) and have the keeper try it
+        Trigger { pick: usize, stop: bool, cents: i64 },
+        /// D-22: back the pool from a wallet's free balance
+        Back { who: usize, amount: u128 },
     }
 
     fn op() -> impl Strategy<Value = Op> {
@@ -575,6 +581,8 @@ mod invariants {
             (0..16usize).prop_map(|pick| Op::Keeper { pick }),
             (0..16usize).prop_map(|pick| Op::Expire { pick }),
             Just(Op::CloseEpoch),
+            (0..16usize, any::<bool>(), 1i64..2_000).prop_map(|(pick, stop, cents)| Op::Trigger { pick, stop, cents }),
+            (0..4usize, 10u128..2_000).prop_map(|(who, a)| Op::Back { who, amount: a * USDC }),
         ]
     }
 
@@ -605,7 +613,7 @@ mod invariants {
             let mut h = setup(seed);
             let deposits = usd(10_000);
             for w in WHO { deposit(&mut h, w, deposits); }
-            let total = seed + deposits * WHO.len() as u128;
+            let mut total = seed + deposits * WHO.len() as u128;
 
             let mut cents: i64 = 500;
             let mut t = T0 + 10;
@@ -652,7 +660,30 @@ mod invariants {
                             if t > o.placed_at + 30 { ctx("anyone", t); h.expire(o.id); }
                         }
                     }
+                    Op::Trigger { pick, stop, cents: at } => {
+                        let ps: Vec<_> = h.positions.values().cloned().collect();
+                        if let Some(p) = ps.get(pick % ps.len().max(1)) {
+                            ctx(&p.owner.to_string(), t);
+                            let at = Some(U128(at as u128 * 1_000_000));
+                            if stop { h.set_triggers(p.id, None, at) } else { h.set_triggers(p.id, at, None) }
+                            let reason = if stop { CloseReason::Stop } else { CloseReason::Target };
+                            // the price the trader saw when setting it never closes the position
+                            let _ = h.internal_keeper_close(p.id, reason, px(cents, t), t);
+                            prop_assert!(h.positions.get(&p.id).is_some_and(|q| q.close_order == p.close_order));
+                            let _ = h.internal_keeper_close(p.id, reason, px(cents, t + 1), t + 1);
+                            // a hit only places a close; the position is still open
+                            prop_assert!(h.positions.contains_key(&p.id));
+                        }
+                    }
+                    Op::Back { who, amount } => {
+                        // backing is new money from outside: the wallet's deposit, straight to the pool
+                        ctx("usdc", t);
+                        let _ = h.ft_on_transfer(acc(WHO[who]), U128(amount), r#"{"back":{}}"#.into());
+                        total += amount;
+                    }
                 }
+                let net: u128 = h.epoch_losses.values().map(|v| (*v).max(0) as u128).sum();
+                prop_assert_eq!(net, h.epoch.net_losses.0);
                 prop_assert_eq!(total_held(&h), total);
                 prop_assert!(h.liability <= h.pool, "liability {} > pool {}", h.liability, h.pool);
                 prop_assert!(h.pool >= oneup_math::reserve(h.liability, h.reserve_floor()).min(h.pool));
@@ -684,8 +715,10 @@ fn take_profit_from_the_order_waits_out_the_hold() {
     assert!(h.internal_keeper_close(pos, CloseReason::Target, px(509, T0 + 70), T0 + 70).is_err());
     // the stop isn't hit by a rising price
     assert!(h.internal_keeper_close(pos, CloseReason::Stop, px(511, T0 + 70), T0 + 70).is_err());
-    // closes at the oracle price that crossed, not at the trigger
+    // reached: places a close, which fills at the next price, not at the trigger or the price that crossed
     h.internal_keeper_close(pos, CloseReason::Target, px(512, T0 + 71), T0 + 71).unwrap();
+    let order = h.get_position(pos).unwrap().close_order.unwrap();
+    h.internal_fill(order, px(512, T0 + 72), T0 + 72).unwrap();
     assert!(h.get_position(pos).is_none());
     // +2.4% on 10,000 = +240, less the winner's cut
     let bal = h.get_balance(acc("alice")).0;
@@ -699,6 +732,8 @@ fn stop_loss_on_a_short_counts_as_a_loss() {
     let pos = open_with(&mut h, "bob", Side::Short, 10, 500, None, Some(505));
     assert!(h.internal_keeper_close(pos, CloseReason::Stop, px(504, T0 + 70), T0 + 70).is_err());
     h.internal_keeper_close(pos, CloseReason::Stop, px(506, T0 + 71), T0 + 71).unwrap();
+    let order = h.get_position(pos).unwrap().close_order.unwrap();
+    h.internal_fill(order, px(506, T0 + 72), T0 + 72).unwrap();
     // −1.2% on 10,000 = −120: the rest comes back and the loss counts toward an Extra Life
     assert_eq!(h.get_balance(acc("bob")).0, usd(880));
     assert_eq!(h.get_pending_life(acc("bob")).0, usd(120));
@@ -715,6 +750,8 @@ fn triggers_set_later_fire_only_on_a_newer_price() {
     h.set_triggers(pos, Some(U128(490 * 1_000_000)), None);
     assert!(h.internal_keeper_close(pos, CloseReason::Target, px(520, T0 + 100), T0 + 100).is_err());
     h.internal_keeper_close(pos, CloseReason::Target, px(519, T0 + 101), T0 + 101).unwrap();
+    let order = h.get_position(pos).unwrap().close_order.unwrap();
+    h.internal_fill(order, px(519, T0 + 102), T0 + 102).unwrap();
     assert!(h.get_position(pos).is_none());
 }
 
@@ -816,4 +853,236 @@ fn others_cannot_deposit_for_someone_else() {
     h.set_intents(Some(acc("intents")));
     ctx("usdc", T0);
     let _ = h.ft_on_transfer(acc("mallory"), U128(usd(5)), r#"{"for":{"account_id":"alice"}}"#.into());
+}
+
+// Security review fixes (21 Oct 2026)
+
+/// A trigger can be set at any price, so a hit must never settle at a price already on chain: it places a
+/// close that only a newer price fills. Otherwise a stop at u128::MAX is a close-whenever-the-oracle-lags
+/// button.
+#[test]
+fn trigger_at_any_price_cannot_close_at_a_known_price() {
+    let mut h = setup(usd(100_000));
+    deposit(&mut h, "alice", usd(1_000));
+    let pos = open_with(&mut h, "alice", Side::Long, 10, 500, None, None);
+    ctx("alice", T0 + 70);
+    h.set_triggers(pos, None, Some(U128(u128::MAX)));
+    h.internal_keeper_close(pos, CloseReason::Stop, px(520, T0 + 71), T0 + 71).unwrap();
+    let order = h.get_position(pos).unwrap().close_order.unwrap();
+    // the 5.20 she saw can't fill it, only a later price
+    assert_eq!(h.internal_fill(order, px(520, T0 + 71), T0 + 71), Err("Price is not newer than the order"));
+    h.internal_fill(order, px(505, T0 + 72), T0 + 72).unwrap();
+    // +1% on 10,000 = +100, less the cut: settled at 5.05, not 5.20
+    assert!(h.get_balance(acc("alice")).0 < usd(1_100));
+    // a second hit while the close is pending does nothing
+    let pos2 = open_with(&mut h, "alice", Side::Long, 10, 500, None, Some(1_000));
+    h.internal_keeper_close(pos2, CloseReason::Stop, px(500, T0 + 80), T0 + 80).unwrap();
+    assert_eq!(h.internal_keeper_close(pos2, CloseReason::Stop, px(500, T0 + 81), T0 + 81), Err("Close already pending"));
+}
+
+#[test]
+fn a_trigger_close_reports_its_reason() {
+    let mut h = setup(usd(100_000));
+    deposit(&mut h, "bob", usd(1_000));
+    let pos = open_with(&mut h, "bob", Side::Long, 10, 500, Some(510), None);
+    h.internal_keeper_close(pos, CloseReason::Target, px(511, T0 + 70), T0 + 70).unwrap();
+    let order = h.get_position(pos).unwrap().close_order.unwrap();
+    assert!(matches!(h.orders.get(&order).unwrap().kind, OrderKind::Close { reason: CloseReason::Target, .. }));
+}
+
+#[test]
+#[should_panic(expected = "Only the keeper")]
+fn only_the_keeper_fills_once_set() {
+    let mut h = setup(usd(100_000));
+    ctx("owner", T0);
+    h.set_keeper(Some(acc("keeper")));
+    deposit(&mut h, "alice", usd(1_000));
+    ctx("alice", T0);
+    let order = h.place_open(MARKET.into(), Side::Long, U128(usd(100)), 10, None, None);
+    // a trader filling their own order could pick the price inside the window
+    let _ = h.fill(order);
+}
+
+#[test]
+#[should_panic(expected = "Only the keeper")]
+fn only_the_keeper_takes_profit_at_the_cap() {
+    let mut h = setup(usd(100_000));
+    ctx("owner", T0);
+    h.set_keeper(Some(acc("keeper")));
+    deposit(&mut h, "alice", usd(1_000));
+    let pos = open(&mut h, "alice", Side::Long, usd(100), 100, 500, T0);
+    ctx("alice", T0 + 100);
+    let _ = h.take_profit(pos);
+}
+
+#[test]
+fn the_keeper_and_operator_may_fill() {
+    let mut h = setup(usd(100_000));
+    ctx("owner", T0);
+    h.set_keeper(Some(acc("keeper")));
+    h.set_operator(Some(acc("op")));
+    deposit(&mut h, "alice", usd(1_000));
+    ctx("alice", T0);
+    let order = h.place_open(MARKET.into(), Side::Long, U128(usd(100)), 10, None, None);
+    for who in ["keeper", "op", "owner"] {
+        ctx(who, T0 + 1);
+        let _ = h.fill(order);
+    }
+    assert_eq!(h.get_keeper(), Some(acc("keeper")));
+}
+
+/// Whoever withdraws from the Verifier writes the message, so it names any account: an Intents open
+/// may only trade the USDC it brought, never the named account's existing balance.
+#[test]
+fn intents_open_trades_only_the_deposit() {
+    let mut h = setup(usd(100_000));
+    ctx("owner", T0);
+    h.set_intents(Some(acc("intents")));
+    deposit(&mut h, "victim", usd(1_000));
+    intents_deposit(&mut h, 1, r#"{"open":{"market_id":"NEAR-USD","side":"Long","margin":"1000000000","leverage":100,"account_id":"victim"}}"#);
+    assert!(h.get_orders(acc("victim")).is_empty());
+    assert_eq!(h.get_balance(acc("victim")).0, usd(1_000) + 1);
+}
+
+/// D-16 by net loss: a long and a short on yourself only lose the winner's cut, so that's all that counts.
+#[test]
+fn wash_trading_counts_only_the_net_loss() {
+    let mut h = setup(usd(100_000));
+    deposit(&mut h, "mallory", usd(2_000));
+    deposit(&mut h, "bob", usd(1_000));
+    let l = open(&mut h, "mallory", Side::Long, usd(1_000), 10, 500, T0);
+    let s = open(&mut h, "mallory", Side::Short, usd(1_000), 10, 500, T0);
+    close(&mut h, "mallory", l, 510, T0 + 100); // +200 less the cut
+    close(&mut h, "mallory", s, 510, T0 + 100); // −200
+    let cut = h.get_epoch().cuts.0;
+    assert!(cut > 0);
+    assert_eq!(h.get_pending_life(acc("mallory")).0, cut);
+    // an honest loser's share isn't diluted by the gross 200
+    let b = open(&mut h, "bob", Side::Long, usd(1_000), 10, 500, T0 + 200);
+    close(&mut h, "bob", b, 490, T0 + 300); // −200
+    assert_eq!(h.get_epoch().net_losses.0, cut + usd(200));
+    // a net winner has no pending life
+    deposit(&mut h, "alice", usd(1_000));
+    let a = open(&mut h, "alice", Side::Long, usd(1_000), 10, 500, T0 + 400);
+    close(&mut h, "alice", a, 510, T0 + 500);
+    assert_eq!(h.get_pending_life(acc("alice")).0, 0);
+}
+
+#[test]
+#[should_panic(expected = "Deposit below the minimum")]
+fn dust_cannot_open_a_balance() {
+    let mut h = setup(usd(100_000));
+    deposit(&mut h, "fake-1", 1);
+}
+
+#[test]
+fn an_existing_balance_takes_any_amount() {
+    let mut h = setup(usd(100_000));
+    deposit(&mut h, "alice", usd(1));
+    deposit(&mut h, "alice", 1);
+    assert_eq!(h.get_balance(acc("alice")).0, usd(1) + 1);
+}
+
+#[test]
+#[should_panic(expected = "Deposit below the minimum")]
+fn intents_dust_cannot_open_a_balance() {
+    let mut h = setup(usd(100_000));
+    ctx("owner", T0);
+    h.set_intents(Some(acc("intents")));
+    intents_deposit(&mut h, 5, r#"{"for":{"account_id":"fake-2"}}"#);
+}
+
+#[test]
+#[should_panic(expected = "no open positions or orders")]
+fn solvency_rule_cannot_change_with_pending_orders() {
+    let mut h = setup(usd(100_000));
+    deposit(&mut h, "alice", usd(1_000));
+    ctx("alice", T0);
+    h.place_open(MARKET.into(), Side::Long, U128(usd(100)), 10, None, None);
+    ctx("owner", T0);
+    let p = crate::Params { solvency_both_sides: false, ..h.get_params() };
+    h.set_params(p);
+}
+
+#[test]
+fn a_partial_buyback_is_not_swapped_twice() {
+    let mut h = setup(usd(100_000));
+    let e = h.get_epoch();
+    h.record_buyback(&e, usd(100));
+    h.buyback_usdc = usd(100);
+    h.buybacks.get_mut(&e.id).unwrap().status = crate::BuybackStatus::Swapping;
+    let pool = h.pool;
+    let _ = h.on_buyback_sent(e.id, U128(usd(100)), Ok(U128(usd(60))));
+    let b = h.get_buyback(e.id).unwrap();
+    assert_eq!((b.usdc.0, b.status), (usd(60), crate::BuybackStatus::Done));
+    assert_eq!(h.buyback_usdc, 0);
+    assert_eq!(h.pool, pool + usd(40));
+}
+
+#[test]
+fn a_refused_pot_is_still_owed() {
+    let mut h = setup(usd(25_000));
+    h.lives_owed = usd(1_000);
+    h.lives_paid = usd(400);
+    h.pool -= usd(400);
+    let pool = h.pool;
+    let _ = h.on_pot(U128(usd(400)), Ok(U128(0)));
+    assert_eq!((h.lives_owed, h.lives_paid, h.pool), (usd(1_400), 0, pool + usd(400)));
+}
+
+/// Decision D-22: anyone backs the pool and gets a Backer Life; early dollars earn more.
+#[test]
+fn anyone_can_back_the_pool() {
+    let mut h = setup(usd(25_000));
+    let owed_before = h.lives_owed;
+    ctx("usdc", T0);
+    let _ = h.ft_on_transfer(acc("bob"), U128(usd(10_000)), r#"{"back":{}}"#.into());
+    let cap = oneup_math::backer_cap_ppm(usd(25_000), usd(10_000));
+    assert_eq!(cap, 1_976_000); // the average of 1.98× at 25K and 1.972× at 35K
+    assert_eq!(h.get_pool().0, usd(35_000));
+    assert_eq!(h.reserve_floor(), usd(35_000)); // only ever paid back from profit
+    assert_eq!(h.lives_owed, owed_before + usd(19_760));
+    // a later backer gets less
+    let b = h.get_backing(Some(U128(usd(10_000))));
+    assert!(b.cap_ppm.0 < cap && b.open);
+    assert_eq!(b.backed.0, usd(35_000));
+}
+
+#[test]
+#[should_panic(expected = "Backing round is full")]
+fn backing_stops_at_the_target() {
+    let mut h = setup(usd(25_000));
+    ctx("owner", T0);
+    h.set_params(crate::Params { backing_target: U128(usd(30_000)), ..h.get_params() });
+    ctx("usdc", T0);
+    let _ = h.ft_on_transfer(acc("bob"), U128(usd(5_001)), r#"{"back":{}}"#.into());
+}
+
+#[test]
+#[should_panic(expected = "Back with at least 10 USDC")]
+fn backing_has_a_minimum() {
+    let mut h = setup(usd(25_000));
+    ctx("usdc", T0);
+    let _ = h.ft_on_transfer(acc("bob"), U128(usd(9)), r#"{"back":{}}"#.into());
+}
+
+#[test]
+fn a_failed_backer_mint_returns_the_backing() {
+    let mut h = setup(usd(25_000));
+    ctx("usdc", T0);
+    let _ = h.ft_on_transfer(acc("bob"), U128(usd(1_000)), r#"{"back":{}}"#.into());
+    let owed = h.lives_owed;
+    let _ = h.on_backer_minted(acc("bob"), U128(usd(1_000)), U128(usd(1_970)), Err(near_sdk::PromiseError::Failed));
+    assert_eq!((h.pool, h.seed), (usd(25_000), usd(25_000)));
+    assert_eq!(h.lives_owed, owed - usd(1_970));
+    assert_eq!(h.get_balance(acc("bob")).0, usd(1_000));
+}
+
+#[test]
+fn the_owner_can_seed_twice() {
+    let mut h = setup(usd(25_000));
+    ctx("usdc", T0);
+    let _ = h.ft_on_transfer(acc("owner"), U128(usd(5_000)), r#"{"seed":{}}"#.into());
+    // both seeds are owed back at 1.0×
+    assert_eq!((h.seed, h.lives_owed), (usd(30_000), usd(30_000)));
 }

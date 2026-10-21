@@ -1,38 +1,27 @@
 // The OneUp relayer (NEP-366 meta transactions): takes a signed delegate action from the app and submits it,
-// paying the gas. It only relays trade calls to the house (place_open, place_close, set_triggers) with no
-// deposit, so it can't be used to spend anyone's funds or burn its gas on other contracts. Localnet only:
-// the relayer is the deployer account from localnet.json.
+// paying the gas. It only relays trade calls to the house (place_open, place_close, set_triggers) from local
+// accounts, with no deposit and at most 100 Tgas, 10 per sender per 10 s (lib/server/relay.ts), so it can't
+// be used to spend anyone's funds or burn its gas on other contracts. Localnet only: the relayer is the
+// deployer account from localnet.json.
 
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { deserialize } from "borsh";
 import { Account, JsonRpcProvider, SCHEMA, getTransactionLastResult, type KeyPairString } from "near-api-js";
+import { deployment, guard } from "@/lib/server/localnet";
+import { underLimit, validateDelegate, type Delegate } from "@/lib/server/relay";
 
 export const dynamic = "force-dynamic";
 
-const ALLOWED = ["place_open", "place_close", "set_triggers"];
-
-interface Decoded {
-  delegateAction: {
-    senderId: string;
-    receiverId: string;
-    actions: { functionCall?: { methodName: string; deposit: bigint } }[];
-  };
-}
-
 export async function POST(req: Request) {
+  const no = guard(req);
+  if (no) return no;
   try {
-    const d = JSON.parse(readFileSync(resolve(process.cwd(), "../localnet.json"), "utf8"));
+    const d = deployment();
     const { signedDelegate } = (await req.json()) as { signedDelegate: string };
-    const decoded = deserialize(SCHEMA.SignedDelegate, Buffer.from(signedDelegate, "base64")) as unknown as Decoded;
+    const decoded = deserialize(SCHEMA.SignedDelegate, Buffer.from(signedDelegate, "base64")) as unknown as { delegateAction: Delegate };
     const da = decoded.delegateAction;
-    const ok =
-      da.receiverId === d.contracts.house &&
-      da.actions.length === 1 &&
-      !!da.actions[0].functionCall &&
-      ALLOWED.includes(da.actions[0].functionCall.methodName) &&
-      BigInt(da.actions[0].functionCall.deposit) === 0n;
-    if (!ok) return Response.json({ error: "The relayer only pays for trades on the house" }, { status: 400 });
+    const bad = validateDelegate(da, d.contracts.house);
+    if (bad) return Response.json({ error: bad }, { status: 400 });
+    if (!underLimit(da.senderId)) return Response.json({ error: "Too many relayed trades: wait a few seconds" }, { status: 429 });
     const relayer = new Account(d.owner.id, new JsonRpcProvider({ url: d.rpcUrl }), d.owner.key as KeyPairString);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const out = await relayer.relayMetaTransaction(decoded as any);

@@ -130,6 +130,19 @@ class Bot {
     if (m?.makeLocks) await this.makeLock();
     if (m?.sell) await this.sell(m.sell);
     await this.govern();
+    if (this.style.collector && Math.random() < 0.02) await this.back();
+  }
+
+  /** The collector now and then backs the house with $1,000–5,000 while the bootstrap round is open (D-22). */
+  private async back() {
+    const amount = BigInt(1_000 + Math.floor(Math.random() * 4_000)) * USDC;
+    const round = await o.backing(amount);
+    if (!round.open || BigInt(round.backed) + amount > BigInt(round.target)) return;
+    if (BigInt(await o.usdcBalance(this.id)) < amount) await this.tx.faucet(amount);
+    await this.tx.back(amount).then(
+      () => log(this.style.name, `backed the house with $${fmtUsdc(amount, 0)} at ${(Number(round.cap_ppm) / 1e6).toFixed(2)}×`),
+      (e) => log(this.style.name, `backing failed: ${short(e)}`),
+    );
   }
 
   private async topUp() {
@@ -253,6 +266,11 @@ class Bot {
     const px = await oneupPrice();
     const now = Math.floor(Date.now() / 1000);
     for (const x of mine) {
+      // Backer Lives are long-term backing (D-22): bots keep them
+      if (x.nft_contract === life && x.token_id.startsWith("b")) {
+        await this.tx.delist(life, x.token_id).catch(() => {});
+        return;
+      }
       if (now - x.listed_at < 300) continue;
       const value = await valueOf(x, px);
       const next = (BigInt(x.price) * 95n) / 100n;
@@ -268,7 +286,7 @@ class Bot {
     const offers: { nft: string; token: string; price: bigint; what: string }[] = [];
     for (const l of await o.lives(this.id)) {
       const v = lifeValue(l);
-      if (v >= USDC && !up.has(`${life}:${l.token_id}`)) offers.push({ nft: life, token: l.token_id, price: share_(v, share.life), what: "Extra Life" });
+      if (v >= USDC && !l.backer && !up.has(`${life}:${l.token_id}`)) offers.push({ nft: life, token: l.token_id, price: share_(v, share.life), what: "Extra Life" });
     }
     for (const l of await o.locks(this.id)) {
       if (l.withdrawn || up.has(`${ve}:${l.token_id}`)) continue;

@@ -2,6 +2,9 @@
 //! The house mints one per losing wallet per epoch and sends each epoch's pot here; holders claim.
 //! Unclaimed USDC moves with the token when it's sold. The metadata is dynamic: every NFT view draws the
 //! token's image (a pixel heart that fills as it pays back) and description from its current state.
+//!
+//! Backer Lives (D-22) are minted for backing the house pool: token id `"b<n>"`, one per backing, and they
+//! never expire. Claiming a token drops its approvals, so a listing can't be drained before it sells.
 
 use near_contract_standards::non_fungible_token::approval::NonFungibleTokenApproval;
 use near_contract_standards::non_fungible_token::core::{NonFungibleTokenCore, NonFungibleTokenResolver};
@@ -10,7 +13,7 @@ use near_contract_standards::non_fungible_token::events::NftMint;
 use near_contract_standards::non_fungible_token::metadata::{
     NFTContractMetadata, NonFungibleTokenMetadataProvider, TokenMetadata, NFT_METADATA_SPEC,
 };
-use near_contract_standards::non_fungible_token::{NonFungibleToken, Token, TokenId};
+use near_contract_standards::non_fungible_token::{refund_approved_account_ids, NonFungibleToken, Token, TokenId};
 use near_sdk::json_types::U128;
 use near_sdk::store::LookupMap;
 use near_sdk::{
@@ -24,7 +27,9 @@ mod acc;
 pub use acc::{remaining_as_of, Accumulator, Snapshot};
 
 const GAS_FT_TRANSFER: Gas = Gas::from_tgas(15);
-const GAS_CLAIM_CALLBACK: Gas = Gas::from_tgas(10);
+const GAS_CLAIM_CALLBACK: Gas = Gas::from_tgas(20);
+/// Tokens claimed in one call.
+const MAX_CLAIM: usize = 30;
 
 #[near(serializers = [borsh])]
 #[derive(Clone, Debug)]
@@ -35,6 +40,8 @@ pub struct Life {
     pub owed: u128,
     pub at: Snapshot,
     pub claimed: u128,
+    /// A Backer Life (D-22): minted for backing the house pool, never expires.
+    pub backer: bool,
 }
 
 #[near(serializers = [json])]
@@ -59,6 +66,8 @@ pub struct LifeInfo {
     pub full_heal: bool,
     /// Past its earning window: keeps what it earned, earns no more.
     pub expired: bool,
+    /// A Backer Life (D-22): minted for backing the house pool, never expires.
+    pub backer: bool,
 }
 
 /// Every life minted in one epoch shares a snapshot, so the group expires in one step.
@@ -108,6 +117,8 @@ pub struct ExtraLife {
     cohorts: LookupMap<u64, Cohort>,
     /// Next epoch whose lives may expire (the seed, epoch 0, never does).
     next_expiry: u64,
+    /// Number of the next Backer Life.
+    next_backer: u64,
 }
 
 pub fn token_id(epoch: u64, owner: &AccountId) -> TokenId {
@@ -134,11 +145,12 @@ impl ExtraLife {
             held: 0,
             cohorts: LookupMap::new(StorageKey::Cohorts),
             next_expiry: 1,
+            next_backer: 1,
         }
     }
 
     /// House only. One life per (epoch, owner): `owed = face × cap`. Token id `"<epoch>:<owner>"`;
-    /// epoch 0 is the seed. Storage is paid by this contract.
+    /// epoch 0 is the old seed path (seeds are Backer Lives now). Storage is paid by this contract.
     pub fn mint_batch(&mut self, epoch: u64, items: Vec<MintItem>) -> Vec<TokenId> {
         require!(env::predecessor_account_id() == self.house, "Only the house");
         let mut ids = vec![];
@@ -159,26 +171,39 @@ impl ExtraLife {
                     self.cohorts.insert(epoch, Cohort { owed, at, expired_at: None });
                 }
             }
-            self.lives.insert(
-                id.clone(),
-                Life { epoch, face: item.face.0, cap_ppm: item.cap_ppm.0, owed, at, claimed: 0 },
+            let life = Life { epoch, face: item.face.0, cap_ppm: item.cap_ppm.0, owed, at, claimed: 0, backer: false };
+            let description = format!(
+                "Earns up to {} USDC from OneUp house profit ({}× of {} face value).",
+                fmt_usdc(owed),
+                fmt_ppm(item.cap_ppm.0),
+                fmt_usdc(item.face.0)
             );
-            let metadata = TokenMetadata {
-                title: Some(format!("Extra Life · epoch {epoch}")),
-                description: Some(format!(
-                    "Earns up to {} USDC from OneUp house profit ({}× of {} face value).",
-                    fmt_usdc(owed),
-                    fmt_ppm(item.cap_ppm.0),
-                    fmt_usdc(item.face.0)
-                )),
-                issued_at: Some(env::block_timestamp_ms().to_string()),
-                ..Default::default()
-            };
-            self.tokens.internal_mint_with_refund(id.clone(), item.owner.clone(), Some(metadata), None);
-            NftMint { owner_id: &item.owner, token_ids: &[&id], memo: None }.emit();
+            self.mint_life(id.clone(), item.owner, life, format!("Extra Life · epoch {epoch}"), description);
             ids.push(id);
         }
         ids
+    }
+
+    /// House only: a Backer Life for `face` USDC backing the house pool, `owed = face × cap`. Token id
+    /// `"b<n>"`, one per backing. It never expires (epoch 0, outside any cohort) and shares every pot from
+    /// now on, pro rata like the others.
+    pub fn mint_backer(&mut self, owner: AccountId, face: U128, cap_ppm: U128) -> TokenId {
+        require!(env::predecessor_account_id() == self.house, "Only the house");
+        let owed = math::owed(face.0, cap_ppm.0);
+        require!(owed > 0, "Nothing owed");
+        let n = self.next_backer;
+        self.next_backer += 1;
+        let id = format!("b{n}");
+        let at = self.acc.add(owed);
+        let life = Life { epoch: 0, face: face.0, cap_ppm: cap_ppm.0, owed, at, claimed: 0, backer: true };
+        let description = format!(
+            "Earns up to {} USDC from OneUp house profit ({}× of {} USDC backing the house pool).",
+            fmt_usdc(owed),
+            fmt_ppm(cap_ppm.0),
+            fmt_usdc(face.0)
+        );
+        self.mint_life(id.clone(), owner, life, format!("Backer Life #{n}"), description);
+        id
     }
 
     /// House only, before each epoch's pot: lives minted in `through_epoch` or earlier stop earning.
@@ -211,41 +236,44 @@ impl ExtraLife {
         PromiseOrValue::Value(U128(amount.0 - used))
     }
 
-    /// Sends the claimable USDC of the caller's tokens.
+    /// Sends the claimable USDC of the caller's tokens (1 to 30). Never more than is held: if short, the
+    /// last tokens are paid less and keep the rest claimable. A token that pays out loses its approvals
+    /// (and so any listing), so a buyer never gets a life drained after it was listed.
     pub fn claim(&mut self, token_ids: Vec<TokenId>) -> Promise {
+        require!(!token_ids.is_empty() && token_ids.len() <= MAX_CLAIM, "Claim 1 to 30 tokens");
         let account = env::predecessor_account_id();
-        let mut total = 0;
-        for id in &token_ids {
-            require!(self.tokens.owner_by_id.get(id).as_ref() == Some(&account), "Not your token");
-            let life = self.lives.get(id).unwrap().clone();
-            let amount = self.claimable(&life);
-            total += amount;
-            self.lives.get_mut(id).unwrap().claimed += amount;
+        let mut left = self.held;
+        let mut paid = vec![];
+        for id in token_ids {
+            require!(self.tokens.owner_by_id.get(&id).as_ref() == Some(&account), "Not your token");
+            let amount = self.claimable(self.lives.get(&id).unwrap()).min(left);
+            if amount > 0 {
+                self.lives.get_mut(&id).unwrap().claimed += amount;
+                left -= amount;
+                self.revoke_all(&id, account.clone());
+                paid.push((id, U128(amount)));
+            }
         }
-        let total = total.min(self.held);
+        let total = self.held - left;
         require!(total > 0, "Nothing to claim");
-        self.held -= total;
+        self.held = left;
         ext_ft::ext(self.usdc.clone())
             .with_attached_deposit(NearToken::from_yoctonear(1))
             .with_static_gas(GAS_FT_TRANSFER)
             .ft_transfer(account.clone(), U128(total), None)
-            .then(Self::ext(env::current_account_id()).with_static_gas(GAS_CLAIM_CALLBACK).on_claim(account, token_ids, U128(total)))
+            .then(Self::ext(env::current_account_id()).with_static_gas(GAS_CLAIM_CALLBACK).on_claim(account, paid, U128(total)))
     }
 
-    /// A failed transfer puts the amounts back as claimable.
+    /// A failed transfer puts each token's amount from that claim back as claimable.
     #[private]
-    pub fn on_claim(&mut self, account_id: AccountId, token_ids: Vec<TokenId>, total: U128, #[callback_result] r: Result<(), PromiseError>) -> bool {
+    pub fn on_claim(&mut self, account_id: AccountId, paid: Vec<(TokenId, U128)>, total: U128, #[callback_result] r: Result<(), PromiseError>) -> bool {
         if r.is_ok() {
             env::log_str(&format!("{account_id} claimed {}", total.0));
             return true;
         }
         self.held += total.0;
-        let mut left = total.0;
-        for id in token_ids {
-            let life = self.lives.get_mut(&id).unwrap();
-            let back = life.claimed.min(left);
-            life.claimed -= back;
-            left -= back;
+        for (id, amount) in paid {
+            self.lives.get_mut(&id).unwrap().claimed -= amount.0;
         }
         false
     }
@@ -281,14 +309,33 @@ impl ExtraLife {
 }
 
 impl ExtraLife {
+    fn mint_life(&mut self, id: TokenId, owner: AccountId, life: Life, title: String, description: String) {
+        self.lives.insert(id.clone(), life);
+        let metadata = TokenMetadata {
+            title: Some(title),
+            description: Some(description),
+            issued_at: Some(env::block_timestamp_ms().to_string()),
+            ..Default::default()
+        };
+        self.tokens.internal_mint_with_refund(id.clone(), owner.clone(), Some(metadata), None);
+        NftMint { owner_id: &owner, token_ids: &[&id], memo: None }.emit();
+    }
+
+    /// Drops every approval on a token, refunding their storage to the owner.
+    fn revoke_all(&mut self, token_id: &TokenId, owner: AccountId) {
+        if let Some(approvals) = self.tokens.approvals_by_id.as_mut().and_then(|a| a.remove(token_id)) {
+            refund_approved_account_ids(owner, &approvals).detach();
+        }
+    }
+
     fn paid(&self, life: &Life) -> u128 {
-        let frozen = self.cohorts.get(&life.epoch).and_then(|c| c.expired_at);
+        let frozen = self.cohorts.get(&life.epoch).and_then(|c| c.expired_at).filter(|_| !life.backer);
         let now = frozen.unwrap_or_else(|| self.acc.snapshot());
         life.owed - remaining_as_of(life.owed, life.at, now)
     }
 
     fn expired(&self, life: &Life) -> bool {
-        self.cohorts.get(&life.epoch).is_some_and(|c| c.expired_at.is_some())
+        !life.backer && self.cohorts.get(&life.epoch).is_some_and(|c| c.expired_at.is_some())
     }
 
     fn claimable(&self, life: &Life) -> u128 {
@@ -308,6 +355,7 @@ impl ExtraLife {
             claimable: U128(paid.saturating_sub(life.claimed)),
             full_heal: paid >= life.owed,
             expired: self.expired(life),
+            backer: life.backer,
         }
     }
 }
@@ -329,17 +377,20 @@ impl ExtraLife {
     fn dynamic(&self, mut t: Token) -> Token {
         let Some(life) = self.lives.get(&t.token_id) else { return t };
         let paid = self.paid(life);
-        let (state, line) = if paid >= life.owed {
+        let (state, mut line) = if paid >= life.owed {
             (HeartState::Healed, format!("Full Heal: paid back all {} USDC.", fmt_usdc(life.owed)))
         } else if self.expired(life) {
             (HeartState::Expired, format!("Expired after paying {} of {} USDC.", fmt_usdc(paid), fmt_usdc(life.owed)))
         } else {
             (HeartState::Earning, format!("Paid {} of {} USDC so far, from OneUp house profit.", fmt_usdc(paid), fmt_usdc(life.owed)))
         };
+        if life.backer {
+            line.push_str(" Backed the house pool.");
+        }
         let m = t.metadata.get_or_insert_with(TokenMetadata::default);
-        m.media = Some(heart_svg(paid, life.owed, state));
+        m.media = Some(heart_svg(paid, life.owed, state, life.backer));
         m.description = Some(line);
-        m.extra = Some(format!(r#"{{"paid":"{}","owed":"{}","state":"{}"}}"#, paid, life.owed, state.name()));
+        m.extra = Some(format!(r#"{{"paid":"{}","owed":"{}","state":"{}","backer":{}}}"#, paid, life.owed, state.name(), life.backer));
         t
     }
 }
@@ -362,8 +413,8 @@ impl HeartState {
 }
 
 /// A pixel heart on an LCD screen, filled from the bottom by `paid / owed`: gold behind a Full Heal, grey
-/// once expired. A `data:` URI, so wallets show it without any server.
-fn heart_svg(paid: u128, owed: u128, state: HeartState) -> String {
+/// once expired, a blue outline for a Backer Life. A `data:` URI, so wallets show it without any server.
+fn heart_svg(paid: u128, owed: u128, state: HeartState, backer: bool) -> String {
     let rows = HEART.len() as u128;
     let filled = if owed == 0 { rows } else { (paid.min(owed) * rows).div_ceil(owed) };
     let (bg, heart, empty) = match state {
@@ -371,13 +422,14 @@ fn heart_svg(paid: u128, owed: u128, state: HeartState) -> String {
         HeartState::Healed => ("f2b705", "e2257a", "e2257a"),
         HeartState::Expired => ("c9cbd4", "8a8c99", "a9abb6"),
     };
+    let ink = if backer { "2563eb" } else { "1c1b29" };
     let on = |x: i32, y: i32| (0..9).contains(&x) && (0..8).contains(&y) && HEART[y as usize][x as usize] != b'.';
     let mut cells = String::new();
     // the ink outline: empty cells touching the heart
     for y in -1..=8 {
         for x in -1..=9 {
             if !on(x, y) && (on(x - 1, y) || on(x + 1, y) || on(x, y - 1) || on(x, y + 1)) {
-                cells.push_str(&format!("<rect x='{}' y='{}' width='1' height='1' fill='%231c1b29'/>", x + 2, y + 2));
+                cells.push_str(&format!("<rect x='{}' y='{}' width='1' height='1' fill='%23{ink}'/>", x + 2, y + 2));
             }
         }
     }

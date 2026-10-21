@@ -125,6 +125,12 @@ function Row({ i, me }: { i: HistoryItem; me: string }) {
       detail = i.kind === "deposit" ? "Wallet → trading balance" : "Trading balance → wallet";
       amount = <span className="font-extrabold">${fmtUsdc(BigInt(i.amount))}</span>;
       break;
+    case "backed":
+      icon = "deposit";
+      title = "Backed the house";
+      detail = `Backer Life owed ${(Number(i.cap_ppm) / 1e6).toFixed(2)}×`;
+      amount = <span className="font-extrabold">${fmtUsdc(BigInt(i.amount))}</span>;
+      break;
     case "claim_usdc":
       icon = "claim";
       color = "var(--long)";

@@ -34,6 +34,8 @@ pub const VE_MAX_EPOCHS: u64 = 104;
 pub const EXIT_PENALTY_MAX_PPM: u128 = 500_000;
 /// $1UP released per USDC of house profit (D-16), before the cap of schedule + carry.
 pub const ONEUP_PER_USDC: u128 = 20;
+/// D-22: the smallest backing.
+pub const MIN_BACKING: u128 = 10 * USDC;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Side {
@@ -186,6 +188,27 @@ pub fn face_value(house_net: u128, loss: u128, losses: u128) -> u128 {
 pub fn life_cap_ppm(pool: u128) -> u128 {
     let p = pool.min(LIFE_CAP_POOL);
     LIFE_CAP_MAX_PPM - (LIFE_CAP_MAX_PPM - LIFE_CAP_MIN_PPM) * p / LIFE_CAP_POOL
+}
+
+/// A Backer Life's cap for backing `amount` into a pool of `pool` (D-22): the average of
+/// `life_cap_ppm` over the pool sizes the backing spans, so early dollars earn more and splitting a backing
+/// into pieces earns the same. Rounded down.
+pub fn backer_cap_ppm(pool: u128, amount: u128) -> u128 {
+    if amount == 0 {
+        return life_cap_ppm(pool);
+    }
+    let (a, b) = (pool, pool + amount);
+    // over the sloped part [a, min(b, P)] the average is the cap at the midpoint; above P it's the floor
+    let top = b.min(LIFE_CAP_POOL);
+    let sloped = top.saturating_sub(a);
+    let sloped_sum = if sloped > 0 {
+        let mid2 = a + top; // twice the midpoint
+        let avg2 = 2 * LIFE_CAP_MAX_PPM - mul_div_ceil(LIFE_CAP_MAX_PPM - LIFE_CAP_MIN_PPM, mid2, LIFE_CAP_POOL);
+        mul_div(avg2, sloped, 2)
+    } else {
+        0
+    };
+    (sloped_sum + LIFE_CAP_MIN_PPM * (amount - sloped)) / amount
 }
 
 pub fn owed(face: u128, cap_ppm: u128) -> u128 {
@@ -464,9 +487,62 @@ mod tests {
         assert_eq!(released_emissions(sched, 0, ONEUP_PER_USDC), 0);
     }
 
+    #[test]
+    fn backer_cap_follows_the_pool_curve() {
+        // a small first backing earns ~2.0×, the whole round from empty averages 1.6×, past $1M it's 1.2×
+        assert_eq!(backer_cap_ppm(0, USDC), 1_999_999);
+        assert_eq!(backer_cap_ppm(0, LIFE_CAP_POOL), 1_600_000);
+        assert_eq!(backer_cap_ppm(LIFE_CAP_POOL, 50_000 * USDC), LIFE_CAP_MIN_PPM);
+        // straddling $1M: half at the sloped part's average (1.22×), half at 1.2×
+        assert_eq!(backer_cap_ppm(LIFE_CAP_POOL - 50_000 * USDC, 100_000 * USDC), 1_210_000);
+        assert_eq!(backer_cap_ppm(500_000 * USDC, 0), life_cap_ppm(500_000 * USDC));
+    }
+
     use proptest::prelude::*;
 
     proptest! {
+        #[test]
+        fn backer_cap_is_bounded_and_falls(pool in 0u128..3_000_000 * USDC, amount in 1u128..2_000_000 * USDC, more in 1u128..1_000_000 * USDC) {
+            let c = backer_cap_ppm(pool, amount);
+            prop_assert!((LIFE_CAP_MIN_PPM..=LIFE_CAP_MAX_PPM).contains(&c));
+            // never above the cap at the pool it starts from, never below where it ends
+            prop_assert!(c <= life_cap_ppm(pool));
+            prop_assert!(c + 1 >= life_cap_ppm(pool + amount));
+            // a later backing never earns more
+            prop_assert!(backer_cap_ppm(pool + more, amount) <= c);
+        }
+
+        #[test]
+        fn splitting_a_backing_earns_no_more(pool in 0u128..2_000_000 * USDC, x in 10 * USDC..1_000_000 * USDC, y in 10 * USDC..1_000_000 * USDC) {
+            let whole = owed(x + y, backer_cap_ppm(pool, x + y));
+            let parts = owed(x, backer_cap_ppm(pool, x)) + owed(y, backer_cap_ppm(pool + x, y));
+            // equal up to rounding the cap to a ppm: splitting gains at most 2 ppm of the amount ($2 per $1M)
+            prop_assert!(parts <= whole + 2 * (x + y) / PPM + 2, "parts {} whole {}", parts, whole);
+        }
+
+        #[test]
+        fn pnl_rounds_against_the_trader(margin in 1u128..1_000_000 * USDC, k in 1u32..=250, entry in 1_000u128..10_000_000 * 100_000_000, price in 1_000u128..10_000_000 * 100_000_000, long: bool) {
+            let side = if long { Side::Long } else { Side::Short };
+            let p = pnl(side, margin, k, entry, price);
+            let n = (margin * k as u128) as i128;
+            let diff = if long { price as i128 - entry as i128 } else { entry as i128 - price as i128 };
+            // p ≤ n·diff/entry exactly: profit rounds down, loss rounds up
+            prop_assert!(p.checked_mul(entry as i128).map_or(true, |pe| pe <= n * diff || p == -(margin as i128)));
+        }
+
+        #[test]
+        fn settlement_conserves_usdc(margin in 1u128..1_000_000 * USDC, pnl_frac in -1_000_000i128..=9_000_000, cut in CUT_BASE_PPM..=CUT_MAX_PPM) {
+            let p = margin as i128 * pnl_frac / 1_000_000;
+            let s = settle(margin, p, cut);
+            // margin in + pool paid = trader out + pool taken
+            prop_assert_eq!(margin + s.pool_paid, s.to_trader + s.pool_taken);
+            prop_assert!(s.pool_paid <= max_liability(margin));
+            prop_assert!(s.to_trader <= margin + max_liability(margin));
+            if p > 0 {
+                prop_assert!(s.cut * PPM >= p as u128 * cut, "the cut rounds up");
+            }
+        }
+
         #[test]
         fn pnl_is_bounded(margin in 1u128..1_000_000 * USDC, k in 1u32..=250, entry in 1u128..10_000_000 * 100_000_000, price in 1u128..10_000_000 * 100_000_000, long: bool) {
             let side = if long { Side::Long } else { Side::Short };

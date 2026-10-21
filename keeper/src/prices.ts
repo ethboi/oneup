@@ -32,6 +32,21 @@ export interface Steerable {
   steer(marketId: string, usd: number): void;
 }
 
+/** Largest move from the last pushed price the keeper sends (a bad print, not a market). */
+export const MAX_JUMP = 0.2;
+
+/** Why a price (USD) shouldn't go out, or null: not a positive number, or more than MAX_JUMP from `prev`,
+ *  the last one pushed. */
+export function sane(prev: number | undefined, next: number): string | null {
+  if (!Number.isFinite(next) || next <= 0) return `bad price ${next}`;
+  if (prev !== undefined && prev > 0 && Math.abs(next / prev - 1) > MAX_JUMP) return `jump of ${((next / prev - 1) * 100).toFixed(1)}% from ${prev}`;
+  return null;
+}
+
+const checkTarget = (usd: number) => {
+  if (!Number.isFinite(usd) || usd <= 0) throw new Error(`bad target ${usd}`);
+};
+
 /** Starting price for a market listed by vote with no configured sim price. */
 const LISTED_START_PRICE = 0.25;
 
@@ -47,6 +62,7 @@ export class SimSource implements PriceSource, Steerable {
   /** Moves a market toward `usd` over the next few ticks (so fills and liquidations see a path, not a jump). */
   steer(marketId: string, usd: number) {
     if (!this.prices.has(marketId)) throw new Error(`unknown market ${marketId}`);
+    checkTarget(usd);
     this.targets.set(marketId, usd);
   }
 
@@ -58,7 +74,7 @@ export class SimSource implements PriceSource, Steerable {
       const target = this.targets.get(m.id);
       if (target !== undefined) {
         const step = (target - p) / 3;
-        p = Math.abs(target - p) / target < 0.0005 ? target : p + step;
+        p = Math.abs(target - p) < target * 0.0005 ? target : p + step;
         if (p === target) this.targets.delete(m.id);
       } else {
         p *= Math.exp(this.vol * gaussian());
@@ -103,19 +119,27 @@ export class LiveSource implements PriceSource, Steerable {
   private targets = new Map<string, number>();
   private holdUntil = new Map<string, number>();
 
+  constructor(
+    private log: (...m: unknown[]) => void = console.log,
+    private fetchPrices: (ids: string[]) => Promise<Map<string, number>> = fetchReal,
+  ) {}
+
   steer(marketId: string, usd: number) {
     const now = this.prices.get(marketId);
-    if (now === undefined) throw new Error(`no price yet for ${marketId}`);
+    if (!now) throw new Error(`no price yet for ${marketId}`);
+    checkTarget(usd);
     this.targets.set(marketId, (this.offsets.get(marketId) ?? 1) * (usd / now));
     this.holdUntil.delete(marketId);
   }
 
   async next(markets: Feed[]): Promise<PushPrice[]> {
-    const real = await fetchReal(markets.map((m) => m.id));
+    // stamped before the fetch: a price is never newer than its publish time says
     const t = nowS();
-    return markets.map((m) => {
+    const real = await this.fetchPrices(markets.map((m) => m.id));
+    return markets.flatMap((m) => {
       const r = real.get(m.id);
-      if (r === undefined) throw new Error(`no live price for ${m.id}`);
+      // one market without a price doesn't hold up the others
+      if (r === undefined || !Number.isFinite(r) || r <= 0) return this.log(`no live price for ${m.id}; skipped`), [];
       let k = this.offsets.get(m.id) ?? 1;
       const target = this.targets.get(m.id);
       if (target !== undefined) {
@@ -130,7 +154,7 @@ export class LiveSource implements PriceSource, Steerable {
       const p = r * k;
       this.prices.set(m.id, p);
       const raw = toRaw(p);
-      return { feed_id: m.feedId, price: raw, conf: Math.round(raw * 0.0005), expo: EXPO, publish_time: t };
+      return [{ feed_id: m.feedId, price: raw, conf: Math.round(raw * 0.0005), expo: EXPO, publish_time: t }];
     });
   }
 }
@@ -154,7 +178,7 @@ async function fetchReal(ids: string[]): Promise<Map<string, number>> {
     ids
       .filter((id) => !out.has(id))
       .map(async (id) => {
-        const r = await fetch(`https://api.coinbase.com/v2/prices/${id}/spot`, { signal: AbortSignal.timeout(3000) }).catch(() => null);
+        const r = await fetch(`https://api.coinbase.com/v2/prices/${encodeURIComponent(id)}/spot`, { signal: AbortSignal.timeout(3000) }).catch(() => null);
         const j = r?.ok ? ((await r.json()) as { data?: { amount?: string } }) : null;
         if (j?.data?.amount) out.set(id, Number(j.data.amount));
       }),

@@ -2,7 +2,8 @@
 //!
 //! List: `nft_approve(token_id, market, msg = {"price":"<USDC>"})` on the NFT contract; it calls
 //! `nft_on_approve` here. Buy: one USDC `ft_transfer_call` to the market with
-//! `{"buy":{"nft_contract":…,"token_id":…}}`. The NFT moves straight from seller to buyer through the
+//! `{"buy":{"nft_contract":…,"token_id":…,"price":"<USDC>"}}`; `price` must match the listing, so a
+//! seller can't re-price it under a buyer who sent more. The NFT moves straight from seller to buyer through the
 //! approval and the seller is paid; if the NFT can't move (sold elsewhere, approval revoked), the buyer's
 //! USDC goes back. The market never holds NFTs, and holds USDC only while a purchase is in flight.
 
@@ -42,7 +43,8 @@ struct ListMsg {
 #[near(serializers = [json])]
 #[serde(rename_all = "snake_case")]
 enum BuyMsg {
-    Buy { nft_contract: AccountId, token_id: TokenId },
+    /// `price`: the listing price the buyer saw.
+    Buy { nft_contract: AccountId, token_id: TokenId, price: U128 },
 }
 
 #[derive(BorshStorageKey)]
@@ -91,13 +93,15 @@ impl Market {
         self.listings.remove(&key);
     }
 
-    /// Buys with USDC: `{"buy":{"nft_contract","token_id"}}`. Anything above the price is refunded.
+    /// Buys with USDC: `{"buy":{"nft_contract","token_id","price"}}`. Fails (refunding all) unless `price`
+    /// is the listing's price; anything sent above it is refunded.
     pub fn ft_on_transfer(&mut self, sender_id: AccountId, amount: U128, msg: String) -> PromiseOrValue<U128> {
         require!(env::predecessor_account_id() == self.usdc, "Pay in USDC");
-        let BuyMsg::Buy { nft_contract, token_id } =
+        let BuyMsg::Buy { nft_contract, token_id, price } =
             near_sdk::serde_json::from_str(&msg).unwrap_or_else(|_| env::panic_str("Bad message"));
         let key = (nft_contract.clone(), token_id.clone());
         let l = self.listings.get(&key).cloned().unwrap_or_else(|| env::panic_str("Not listed"));
+        require!(price.0 == l.price.0, "Price changed");
         require!(amount.0 >= l.price.0, "Below the price");
         require!(sender_id != l.seller, "That's your own listing");
         // taken down now so it can't be bought twice while the transfer is in flight
@@ -224,9 +228,9 @@ mod tests {
         let _ = m.nft_on_approve(token.into(), acc(seller), 7, format!(r#"{{"price":"{price}"}}"#));
     }
 
-    fn buy(m: &mut Market, buyer: &str, nft: &str, token: &str, amount: u128) {
+    fn buy(m: &mut Market, buyer: &str, nft: &str, token: &str, amount: u128, price: u128) {
         ctx("usdc");
-        let _ = m.ft_on_transfer(acc(buyer), U128(amount), format!(r#"{{"buy":{{"nft_contract":"{nft}","token_id":"{token}"}}}}"#));
+        let _ = m.ft_on_transfer(acc(buyer), U128(amount), format!(r#"{{"buy":{{"nft_contract":"{nft}","token_id":"{token}","price":"{price}"}}}}"#));
     }
 
     #[test]
@@ -252,7 +256,7 @@ mod tests {
     fn buying_takes_the_listing_down_and_pays_on_success() {
         let mut m = setup();
         list(&mut m, "ve", "12", "alice", 50_000_000);
-        buy(&mut m, "bob", "ve", "12", 60_000_000);
+        buy(&mut m, "bob", "ve", "12", 60_000_000, 50_000_000);
         assert!(m.get_listing(acc("ve"), "12".into()).is_none());
         // the NFT moved: Bob gets 10 USDC change
         let l = Listing { nft_contract: acc("ve"), token_id: "12".into(), seller: acc("alice"), approval_id: 7, price: U128(50_000_000), listed_at: 0 };
@@ -267,7 +271,34 @@ mod tests {
     fn underpaying_fails() {
         let mut m = setup();
         list(&mut m, "ve", "12", "alice", 50_000_000);
-        buy(&mut m, "bob", "ve", "12", 49_999_999);
+        buy(&mut m, "bob", "ve", "12", 49_999_999, 50_000_000);
+    }
+
+    #[test]
+    #[should_panic(expected = "Price changed")]
+    fn a_reprice_under_the_buyer_fails() {
+        let mut m = setup();
+        list(&mut m, "ve", "12", "alice", 50_000_000);
+        // Bob sends 60 for the 50 listing; Alice re-lists at 60 first
+        list(&mut m, "ve", "12", "alice", 60_000_000);
+        buy(&mut m, "bob", "ve", "12", 60_000_000, 50_000_000);
+    }
+
+    #[test]
+    #[should_panic(expected = "Price changed")]
+    fn a_cut_price_must_be_seen_too() {
+        let mut m = setup();
+        list(&mut m, "ve", "12", "alice", 50_000_000);
+        buy(&mut m, "bob", "ve", "12", 50_000_000, 40_000_000);
+    }
+
+    #[test]
+    #[should_panic(expected = "Bad message")]
+    fn buy_needs_a_price() {
+        let mut m = setup();
+        list(&mut m, "ve", "12", "alice", 50_000_000);
+        ctx("usdc");
+        let _ = m.ft_on_transfer(acc("bob"), U128(50_000_000), r#"{"buy":{"nft_contract":"ve","token_id":"12"}}"#.into());
     }
 
     #[test]
@@ -276,7 +307,7 @@ mod tests {
         let mut m = setup();
         list(&mut m, "ve", "12", "alice", 50_000_000);
         ctx("oneup");
-        let _ = m.ft_on_transfer(acc("bob"), U128(50_000_000), r#"{"buy":{"nft_contract":"ve","token_id":"12"}}"#.into());
+        let _ = m.ft_on_transfer(acc("bob"), U128(50_000_000), r#"{"buy":{"nft_contract":"ve","token_id":"12","price":"50000000"}}"#.into());
     }
 
     #[test]

@@ -6,6 +6,7 @@
 import { fmtUsdc, ppmToNumber, type EpochSummary } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { Icon } from "./Icon";
+import { Backing } from "./Backing";
 import { Governance } from "./Governance";
 
 const big = (x?: string) => (x === undefined ? 0n : BigInt(x));
@@ -161,6 +162,7 @@ export function Solvency() {
           )}
         </div>
       </div>
+      <Backing />
       <Governance />
     </div>
   );

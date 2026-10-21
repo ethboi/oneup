@@ -41,10 +41,10 @@ bot in the account menu). Chain state persists in `.localnet/`.
 | `pnpm localnet:reset` | Wipes the local chain for a fresh deploy |
 | `pnpm test` | Contract unit + property tests, SDK and simulation tests |
 | `pnpm test:sandbox` | Builds the wasm and runs end-to-end tests on a sandbox chain |
+| `pnpm test:ts` | API route, relayer, solver, indexer and keeper price tests |
 | `pnpm smoke` | Against a running demo: deposit → 50× long → fill → −2% → liquidation |
 | `pnpm sim` | Re-runs the early-vs-late simulation |
 | `pnpm farm` | Wash-trading break-even: the $1UP price at which trading against yourself would pay |
-| `pnpm demo --lan` | Same as `pnpm demo`, served to your Wi-Fi so you can use it on a phone |
 
 Move a price during the demo:
 `curl -XPOST localhost:8787/price -d '{"market":"NEAR-USD","movePct":-2}'`
@@ -54,6 +54,7 @@ Move a price during the demo:
 ```mermaid
 flowchart LR
   T[Traders] -- "losses, liquidations, winners' cut" --> P[(House pool<br/>USDC)]
+  K[Backers] -- "back the pool<br/>(bootstrap round)" --> P
   P -- "winners' profit (≤ 9× margin)" --> T
   P --> R{{"Reserve<br/>1.2× worst case,<br/>never below the seed"}}
   P -- "half the surplus<br/>above the reserve" --> S((Epoch payout))
@@ -63,7 +64,14 @@ flowchart LR
   E[$1UP emissions] -- "20 per $1 of house profit<br/>to losers, as 2-year locks" --> V
   L <-. "sell" .-> M[(Market)]
   V <-. "sell" .-> M
+  K -. "Backer Lives" .-> L
 ```
+
+**Where the pool comes from.** Anyone can back the house during its bootstrap round (up to $1M). The USDC
+joins the pool for good, and the backer gets a **Backer Life**: an Extra Life that never expires, paid from
+the same profit as the losers' lives. It's owed the average of the Extra Life curve over the backing, so the
+first dollar earns 2.0× and the last 1.2×; to get out early, sell it on the market. Backers are losers by
+choice ([D-22](docs/decisions.md)). The Solvency tab shows the round and the curve.
 
 ## The rules
 
@@ -139,9 +147,12 @@ they were paid, so later losers recovered less. Making lives expire after 13 epo
 | [`bots`](bots) | Six rule-based trading agents for demo volume; one sells its lives and locks, one buys bargains |
 | [`sim`](sim) | Early-vs-late simulation and the farming break-even |
 | [`app`](app) | Next.js app: trade, Extra Lives, locks, market, solvency, fairness |
-| [`docs`](docs) | [Maths](docs/maths.md), [interfaces](docs/interfaces.md), [decisions](docs/decisions.md), [plan](PLAN.md) |
+| [`docs`](docs) | [Maths](docs/maths.md), [interfaces](docs/interfaces.md), [decisions](docs/decisions.md), [security](docs/SECURITY.md), [plan](PLAN.md) |
 
-Tests: 103 contract unit and property tests, 5 end-to-end sandbox tests, plus SDK and simulation tests.
+Tests: 151 contract unit and property tests, 7 end-to-end sandbox tests, 17 tests of the API routes,
+relayer, solver and keeper, plus SDK and simulation tests. A security review on 21 Oct found 21 issues, from
+a stop-loss that could close at a stale price to one key shared by every account; each fix has a test that
+failed before it ([docs/SECURITY.md](docs/SECURITY.md)).
 The sandbox tests found two real bugs during the build (a u128 overflow in reward splits and a
 duplicate-registration panic), and running the demo found a third (the reserve floor; decision D-12).
 
@@ -160,7 +171,8 @@ Built for NEAR HACKATHON. The tracks it leans on, and the NEAR pieces it uses:
   of the pool are council votes ([D-20](docs/decisions.md)).
 - **AI Security & Defense.** One-tap trading uses a **function-call key** that can only open, close and
   set TP/SL, with a gas budget; it can't attach deposits, so it can't move funds. The keeper's price feed
-  uses the same kind of key.
+  uses the same kind of key, and contract accounts have no keys at all. The threat model, the review and
+  its 21 fixes are in [docs/SECURITY.md](docs/SECURITY.md).
 - **Real-World Money.** Gasless trading: session-key trades go as **meta transactions** (NEP-366) to a
   relayer that pays the gas.
 - **Games With Real Economies.** Rounds, leaderboards, achievements and a player market for Extra Lives
@@ -179,8 +191,9 @@ testnet or mainnet; Rhea's buyback swap is a local stand-in.
   `price-oracle-pyth.near` with the same calls. Outlayer's testnet feed was stale when checked.
 - **USDC** is a local token with a faucet. **Buybacks** swap on a local constant-product pool standing in
   for Rhea.
-- **NEAR Intents** deposits aren't integrated: Intents has no testnet or local deployment.
-- Buybacks are triggered by the owner key for now, so nobody can sandwich them with a zero minimum
-  (decision D-10). The owner also lists markets (D-14).
+- **NEAR Intents** runs locally with the official contracts, but the bridge from other chains is simulated:
+  the root account mints the bridged token into the Verifier, as a real bridge would after a deposit.
+- Buybacks run through an operator role with a minimum price, so nobody can sandwich them (D-10, D-20).
+  Order fills go through a keeper role (D-23).
 
 See [`docs/decisions.md`](docs/decisions.md) for every design decision and known limit.

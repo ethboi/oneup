@@ -1,9 +1,11 @@
 use near_sdk::json_types::U128;
 use near_sdk::test_utils::VMContextBuilder;
-use near_sdk::{testing_env, AccountId, NearToken};
+use near_sdk::{testing_env, AccountId, NearToken, PromiseError};
 use oneup_math::USDC;
+use proptest::prelude::*;
 
 use crate::{ExtraLife, MintItem};
+use near_contract_standards::non_fungible_token::approval::NonFungibleTokenApproval;
 use near_contract_standards::non_fungible_token::core::NonFungibleTokenCore;
 
 fn acc(s: &str) -> AccountId {
@@ -159,4 +161,201 @@ fn metadata_is_drawn_from_the_life() {
     let healed = c.nft_token("1:alice".into()).unwrap().metadata.unwrap();
     assert!(healed.media.unwrap().contains("f2b705"));
     assert!(healed.extra.unwrap().contains(r#""state":"full_heal""#));
+}
+
+fn backer(c: &mut ExtraLife, owner: &str, face: u128) -> String {
+    ctx("house", 0);
+    c.mint_backer(acc(owner), U128(face * USDC), U128(1_000_000))
+}
+
+fn claimed(c: &ExtraLife, id: &str) -> u128 {
+    c.lives.get(&id.to_string()).unwrap().claimed
+}
+
+#[test]
+fn claim_drops_the_approvals() {
+    let mut c = setup();
+    ctx("house", 0);
+    c.mint_batch(1, vec![item("alice", 1_000, 2_000_000)]);
+    ctx("alice", 10_000_000_000_000_000_000_000);
+    let _ = c.nft_approve("1:alice".into(), acc("market"), Some(r#"{"price":"1"}"#.into()));
+    assert!(c.nft_is_approved("1:alice".into(), acc("market"), None));
+    pot(&mut c, 500);
+    ctx("alice", 0);
+    let _ = c.claim(vec!["1:alice".into()]);
+    assert!(!c.nft_is_approved("1:alice".into(), acc("market"), None));
+}
+
+#[test]
+fn claim_never_records_more_than_it_sends() {
+    let mut c = setup();
+    ctx("house", 0);
+    c.mint_batch(1, vec![item("alice", 1_000, 1_000_000), item("bob", 1_000, 1_000_000)]);
+    let b = backer(&mut c, "alice", 1_000);
+    pot(&mut c, 900); // 300 each
+    c.held = 500 * USDC; // short of the 600 claimable
+    ctx("alice", 0);
+    let _ = c.claim(vec!["1:alice".into(), b.clone()]);
+    assert_eq!(c.held, 0);
+    // the first is paid in full, the last only what was left; the rest stays claimable
+    assert_eq!((claimed(&c, "1:alice"), claimed(&c, &b)), (300 * USDC, 200 * USDC));
+    assert_eq!(c.life_info(b).unwrap().claimable.0, 100 * USDC);
+}
+
+#[test]
+fn failed_claim_restores_exactly_its_amounts() {
+    let mut c = setup();
+    ctx("house", 0);
+    c.mint_batch(1, vec![item("alice", 1_000, 1_000_000)]);
+    let b = backer(&mut c, "alice", 1_000);
+    pot(&mut c, 400); // 200 each
+    ctx("alice", 0);
+    let _ = c.claim(vec![b.clone()]);
+    pot(&mut c, 200); // 100 more each
+    ctx("alice", 0);
+    let _ = c.claim(vec!["1:alice".into(), b.clone()]);
+    assert_eq!((claimed(&c, "1:alice"), claimed(&c, &b)), (300 * USDC, 300 * USDC));
+    // the second transfer fails: only its 300 + 100 come back, not the backer's earlier 200
+    c.on_claim(acc("alice"), vec![("1:alice".into(), U128(300 * USDC)), (b.clone(), U128(100 * USDC))], U128(400 * USDC), Err(PromiseError::Failed));
+    assert_eq!((claimed(&c, "1:alice"), claimed(&c, &b)), (0, 200 * USDC));
+    assert_eq!(c.held, 400 * USDC);
+}
+
+#[test]
+#[should_panic(expected = "Claim 1 to 30 tokens")]
+fn claim_is_capped_at_30() {
+    let mut c = setup();
+    ctx("alice", 0);
+    let _ = c.claim(vec!["1:alice".to_string(); 31]);
+}
+
+#[test]
+fn one_owner_can_back_twice() {
+    let mut c = setup();
+    let a = backer(&mut c, "alice", 1_000);
+    let b = backer(&mut c, "alice", 500);
+    assert_eq!((a.as_str(), b.as_str()), ("b1", "b2"));
+    let lives = c.lives_for_owner(acc("alice"), None, None);
+    assert_eq!(lives.len(), 2);
+    assert!(lives.iter().all(|l| l.backer && l.epoch == 0));
+    let t = c.nft_token(a).unwrap().metadata.unwrap();
+    assert_eq!(t.title.unwrap(), "Backer Life #1");
+    assert!(t.media.unwrap().contains("2563eb"));
+    // the old epoch-0 path still works after a backing
+    ctx("house", 0);
+    c.mint_batch(0, vec![item("seed", 1_000, 1_000_000)]);
+    assert!(!c.life_info("0:seed".into()).unwrap().backer);
+}
+
+#[test]
+#[should_panic(expected = "Only the house")]
+fn only_the_house_mints_backers() {
+    let mut c = setup();
+    ctx("alice", 0);
+    c.mint_backer(acc("alice"), U128(USDC), U128(1_000_000));
+}
+
+#[test]
+fn backer_earns_only_from_later_pots() {
+    let mut c = setup();
+    ctx("house", 0);
+    c.mint_batch(1, vec![item("alice", 1_000, 1_000_000)]);
+    pot(&mut c, 500); // all Alice's
+    let b = backer(&mut c, "bob", 500);
+    pot(&mut c, 500); // 500 : 500 owed → 250 each
+    assert_eq!(c.life_info(b).unwrap().paid.0, 250 * USDC);
+    assert_eq!(c.life_info("1:alice".into()).unwrap().paid.0, 750 * USDC);
+}
+
+#[test]
+fn backers_never_expire_and_full_heal() {
+    let mut c = setup();
+    let b = backer(&mut c, "bob", 1_000);
+    ctx("house", 0);
+    c.mint_batch(1, vec![item("alice", 1_000, 1_000_000)]);
+    pot(&mut c, 1_000);
+    ctx("house", 0);
+    assert_eq!(c.expire(50).0, 500 * USDC); // Alice's 500 drops out; the backer's 500 stays owed
+    let info = c.life_info(b.clone()).unwrap();
+    assert!(!info.expired && info.paid.0 == 500 * USDC);
+    assert_eq!(pot(&mut c, 2_000), 1_500 * USDC);
+    let info = c.life_info(b.clone()).unwrap();
+    assert!(info.full_heal && !info.expired && info.claimable.0 == 1_000 * USDC);
+    let t = c.nft_token(b).unwrap().metadata.unwrap();
+    assert!(t.extra.unwrap().contains(r#""state":"full_heal","backer":true"#));
+    assert!(t.description.unwrap().ends_with("Backed the house pool."));
+}
+
+#[derive(Debug, Clone)]
+enum Op {
+    Mint(u8, u128),
+    Back(u8, u128),
+    Pot(u128),
+    Expire,
+    Claim(u8),
+}
+
+fn op() -> impl Strategy<Value = Op> {
+    prop_oneof![
+        (0u8..4, 1u128..10_000_000_000).prop_map(|(o, f)| Op::Mint(o, f)),
+        (0u8..4, 1u128..10_000_000_000).prop_map(|(o, f)| Op::Back(o, f)),
+        (0u128..20_000_000_000).prop_map(Op::Pot),
+        Just(Op::Expire),
+        (0u8..4).prop_map(Op::Claim),
+    ]
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(64))]
+
+    /// Claims never send more than the pots brought in, and no life claims more than it was paid.
+    #[test]
+    fn claims_never_exceed_pots(ops in prop::collection::vec(op(), 1..40)) {
+        let mut c = setup();
+        let owners = ["alice", "bob", "carol", "dave"];
+        let (mut epoch, mut received, mut sent) = (1u64, 0u128, 0u128);
+        let mut ids: Vec<(String, usize)> = vec![];
+        for o in ops {
+            match o {
+                Op::Mint(w, face) => {
+                    ctx("house", 0);
+                    // one life per owner per epoch: a repeat moves to a new epoch
+                    if ids.iter().any(|(id, _)| *id == crate::token_id(epoch, &acc(owners[w as usize]))) { epoch += 1; }
+                    let minted = c.mint_batch(epoch, vec![MintItem { owner: acc(owners[w as usize]), face: U128(face), cap_ppm: U128(1_500_000) }]);
+                    ids.extend(minted.into_iter().map(|id| (id, w as usize)));
+                }
+                Op::Back(w, face) => {
+                    ctx("house", 0);
+                    ids.push((c.mint_backer(acc(owners[w as usize]), U128(face), U128(1_000_000)), w as usize));
+                }
+                Op::Pot(p) => {
+                    ctx("usdc", 0);
+                    if let near_sdk::PromiseOrValue::Value(back) = c.ft_on_transfer(acc("house"), U128(p), r#"{"epoch_pot":{"epoch":1}}"#.into()) {
+                        received += p - back.0;
+                    }
+                    epoch += 1; // a pot ends the epoch: later lives join the next cohort
+                }
+                Op::Expire => {
+                    ctx("house", 0);
+                    c.expire(epoch - 1);
+                }
+                Op::Claim(w) => {
+                    let mine: Vec<String> = ids.iter().filter(|(_, o)| *o == w as usize).map(|(id, _)| id.clone()).take(30).collect();
+                    let claimable: u128 = mine.iter().map(|id| c.life_info(id.clone()).unwrap().claimable.0).sum();
+                    if claimable > 0 && c.held > 0 {
+                        let before = c.held;
+                        ctx(owners[w as usize], 0);
+                        let _ = c.claim(mine);
+                        sent += before - c.held;
+                    }
+                }
+            }
+            prop_assert!(sent <= received, "sent {} received {}", sent, received);
+            prop_assert_eq!(received - sent, c.held);
+            for (id, _) in &ids {
+                let l = c.lives.get(id).unwrap();
+                prop_assert!(l.claimed <= c.life_info(id.clone()).unwrap().paid.0);
+            }
+        }
+    }
 }

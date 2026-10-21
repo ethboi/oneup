@@ -5,6 +5,10 @@
 //!
 //! Epochs follow the house: at each epoch start the house calls `checkpoint(e)`, which fixes the total
 //! weight for `e`. A lock counts from the epoch after it's made.
+//!
+//! A closed lock (unlocked, left early or merged away) loses its approvals and can't be approved or moved,
+//! so no listing can sell it empty. Claiming a lock's rewards also drops its approvals, so a listing can't
+//! be drained before it sells.
 
 use near_contract_standards::non_fungible_token::approval::NonFungibleTokenApproval;
 use near_contract_standards::non_fungible_token::core::{NonFungibleTokenCore, NonFungibleTokenResolver};
@@ -13,7 +17,7 @@ use near_contract_standards::non_fungible_token::events::NftMint;
 use near_contract_standards::non_fungible_token::metadata::{
     NFTContractMetadata, NonFungibleTokenMetadataProvider, TokenMetadata, NFT_METADATA_SPEC,
 };
-use near_contract_standards::non_fungible_token::{NonFungibleToken, Token, TokenId};
+use near_contract_standards::non_fungible_token::{refund_approved_account_ids, NonFungibleToken, Token, TokenId};
 use near_sdk::json_types::U128;
 use near_sdk::store::LookupMap;
 use near_sdk::{
@@ -32,6 +36,8 @@ const GAS_CALLBACK: Gas = Gas::from_tgas(10);
 const MAX_LOCKS_PER_TRANSFER: usize = 30;
 /// Locks claimed or merged in one call.
 const MAX_LOCKS_PER_CALL: usize = 30;
+/// Smallest lock made by hand (each lock costs storage). The house's loser locks can be smaller.
+pub const MIN_LOCK: u128 = math::ONEUP;
 
 #[near(serializers = [borsh])]
 #[derive(Clone, Debug)]
@@ -156,12 +162,14 @@ impl Ve {
         match msg {
             TransferMsg::Lock { epochs } => {
                 require!((1..=math::VE_MAX_EPOCHS).contains(&epochs), "Lock 1 to 104 epochs");
+                require!(amount.0 >= MIN_LOCK, "Lock at least 1 $1UP");
                 self.mint_lock(sender_id, amount.0, epochs, false);
             }
             TransferMsg::LockFor { items } => {
                 require!(sender_id == self.house, "Only the house");
                 require!(items.len() <= MAX_LOCKS_PER_TRANSFER, "Too many locks in one transfer");
                 require!(items.iter().map(|(_, a)| a.0).sum::<u128>() == amount.0, "Locks don't add up");
+                // no MIN_LOCK here: a small loss still gets its lock, and only the house can make these
                 for (owner, a) in items {
                     self.mint_lock(owner, a.0, math::VE_MAX_EPOCHS, true);
                 }
@@ -196,25 +204,32 @@ impl Ve {
         self.claim_many(vec![token_id], epochs);
     }
 
-    /// Pays several locks' rewards in one transfer.
+    /// Pays several locks' rewards in one transfer. A lock that pays out loses its approvals (and so any
+    /// listing), so a buyer never gets a lock drained after it was listed.
     pub fn claim_many(&mut self, token_ids: Vec<TokenId>, epochs: Vec<u64>) {
         require!(!token_ids.is_empty() && token_ids.len() <= MAX_LOCKS_PER_CALL, "Claim 1 to 30 locks");
         let mut account = None;
         let mut pay = 0;
         for token_id in token_ids {
-            account = Some(self.assert_lock_owner(&token_id));
+            let owner = self.assert_lock_owner(&token_id);
+            account = Some(owner.clone());
             let lock = self.locks.get(&token_id).unwrap();
             require!(lock.merged_into.is_none(), "Merged into another lock: claim that one");
+            let mut paid = 0;
             for e in &epochs {
                 require!(*e < self.epoch, "Epoch not finished");
                 let key = (token_id.clone(), *e);
                 let due = self.available(&token_id, *e);
                 let claimed = self.claimed.get(&key).copied().unwrap_or(0);
                 if due > claimed {
-                    pay += due - claimed;
+                    paid += due - claimed;
                     self.claimed.insert(key, due);
                 }
             }
+            if paid > 0 {
+                self.revoke_all(&token_id, owner);
+            }
+            pay += paid;
         }
         let account = account.unwrap();
         pay += self.owed.remove(&account).unwrap_or(0);
@@ -243,6 +258,7 @@ impl Ve {
             lock.exited = Some(epoch);
             lock.withdrawn = true;
             self.locks.insert(id.clone(), lock);
+            self.revoke_all(id, owner.clone().unwrap());
         }
         let new_id = self.mint(owner.unwrap(), amount, end, from_loss, token_ids.clone());
         for id in token_ids {
@@ -261,6 +277,7 @@ impl Ve {
         require!(lock.merged_into.is_none(), "Merged into another lock");
         lock.withdrawn = true;
         let amount = lock.amount;
+        self.revoke_all(&token_id, account.clone());
         self.send(account, amount);
     }
 
@@ -277,7 +294,8 @@ impl Ve {
         lock.exited = Some(epoch);
         lock.withdrawn = true;
         let amount = lock.amount;
-        self.locks.insert(token_id, lock);
+        self.locks.insert(token_id.clone(), lock);
+        self.revoke_all(&token_id, account.clone());
         if penalty > 0 {
             self.add_reward(epoch + 1, penalty);
         }
@@ -350,6 +368,18 @@ impl Ve {
         let account = env::predecessor_account_id();
         require!(self.tokens.owner_by_id.get(token_id).as_ref() == Some(&account), "Not your lock");
         account
+    }
+
+    /// Unlocked, left early or merged away: nothing left to sell.
+    fn closed(&self, token_id: &TokenId) -> bool {
+        self.locks.get(token_id).is_some_and(|l| l.withdrawn || l.merged_into.is_some())
+    }
+
+    /// Drops every approval on a lock, refunding their storage to the owner.
+    fn revoke_all(&mut self, token_id: &TokenId, owner: AccountId) {
+        if let Some(approvals) = self.tokens.approvals_by_id.as_mut().and_then(|a| a.remove(token_id)) {
+            refund_approved_account_ids(owner, &approvals).detach();
+        }
     }
 
     fn mint_lock(&mut self, owner: AccountId, amount: u128, epochs: u64, from_loss: bool) {
@@ -431,12 +461,13 @@ impl Ve {
     }
 }
 
-// NEP-171 plumbing (locks are transferable; rewards go to the current owner)
+// NEP-171 plumbing (open locks are transferable; rewards go to the current owner)
 
 #[near]
 impl NonFungibleTokenCore for Ve {
     #[payable]
     fn nft_transfer(&mut self, receiver_id: AccountId, token_id: TokenId, approval_id: Option<u64>, memo: Option<String>) {
+        require!(!self.closed(&token_id), "Lock is closed");
         self.tokens.nft_transfer(receiver_id, token_id, approval_id, memo)
     }
 
@@ -449,6 +480,7 @@ impl NonFungibleTokenCore for Ve {
         memo: Option<String>,
         msg: String,
     ) -> PromiseOrValue<bool> {
+        require!(!self.closed(&token_id), "Lock is closed");
         self.tokens.nft_transfer_call(receiver_id, token_id, approval_id, memo, msg)
     }
 
@@ -475,6 +507,7 @@ impl NonFungibleTokenResolver for Ve {
 impl NonFungibleTokenApproval for Ve {
     #[payable]
     fn nft_approve(&mut self, token_id: TokenId, account_id: AccountId, msg: Option<String>) -> Option<Promise> {
+        require!(!self.closed(&token_id), "Lock is closed");
         self.tokens.nft_approve(token_id, account_id, msg)
     }
 
