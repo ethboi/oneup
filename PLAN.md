@@ -163,7 +163,7 @@ Run: `cd contracts && cargo test -p oneup-math -p oneup-house` · `./build.sh &&
   exit penalty to stayers; D-16 losers-only $1UP, 20 per $1 of house profit, as locks (`pnpm farm`);
   D-17 marketplace contract for Extra Lives and locks
 - [x] Locks and Market tabs, Sell on cards; bots sell and buy on the market
-- [ ] Update the spec doc for D-14 to D-17
+- [x] Update the spec doc for D-14 to D-17
 
 ### Stage 9 — Ship (12–14 Nov)
 
