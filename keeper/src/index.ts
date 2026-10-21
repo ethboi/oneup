@@ -99,7 +99,7 @@ async function handleEpoch() {
   const [epoch, closing] = await Promise.all([oneup.epoch(), oneup.closing()]);
   if (!closing && nowS() < epoch.started_at + d.epochLengthS) return;
   for (let i = 0; i < 20; i++) {
-    const r = await keeper.closeEpoch(20);
+    const r = await keeper.closeEpoch();
     if (r === "begun") log(`epoch ${epoch.id} ended; closing`);
     if (r === "closed") {
       const e = (await oneup.epoch()).id - 1;

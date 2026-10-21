@@ -24,7 +24,9 @@ export const LIFE_CAP_POOL = 1_000_000n * USDC;
 export const SUPPLY = 1_000_000_000n * ONEUP;
 export const EMISSIONS_TOTAL = 900_000_000n * ONEUP;
 export const EMISSION_EPOCHS = 208n;
-export const VE_MAX_EPOCHS = 52n;
+export const VE_MAX_EPOCHS = 104n;
+export const EXIT_PENALTY_MAX_PPM = 500_000n;
+export const ONEUP_PER_USDC = 20n;
 
 export type Side = "Long" | "Short";
 
@@ -145,6 +147,17 @@ export function emissionsForEpoch(e: bigint): bigint {
 
 export const vePower = (amount: bigint, epochsLeft: bigint) =>
   (amount * min(epochsLeft, VE_MAX_EPOCHS)) / VE_MAX_EPOCHS;
+
+/** Cost of leaving a lock with `epochsLeft` to run: up to 50% at the full 104, rounded up. */
+export const exitPenalty = (amount: bigint, epochsLeft: bigint) => {
+  const n = amount * EXIT_PENALTY_MAX_PPM * min(epochsLeft, VE_MAX_EPOCHS);
+  const d = PPM * VE_MAX_EPOCHS;
+  return (n + d - 1n) / d;
+};
+
+/** $1UP released to an epoch's losers: 20 per USDC of house profit, at most what's available. */
+export const releasedEmissions = (available: bigint, houseNet: bigint, rate = ONEUP_PER_USDC) =>
+  min(houseNet * rate * (ONEUP / USDC), available);
 
 // Display helpers
 

@@ -1,9 +1,12 @@
 "use client";
 
-import { fmtUsdc, ppmToNumber, type LifeInfo } from "@oneup/sdk";
+import { emissionsForEpoch, fmtUsdc, ppmToNumber, releasedEmissions, type LifeInfo, type Listing } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { fmtClock, useNow } from "./Header";
 import { HealthBar, PixelHeart } from "./Pixel";
+import { fmtOneup } from "./Header";
+import { Sell, useListings } from "./Sell";
+import { lifeValue } from "@/lib/value";
 
 export function Lives() {
   const { o, d, me, tx, run } = useOneUp();
@@ -11,6 +14,8 @@ export function Lives() {
   const expiry = usePoll(() => o.view<{ life_expiry_epochs: number }>(d.contracts.house, "get_params"), [], 60_000)?.life_expiry_epochs;
   const pending = usePoll(() => o.pendingLife(me), [me]);
   const epoch = usePoll(() => o.epoch(), []);
+  const carry = usePoll(() => o.emissionCarry(), []);
+  const listings = useListings();
   const now = useNow();
   const claimable = lives.reduce((s, l) => s + BigInt(l.claimable), 0n);
   const left = epoch ? Math.max(0, epoch.started_at + d.epochLengthS - now) : 0;
@@ -29,6 +34,7 @@ export function Lives() {
         <div className="text-right">
           <div className="display num text-2xl">${pending ? fmtUsdc(BigInt(pending)) : "…"}</div>
           <div className="label num">lost so far, mints in {fmtClock(left)}</div>
+          <OneupEstimate pending={pending} carry={carry} />
         </div>
       </div>
 
@@ -48,14 +54,31 @@ export function Lives() {
       {lives.length === 0 && <p className="label">No Extra Lives yet. Lose a trade and wait for the epoch to end.</p>}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {lives.map((l) => (
-          <LifeCard key={l.token_id} l={l} expiry={expiry} />
+          <LifeCard key={l.token_id} l={l} expiry={expiry} listings={listings} />
         ))}
       </div>
     </div>
   );
 }
 
-function LifeCard({ l, expiry }: { l: LifeInfo; expiry?: number }) {
+/** Your share of this epoch's $1UP release if it closed now: 20 per $1 of house profit so far, by loss. */
+function OneupEstimate({ pending, carry }: { pending?: string; carry?: string }) {
+  const { o } = useOneUp();
+  const epoch = usePoll(() => o.epoch(), []);
+  if (!pending || !epoch || carry === undefined || BigInt(pending) === 0n) return null;
+  const losses = BigInt(epoch.losses);
+  const net = losses > BigInt(epoch.payouts) ? losses - BigInt(epoch.payouts) : 0n;
+  const release = releasedEmissions(BigInt(carry) + emissionsForEpoch(BigInt(epoch.id)), net);
+  const mine = losses > 0n ? (release * BigInt(pending)) / losses : 0n;
+  return (
+    <div className="label num mt-1">
+      {mine > 0n ? `plus about ${fmtOneup(mine.toString())} $1UP, locked for 2 years` : "no $1UP unless the house ends in profit"}
+    </div>
+  );
+}
+
+function LifeCard({ l, expiry, listings }: { l: LifeInfo; expiry?: number; listings: Listing[] }) {
+  const { d } = useOneUp();
   const owed = BigInt(l.owed);
   const paid = BigInt(l.paid);
   const progress = owed === 0n ? 0 : Number((paid * 10_000n) / owed) / 10_000;
@@ -94,6 +117,7 @@ function LifeCard({ l, expiry }: { l: LifeInfo; expiry?: number }) {
           </>
         )}
       </dl>
+      {lifeValue(l) > 0n && <Sell nft={d.contracts.life} tokenId={l.token_id} suggested={(lifeValue(l) * 7n) / 10n} listings={listings} />}
     </div>
   );
 }

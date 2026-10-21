@@ -1,7 +1,7 @@
 "use client";
 
 // "Can't go bust": the pool against the worst case it must cover (every open position's max win, both
-// sides, decision D-1), per-market liability against vote-set capacity, and the epoch history.
+// sides, decision D-1), per-market liability against its cap (half the pool, D-14), and the epoch history.
 
 import { fmtUsdc, ppmToNumber, type EpochSummary } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
@@ -69,7 +69,7 @@ export function Solvency() {
 
       <div className="panel p-5">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <div className="text-lg font-extrabold">Per market: max wins against vote-set capacity</div>
+          <div className="text-lg font-extrabold">Per market: max wins against its cap (half the pool)</div>
           <div className="flex gap-4 text-sm">
             <Legend color="var(--series-long)" label="Longs" />
             <Legend color="var(--series-short)" label="Shorts" />

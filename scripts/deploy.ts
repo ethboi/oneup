@@ -38,7 +38,7 @@ export async function deploy(opts: { home: string; rpcUrl: string; epochLengthS:
 
   console.log("Deploying OneUp");
   step("accounts");
-  const names = ["usdc", "oracle", "house", "life", "oneup", "ve", "swap"] as const;
+  const names = ["usdc", "oracle", "house", "life", "oneup", "ve", "swap", "market"] as const;
   const c = {} as Record<(typeof names)[number], Account>;
   for (const n of names) c[n] = await create(n, "30");
   const keeper = await create("keeper", "100");
@@ -55,6 +55,7 @@ export async function deploy(opts: { home: string; rpcUrl: string; epochLengthS:
     oneup: "oneup_token",
     ve: "oneup_ve",
     swap: "mock_swap",
+    market: "oneup_market",
   };
   for (const n of names) await c[n].deployContract(WASM(code[n]));
 
@@ -76,13 +77,16 @@ export async function deploy(opts: { home: string; rpcUrl: string; epochLengthS:
       solvency_both_sides: true,
       epoch_length_s: opts.epochLengthS,
       life_expiry_epochs: 13,
+      market_capacity_ppm: "500000",
+      oneup_per_usdc: 20,
     },
   });
   await call(root, id("life"), "new", { owner: rootId, house: id("house"), usdc: id("usdc") });
   // the root account stands in for the Rhea seed and the treasury
   await call(root, id("oneup"), "new", { house: id("house"), rhea_seed: rootId, treasury: rootId });
-  await call(root, id("ve"), "new", { owner: rootId, house: id("house"), oneup: id("oneup"), usdc: id("usdc"), treasury: rootId });
+  await call(root, id("ve"), "new", { owner: rootId, house: id("house"), oneup: id("oneup") });
   await call(root, id("swap"), "new", { owner: rootId, usdc: id("usdc"), oneup: id("oneup") });
+  await call(root, id("market"), "new", { usdc: id("usdc"), nft_contracts: [id("life"), id("ve")] });
 
   step("wiring");
   await call(root, id("house"), "set_life", { life: id("life") });
@@ -91,7 +95,7 @@ export async function deploy(opts: { home: string; rpcUrl: string; epochLengthS:
   for (const m of MARKETS) await call(root, id("house"), "add_market", { market_id: m.id, feed_id: m.feedId, max_leverage: 100 });
 
   step("token registrations");
-  for (const a of [id("house"), id("life"), id("ve"), id("swap")]) {
+  for (const a of [id("house"), id("life"), id("ve"), id("swap"), id("market")]) {
     await call(root, id("usdc"), "mint", { receiver_id: a, amount: "0" });
   }
   for (const a of [id("ve"), id("swap"), keeper.accountId, demo.accountId, ...bots.map((b) => b.accountId)]) {
@@ -124,6 +128,7 @@ export async function deploy(opts: { home: string; rpcUrl: string; epochLengthS:
       usdc: id("usdc"),
       oracle: id("oracle"),
       swap: id("swap"),
+      market: id("market"),
     },
     owner: { id: rootId, key: validator.secret_key },
     keeper: { id: keeper.accountId, key: keyString },

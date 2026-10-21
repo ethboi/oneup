@@ -52,7 +52,10 @@ describe("maths vectors", () => {
   });
 
   it("V7 ve power", () => {
-    expect(m.vePower(1_000n * m.ONEUP, 26n)).toBe(500n * m.ONEUP);
+    expect(m.vePower(1_000n * m.ONEUP, 52n)).toBe(500n * m.ONEUP);
+    expect(m.exitPenalty(1_000n * m.ONEUP, 104n)).toBe(500n * m.ONEUP);
+    expect(m.exitPenalty(1n, 1n)).toBe(1n);
+    expect(m.releasedEmissions(m.emissionsForEpoch(1n), 1_000n * m.USDC)).toBe(20_000n * m.ONEUP);
   });
 
   it("formats", () => {

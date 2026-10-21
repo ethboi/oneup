@@ -9,13 +9,15 @@ import { Account, type KeyPairString } from "near-api-js";
 import {
   ONEUP,
   OneUp,
-  PPM,
   USDC,
   accountSender,
   fmtUsdc,
   normalizePrice,
   pnl,
   type Deployment,
+  type LifeInfo,
+  type Listing,
+  type LockInfo,
   type Position,
   type Side,
 } from "@oneup/sdk";
@@ -34,7 +36,10 @@ interface Style {
   takeProfit: number;
   stopLoss: number;
   maxHoldS: [number, number];
-  votes?: boolean;
+  /** Locks $1UP and buys Extra Lives and locks on the marketplace when they're cheap. */
+  collector?: boolean;
+  /** Sells its Extra Lives and loss-locks on the marketplace for quick cash. */
+  seller?: boolean;
 }
 
 const sma = (xs: number[], n: number) => xs.slice(-n).reduce((a, b) => a + b, 0) / Math.min(n, xs.length);
@@ -42,7 +47,7 @@ const coin = (): Side => (Math.random() < 0.5 ? "Long" : "Short");
 const between = ([a, b]: [number, number]) => a + Math.random() * (b - a);
 
 const STYLES: Style[] = [
-  { name: "degen", side: coin, margin: [200, 800], leverage: [50, 100], takeProfit: 2, stopLoss: 0.95, maxHoldS: [90, 240] },
+  { name: "degen", side: coin, margin: [200, 800], leverage: [50, 100], takeProfit: 2, stopLoss: 0.95, maxHoldS: [90, 240], seller: true },
   {
     name: "trend",
     side: (h) => (h.length < 10 ? null : h.at(-1)! > sma(h, 10) ? "Long" : "Short"),
@@ -71,7 +76,7 @@ const STYLES: Style[] = [
     stopLoss: 0.2,
     maxHoldS: [60, 100],
   },
-  { name: "voter", side: coin, margin: [100, 300], leverage: [5, 10], takeProfit: 0.3, stopLoss: 0.3, maxHoldS: [120, 300], votes: true },
+  { name: "collector", side: coin, margin: [100, 300], leverage: [5, 10], takeProfit: 0.3, stopLoss: 0.3, maxHoldS: [120, 300], collector: true },
 ];
 
 /** Shared price history per market, sampled every few seconds. */
@@ -109,7 +114,9 @@ class Bot {
     for (const p of positions) await this.maybeClose(p);
     if (positions.length === 0) await this.maybeOpen();
     if (Date.now() - this.lastClaim > 120_000) await this.claims();
-    if (this.style.votes && !this.locked) await this.lockAndVote();
+    if (this.style.collector && !this.locked) await this.lock();
+    if (this.style.collector) await this.shop();
+    if (this.style.seller) await this.sell();
   }
 
   private async topUp() {
@@ -171,37 +178,91 @@ class Bot {
     }
     const epoch = (await o.epoch()).id;
     const epochs = Array.from({ length: Math.min(10, epoch - 1) }, (_, i) => epoch - 1 - i);
-    if (epochs.length && BigInt(await o.claimableEmissions(this.id, epochs)) > 0n) {
-      await this.tx.claimEmissions(epochs).then(
-        () => log(this.style.name, "claimed $1UP emissions"),
-        (e) => log(this.style.name, `emissions claim failed: ${short(e)}`),
-      );
-    }
     for (const l of await o.locks(this.id)) {
-      if ((await o.veClaimable(l.token_id, epochs)).length) {
+      if (epochs.length && BigInt(await o.veClaimable(l.token_id, epochs)) > 0n) {
         await this.tx.claimVe(l.token_id, epochs).then(
-          () => log(this.style.name, `claimed voter rewards for lock #${l.token_id}`),
-          (e) => log(this.style.name, `ve claim failed: ${short(e)}`),
+          () => log(this.style.name, `claimed lock rewards for #${l.token_id}`),
+          (e) => log(this.style.name, `lock claim failed: ${short(e)}`),
         );
       }
     }
   }
 
-  private async lockAndVote() {
+  private async lock() {
     this.locked = true;
-    const markets = (await o.markets()).map((m) => m.id);
-    if ((await o.locks(this.id)).length === 0) {
-      await this.tx.lock(5_000n * ONEUP, 52);
-      log(this.style.name, "locked 5,000 $1UP for 52 epochs");
-    }
-    const lock = (await o.locks(this.id))[0];
-    // 50% to the first market, the rest split evenly
-    const rest = markets.slice(1);
-    const each = rest.length ? (PPM / 2n) / BigInt(rest.length) : 0n;
-    const alloc: [string, bigint][] = [[markets[0], PPM - each * BigInt(rest.length)], ...rest.map((m): [string, bigint] => [m, each])];
-    await this.tx.vote(lock.token_id, alloc);
-    log(this.style.name, `voted ${alloc.map(([m, a]) => `${m} ${Number(a) / 1e4}%`).join(", ")}`);
+    if ((await o.locks(this.id)).some((l) => !l.from_loss)) return;
+    await this.tx.lock(5_000n * ONEUP, 104);
+    log(this.style.name, "locked 5,000 $1UP for 104 epochs");
   }
+
+  private listed = new Set<string>();
+
+  /** Lists Extra Lives at 70% of the USDC they can still earn, and loss-locks at 40% of their $1UP value. */
+  private async sell() {
+    const { life, ve } = d.contracts;
+    for (const l of await o.lives(this.id)) {
+      const left = lifeValue(l);
+      if (left < USDC || this.listed.has(l.token_id)) continue;
+      this.listed.add(l.token_id);
+      const price = (left * 70n) / 100n;
+      await this.tx.list(life, l.token_id, price).then(
+        () => log(this.style.name, `listed Extra Life ${l.token_id} for $${fmtUsdc(price)}`),
+        (e) => log(this.style.name, `listing failed: ${short(e)}`),
+      );
+    }
+    const px = await oneupPrice();
+    for (const l of await o.locks(this.id)) {
+      if (!l.from_loss || l.withdrawn || this.listed.has(`lock${l.token_id}`)) continue;
+      this.listed.add(`lock${l.token_id}`);
+      const price = (lockValue(l, px) * 40n) / 100n;
+      if (price < USDC) continue;
+      await this.tx.list(ve, l.token_id, price).then(
+        () => log(this.style.name, `listed lock #${l.token_id} for $${fmtUsdc(price)}`),
+        (e) => log(this.style.name, `listing failed: ${short(e)}`),
+      );
+    }
+  }
+
+  /** Buys listings priced at or under 75% of their value, with wallet USDC. */
+  private async shop() {
+    const listings = (await o.listings().catch(() => [] as Listing[])).filter((x) => x.seller !== this.id);
+    if (listings.length === 0) return;
+    const px = await oneupPrice();
+    for (const x of listings) {
+      const value =
+        x.nft_contract === d.contracts.life
+          ? await o.lifeInfo(x.token_id).then((l) => (l ? lifeValue(l) : 0n))
+          : await o.lockInfo(x.token_id).then((l) => (l && !l.withdrawn ? lockValue(l, px) : 0n));
+      const price = BigInt(x.price);
+      if (value === 0n || price * 4n > value * 3n) continue;
+      const wallet = BigInt(await o.usdcBalance(this.id));
+      if (wallet < price) await this.tx.faucet(10_000n * USDC);
+      const what = x.nft_contract === d.contracts.life ? `Extra Life ${x.token_id}` : `lock #${x.token_id}`;
+      await this.tx.buy(x.nft_contract, x.token_id, price).then(
+        () => log(this.style.name, `bought ${what} for $${fmtUsdc(price)} (worth ~$${fmtUsdc(value)})`),
+        (e) => log(this.style.name, `buy failed: ${short(e)}`),
+      );
+      return; // one purchase per step
+    }
+  }
+}
+
+/** USDC an Extra Life can still earn (0 once it has expired or healed fully). */
+function lifeValue(l: LifeInfo): bigint {
+  if (l.expired || l.full_heal) return BigInt(l.claimable);
+  return BigInt(l.owed) - BigInt(l.paid) + BigInt(l.claimable);
+}
+
+/** USDC per whole $1UP, from the swap (1e6 units). */
+async function oneupPrice(): Promise<bigint> {
+  const out = BigInt(await o.swapQuote(100n * USDC).catch(() => "0"));
+  return out === 0n ? 0n : (100n * USDC * ONEUP) / out;
+}
+
+/** What a lock is worth if you left it today: its $1UP after the exit penalty, at the swap price. */
+function lockValue(l: LockInfo, px: bigint): bigint {
+  const keep = BigInt(l.amount) - BigInt(l.exit_penalty);
+  return (keep * px) / ONEUP;
 }
 
 const bots = d.bots.map((b, i) => new Bot(b.id, b.key, STYLES[i % STYLES.length]));

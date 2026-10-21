@@ -5,12 +5,13 @@ import { OneUpProvider } from "@/lib/oneup";
 import { Header } from "@/components/Header";
 import { Trade } from "@/components/Trade";
 import { Lives } from "@/components/Lives";
-import { Vote } from "@/components/Vote";
+import { Locks } from "@/components/Locks";
+import { Market } from "@/components/Market";
 import { Solvency } from "@/components/Solvency";
 import { Fairness } from "@/components/Fairness";
 import { Toasts } from "@/components/Toasts";
 
-const TABS = ["Trade", "Extra Lives", "Vote", "Solvency", "Fairness"] as const;
+const TABS = ["Trade", "Extra Lives", "Locks", "Market", "Solvency", "Fairness"] as const;
 type Tab = (typeof TABS)[number];
 
 export default function Home() {
@@ -30,7 +31,8 @@ export default function Home() {
         </nav>
         {tab === "Trade" && <Trade />}
         {tab === "Extra Lives" && <Lives />}
-        {tab === "Vote" && <Vote />}
+        {tab === "Locks" && <Locks />}
+        {tab === "Market" && <Market />}
         {tab === "Solvency" && <Solvency />}
         {tab === "Fairness" && <Fairness />}
       </div>

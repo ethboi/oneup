@@ -20,6 +20,7 @@ export interface Deployment {
     usdc: string;
     oracle: string;
     swap: string;
+    market: string;
   };
   /** Dev keys. Localnet only: one throwaway key for every account it creates. */
   owner: { id: string; key: string };

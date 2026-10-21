@@ -19,7 +19,7 @@ export function PriceChart({ points, marks = [] }: { points: { t: number; p: num
   const [ref, W] = useWidth();
   const narrow = W < 480;
   const H = narrow ? 210 : 250;
-  const PAD = { l: 10, r: narrow ? 64 : 84, t: 14, b: 14 };
+  const PAD = { l: 10, r: narrow ? 64 : 84, t: 34, b: 14 }; // room at the top for the readout the console prints on screen
   const [hover, setHover] = useState<number | null>(null);
 
   if (points.length < 2) {

@@ -167,10 +167,18 @@ function cleanError(e: unknown): string {
   return (m?.[1] ?? s.split("\n")[0]).slice(0, 160);
 }
 
+/** The start-up screen: the logo drops into a green LCD, like an old handheld booting. */
 function Splash({ text }: { text: string }) {
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <p className="text-[var(--muted)]">{text}</p>
+    <div className="flex min-h-screen items-center justify-center p-4">
+      <div className="case w-full max-w-sm p-4">
+        <div className="bezel p-3 pb-6">
+          <div className="lcd flex h-48 flex-col items-center justify-center gap-3 overflow-hidden">
+            <span className="boot-logo display text-4xl italic text-[var(--lcd-ink)]">OneUp</span>
+            <span className="boot-text display text-sm text-[var(--lcd-3)]">{text}</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -106,18 +106,34 @@ export interface LockInfo {
   owner_id: string;
   amount: U128;
   created: number;
+  /** First epoch with zero weight. */
   end: number;
+  /** Made by the house from a loss, rather than locked by hand. */
+  from_loss: boolean;
+  /** Weight for the next epoch. */
   power: U128;
-  votes: [string, U128][];
+  /** What leaving now would cost. */
+  exit_penalty: U128;
+  exited: number | null;
   withdrawn: boolean;
 }
 
-export interface Proposal {
-  market_id: string;
-  feed_id: string;
-  proposer: string;
-  created: number;
-  idle: number;
+export interface EpochEmissions {
+  epoch: number;
+  scheduled: U128;
+  released: U128;
+  locked: U128;
+  carry: U128;
+}
+
+export interface Listing {
+  nft_contract: string;
+  token_id: string;
+  seller: string;
+  approval_id: number;
+  /** USDC, 1e6. */
+  price: U128;
+  listed_at: number;
 }
 
 export interface OraclePrice {
@@ -139,6 +155,8 @@ export interface CallArgs {
 export type Send = <T>(call: CallArgs) => Promise<T>;
 
 const ONE_YOCTO = 1n;
+/** 0.01 NEAR: storage for an NFT approval; the excess is refunded. */
+const STORAGE_DEPOSIT = 10n ** 22n;
 const MAX_GAS = teraToGas("300");
 
 export function accountSender(account: Account): Send {
@@ -180,10 +198,10 @@ export class OneUp {
   listPositions = (from_index = 0, limit = 100) => this.house<Position[]>("list_positions", { from_index, limit });
   listOrders = (from_index = 0, limit = 100) => this.house<Order[]>("list_orders", { from_index, limit });
   pendingLife = (account_id: string) => this.house<U128>("get_pending_life", { account_id });
-  voteShares = () => this.house<[string, U128][]>("get_vote_shares");
   buyback = (epoch: number) => this.house<{ status: string; usdc: U128; oneup: U128 } | null>("get_buyback", { epoch });
-  claimableEmissions = (account_id: string, epochs: number[]) =>
-    this.house<U128>("get_claimable_emissions", { account_id, epochs });
+  emissions = (epoch: number) => this.house<EpochEmissions | null>("get_emissions", { epoch });
+  emissionCarry = () => this.house<U128>("get_emission_carry");
+  params = () => this.house<{ life_expiry_epochs: number; market_capacity_ppm: U128; oneup_per_usdc: number }>("get_params");
   quoteOpen = (market_id: string, side: Side, margin: bigint, leverage: number, price?: bigint) =>
     this.house<Quote>("quote_open", {
       market_id,
@@ -197,11 +215,15 @@ export class OneUp {
   price = (feedId: string) => this.view<OraclePrice | null>(this.d.contracts.oracle, "get_price_unsafe", { price_identifier: feedId });
   lives = (account_id: string) => this.view<LifeInfo[]>(this.d.contracts.life, "lives_for_owner", { account_id });
   locks = (account_id: string) => this.view<LockInfo[]>(this.d.contracts.ve, "locks_for_owner", { account_id });
-  votes = (epoch: number) => this.view<[string, U128][]>(this.d.contracts.ve, "get_votes", { epoch });
-  pendingVotes = () => this.view<[string, U128][]>(this.d.contracts.ve, "get_pending_votes");
-  proposals = () => this.view<Proposal[]>(this.d.contracts.ve, "get_proposals");
-  veClaimable = (token_id: string, epochs: number[]) =>
-    this.view<[string, U128][]>(this.d.contracts.ve, "get_claimable", { token_id, epochs });
+  lockInfo = (token_id: string) => this.view<LockInfo | null>(this.d.contracts.ve, "lock_info", { token_id });
+  totalPower = (epoch: number) => this.view<U128>(this.d.contracts.ve, "get_total_power", { epoch });
+  pendingPower = () => this.view<U128>(this.d.contracts.ve, "get_pending_power");
+  lockRewards = (epoch: number) => this.view<U128>(this.d.contracts.ve, "get_rewards", { epoch });
+  veClaimable = (token_id: string, epochs: number[]) => this.view<U128>(this.d.contracts.ve, "get_claimable", { token_id, epochs });
+  lifeInfo = (token_id: string) => this.view<LifeInfo | null>(this.d.contracts.life, "life_info", { token_id });
+  listings = () => this.view<Listing[]>(this.d.contracts.market, "get_listings", {});
+  /** $1UP out for `usdc_in` on the swap (Rhea's stand-in). */
+  swapQuote = (usdc_in: bigint) => this.view<U128>(this.d.contracts.swap, "get_quote", { usdc_in: usdc_in.toString() });
   usdcBalance = (account_id: string) => this.view<U128>(this.d.contracts.usdc, "ft_balance_of", { account_id });
   oneupBalance = (account_id: string) => this.view<U128>(this.d.contracts.oneup, "ft_balance_of", { account_id });
 
@@ -230,22 +252,26 @@ export class OneUp {
       expire: (order_id: number) => house<void>("expire", { order_id }),
       liquidate: (position_id: number) => house<boolean>("liquidate", { position_id }),
       takeProfit: (position_id: number) => house<boolean>("take_profit", { position_id }),
-      closeEpoch: (limit = 20) => house<string>("close_epoch", { limit }, MAX_GAS),
+      closeEpoch: (limit = 10) => house<string>("close_epoch", { limit }, MAX_GAS),
       buyback: (epoch: number, min_out: bigint) => house<void>("buyback", { epoch, min_out: min_out.toString() }, MAX_GAS),
-      claimEmissions: (epochs: number[]) => house<void>("claim_emissions", { epochs }),
       claimLives: (token_ids: string[]) => send<void>({ contractId: c.life, methodName: "claim", args: { token_ids } }),
       lock: (amount: bigint, epochs: number) => ftCall(c.oneup, c.ve, amount, JSON.stringify({ lock: { epochs } })),
-      vote: (token_id: string, allocations: [string, bigint][]) =>
-        send<void>({
-          contractId: c.ve,
-          methodName: "vote",
-          args: { token_id, allocations: allocations.map(([m, a]) => [m, a.toString()]) },
-        }),
       claimVe: (token_id: string, epochs: number[]) => send<void>({ contractId: c.ve, methodName: "claim", args: { token_id, epochs } }),
-      bribe: (token: string, market_id: string, amount: bigint) =>
-        ftCall(token, c.ve, amount, JSON.stringify({ bribe: { market_id } })),
-      propose: (market_id: string, feed_id: string) =>
-        ftCall(c.usdc, c.ve, 500n * 1_000_000n, JSON.stringify({ propose: { market_id, feed_id } })),
+      unlock: (token_id: string) => send<void>({ contractId: c.ve, methodName: "unlock", args: { token_id } }),
+      exitEarly: (token_id: string) => send<U128>({ contractId: c.ve, methodName: "exit_early", args: { token_id } }),
+      /** Lists an Extra Life or a lock: `nft` is the life or ve contract, `price` in USDC units (1e6). */
+      list: (nft: string, token_id: string, price: bigint) =>
+        send<void>({
+          contractId: nft,
+          methodName: "nft_approve",
+          args: { token_id, account_id: c.market, msg: JSON.stringify({ price: price.toString() }) },
+          gas: MAX_GAS,
+          deposit: STORAGE_DEPOSIT,
+        }),
+      delist: (nft: string, token_id: string) =>
+        send<void>({ contractId: c.market, methodName: "delist", args: { nft_contract: nft, token_id } }),
+      buy: (nft: string, token_id: string, price: bigint) =>
+        ftCall(c.usdc, c.market, price, JSON.stringify({ buy: { nft_contract: nft, token_id } })),
       pushPrices: (updates: { feed_id: string; price: number; conf: number; expo: number; publish_time: number }[]) =>
         send<number>({ contractId: c.oracle, methodName: "push_prices", args: { updates } }),
     };
