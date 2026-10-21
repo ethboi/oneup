@@ -29,6 +29,46 @@ const STEPS: { icon: React.ReactNode; title: string; body: string }[] = [
   },
 ];
 
+/** Side by side: where each half of the design comes from, and what OneUp changes. */
+const LINEAGE: { row: string; papertrade: string; aerodrome: string; oneup: string }[] = [
+  {
+    row: "What a loss gets you",
+    papertrade: "PAPER tokens, 100 per $1 lost; stake them for a share of house profit",
+    aerodrome: "–",
+    oneup: "An Extra Life (a USDC claim on house profit, capped) plus $1UP, locked",
+  },
+  {
+    row: "When the house can't pay winners",
+    papertrade: "Winners queue as debt",
+    aerodrome: "–",
+    oneup: "Never happens: trades the pool couldn't cover in the worst case are refused",
+  },
+  {
+    row: "How long a claim lasts",
+    papertrade: "No end date",
+    aerodrome: "–",
+    oneup: "13 epochs, so early losers can't crowd out late ones",
+  },
+  {
+    row: "The locked token",
+    papertrade: "–",
+    aerodrome: "AERO locked up to 4 years as a veAERO NFT; weight shrinks as it runs down",
+    oneup: "$1UP locked up to 2 years as an NFT; weight is amount × time left",
+  },
+  {
+    row: "What locks earn",
+    papertrade: "–",
+    aerodrome: "Fees and bribes from the pools you vote for",
+    oneup: "The house's buybacks; no voting, no bribes",
+  },
+  {
+    row: "Getting out early",
+    papertrade: "–",
+    aerodrome: "Sell the NFT elsewhere",
+    oneup: "Leave for a penalty paid to the lockers who stay, or sell on the built-in market",
+  },
+];
+
 const BUILT: { icon: IconName; title: string; body: string }[] = [
   { icon: "shield", title: "8 Rust contracts", body: "House, Extra Life (NEP-171), $1UP (NEP-141), locks, market (NEP-178 approvals), and mock USDC, oracle and swap. Events follow NEP-297." },
   { icon: "check", title: "100 contract tests", body: "Unit and property tests, plus end-to-end tests on a sandbox chain." },
@@ -73,6 +113,37 @@ export function About() {
               </li>
             ))}
           </ol>
+        </section>
+
+        <section className="p-5">
+          <h2 className="text-lg font-extrabold">Papertrade meets Aerodrome</h2>
+          <p className="mt-2 max-w-3xl text-sm text-[var(--muted)]">
+            The idea that a loss buys you a claim on the house comes from Papertrade. The lock that earns protocol
+            revenue, weighted by how long it has left, comes from Aerodrome&apos;s vote-escrow. OneUp keeps both and
+            changes what made each one hard to live with.
+          </p>
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[640px] text-sm">
+              <thead>
+                <tr className="label text-left">
+                  <th className="w-[22%] pb-2 pr-3 font-normal" />
+                  <th className="pb-2 pr-3 font-normal">Papertrade</th>
+                  <th className="pb-2 pr-3 font-normal">Aerodrome</th>
+                  <th className="pb-2 font-bold text-[var(--text)]">OneUp</th>
+                </tr>
+              </thead>
+              <tbody>
+                {LINEAGE.map((r) => (
+                  <tr key={r.row} className="border-t border-[var(--line)] align-top">
+                    <th className="py-2.5 pr-3 text-left font-bold">{r.row}</th>
+                    <td className="py-2.5 pr-3 text-[var(--muted)]">{r.papertrade}</td>
+                    <td className="py-2.5 pr-3 text-[var(--muted)]">{r.aerodrome}</td>
+                    <td className="py-2.5">{r.oneup}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
 
         <section className="p-5">

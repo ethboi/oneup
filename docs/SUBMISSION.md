@@ -26,10 +26,12 @@ A draft of the form, to check before sending. **One submission, not editable.** 
 
 ## Description
 
-The form allows 20 to 2,000 characters. This draft is 1,637.
+The form allows 20 to 2,000 characters. This draft is 1,814.
 
 ```text
 OneUp is a perpetuals exchange on NEAR where losing isn't the end of the story. Lose a trade, get a life.
+
+Think Papertrade meets Aerodrome: a loss buys a claim on the house, and a locked token earns by size and time left, without the payout queue, the forever-claims or the bribes.
 
 Traders go long or short up to 100x against one USDC house pool, at the oracle price, with no fees, funding or slippage. Any trade the pool couldn't pay in the worst case is refused, so the house can't go bust and there is never a payout queue.
 

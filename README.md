@@ -7,6 +7,11 @@ price, with no fees, funding or slippage. When you lose, you get an **Extra Life
 that earns USDC back from the house's real profit, plus **$1UP** locked for two years that earns the house's
 buybacks. Sell either one on the built-in market whenever you like.
 
+Think of it as Papertrade meets Aerodrome: from Papertrade, a loss buys a claim on the house; from
+Aerodrome, a vote-escrow lock that earns protocol revenue by size and time left. OneUp keeps both and drops
+what made them hard to live with: no payout queue (the house refuses trades it couldn't cover), claims that
+expire so late players aren't crowded out, and locks that earn buybacks without gauge votes or bribes.
+
 Built at NEAR HACKATHON. Rust contracts on NEAR (near-sdk), a TypeScript keeper, bots and simulation, and a
 Next.js app, all running on a local NEAR chain with one command.
 
