@@ -304,3 +304,44 @@ export function historyFor(account: string): { items: HistoryItem[]; synced: boo
     progress: state.head > 0 ? Math.min(1, done / state.head) : 0,
   };
 }
+
+export interface BoardRow {
+  account: string;
+  pnl: string;
+  trades: number;
+}
+
+export interface Board {
+  /** By total PnL in the window, best first. */
+  top: BoardRow[];
+  /** The best single trade by return on margin. */
+  best: (TradeRecord & { account: string }) | null;
+  /** The biggest single loss: the biggest Extra Life on its way. */
+  biggestLoss: (TradeRecord & { account: string }) | null;
+  synced: boolean;
+}
+
+/** A leaderboard of trades closed in [from, to] (ms), across every account. */
+export function boardBetween(from: number, to: number): Board {
+  const sums = new Map<string, { pnl: bigint; trades: number }>();
+  let best: Board["best"] = null;
+  let worst: Board["biggestLoss"] = null;
+  const roe = (t: TradeRecord) => Number(t.pnl) / Math.max(1, Number(t.margin));
+  for (const [account, items] of state.history) {
+    for (const i of items) {
+      if (i.kind !== "trade" || i.t < from || i.t > to) continue;
+      const s = sums.get(account) ?? { pnl: 0n, trades: 0 };
+      s.pnl += BigInt(i.trade.pnl);
+      s.trades++;
+      sums.set(account, s);
+      if (!best || roe(i.trade) > roe(best)) best = { ...i.trade, account };
+      if (!worst || BigInt(i.trade.pnl) < BigInt(worst.pnl)) worst = { ...i.trade, account };
+    }
+  }
+  const top = [...sums]
+    .sort((a, b) => (b[1].pnl > a[1].pnl ? 1 : b[1].pnl < a[1].pnl ? -1 : 0))
+    .slice(0, 5)
+    .map(([account, s]) => ({ account, pnl: s.pnl.toString(), trades: s.trades }));
+  const done = (state.next ?? 1) - 1;
+  return { top, best, biggestLoss: worst && BigInt(worst.pnl) < 0n ? worst : null, synced: state.head > 0 && done >= state.head - 10 };
+}

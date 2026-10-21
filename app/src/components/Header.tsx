@@ -7,6 +7,7 @@ import { Logo, PixelCoin } from "./Pixel";
 import { Icon } from "./Icon";
 import { Popover } from "./Popover";
 import { MuteButton } from "./Sounds";
+import { openBadges } from "./Achievements";
 
 export interface NavTab {
   name: string;
@@ -122,7 +123,7 @@ function AccountMenu() {
         </>
       }
     >
-      {() => (
+      {(close) => (
         <div className="flex flex-col gap-3">
           <dl className="num grid grid-cols-2 gap-y-1 text-sm">
             <dt className="label">Wallet</dt>
@@ -149,9 +150,39 @@ function AccountMenu() {
             </button>
           </div>
           <p className="label">Optional: placing a trade moves what it needs from your wallet in the same step.</p>
+          <button className="btn btn-ghost justify-start" onClick={() => (close(), openBadges())}>
+            <Icon name="trophy" />
+            Achievements and console skins
+          </button>
+          <RoundsToggle />
         </div>
       )}
     </Popover>
+  );
+}
+
+/** Whether the "round over" screen shows after each epoch (remembered in this browser). */
+function RoundsToggle() {
+  const [on, setOn] = useState(true);
+  useEffect(() => {
+    try {
+      setOn(localStorage.getItem("oneup.rounds.off") !== "1");
+    } catch {}
+  }, []);
+  return (
+    <label className="flex items-center gap-2 text-sm">
+      <input
+        type="checkbox"
+        checked={on}
+        onChange={(e) => {
+          setOn(e.target.checked);
+          try {
+            localStorage.setItem("oneup.rounds.off", e.target.checked ? "0" : "1");
+          } catch {}
+        }}
+      />
+      Show results after each epoch
+    </label>
   );
 }
 

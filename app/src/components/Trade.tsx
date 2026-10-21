@@ -24,6 +24,8 @@ import { fmtClock, useNow } from "./Header";
 import { PixelHeart } from "./Pixel";
 import { Icon } from "./Icon";
 import { Popover } from "./Popover";
+import { useTilt } from "@/lib/tilt";
+import { useRevengeFlash, useStreak } from "./Streaks";
 import { Burst, Gauge, MoodGlow, useCloseFx, useMood, useTensionSound } from "./Mood";
 import { ActivityList, useActivity } from "./Activity";
 import { HistoryList } from "./History";
@@ -181,10 +183,13 @@ function Console({
   marks: Mark[];
   mine: Position[];
 }) {
-  const { prices, history } = useOneUp();
+  const { prices, history, me } = useOneUp();
   const mood = useMood(mine, prices[market]);
+  const tilt = useTilt(me);
   useTensionSound(mood);
   const fx = useCloseFx(market);
+  const revenge = useRevengeFlash();
+  const streak = useStreak(me);
   const [range, setRange] = useState<number>(RANGES[1][1]);
   const now = useNow();
   const pts = (history[market] ?? []).filter((p, i, a) => p.t >= now * 1000 - range || i === a.length - 1);
@@ -225,6 +230,19 @@ function Console({
           <PriceChart points={pts} marks={marks} alarm={mood.state === "danger" || mood.state === "critical"} />
           <MoodGlow mood={mood} />
           {fx && <Burst fx={fx} />}
+          {(revenge || tilt > 0) && (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center" role="status">
+              {revenge ? (
+                <span key={revenge} className="revenge display">
+                  REVENGE TRADE
+                  <br />
+                  DETECTED
+                </span>
+              ) : (
+                <span className="tilt display">TILT</span>
+              )}
+            </div>
+          )}
           {mood.state !== "none" && (
             <div className="pointer-events-none absolute right-3 top-2.5">
               <Gauge mood={mood} />
@@ -236,6 +254,12 @@ function Console({
             {pts.length > 1 && (
               <span className="text-sm">
                 {change >= 0 ? "▲" : "▼"} {Math.abs(change).toFixed(2)}%
+              </span>
+            )}
+            {streak && streak.n >= 2 && (
+              <span className="text-sm" title={`${streak.n} ${streak.win ? "wins" : "losses"} in a row`}>
+                · {streak.win ? "W" : "L"}
+                {streak.n}
               </span>
             )}
           </div>

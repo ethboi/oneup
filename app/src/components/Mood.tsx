@@ -9,6 +9,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { liquidationPrice, type Position } from "@oneup/sdk";
 import { heartbeat, lowHpBeep, shimmer } from "@/lib/sound";
 import { useFx, type FxEvent } from "@/lib/fx";
+import { nearMisses } from "@/lib/achievements";
 import { PixelCoin, PixelHeart } from "./Pixel";
 
 export interface Mood {
@@ -41,6 +42,7 @@ export function useMood(positions: Position[], mark?: bigint): Mood {
       const entry = Number(p.entry_price);
       const liq = Number(liquidationPrice(p.side, BigInt(p.entry_price), p.leverage));
       const h = 1 - along(entry, liq, m);
+      if (h < 0.25) nearMisses.add(p.id); // remembered for the Clutch badge
       const cap = entry * (1 + ((p.side === "Long" ? 1 : -1) * 9) / p.leverage);
       const target = p.triggers.take_profit ? Number(p.triggers.take_profit) : cap;
       progress = Math.max(progress, along(entry, target, m));
@@ -123,9 +125,9 @@ export function MoodGlow({ mood }: { mood: Mood }) {
 
 /** One-off effects for closes in this market: a coin burst for a win, a cracked heart then a +1 for a loss. */
 export function useCloseFx(market: string) {
-  const [fx, setFx] = useState<(FxEvent & { id: number }) | null>(null);
+  const [fx, setFx] = useState<(CloseFx & { id: number }) | null>(null);
   useFx((e) => {
-    if (e.market !== market) return;
+    if (!("market" in e) || e.market !== market) return;
     const id = Date.now();
     setFx({ ...e, id });
     setTimeout(() => setFx((f) => (f?.id === id ? null : f)), 1600);
@@ -133,7 +135,9 @@ export function useCloseFx(market: string) {
   return fx;
 }
 
-export function Burst({ fx }: { fx: FxEvent & { id: number } }) {
+type CloseFx = Extract<FxEvent, { market: string }>;
+
+export function Burst({ fx }: { fx: CloseFx & { id: number } }) {
   // fixed scatter so renders agree; the key restarts the animation for each close
   const coins = useMemo(
     () => Array.from({ length: 14 }, (_, i) => ({ dx: Math.round(Math.cos((i / 14) * Math.PI * 2) * (90 + (i % 3) * 40)), dy: -60 - (i % 4) * 35, d: (i % 5) * 0.04 })),

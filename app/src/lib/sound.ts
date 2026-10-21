@@ -2,7 +2,7 @@
 // files. Browsers only allow sound after the page has been interacted with, so the context is created on
 // first use (always after a click here). Muting is per browser.
 
-export type Sfx = "send" | "fill" | "win" | "lose" | "liquidated" | "plusOne" | "life" | "claim" | "error";
+export type Sfx = "send" | "fill" | "win" | "lose" | "liquidated" | "plusOne" | "life" | "claim" | "error" | "tilt" | "badge" | "heal" | "round" | "revenge";
 
 const KEY = "oneup.muted";
 const VOLUME = 0.12;
@@ -100,6 +100,19 @@ const SOUNDS: Record<Sfx, () => Tone[]> = {
     { note: "E6", at: 0.26, len: 0.18 },
   ],
   error: () => [{ freq: 110, at: 0, len: 0.12 }, { freq: 98, at: 0.13, len: 0.18 }],
+  // a pinball machine's tilt buzzer
+  tilt: () => [0, 0.18, 0.36].map((at) => ({ freq: 140, at, len: 0.13, gain: 1.2 })),
+  // an arcade "here we go": low, then a sharp rise
+  revenge: () => [{ freq: 220, to: 880, at: 0, len: 0.25, gain: 0.9 }, { note: "A5", at: 0.27, len: 0.08 }, { note: "A5", at: 0.38, len: 0.15 }],
+  badge: () => run(["G5", "C6", "E6"], 0.06).concat({ note: "G6", at: 0.18, len: 0.3, gain: 0.9 }),
+  heal: () =>
+    run(["C5", "E5", "G5", "C6", "E6", "G6", "C7"], 0.07).concat(
+      { note: "E6", at: 0.5, len: 0.12, wave: "triangle", gain: 1.2 },
+      { note: "G6", at: 0.62, len: 0.12, wave: "triangle", gain: 1.2 },
+      { note: "C7", at: 0.74, len: 0.45, gain: 0.9 },
+    ),
+  // round over: a short fanfare
+  round: () => run(["G4", "C5", "E5", "G5"], 0.09, "square", 0.8).concat({ note: "C6", at: 0.36, len: 0.35, gain: 0.8 }),
 };
 
 export function sfx(name: Sfx) {

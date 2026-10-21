@@ -23,6 +23,8 @@ export interface CardData {
   exit: bigint;
   state: "open" | "closed" | "liquidated";
   account: string;
+  /** A Full Heal card instead of a trade: the life's epoch and what it paid back. */
+  heal?: { epoch: number; paid: bigint };
 }
 
 const W = 1200;
@@ -135,6 +137,11 @@ export async function drawCard(canvas: HTMLCanvasElement, d: CardData) {
   ctx.restore();
 
   const px = lx + 40;
+  if (d.heal) {
+    drawHeal(ctx, f, d.heal, { lx, ly, lw, lh, px });
+    footer(ctx, f, bx);
+    return;
+  }
   ctx.fillStyle = C.ink;
   ctx.font = `700 34px ${f.pixel}`;
   ctx.fillText(d.market, px, ly + 64);
@@ -182,13 +189,40 @@ export async function drawCard(canvas: HTMLCanvasElement, d: CardData) {
     ctx.textAlign = "left";
   }
 
-  // below the screen
+  footer(ctx, f, bx);
+}
+
+/** Below the screen: the tagline. */
+function footer(ctx: CanvasRenderingContext2D, f: { pixel: string }, bx: number) {
   ctx.fillStyle = C.wordmark;
   ctx.font = `700 28px ${f.pixel}`;
+  ctx.textAlign = "left";
   ctx.fillText("Lose a trade, get a life.", bx + 6, H - 36);
 }
 
+/** The Full Heal card: the life paid back in full. */
+function drawHeal(
+  ctx: CanvasRenderingContext2D,
+  f: { pixel: string; body: string },
+  heal: { epoch: number; paid: bigint },
+  { lx, ly, lw, px }: { lx: number; ly: number; lw: number; lh: number; px: number },
+) {
+  ctx.fillStyle = C.ink;
+  ctx.textAlign = "left";
+  ctx.font = `700 34px ${f.pixel}`;
+  ctx.fillText(`EXTRA LIFE · EPOCH ${heal.epoch}`, px, ly + 64);
+  ctx.font = `700 96px ${f.pixel}`;
+  ctx.fillText("FULL HEAL", px - 4, ly + 180);
+  ctx.font = `800 54px ${f.body}`;
+  ctx.fillText(`+$${fmtUsdc(heal.paid)} back`, px, ly + 258);
+  ctx.font = `500 24px ${f.body}`;
+  ctx.fillStyle = C.inkSoft;
+  ctx.fillText("A losing trade, paid back in full from the house's profit.", px, ly + 318);
+  sprite(ctx, HEART, { "#": C.heart, "*": "#fff" }, lx + lw - 290, ly + 40, 21);
+}
+
 export function shareText(d: CardData) {
+  if (d.heal) return `Full Heal: a losing trade paid me back $${fmtUsdc(d.heal.paid, 0)} on OneUp. Lose a trade, get a life.`;
   const r = roe(d);
   return d.pnl >= 0n
     ? `+${r.toFixed(1)}% on ${d.market} ${d.side.toLowerCase()} ${d.leverage}× on OneUp.`
@@ -209,7 +243,7 @@ export function ShareButton({ data, compact }: { data: () => CardData; compact?:
   );
 }
 
-function ShareDialog({ data, onClose }: { data: CardData; onClose: () => void }) {
+export function ShareDialog({ data, onClose }: { data: CardData; onClose: () => void }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const [blob, setBlob] = useState<Blob | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -224,7 +258,7 @@ function ShareDialog({ data, onClose }: { data: CardData; onClose: () => void })
     };
   }, [data, onClose]);
 
-  const name = `oneup-${data.market.toLowerCase()}-${data.side.toLowerCase()}.png`;
+  const name = data.heal ? `oneup-full-heal-${data.heal.epoch}.png` : `oneup-${data.market.toLowerCase()}-${data.side.toLowerCase()}.png`;
   const file = blob ? new File([blob], name, { type: "image/png" }) : null;
   const canShare = !!file && typeof navigator !== "undefined" && !!navigator.canShare?.({ files: [file] });
   const download = () => {
