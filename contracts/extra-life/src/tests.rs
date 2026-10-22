@@ -194,7 +194,7 @@ fn claim_never_records_more_than_it_sends() {
     ctx("house", 0);
     c.mint_batch(1, vec![item("alice", 1_000, 1_000_000), item("bob", 1_000, 1_000_000)]);
     let b = backer(&mut c, "alice", 1_000);
-    pot(&mut c, 900); // 300 each
+    pot(&mut c, 900); // losers 600 (300 each), the backer 300
     c.held = 500 * USDC; // short of the 600 claimable
     ctx("alice", 0);
     let _ = c.claim(vec!["1:alice".into(), b.clone()]);
@@ -210,17 +210,17 @@ fn failed_claim_restores_exactly_its_amounts() {
     ctx("house", 0);
     c.mint_batch(1, vec![item("alice", 1_000, 1_000_000)]);
     let b = backer(&mut c, "alice", 1_000);
-    pot(&mut c, 400); // 200 each
+    pot(&mut c, 300); // Alice 200, the backer 100 (two thirds, one third)
     ctx("alice", 0);
     let _ = c.claim(vec![b.clone()]);
-    pot(&mut c, 200); // 100 more each
+    pot(&mut c, 150); // 100 and 50 more
     ctx("alice", 0);
     let _ = c.claim(vec!["1:alice".into(), b.clone()]);
-    assert_eq!((claimed(&c, "1:alice"), claimed(&c, &b)), (300 * USDC, 300 * USDC));
-    // the second transfer fails: only its 300 + 100 come back, not the backer's earlier 200
-    c.on_claim(acc("alice"), vec![("1:alice".into(), U128(300 * USDC)), (b.clone(), U128(100 * USDC))], U128(400 * USDC), Err(PromiseError::Failed));
-    assert_eq!((claimed(&c, "1:alice"), claimed(&c, &b)), (0, 200 * USDC));
-    assert_eq!(c.held, 400 * USDC);
+    assert_eq!((claimed(&c, "1:alice"), claimed(&c, &b)), (300 * USDC, 150 * USDC));
+    // the second transfer fails: only its 300 + 50 come back, not the backer's earlier 100
+    c.on_claim(acc("alice"), vec![("1:alice".into(), U128(300 * USDC)), (b.clone(), U128(50 * USDC))], U128(350 * USDC), Err(PromiseError::Failed));
+    assert_eq!((claimed(&c, "1:alice"), claimed(&c, &b)), (0, 100 * USDC));
+    assert_eq!(c.held, 350 * USDC);
 }
 
 #[test]
@@ -266,8 +266,9 @@ fn backer_earns_only_from_later_pots() {
     let b = backer(&mut c, "bob", 500);
     // shared by what each was owed (D-25): Alice 1_000, Bob 500, so 2 : 1 even though Alice is half paid
     pot(&mut c, 500);
-    assert_eq!(c.life_info(b).unwrap().paid.0, 166_666_666);
-    assert_eq!(c.life_info("1:alice".into()).unwrap().paid.0, 833_333_334); // the pot is spent exactly: 500 in all
+    // and two thirds to losers (D-26) gives the same 2 : 1 here
+    assert_eq!(c.life_info(b).unwrap().paid.0, 166_666_667);
+    assert_eq!(c.life_info("1:alice".into()).unwrap().paid.0, 833_333_333); // the pot is spent exactly: 500 in all
 }
 
 #[test]
@@ -276,9 +277,9 @@ fn backers_never_expire_and_full_heal() {
     let b = backer(&mut c, "bob", 1_000);
     ctx("house", 0);
     c.mint_batch(1, vec![item("alice", 1_000, 1_000_000)]);
-    pot(&mut c, 1_000);
+    pot(&mut c, 1_500); // Alice's two thirds pay her in full, the backer's third is 500
     ctx("house", 0);
-    assert_eq!(c.expire(50).0, 500 * USDC); // Alice's 500 drops out; the backer's 500 stays owed
+    assert_eq!(c.expire(50).0, 500 * USDC); // Alice is done; the backer's 500 stays owed
     let info = c.life_info(b.clone()).unwrap();
     assert!(!info.expired && info.paid.0 == 500 * USDC);
     assert_eq!(pot(&mut c, 2_000), 1_500 * USDC);
@@ -361,4 +362,28 @@ proptest! {
             }
         }
     }
+}
+
+#[test]
+fn losers_get_two_thirds_backers_one_third() {
+    let mut c = setup();
+    let b = backer(&mut c, "bob", 1_000_000);
+    ctx("house", 0);
+    c.mint_batch(1, vec![item("alice", 1_000, 1_000_000)]);
+    // backers are owed 1000× more, but get only their third
+    pot(&mut c, 900);
+    assert_eq!(c.life_info("1:alice".into()).unwrap().paid.0, 600 * USDC);
+    assert_eq!(c.life_info(b).unwrap().paid.0, 300 * USDC);
+}
+
+#[test]
+fn a_side_passes_on_what_it_cant_use() {
+    let mut c = setup();
+    let b = backer(&mut c, "bob", 1_000_000);
+    ctx("house", 0);
+    c.mint_batch(1, vec![item("alice", 100, 1_000_000)]);
+    // Alice can take only 100 of her 2_000 slice: the rest goes to the backer
+    assert_eq!(pot(&mut c, 3_000), 0);
+    assert!(c.life_info("1:alice".into()).unwrap().full_heal);
+    assert_eq!(c.life_info(b).unwrap().paid.0, 2_900 * USDC);
 }

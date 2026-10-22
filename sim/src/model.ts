@@ -70,12 +70,37 @@ export function flows(opts: { epochs: number; start: number; peak: number; mid: 
 }
 
 // OneUp (docs/maths.md §5–6)
+/** How each epoch's pot is split across earning lives: "split" is the contracts (D-26: two thirds to losers'
+ *  lives, one third to backers', each side by original owed); "owed" is D-25 alone; "remaining" before D-25. */
+export type Share = "split" | "owed" | "remaining";
+
+/** Water-filling: the same fraction of each life's original owed, lives that would pass their cap filled and the
+ *  rest shared again. Returns what the lives couldn't take. */
+function fill<T extends { face: number; remaining: number }>(lives: T[], amount: number, pay: (o: T, x: number) => void): number {
+  let left = amount;
+  let open = lives.filter((o) => o.remaining > 1e-9);
+  while (left > 1e-9 && open.length) {
+    const rate = left / open.reduce((s, o) => s + o.face, 0);
+    const full = open.filter((o) => o.remaining <= rate * o.face);
+    if (full.length === 0) {
+      for (const o of open) pay(o, rate * o.face);
+      return 0;
+    }
+    for (const o of full) {
+      left -= o.remaining;
+      pay(o, o.remaining);
+    }
+    open = open.filter((o) => o.remaining > 1e-9);
+  }
+  return left;
+}
+
 /**
  * `share`: how each epoch's pot is split across earning lives. "owed" (D-25, the contracts) shares it by what
  * each life was owed when minted, each capped at what it's still owed (any excess goes round again);
  * "remaining" (before D-25) shared it by what each is still owed, so a half-paid life earned half as fast.
  */
-export function oneup(fs: Flow[], seed = 25_000, utilisation = 0.5, expiry = Infinity, share: "owed" | "remaining" = "owed"): { cohorts: Cohort[]; pool: number[] } {
+export function oneup(fs: Flow[], seed = 25_000, utilisation = 0.5, expiry = Infinity, share: Share = "split"): { cohorts: Cohort[]; pool: number[] } {
   let pool = seed;
   // Each life cohort: what it was owed and what it's still owed. The seed is cohort −1 at 1.0×.
   const owed: { epoch: number; face: number; remaining: number }[] = [{ epoch: -1, face: seed, remaining: seed }];
@@ -102,25 +127,17 @@ export function oneup(fs: Flow[], seed = 25_000, utilisation = 0.5, expiry = Inf
     };
     if (pot > 0 && share === "remaining") {
       for (const o of owed) pay(o, (pot * o.remaining) / totalOwed);
+    } else if (pot > 0 && share === "owed") {
+      fill(owed, pot, pay);
     } else if (pot > 0) {
-      // water-filling: an equal fraction of each life's original owed, lives that would pass their cap are
-      // filled and the rest shared again
-      let left = pot;
-      let open = owed.filter((o) => o.remaining > 1e-9);
-      while (left > 1e-9 && open.length) {
-        const rate = left / open.reduce((s, o) => s + o.face, 0);
-        const full = open.filter((o) => o.remaining <= rate * o.face);
-        if (full.length === 0) {
-          for (const o of open) pay(o, rate * o.face);
-          left = 0;
-        } else {
-          for (const o of full) {
-            left -= o.remaining;
-            pay(o, o.remaining);
-          }
-          open = open.filter((o) => o.remaining > 1e-9);
-        }
-      }
+      // D-26: two thirds to losers' lives, one third to the seed's (backers'); each passes on what it can't use
+      const losers = owed.filter((o) => o.epoch >= 0);
+      const backers = owed.filter((o) => o.epoch < 0);
+      const slice = (pot * 2) / 3;
+      const lLeft = fill(losers, slice, pay);
+      const bLeft = fill(backers, pot - slice, pay);
+      fill(backers, lLeft, pay);
+      fill(losers, bLeft, pay);
     }
     pool -= pot + buyback;
     poolSeries.push(pool);
@@ -185,7 +202,7 @@ export function papertrade(fs: Flow[], seed = 25_000) {
 
 export const LIFE_EXPIRY_EPOCHS = 13;
 
-export function run(fs: Flow[], seed = 25_000, expiry = LIFE_EXPIRY_EPOCHS, share: "owed" | "remaining" = "owed"): RunResult {
+export function run(fs: Flow[], seed = 25_000, expiry = LIFE_EXPIRY_EPOCHS, share: Share = "split"): RunResult {
   const o = oneup(fs, seed, 0.5, expiry, share);
   const n = oneup(fs, seed, 0.5, Infinity, share);
   const p = papertrade(fs, seed);

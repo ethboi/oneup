@@ -62,10 +62,17 @@ pub struct Params {
     /// D-22: anyone may back the pool until the total seeded reaches this.
     #[serde(default = "default_backing_target")]
     pub backing_target: U128,
+    /// D-26: $1UP locked for a backer per USDC backed, from the allocation the owner funds.
+    #[serde(default = "default_backer_oneup")]
+    pub backer_oneup_per_usdc: u32,
 }
 
 fn default_backing_target() -> U128 {
     U128(math::LIFE_CAP_POOL)
+}
+
+fn default_backer_oneup() -> u32 {
+    10
 }
 
 impl Default for Params {
@@ -83,6 +90,7 @@ impl Default for Params {
             market_capacity_ppm: U128(500_000),
             oneup_per_usdc: math::ONEUP_PER_USDC as u32,
             backing_target: default_backing_target(),
+            backer_oneup_per_usdc: default_backer_oneup(),
         }
     }
 }
@@ -235,6 +243,8 @@ pub struct House {
     intents: Option<AccountId>,
     /// Fills orders and fires take-profits and triggers. None = anyone may (tests, a keeperless setup).
     keeper: Option<AccountId>,
+    /// $1UP the owner set aside for backers' locks (D-26), not yet handed out.
+    backer_oneup: u128,
 }
 
 pub(crate) fn now_s() -> u64 {
@@ -275,6 +285,7 @@ impl House {
             operator: None,
             intents: None,
             keeper: None,
+            backer_oneup: 0,
         }
     }
 

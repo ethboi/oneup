@@ -48,6 +48,17 @@ impl House {
         U128(self.emission_carry)
     }
 
+    /// After a backer's `lock_for` transfer: anything `ve` didn't take goes back to the backers' allocation.
+    #[private]
+    pub fn on_backer_lock(&mut self, amount: U128, #[callback_result] used: Result<U128, PromiseError>) -> U128 {
+        let back = amount.0 - used.map_or(0, |u| u.0.min(amount.0));
+        self.backer_oneup += back;
+        if back > 0 {
+            env::log_str(&format!("Backer lock failed; {back} $1UP back to the allocation"));
+        }
+        U128(back)
+    }
+
     /// After a `lock_for` transfer: anything `ve` didn't take goes back to the carry.
     #[private]
     pub fn on_locks(&mut self, epoch: u64, amount: U128, #[callback_result] used: Result<U128, PromiseError>) -> bool {
@@ -124,6 +135,32 @@ impl House {
             .with_static_gas(gas)
             .ft_transfer_call(self.ve.clone().expect("ve"), U128(total), None, msg)
             .then(Self::ext(env::current_account_id()).with_static_gas(GAS_LOCKS_CALLBACK).on_locks(epoch, U128(total)))
+    }
+
+    /// $1UP owed a backer for `usdc` backed (D-26): the rate, capped by what's left of the allocation.
+    pub(crate) fn backer_oneup_for(&self, usdc: u128) -> u128 {
+        if self.oneup.is_none() || self.ve.is_none() {
+            return 0;
+        }
+        // USDC has 6 decimals and $1UP 18
+        (usdc * self.params.backer_oneup_per_usdc as u128 * 1_000_000_000_000).min(self.backer_oneup)
+    }
+
+    /// Locks a backer's $1UP for two years, like a loser's (D-26). What `ve` doesn't take goes back to the
+    /// allocation.
+    pub(crate) fn lock_for_backer(&mut self, account: AccountId, usdc: u128) {
+        let amount = self.backer_oneup_for(usdc);
+        if amount == 0 {
+            return;
+        }
+        self.backer_oneup -= amount;
+        let msg = near_sdk::serde_json::json!({ "lock_for": { "items": [[account, U128(amount)]] } }).to_string();
+        ext_ft::ext(self.oneup.clone().expect("oneup"))
+            .with_attached_deposit(NearToken::from_yoctonear(1))
+            .with_static_gas(GAS_LOCKS_BASE.saturating_add(GAS_LOCK_EACH))
+            .ft_transfer_call(self.ve.clone().expect("ve"), U128(amount), None, msg)
+            .then(Self::ext(env::current_account_id()).with_static_gas(GAS_LOCKS_CALLBACK).on_backer_lock(U128(amount)))
+            .detach();
     }
 
     /// Release not handed out (rounding across losers) goes back to the carry.

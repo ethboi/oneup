@@ -36,7 +36,8 @@ buyer  ──ft_transfer_call──▶ usdc ──▶ market ──▶ life|ve.n
 
 | Method | Caller | Does |
 |---|---|---|
-| `ft_on_transfer(sender_id, amount, msg)` | USDC contract | `msg = ""` credits the sender's free balance; `{"open":{market_id, side, margin, leverage, take_profit?, stop_loss?}}` credits it and places an open in the same step (a refused open refunds the whole transfer); `{"seed":{}}` (owner) adds to the pool and mints a 1.0× Backer Life; `{"back":{}}` (anyone, ≥ 10 USDC, until the total seeded reaches `backing_target`) adds to the pool and mints a Backer Life owed `backer_cap_ppm(pool, amount)` (D-22); from the Intents Verifier only, `{"for":{account_id}}` and `open` with `account_id` credit that account, and an open may not exceed the deposit (D-21). A new balance needs at least `min_margin` |
+| `ft_on_transfer(sender_id, amount, msg)` | USDC contract | `msg = ""` credits the sender's free balance; `{"open":{market_id, side, margin, leverage, take_profit?, stop_loss?}}` credits it and places an open in the same step (a refused open refunds the whole transfer); `{"seed":{}}` (owner) adds to the pool and mints a 1.0× Backer Life; `{"back":{}}` (anyone, ≥ 10 USDC, until the total seeded reaches `backing_target`) adds to the pool, mints a Backer Life owed `backer_cap_ppm(pool, amount)` (D-22) and locks
+`backer_oneup_per_usdc` (10) $1UP per USDC for two years from the backers' allocation (D-26); from the Intents Verifier only, `{"for":{account_id}}` and `open` with `account_id` credit that account, and an open may not exceed the deposit (D-21). A new balance needs at least `min_margin` |
 | `withdraw(amount)` | trader | sends free balance; refunds on failed transfer |
 | `place_open(market_id, side, margin, leverage, take_profit?, stop_loss?) → order_id` | trader | moves margin from free balance into the order; pre-checks solvency and capacity with the order counted; optional trigger prices go with the position (D-19) |
 | `set_triggers(position_id, take_profit?, stop_loss?)` | owner of the position | sets or clears them; they fire only on prices published after this call |
@@ -72,7 +73,9 @@ bb_pot}`.
 
 ## extra-life (NEP-171 + NEP-177 metadata + NEP-181 enumeration)
 
-Each pot is shared by what each life was originally owed, capped at what it's still owed (D-25, maths §6).
+Each pot goes two thirds to losers' lives and one third to Backer Lives, each side passing on what it can't
+use (D-26). Within a side it's shared by what each life was originally owed, capped at what it's still owed
+(D-25, maths §6).
 Lives minted together (an epoch's cohort, or Backer Lives minted between two pots) are always paid the same
 fraction, so the contract keeps groups, each with its total owed and the fraction paid:
 

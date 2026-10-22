@@ -6,7 +6,8 @@
 //! Backer Lives (D-22) are minted for backing the house pool: token id `"b<n>"`, one per backing, and they
 //! never expire. Claiming a token drops its approvals, so a listing can't be drained before it sells.
 //!
-//! Each pot is shared by what each life was originally owed, capped at what it's still owed (D-25, acc.rs).
+//! Each pot is split two thirds to losers' lives and one third to Backer Lives (D-26), and within each side
+//! shared by what each life was originally owed, capped at what it's still owed (D-25, acc.rs).
 
 use near_contract_standards::non_fungible_token::approval::NonFungibleTokenApproval;
 use near_contract_standards::non_fungible_token::core::{NonFungibleTokenCore, NonFungibleTokenResolver};
@@ -29,6 +30,9 @@ mod acc;
 pub use acc::{share_pot, Group, ONE};
 
 const GAS_FT_TRANSFER: Gas = Gas::from_tgas(15);
+/// D-26: losers' lives get this share of each pot (numerator, denominator), Backer Lives the rest; either side
+/// passes on what it can't use.
+pub const LOSERS_SHARE: (u128, u128) = (2, 3);
 const GAS_CLAIM_CALLBACK: Gas = Gas::from_tgas(20);
 /// Tokens claimed in one call.
 const MAX_CLAIM: usize = 30;
@@ -239,16 +243,25 @@ impl ExtraLife {
         U128(self.owed_remaining())
     }
 
-    /// USDC from the house: an epoch's pot, shared by what each earning life was owed, each capped at what it's
-    /// still owed (D-25). Returns the unused part (when lives are owed less than the pot).
+    /// USDC from the house: an epoch's pot. Two thirds go to losers' lives and one third to Backer Lives, each
+    /// side passing on what it can't use (D-26); within a side, shared by what each life was owed, capped at what
+    /// it's still owed (D-25). Returns the unused part (when lives are owed less than the pot).
     pub fn ft_on_transfer(&mut self, sender_id: AccountId, amount: U128, msg: String) -> PromiseOrValue<U128> {
         require!(env::predecessor_account_id() == self.usdc, "Only USDC");
         require!(sender_id == self.house, "Only the house sends pots");
         let PotMsg::EpochPot { epoch } =
             near_sdk::serde_json::from_str(&msg).unwrap_or_else(|_| env::panic_str("Bad pot message"));
-        let mut groups: Vec<Group> = self.earning.iter().map(|k| self.groups.get(k).cloned().unwrap_or_default()).collect();
-        let used = share_pot(&mut groups, amount.0);
-        for (k, g) in self.earning.iter().zip(groups) {
+        // two slices (D-26): losers' lives two thirds, Backer Lives one third; each passes on what it can't use
+        let (backer_keys, loser_keys): (Vec<u64>, Vec<u64>) = self.earning.iter().partition(|k| *k & 1 == 1);
+        let load = |keys: &[u64]| -> Vec<Group> { keys.iter().map(|k| self.groups.get(k).cloned().unwrap_or_default()).collect() };
+        let (mut losers, mut backers) = (load(&loser_keys), load(&backer_keys));
+        let losers_slice = math::mul_div(amount.0, LOSERS_SHARE.0, LOSERS_SHARE.1);
+        let to_losers = share_pot(&mut losers, losers_slice);
+        let to_backers = share_pot(&mut backers, amount.0 - losers_slice);
+        let spill_to_backers = share_pot(&mut backers, losers_slice - to_losers);
+        let spill_to_losers = share_pot(&mut losers, amount.0 - losers_slice - to_backers);
+        let used = to_losers + to_backers + spill_to_backers + spill_to_losers;
+        for (k, g) in loser_keys.iter().zip(losers).chain(backer_keys.iter().zip(backers)) {
             self.groups.insert(*k, g);
         }
         // groups paid in full stop earning

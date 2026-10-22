@@ -223,8 +223,8 @@ Now anyone can **back** the pool (`{"back":{}}`, at least 10 USDC) until the tot
 
 - **joins the pool for good and raises the reserve floor** (D-12), so it is only ever repaid from house
   profit, never paid out as surplus;
-- **mints a Backer Life**: an Extra Life that never expires, paid from the same pots as losers' lives, by
-  what it was owed (D-25);
+- **mints a Backer Life**: an Extra Life that never expires, paid from a third of each pot (D-26), by what it
+  was owed (D-25); and a two-year lock of 10 $1UP per $1 backed (D-26);
 - **is owed the curve's average over the backing**: losers' lives are capped at 2.0× at an empty pool,
   falling to 1.2× at $1M (`life_cap_ppm`); a backing of `x` into a pool of `p` is owed the average of that
   curve over `[p, p + x]` (`backer_cap_ppm`). Early dollars earn more, and splitting a backing into pieces
@@ -287,6 +287,34 @@ ones.
 In the contract, lives minted together (an epoch's cohort, or the Backer Lives minted between two pots) are
 always paid the same fraction, so the accumulator is a list of groups with a paid fraction each: a pot is
 O(groups earning), at most 14 cohorts plus the bootstrap round's backer groups, and a claim stays O(1).
+
+## D-26 · Losers' lives get their own slice; backers get $1UP too · **Decided (22 Oct 2026)**
+
+With the bootstrap round (D-22) backed, Backer Lives were owed about $1.1M against a few hundred dollars of
+losers' lives, and D-25 shares a pot by what each was owed: a round's pot paid losers' lives under 0.1% of it.
+"Lose a trade, get a life" meant almost nothing until the backers were paid.
+
+**Two slices.** Each round's Extra Life pot now goes two thirds to losers' lives and one third to Backer Lives;
+within each side it's shared as D-25 says, and either side passes on what it can't use (so nothing is wasted
+when one side is paid up). `pnpm --filter @oneup/sim backers` puts the trade-off in numbers:
+
+| Traders lose a week | Losers' lives paid of their cap, before → after | Backers paid in full, before → after |
+|---|---|---|
+| $25K | 3% → 29% | 10 years+ → 10 years+ |
+| $250K | 39% → 39% | 86 weeks → 3.1 years |
+| $1M | 42% → 42% | 42 weeks → 42 weeks |
+| $2M | 42% → 42% | 34 weeks → 23 weeks |
+
+At low volume (a new exchange, the demo) losers' lives go from almost nothing to a real payback; once the
+surplus is the limit, losers get the same either way and backers wait longer at mid volumes.
+
+**Backers get $1UP.** Backing was a capped claim with no upside. Now each backing also locks 10 $1UP per $1
+for two years (the same lock losers get, earning buybacks), from an allocation the owner funds out of the
+treasury (`{"fund_backers":{}}`, 7.5M $1UP for the $750K of the round after the house's seed). The owner's own
+seed gets none. When the allocation runs out, backings still mint their Backer Life but no lock.
+
+Redeeming a backing against spare pool capital was considered and left out: it makes backing an LP vault,
+which D-22 avoided, and shrinks the pool when traders need it most. The exit is still the market.
 
  · **Noted**
 

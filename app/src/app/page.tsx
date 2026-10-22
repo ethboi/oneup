@@ -10,6 +10,8 @@ import { Market } from "@/components/Market";
 import { Solvency } from "@/components/Solvency";
 import { Fairness } from "@/components/Fairness";
 import { About } from "@/components/About";
+import { BackPage } from "@/components/BackPage";
+import { Tokenomics } from "@/components/Tokenomics";
 import { Toasts } from "@/components/Toasts";
 import { SoundEvents } from "@/components/Sounds";
 import { AchievementWatcher, BadgesDialog } from "@/components/Achievements";
@@ -19,13 +21,15 @@ import { Onboarding } from "@/components/Onboarding";
 import { Icon, type IconName } from "@/components/Icon";
 import { Logo } from "@/components/Pixel";
 
-const TABS = ["Trade", "Extra Lives", "Locks", "Market", "Solvency", "Fairness", "About"] as const;
+const TABS = ["Trade", "Extra Lives", "Locks", "Market", "Backing", "$1UP", "Solvency", "Fairness", "About"] as const;
 type Tab = (typeof TABS)[number];
 const TAB_ICONS: Record<Tab, IconName> = {
   Trade: "chart",
   "Extra Lives": "heart",
   Locks: "lock",
   Market: "store",
+  Backing: "deposit",
+  $1UP: "claim",
   Solvency: "shield",
   Fairness: "scale",
   About: "info",
@@ -63,6 +67,8 @@ export default function Home() {
         {tab === "Extra Lives" && <Lives />}
         {tab === "Locks" && <Locks />}
         {tab === "Market" && <Market />}
+        {tab === "Backing" && <BackPage go={(t) => go(t as Tab)} />}
+        {tab === "$1UP" && <Tokenomics />}
         {tab === "Solvency" && <Solvency />}
         {tab === "Fairness" && <Fairness />}
         {tab === "About" && <About />}
@@ -73,7 +79,7 @@ export default function Home() {
       <nav className="bottom-nav lg:hidden" aria-label="Sections">
         {more && (
           <div className="absolute inset-x-3 bottom-[68px] flex flex-col gap-1 rounded-xl border border-[var(--panel-edge)] bg-[var(--panel)] p-2 shadow-[var(--panel-shadow)]">
-            {(["Solvency", "Fairness", "About"] as const).map((t) => (
+            {(["Backing", "$1UP", "Solvency", "Fairness", "About"] as const).map((t) => (
               <button key={t} className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-left font-bold hover:bg-[var(--panel-2)]" onClick={() => go(t)}>
                 <Icon name={TAB_ICONS[t]} />
                 {t}
@@ -133,6 +139,16 @@ function Footer({ go }: { go: (t: Tab) => void }) {
             <li>
               <button type="button" className={link} onClick={() => go("Fairness")}>
                 Fair to late players
+              </button>
+            </li>
+            <li>
+              <button type="button" className={link} onClick={() => go("Backing")}>
+                Back the house
+              </button>
+            </li>
+            <li>
+              <button type="button" className={link} onClick={() => go("$1UP")}>
+                $1UP tokenomics
               </button>
             </li>
           </ul>

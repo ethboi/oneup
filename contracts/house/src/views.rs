@@ -14,6 +14,9 @@ pub struct Backing {
     /// What the quoted amount would be owed, × 1e6, and in USDC.
     pub cap_ppm: U128,
     pub owed: U128,
+    /// $1UP the quoted amount would be locked for its backer (D-26), and what's left of the allocation.
+    pub oneup: U128,
+    pub oneup_left: U128,
 }
 
 #[near(serializers = [json])]
@@ -115,6 +118,8 @@ impl House {
             min: U128(math::MIN_BACKING),
             cap_ppm: U128(cap_ppm),
             owed: U128(math::owed(amount, cap_ppm)),
+            oneup: U128(self.backer_oneup_for(amount)),
+            oneup_left: U128(self.backer_oneup),
         }
     }
 

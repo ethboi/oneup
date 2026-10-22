@@ -44,6 +44,13 @@ impl House {
     pub fn ft_on_transfer(&mut self, sender_id: AccountId, amount: U128, msg: String) -> PromiseOrValue<U128> {
         let token = env::predecessor_account_id();
         if Some(&token) == self.oneup.as_ref() {
+            // the owner funding backers' $1UP (D-26); anything else is a buyback's proceeds
+            if msg == r#"{"fund_backers":{}}"# {
+                require!(sender_id == self.owner, "Only the owner funds backers' $1UP");
+                self.backer_oneup += amount.0;
+                env::log_str(&format!("{} $1UP set aside for backers", amount.0));
+                return PromiseOrValue::Value(U128(0));
+            }
             return self.on_buyback_proceeds(sender_id, amount, msg);
         }
         require!(token == self.usdc, "Only USDC deposits");
@@ -65,7 +72,8 @@ impl House {
                     require!(amount.0 >= math::MIN_BACKING, "Back with at least 10 USDC");
                     require!(self.seed + amount.0 <= self.params.backing_target.0, "Backing round is full");
                     let cap = math::backer_cap_ppm(self.pool, amount.0);
-                    self.back(sender_id, amount.0, cap);
+                    self.back(sender_id.clone(), amount.0, cap);
+                    self.lock_for_backer(sender_id, amount.0);
                 }
                 DepositMsg::Open { market_id, side, margin, leverage, take_profit, stop_loss, account_id } => {
                     let triggers = Triggers { take_profit, stop_loss };

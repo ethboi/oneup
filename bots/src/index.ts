@@ -168,7 +168,8 @@ class Bot {
     if (m?.makeLocks) await this.makeLock();
     if (m?.sell) await this.sell(m.sell);
     await this.govern();
-    if (this.style.collector && Math.random() < 0.02) await this.back();
+    // the collector backs the house only now and then, so the demo's round stays open for people to try
+    if (this.style.collector && Math.random() < 0.002) await this.back();
   }
 
   /** The collector now and then backs the house with $1,000–5,000 while the bootstrap round is open (D-22). */

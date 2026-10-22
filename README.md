@@ -77,10 +77,11 @@ flowchart LR
 **Where the pool comes from.** Anyone can back the house during its bootstrap round (up to $1M). The USDC
 joins the pool for good, and the backer gets a **Backer Life**: an Extra Life that never expires, paid from
 the same profit as the losers' lives. It's owed the average of the Extra Life curve over the backing, so the
-first dollar earns 2.0× and the last 1.2×; to get out early, sell it on the market. Backers are losers by
-choice ([D-22](docs/decisions.md)). The Solvency tab shows the round and the curve. How long a full round
-takes to pay back depends on volume: with traders losing $250K a week, half in about 43 weeks and all of it in
-about 86 (`pnpm --filter @oneup/sim backers`).
+first dollar earns 2.0× and the last 1.2×, and comes with a two-year lock of 10 $1UP per $1 that earns
+buybacks ([D-26](docs/decisions.md)); to get out early, sell it on the market. Backers are losers by
+choice ([D-22](docs/decisions.md)). The Backing tab shows the round, the curve and when it pays back; the $1UP tab the token's split and releases. How long a full round
+takes to pay back depends on volume: with traders losing $1M a week, half in about 22 weeks and all of it in
+about 42 (`pnpm --filter @oneup/sim backers`).
 
 ## The rules
 
@@ -101,9 +102,10 @@ covers every open position and no USDC is created or lost.
 **Extra Lives.** At each epoch's end, the house's net result (losses taken − payouts made) is split among
 that epoch's losers in proportion to their losses: that's each Extra Life's face value, so fake losses from
 a long/short pair only create claims as big as the cut they paid. A life can earn up to *cap × face*; the
-cap is 2.0× at an empty pool, falling to 1.2× at $1M. Lives are paid from 60% of half the surplus, by what
-each was owed: every earning life gets the same fraction of its cap each epoch, so it pays back in a straight
-line ([D-25](docs/decisions.md)). A life earns for the epoch it's
+cap is 2.0× at an empty pool, falling to 1.2× at $1M. Lives are paid from 60% of half the surplus: two thirds to
+losers' lives and one third to Backer Lives, each side passing on what it can't use
+([D-26](docs/decisions.md)). Within a side every earning life gets the same fraction of its cap each epoch, so it
+pays back in a straight line ([D-25](docs/decisions.md)). A life earns for the epoch it's
 minted in and 13 after, then stops and keeps what it earned. Lives are NEP-171 NFTs: sell one and its
 unclaimed USDC goes with it.
 

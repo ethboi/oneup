@@ -8,6 +8,7 @@
 import { useState } from "react";
 import { fmtUsdc, lifeCapPpm, ppmToNumber, LIFE_CAP_POOL, USDC } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
+import { fmtOneup } from "./Header";
 
 export function Backing() {
   const { o, me, tx, run } = useOneUp();
@@ -38,8 +39,8 @@ export function Backing() {
       </div>
       <p className="label mt-1 max-w-3xl">
         Your USDC joins the pool for good and gives traders room to trade. In return you get a Backer Life: an Extra Life that never
-        expires, paid from house profit alongside the losers&apos; lives. It&apos;s owed more the earlier you back, on the same curve
-        losers get. To get out early, sell it on the Market.
+        expires, paid from a third of every round&apos;s Extra Life payout, and owed more the earlier you back. You also get $1UP,
+        locked for two years, earning the house&apos;s buybacks. To get out early, sell the Backer Life on the Market.
       </p>
 
       <div className="mt-4 grid gap-5 lg:grid-cols-[1.4fr_1fr]">
@@ -59,6 +60,8 @@ export function Backing() {
                 <dd className="text-right font-bold">{ppmToNumber(BigInt(round.cap_ppm)).toFixed(3)}×</dd>
                 <dt className="label">Backer Life worth</dt>
                 <dd className="text-right font-bold">${fmtUsdc(BigInt(round.owed), 0)}</dd>
+                <dt className="label">Plus $1UP, locked 2 years</dt>
+                <dd className="text-right font-bold">{fmtOneup(round.oneup)}</dd>
                 <dt className="label">Room left in the round</dt>
                 <dd className="text-right">${fmtUsdc(left, 0)}</dd>
               </dl>

@@ -6,7 +6,6 @@
 import { fmtUsdc, ppmToNumber, type EpochSummary } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { Icon } from "./Icon";
-import { Backing } from "./Backing";
 import { Governance } from "./Governance";
 
 const big = (x?: string) => (x === undefined ? 0n : BigInt(x));
@@ -174,7 +173,10 @@ export function Solvency() {
           )}
         </div>
       </div>
-      <Backing />
+      <div className="panel p-5 text-sm">
+        <b>Where the pool comes from:</b> the house&apos;s seed and the bootstrap round. Backing has its own tab: the round, the
+        curve, when it pays back, and the $1UP backers get.
+      </div>
       <Governance />
     </div>
   );

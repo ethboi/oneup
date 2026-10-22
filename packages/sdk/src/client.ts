@@ -121,6 +121,9 @@ export interface Backing {
   /** For the quoted amount: the cap (ppm) and what the Backer Life would be owed. */
   cap_ppm: U128;
   owed: U128;
+  /** $1UP the quoted amount would be locked for its backer (D-26), and what's left of the allocation (1e18). */
+  oneup: U128;
+  oneup_left: U128;
 }
 
 export interface LockInfo {

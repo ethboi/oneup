@@ -10,14 +10,14 @@ const ROOT = resolve(import.meta.dirname, "..");
 const WASM = (name: string) => readFileSync(resolve(ROOT, `contracts/target/near/${name}/${name}.wasm`));
 
 const SEED_USDC = 250_000n * USDC; // the house's own seed, owed back at 1.0×
-/** D-22: bots back the rest of the round at the curve's price, leaving room for the demo trader. D-1's
- *  both-sides solvency needs a deep pool for bot volume. */
+/** D-22: two bots back $100K of the round at the curve's price, leaving most of it open for the demo (and
+ *  the pool's surplus visible: every backing raises the reserve floor). */
 const BACKERS: [number, bigint][] = [
-  [3, 250_000n * USDC],
-  [1, 150_000n * USDC],
-  [5, 100_000n * USDC],
-  [0, 50_000n * USDC],
+  [3, 60_000n * USDC],
+  [1, 40_000n * USDC],
 ];
+/** D-26: $1UP set aside for backers' locks, 10 per $1 of the round left after the house's seed. */
+const BACKER_ONEUP = 7_500_000n * ONEUP;
 const SWAP_USDC = 100_000n * USDC;
 const SWAP_ONEUP = 10_000_000n * ONEUP;
 const BOT_USDC = 50_000n * USDC;
@@ -127,6 +127,9 @@ export async function deploy(opts: { home: string; rpcUrl: string; epochLengthS:
   await ftCall(root, id("usdc"), id("house"), SEED_USDC, JSON.stringify({ seed: {} }));
   // only the keeper fills orders and fires triggers, so no trader picks their own fill price (D-2, D-19)
   await call(root, id("house"), "set_keeper", { keeper: keeper.accountId });
+
+  step("backers' $1UP (D-26)");
+  await ftCall(root, id("oneup"), id("house"), BACKER_ONEUP, JSON.stringify({ fund_backers: {} }));
 
   step("bootstrap round: bots back the pool (D-22)");
   for (const [i, amount] of BACKERS) {

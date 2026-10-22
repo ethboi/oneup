@@ -1086,3 +1086,48 @@ fn the_owner_can_seed_twice() {
     // both seeds are owed back at 1.0×
     assert_eq!((h.seed, h.lives_owed), (usd(30_000), usd(30_000)));
 }
+
+const ONEUP_UNIT: u128 = 1_000_000_000_000_000_000;
+
+#[test]
+fn a_backing_locks_its_oneup_from_the_allocation() {
+    let mut h = setup(usd(25_000));
+    ctx("owner", T0);
+    h.set_token_and_ve(acc("oneup"), acc("ve"));
+    ctx("oneup", T0);
+    let _ = h.ft_on_transfer(acc("owner"), U128(150_000 * ONEUP_UNIT), r#"{"fund_backers":{}}"#.into());
+    assert_eq!(h.get_backing(None).oneup_left.0, 150_000 * ONEUP_UNIT);
+    // 10 $1UP per $1: $10,000 backed is 100,000 $1UP, locked for two years
+    assert_eq!(h.get_backing(Some(U128(usd(10_000)))).oneup.0, 100_000 * ONEUP_UNIT);
+    ctx("usdc", T0);
+    let _ = h.ft_on_transfer(acc("bob"), U128(usd(10_000)), r#"{"back":{}}"#.into());
+    assert_eq!(h.get_backing(None).oneup_left.0, 50_000 * ONEUP_UNIT);
+    // the next backer gets what's left, not more
+    assert_eq!(h.get_backing(Some(U128(usd(10_000)))).oneup.0, 50_000 * ONEUP_UNIT);
+    // a lock ve refused comes back to the allocation
+    ctx("house", T0);
+    h.on_backer_lock(U128(100_000 * ONEUP_UNIT), Err(near_sdk::PromiseError::Failed));
+    assert_eq!(h.get_backing(None).oneup_left.0, 150_000 * ONEUP_UNIT);
+}
+
+#[test]
+#[should_panic(expected = "Only the owner funds backers' $1UP")]
+fn only_the_owner_funds_backers() {
+    let mut h = setup(usd(25_000));
+    ctx("owner", T0);
+    h.set_token_and_ve(acc("oneup"), acc("ve"));
+    ctx("oneup", T0);
+    let _ = h.ft_on_transfer(acc("mallory"), U128(ONEUP_UNIT), r#"{"fund_backers":{}}"#.into());
+}
+
+#[test]
+fn the_owners_seed_gets_no_oneup() {
+    let mut h = setup(usd(25_000));
+    ctx("owner", T0);
+    h.set_token_and_ve(acc("oneup"), acc("ve"));
+    ctx("oneup", T0);
+    let _ = h.ft_on_transfer(acc("owner"), U128(150_000 * ONEUP_UNIT), r#"{"fund_backers":{}}"#.into());
+    ctx("usdc", T0);
+    let _ = h.ft_on_transfer(acc("owner"), U128(usd(10_000)), r#"{"seed":{}}"#.into());
+    assert_eq!(h.get_backing(None).oneup_left.0, 150_000 * ONEUP_UNIT);
+}

@@ -127,8 +127,9 @@ bb_pot  = 0.3 × P + (0.6 × P − el_pot)          # buybacks get whatever the 
                                                 # the remaining 0.1 × P simply stays in the pool
 ```
 
-Each earning Extra Life `j` is paid the same fraction `δ` of what it was owed, capped at what it's still owed
-(D-25):
+The pot is split first (D-26): two thirds to losers' lives, one third to Backer Lives; whatever one side can't
+use goes to the other. Within a side, each earning Extra Life `j` is paid the same fraction `δ` of what it was
+owed, capped at what it's still owed (D-25):
 
 ```
 δ      = el_pot / Σ owed_j                      # over lives still earning

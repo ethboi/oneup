@@ -42,8 +42,9 @@ async fn lose_close_epoch_claim() -> anyhow::Result<()> {
     assert_eq!(summary["lives_pot"], json!(usd(150)));
     assert_eq!(view(&e.life, "held", json!({})).await?, json!(usd(150)));
     let claimable: u128 = life["claimable"].as_str().unwrap().parse()?;
-    // pro rata to owed: 959.8 / 100_959.8 of the pot
-    assert_eq!(claimable, 150 * USDC * 959_800_000 / 100_959_800_000);
+    // losers' lives get two thirds of the pot (D-26): Bob is the only loser, so 100 of the 150, rather than the
+    // 959.8 / 100_959.8 he'd get sharing it with the seed's 100K Backer Life
+    assert_eq!(claimable, 100 * USDC);
 
     bob.call(e.life.id(), "claim").args_json(json!({"token_ids": [id]})).max_gas().transact().await?.into_result()?;
     assert_eq!(view(&e.usdc, "ft_balance_of", json!({"account_id": bob.id()})).await?, json!(claimable.to_string()));
