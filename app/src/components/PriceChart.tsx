@@ -62,8 +62,7 @@ function candles(points: { t: number; p: number }[], from: number, size: number,
 }
 
 const DASH = { entry: "6 4", liq: "2 3", tp: "10 3 2 3", sl: "10 3 2 3" } as const;
-/** The recent trail's shortest length, and how long a new tick shows on the price tag. */
-const TRAIL_MS = 15_000;
+/** How long a new tick shows on the price tag. */
 const TICK_MS = 1_200;
 /** How long a new price takes to ease in. */
 const EASE_MS = 500;
@@ -214,12 +213,6 @@ export function PriceChart({
       .join(" ") + ` L${x(last.t).toFixed(1)} ${y(headP).toFixed(1)} L${x(t1).toFixed(1)} ${y(headP).toFixed(1)}`;
   // cents on BTC and ETH too: a $0.80 move matters at 50×
   const digits = last.p < 10 ? 4 : 2;
-  // the last tenth of the window (at least 15 s), drawn heavier so the latest moves stand out at any zoom
-  const trailMs = Math.max(TRAIL_MS, (t1 - t0) / 10);
-  const recent = points.filter((pt, i) => i < points.length - 1 && pt.t >= t1 - trailMs);
-  const trail =
-    recent.map((pt, i) => `${i ? "L" : "M"}${x(pt.t).toFixed(1)} ${y(pt.p).toFixed(1)}`).join(" ") +
-    `${recent.length ? " L" : "M"}${x(last.t).toFixed(1)} ${y(headP).toFixed(1)} L${x(t1).toFixed(1)} ${y(headP).toFixed(1)}`;
   // a fresh tick: which way it went, shown on the price tag for a moment
   const fresh = now !== null && now - last.t < TICK_MS && last.p !== prev.p;
   const tickUp = last.p > prev.p;
@@ -399,7 +392,6 @@ export function PriceChart({
               {/* the fill would muddy a position's zone, so it only shows on its own */}
               {!zone && <path d={`${line} L${x(t1)} ${plotB} L${x(points[0].t)} ${plotB} Z`} fill="url(#lcd-fill)" />}
               <path d={line} fill="none" stroke="var(--lcd-ink)" strokeWidth="2.5" strokeLinejoin="round" />
-              <path d={trail} fill="none" stroke="var(--lcd-ink)" strokeWidth="4.5" strokeLinejoin="round" strokeLinecap="round" />
             </>
           )}
         </g>
