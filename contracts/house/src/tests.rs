@@ -304,6 +304,11 @@ fn close_epoch_fully(h: &mut House) -> u32 {
                 let owed = h.lives_owed;
                 let _ = h.on_expired(Ok(U128(owed)));
             }
+            "recalling" => {
+                // the vault sends it back
+                let need = h.recall_needed().unwrap();
+                h.on_recalled(U128(need), true, Ok(()));
+            }
             _ => {}
         }
         assert!(steps < 100);
@@ -1130,4 +1135,158 @@ fn the_owners_seed_gets_no_oneup() {
     ctx("usdc", T0);
     let _ = h.ft_on_transfer(acc("owner"), U128(usd(10_000)), r#"{"seed":{}}"#.into());
     assert_eq!(h.get_backing(None).oneup_left.0, 150_000 * ONEUP_UNIT);
+}
+
+// D-27: the house's money at work, and the jackpot its interest builds
+
+fn with_vault(h: &mut House) {
+    ctx("owner", T0);
+    h.set_vault(acc("vault"));
+}
+
+#[test]
+fn only_the_pool_above_cash_on_hand_is_deployed() {
+    let mut h = setup(usd(25_000));
+    with_vault(&mut h);
+    // no open positions: keep 10% of the pool
+    assert_eq!(h.get_treasury().deployable.0, usd(22_500));
+    ctx("keeper", T0);
+    let _ = h.deploy(U128(usd(22_500)));
+    h.on_deployed(U128(usd(22_500)), Ok(U128(usd(22_500))));
+    assert_eq!(h.get_treasury().deployed.0, usd(22_500));
+}
+
+#[test]
+#[should_panic(expected = "More than may be deployed")]
+fn deploying_past_the_limit_is_refused() {
+    let mut h = setup(usd(25_000));
+    with_vault(&mut h);
+    ctx("keeper", T0);
+    let _ = h.deploy(U128(usd(22_501)));
+}
+
+#[test]
+fn a_refused_deposit_is_back_on_hand() {
+    let mut h = setup(usd(25_000));
+    with_vault(&mut h);
+    ctx("keeper", T0);
+    let _ = h.deploy(U128(usd(10_000)));
+    h.on_deployed(U128(usd(10_000)), Ok(U128(0)));
+    assert_eq!(h.get_treasury().deployed.0, 0);
+}
+
+#[test]
+fn the_close_brings_home_what_the_payout_needs() {
+    let mut h = setup(usd(25_000));
+    // no float, so the payout can only come from the vault
+    ctx("owner", T0);
+    h.set_params(crate::Params { float_ppm: U128(0), ..h.get_params() });
+    with_vault(&mut h);
+    // Bob is liquidated: the house makes 1_000, then all 26K goes to work
+    deposit(&mut h, "bob", usd(1_000));
+    let b = open(&mut h, "bob", Side::Long, usd(1_000), 50, 500, T0 + 10);
+    h.internal_keeper_close(b, CloseReason::Liquidation, px(491, T0 + 20), T0 + 20).unwrap();
+    ctx("keeper", T0 + 30);
+    let all = h.get_treasury().deployable.0;
+    assert_eq!(all, usd(26_000));
+    let _ = h.deploy(U128(all));
+    h.on_deployed(U128(all), Ok(U128(all)));
+    ctx("keeper", T0 + 600);
+    let mut saw_recall = false;
+    loop {
+        match h.close_epoch(Some(5)).as_str() {
+            "closed" => break,
+            "recalling" => {
+                saw_recall = true;
+                let need = h.recall_needed().unwrap();
+                h.on_recalled(U128(need), true, Ok(()));
+            }
+            "waiting for mints" => {
+                for _ in 0..h.get_closing().unwrap().pending_mints {
+                    let _ = h.on_minted(U128(0), true, Ok(vec![]));
+                }
+            }
+            "expiring" => {
+                let owed = h.lives_owed;
+                let _ = h.on_expired(Ok(U128(owed)));
+            }
+            _ => {}
+        }
+    }
+    assert!(saw_recall);
+    // the payout (450) came home first: what's left in the pool covers exactly what's deployed
+    let s = h.get_epoch_summary(1).unwrap();
+    assert_eq!(s.lives_pot.0 + s.buyback_pot.0, usd(450));
+    assert_eq!(h.get_pool().0, h.get_treasury().deployed.0);
+}
+
+#[test]
+fn losers_get_tickets_and_one_takes_the_jackpot() {
+    let mut h = setup(usd(25_000));
+    ctx("owner", T0);
+    h.set_params(crate::Params { jackpot_epochs: 1, ..h.get_params() });
+    with_vault(&mut h);
+    // the vault's interest arrives
+    h.on_harvested(Ok(U128(usd(500))));
+    deposit(&mut h, "bob", usd(1_000));
+    let b = open(&mut h, "bob", Side::Long, usd(1_000), 50, 500, T0 + 10);
+    h.internal_keeper_close(b, CloseReason::Liquidation, px(491, T0 + 20), T0 + 20).unwrap();
+    ctx("keeper", T0 + 600);
+    close_epoch_fully(&mut h);
+    // Bob held every ticket ($1,000 lost): the 500 is his to withdraw
+    assert_eq!(h.get_balance(acc("bob")).0, usd(500));
+    let t = h.get_treasury();
+    assert_eq!((t.jackpot.0, t.tickets.0), (0, 0));
+}
+
+#[test]
+fn with_no_losers_the_jackpot_rolls_over() {
+    let mut h = setup(usd(25_000));
+    ctx("owner", T0);
+    h.set_params(crate::Params { jackpot_epochs: 1, ..h.get_params() });
+    h.on_harvested(Ok(U128(usd(500))));
+    ctx("keeper", T0 + 600);
+    close_epoch_fully(&mut h);
+    assert_eq!(h.get_treasury().jackpot.0, usd(500));
+}
+
+#[test]
+fn tickets_count_net_loss_only() {
+    let mut h = setup(usd(25_000));
+    // Alice loses 500 and wins some back: only the net counts
+    deposit(&mut h, "alice", usd(2_000));
+    let a = open(&mut h, "alice", Side::Short, usd(1_000), 10, 500, T0 + 10);
+    close(&mut h, "alice", a, 525, T0 + 100);
+    let a2 = open(&mut h, "alice", Side::Long, usd(500), 10, 500, T0 + 200);
+    close(&mut h, "alice", a2, 510, T0 + 300);
+    ctx("keeper", T0 + 600);
+    close_epoch_fully(&mut h);
+    let net = h.get_tickets(acc("alice")).0;
+    assert!(net > 0 && net < usd(500), "{net}");
+}
+
+// D-28: the marketplace's cut
+
+#[test]
+fn a_market_fee_is_house_profit() {
+    let mut h = setup(usd(25_000));
+    ctx("owner", T0);
+    h.set_marketplace(acc("market"));
+    ctx("usdc", T0);
+    let _ = h.ft_on_transfer(acc("market"), U128(usd(20)), r#"{"market_fee":{}}"#.into());
+    assert_eq!(h.get_pool().0, usd(25_020));
+    ctx("keeper", T0 + 600);
+    close_epoch_fully(&mut h);
+    let s = h.get_epoch_summary(1).unwrap();
+    assert_eq!((s.fees.0, s.house_net.0), (usd(20), usd(20)));
+}
+
+#[test]
+#[should_panic(expected = "Only the marketplace pays fees")]
+fn only_the_marketplace_pays_fees() {
+    let mut h = setup(usd(25_000));
+    ctx("owner", T0);
+    h.set_marketplace(acc("market"));
+    ctx("usdc", T0);
+    let _ = h.ft_on_transfer(acc("mallory"), U128(usd(20)), r#"{"market_fee":{}}"#.into());
 }

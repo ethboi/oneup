@@ -58,6 +58,8 @@ pub struct Closing {
     /// $1UP released to this epoch's losers, and how much has been handed out so far.
     pub oneup_release: u128,
     pub oneup_assigned: u128,
+    /// D-27: waiting on the vault for USDC the payout needs.
+    pub recalling: bool,
 }
 
 #[near(serializers = [json, borsh])]
@@ -69,6 +71,9 @@ pub struct EpochSummary {
     pub losses: U128,
     pub payouts: U128,
     pub cuts: U128,
+    /// D-28: the marketplace's cut, part of `house_net`.
+    #[serde(default)]
+    pub fees: U128,
     pub house_net: U128,
     pub cap_ppm: U128,
     pub lives_minted: u32,
@@ -114,6 +119,10 @@ impl House {
             }
             // net winners and wallets that broke even get nothing
             let batch: Vec<(AccountId, u128)> = taken.into_iter().filter(|(_, v)| *v > 0).map(|(k, v)| (k, v as u128)).collect();
+            // each dollar of net loss is a jackpot ticket (D-27), house profit or not
+            for (owner, loss) in &batch {
+                self.add_tickets(owner, *loss);
+            }
             if c.house_net > 0 {
                 let losses = c.epoch.net_losses.0;
                 let batch_losses = batch.clone();
@@ -159,8 +168,20 @@ impl House {
             } else {
                 "waiting for expiry"
             }
+        } else if c.recalling {
+            "waiting for recall"
+        } else if let Some(need) = self.recall_needed() {
+            // the payout leaves as USDC: bring home what the vault holds of it first (D-27)
+            c.recalling = true;
+            self.recall_from_vault(need, true).detach();
+            "recalling"
         } else {
+            let draw = self.params.jackpot_epochs > 0 && c.epoch.id % self.params.jackpot_epochs == 0;
+            let id = c.epoch.id;
             self.pay(c);
+            if draw {
+                self.draw_jackpot(id);
+            }
             return "closed".into();
         };
         self.closing = Some(c);
@@ -271,7 +292,8 @@ impl House {
             IterableMap::new(StorageKey::EpochLosses { epoch: next }),
         );
         let finished = std::mem::replace(&mut self.epoch, Epoch { id: next, started_at: now, ..Default::default() });
-        let house_net = finished.losses.0.saturating_sub(finished.payouts.0);
+        // trading's result plus the marketplace's cut (D-28)
+        let house_net = (finished.losses.0 + finished.fees.0).saturating_sub(finished.payouts.0);
         let oneup_release = self.release_emissions(&finished, house_net);
         self.checkpoint_ve(next);
         self.closing = Some(Closing {
@@ -286,7 +308,19 @@ impl House {
             expired: false,
             oneup_release,
             oneup_assigned: 0,
+            recalling: false,
         });
+    }
+
+    /// USDC the round's payout needs back from the vault: the pool after the payout must still cover what's
+    /// deployed, or the cash backing traders' balances would leave.
+    pub(crate) fn recall_needed(&self) -> Option<u128> {
+        if self.deployed == 0 {
+            return None;
+        }
+        let p = math::epoch_payout(self.pool, self.liability, self.lives_owed, self.reserve_floor());
+        let after = self.pool - p.lives_pot - p.buyback_pot;
+        (self.deployed > after).then(|| self.deployed - after)
     }
 
     /// Mints lives `(owner, face, cap_ppm)` and counts what they're owed straight away.
@@ -341,6 +375,7 @@ impl House {
             losses: c.epoch.losses,
             payouts: c.epoch.payouts,
             cuts: c.epoch.cuts,
+            fees: c.epoch.fees,
             house_net: U128(c.house_net),
             cap_ppm: U128(c.cap_ppm),
             lives_minted: c.lives_minted,

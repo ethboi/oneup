@@ -31,7 +31,7 @@ received and no life claims more than it was paid.
 |---|---|---|---|
 | Owner | Sputnik DAO (D-20) | List, pause and size markets; set the oracle, swap, params, keeper, operator, Intents Verifier; hand over ownership | Touch traders' balances or positions directly |
 | Operator | root | Run buybacks with a minimum price (D-10) | Anything else the owner does |
-| Keeper | `keeper.test.near` | Fill orders, take profit at the 9× cap (D-23); push prices through a separate key that can only call the oracle | Pick a fill price older than the order or outside the window; move funds |
+| Keeper | `keeper.test.near` | Fill orders, take profit at the 9× cap (D-23); push prices through a separate key that can only call the oracle; deploy pool USDC to the vault up to the contract's limit (D-27) | Pick a fill price older than the order or outside the window; move funds anywhere but the vault |
 | Anyone | – | Liquidate, place a close for a crossed trigger, expire a stale order, close an epoch, back the pool | Fill an order or take profit while a keeper is set |
 | NEAR Intents Verifier | `intents.test.near` | Deposit USDC naming the account it's for (D-21) | Open a trade larger than the deposit it brings |
 | Session key | browser | Open, close and set triggers on the house, with no deposit (gasless through the relayer) | Deposit, withdraw or move tokens |
@@ -47,6 +47,10 @@ trader's and the bots' keys (`/api/config`); the root, keeper and solver keys st
   checks each price's age (60 s), its confidence (when the feed reports one) and that it isn't more than
   5 s in the future, and the mock oracle only accepts a newer price than the last. A wrong price is still
   a wrong settlement.
+- **The yield vault** (D-27) holds most of the pool between rounds. If it failed, the house couldn't pay out what's
+  deployed: the contract keeps 1.2× the worst case plus 10% on hand, but the vault's own safety is a trust
+  assumption, which is why the DAO picks it and the mainnet choice is plain USDC lending.
+- **The jackpot draw** uses NEAR's block random seed, which a validator could bias slightly.
 - **The keeper** is trusted to fill promptly at the first price after each order (D-23). It can delay a
   fill, which expires the order and refunds the margin; it can't choose an older price.
 - **The owner** can change the oracle, the swap contract and the params, so it can take funds. That's why

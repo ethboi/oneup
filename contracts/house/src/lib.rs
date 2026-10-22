@@ -12,6 +12,7 @@ mod epochs;
 mod events;
 mod oracle;
 mod trading;
+mod treasury;
 mod views;
 
 #[cfg(test)]
@@ -65,6 +66,20 @@ pub struct Params {
     /// D-26: $1UP locked for a backer per USDC backed, from the allocation the owner funds.
     #[serde(default = "default_backer_oneup")]
     pub backer_oneup_per_usdc: u32,
+    /// D-27: the share of the pool always kept on hand, besides 1.2 × the worst case (ppm).
+    #[serde(default = "default_float")]
+    pub float_ppm: U128,
+    /// D-27: the jackpot is drawn at the close of every this-many rounds.
+    #[serde(default = "default_jackpot_epochs")]
+    pub jackpot_epochs: u64,
+}
+
+fn default_float() -> U128 {
+    U128(100_000)
+}
+
+fn default_jackpot_epochs() -> u64 {
+    4
 }
 
 fn default_backing_target() -> U128 {
@@ -91,6 +106,8 @@ impl Default for Params {
             oneup_per_usdc: math::ONEUP_PER_USDC as u32,
             backing_target: default_backing_target(),
             backer_oneup_per_usdc: default_backer_oneup(),
+            float_ppm: default_float(),
+            jackpot_epochs: default_jackpot_epochs(),
         }
     }
 }
@@ -172,6 +189,8 @@ pub struct Epoch {
     /// Σ over wallets of max(0, losses − profit paid): what the epoch's Extra Lives and $1UP are shared by.
     pub net_losses: U128,
     pub markets: Vec<MarketTotals>,
+    /// D-28: the house's cut of marketplace sales, counted as house profit.
+    pub fees: U128,
 }
 
 /// One market's results in an epoch.
@@ -195,6 +214,7 @@ enum StorageKey {
     Epochs,
     Emissions,
     Buybacks,
+    Tickets,
 }
 
 #[near(contract_state)]
@@ -245,6 +265,14 @@ pub struct House {
     keeper: Option<AccountId>,
     /// $1UP the owner set aside for backers' locks (D-26), not yet handed out.
     backer_oneup: u128,
+    /// D-27: the yield vault, the pool USDC in it, the jackpot its interest builds, and this period's tickets.
+    vault: Option<AccountId>,
+    deployed: u128,
+    jackpot: u128,
+    tickets: IterableMap<AccountId, u128>,
+    tickets_total: u128,
+    /// D-28: the marketplace whose sales pay the house a cut.
+    marketplace: Option<AccountId>,
 }
 
 pub(crate) fn now_s() -> u64 {
@@ -286,6 +314,12 @@ impl House {
             intents: None,
             keeper: None,
             backer_oneup: 0,
+            vault: None,
+            deployed: 0,
+            jackpot: 0,
+            tickets: IterableMap::new(StorageKey::Tickets),
+            tickets_total: 0,
+            marketplace: None,
         }
     }
 

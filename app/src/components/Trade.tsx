@@ -33,6 +33,7 @@ import { Burst, Gauge, MoodGlow, useCloseFx, useMood, useTensionSound } from "./
 import { ActivityList, useActivity } from "./Activity";
 import { HistoryList } from "./History";
 import { ShareButton, type CardData } from "./PnlCard";
+import { Jackpot } from "./Jackpot";
 
 /** Chart windows: the app keeps up to 30 minutes of prices it has seen. */
 const RANGES = [
@@ -339,8 +340,9 @@ export function Trade() {
           <Below positions={positions} orders={orders} focused={focused?.id} pick={pick} />
         </div>
       </div>
-      <div ref={formRef} id="order-form" className="order-3">
+      <div ref={formRef} id="order-form" className="order-3 flex flex-col gap-4">
         <OrderForm t={ticket} />
+        <Jackpot compact />
       </div>
       {!formVisible && <TradeBar t={ticket} />}
     </div>
@@ -674,7 +676,7 @@ function OrderForm({ t }: { t: Ticket }) {
           <div className="flex items-center gap-2">
             <PixelHeart size={18} className="shrink-0" />
             <span className="num min-w-0 flex-1">
-              Lose it → Extra Life up to <b>${fmtUsdc(lifeUpTo, 0)}</b> + <b>{oneupUpTo.toLocaleString("en-US")} $1UP</b>
+              Lose it → Extra Life up to <b>${fmtUsdc(lifeUpTo, 0)}</b> + <b>{oneupUpTo.toLocaleString("en-US")} $1UP</b> + jackpot tickets
             </span>
             <button type="button" className="label shrink-0 underline decoration-dotted underline-offset-2" aria-expanded={why} onClick={() => setWhy(!why)}>
               {why ? "Hide" : "How"}

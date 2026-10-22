@@ -126,6 +126,19 @@ export interface Backing {
   oneup_left: U128;
 }
 
+/** The house's money at work (D-27). */
+export interface Treasury {
+  vault: string | null;
+  /** Pool USDC in the vault, and the most that may be. */
+  deployed: U128;
+  deployable: U128;
+  /** USDC from the vault's interest waiting to be drawn, and this period's tickets ($1 of net loss each, 1e6). */
+  jackpot: U128;
+  tickets: U128;
+  /** The round whose close draws it. */
+  draw_epoch: number;
+}
+
 export interface LockInfo {
   token_id: string;
   owner_id: string;
@@ -283,6 +296,13 @@ export class OneUp {
   };
   owner = () => this.house<[string, string | null]>("get_owner");
   /** The bootstrap round (D-22), with what backing `amount` now earns. */
+  treasury = () => this.house<Treasury>("get_treasury");
+  tickets = (account_id: string) => this.house<U128>("get_tickets", { account_id });
+  /** The house's deposit in the vault: principal and interest accrued (D-27). */
+  vaultDeposit = () =>
+    this.d.contracts.vault
+      ? this.view<{ principal: U128; interest: U128; updated: number }>(this.d.contracts.vault, "deposit_of", { account_id: this.d.contracts.house })
+      : Promise.resolve(null);
   backing = (amount?: bigint) => this.house<Backing>("get_backing", { amount: amount?.toString() ?? null });
   usdcBalance = (account_id: string) => this.view<U128>(this.d.contracts.usdc, "ft_balance_of", { account_id });
   oneupBalance = (account_id: string) => this.view<U128>(this.d.contracts.oneup, "ft_balance_of", { account_id });
@@ -352,6 +372,10 @@ export class OneUp {
         ftCall(c.usdc, c.market, price, JSON.stringify({ buy: { nft_contract: nft, token_id, price: price.toString() } })),
       /** Backs the house pool during the bootstrap round for a Backer Life (D-22). */
       back: (amount: bigint) => ftCall(c.usdc, c.house, amount, JSON.stringify({ back: {} })),
+      /** D-27: the keeper puts pool USDC to work, brings it home, and brings the interest into the jackpot. */
+      deployToVault: (amount: bigint) => house<void>("deploy", { amount: amount.toString() }, MAX_GAS),
+      recall: (amount: bigint) => house<void>("recall", { amount: amount.toString() }, MAX_GAS),
+      harvest: () => house<void>("harvest", {}, MAX_GAS),
       pushPrices: (updates: { feed_id: string; price: number; conf: number; expo: number; publish_time: number }[]) =>
         send<number>({ contractId: c.oracle, methodName: "push_prices", args: { updates } }),
     };

@@ -47,6 +47,10 @@ pub enum Event {
     Backed { account_id: AccountId, amount: U128, cap_ppm: U128, owed: U128, pool: U128 },
     #[event_version("1.0.0")]
     TriggersSet { position_id: u64, account_id: AccountId, take_profit: Option<U128>, stop_loss: Option<U128> },
+    #[event_version("1.0.0")]
+    JackpotWon { epoch: u64, account_id: AccountId, amount: U128, tickets: U128, total_tickets: U128 },
+    #[event_version("1.0.0")]
+    JackpotRolled { epoch: u64, jackpot: U128 },
 }
 
 #[near(serializers = [json, borsh])]

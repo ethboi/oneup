@@ -21,6 +21,8 @@ export interface Deployment {
     oracle: string;
     swap: string;
     market: string;
+    /** The yield vault the house's idle pool earns in (D-27). */
+    vault?: string;
     /** The Sputnik DAO that owns the house (D-20). */
     dao?: string;
   };

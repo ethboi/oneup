@@ -85,7 +85,8 @@ export function Market() {
         <Explainer line={<>Buy and sell Extra Lives and $1UP locks for USDC. You have <b className="num text-[var(--text)]">{usd(wallet)}</b> in your wallet.</>}>
           Buy someone&apos;s Extra Life and its USDC payouts are yours. Buy a lock and you get its $1UP when it ends, and its share
           of buybacks until then. You pay from your wallet&apos;s USDC and the NFT moves to you in the same step; if it was
-          sold elsewhere first, your USDC comes straight back. There are no fees.
+          sold elsewhere first, your USDC comes straight back. Sellers pay 2% of the price, which goes into the house pool
+          as profit (and so back to Extra Lives and buybacks).
         </Explainer>
 
         <div className="panel">
@@ -169,7 +170,10 @@ function YourItems({ px, listings }: { px: bigint; listings: Listing[] }) {
   }
   return (
     <div className="divide-y divide-[var(--line)]">
-      <p className="label px-4 pb-3">Suggested prices are 70% of what a life can still pay and 80% of a lock&apos;s value if left today.</p>
+      <p className="label px-4 pb-3">
+        Suggested prices are 70% of what a life can still pay and 80% of a lock&apos;s value if left today. You get the price less a 2% fee
+        that goes to the house pool.
+      </p>
       {lives.map((l) => (
         <div key={l.token_id} className="flex flex-col gap-2 p-3">
           <span className="flex min-w-0 items-center gap-3">

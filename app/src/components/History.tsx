@@ -131,6 +131,13 @@ function Row({ i, me }: { i: HistoryItem; me: string }) {
       detail = `Backer Life owed ${(Number(i.cap_ppm) / 1e6).toFixed(2)}×`;
       amount = <span className="font-extrabold">${fmtUsdc(BigInt(i.amount))}</span>;
       break;
+    case "jackpot":
+      icon = "trophy";
+      color = "var(--accent)";
+      title = "Won the jackpot";
+      detail = `With ${fmtUsdc(BigInt(i.tickets), 0)} tickets`;
+      amount = <span className="font-extrabold text-[var(--long)]">+${fmtUsdc(BigInt(i.amount))}</span>;
+      break;
     case "claim_usdc":
       icon = "claim";
       color = "var(--long)";

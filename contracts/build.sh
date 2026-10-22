@@ -3,6 +3,6 @@
 set -euo pipefail
 export PATH="$HOME/.cargo/bin:$PATH"
 cd "$(dirname "$0")"
-for c in house extra-life oneup-token ve market mock-usdc mock-oracle mock-swap; do
+for c in house extra-life oneup-token ve market mock-usdc mock-oracle mock-swap mock-vault; do
   (cd "$c" && cargo near build non-reproducible-wasm --no-abi)
 done

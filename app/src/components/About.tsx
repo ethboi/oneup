@@ -58,6 +58,118 @@ const BUILT: { icon: IconName; title: string; body: string }[] = [
   { icon: "scale", title: "Simulations", body: "Fairness to late players and the cost of farming $1UP, tested before the rules were fixed." },
 ];
 
+type Status = "demo" | "simulated" | "mainnet";
+
+const STATUS: Record<Status, { label: string; bg: string; fg: string }> = {
+  demo: { label: "In the demo", bg: "color-mix(in srgb, var(--long) 15%, transparent)", fg: "var(--long)" },
+  simulated: { label: "Simulated locally", bg: "color-mix(in srgb, var(--info) 15%, transparent)", fg: "var(--info)" },
+  mainnet: { label: "Mainnet plan", bg: "var(--panel-2)", fg: "var(--muted)" },
+};
+
+/** Every NEAR tool OneUp uses, for the Built on NEAR section. */
+const NEAR: { title: string; status: Status; body: string; points: string[] }[] = [
+  {
+    title: "Rust smart contracts",
+    status: "demo",
+    body: "Nine contracts written with near-sdk 5, built with cargo-near.",
+    points: [
+      "House, Extra Life, $1UP, ve locks and the market, plus mock USDC, oracle, swap and yield vault",
+      "Contract accounts have their keys deleted after deploy, so nobody can redeploy them",
+      "Cross-contract calls with callbacks for every payout, mint and recall",
+    ],
+  },
+  {
+    title: "NEAR standards",
+    status: "demo",
+    body: "Everything that moves follows a NEP, so wallets, explorers and indexers understand it.",
+    points: [
+      "NEP-141 fungible tokens with NEP-145 storage: $1UP and USDC",
+      "NEP-171 NFTs with NEP-177 metadata, NEP-178 approvals and NEP-181 enumeration: Extra Lives and locks",
+      "NEP-297 events, which the app's feed, history and leaderboard read",
+      "NEP-245 multi-token balances inside NEAR Intents",
+    ],
+  },
+  {
+    title: "NEAR Intents",
+    status: "simulated",
+    body: "Pay from Ethereum or Solana in one signature: bridge, swap to USDC and deposit, as one intent.",
+    points: [
+      "The official Verifier and PoA token factory (release 0.4.2) run on the local chain",
+      "Intents are signed with the official SDK; OneUp's solver fills them with execute_intents",
+      "Only the bridge step is simulated here; on mainnet it's the 1Click API",
+    ],
+  },
+  {
+    title: "Sputnik DAO",
+    status: "demo",
+    body: "A DAO owns the house: the same Sputnik DAO v2 code mainnet DAOs run.",
+    points: [
+      "Listing and pausing markets, params, the keeper, the yield vault: all council votes",
+      "Proposals and votes are in the app, on the Solvency tab",
+    ],
+  },
+  {
+    title: "Function-call keys (session keys)",
+    status: "demo",
+    body: "One-tap trading signs with a key that can only call the house's trade methods.",
+    points: ["It can open, close and set triggers; it can't deposit, withdraw or move tokens", "Turn it off and the key is deleted"],
+  },
+  {
+    title: "Meta transactions (NEP-366)",
+    status: "demo",
+    body: "Gasless trades: the app signs a delegate action and a relayer pays the gas.",
+    points: ["The relayer only forwards trade calls to the house, with a gas cap and a rate limit"],
+  },
+  {
+    title: "Chain Signatures",
+    status: "mainnet",
+    body: "How the house would hold its yield position on Ethereum from a NEAR contract (D-27).",
+    points: [
+      "The house's own derived Ethereum address lends idle pool USDC, reached through NEAR Intents",
+      "No person holds the keys; the DAO picks where it lends",
+      "Locally a 5% mock vault stands in",
+    ],
+  },
+  {
+    title: "Pyth prices via Outlayer",
+    status: "simulated",
+    body: "Every fill and settlement uses an oracle price published after the order.",
+    points: [
+      "Locally the keeper pushes live Binance prices into a Pyth-compatible oracle",
+      "On mainnet the house reads Outlayer's Pyth oracle with the same calls",
+      "The house checks each price's age, confidence and that it isn't from the future",
+    ],
+  },
+  {
+    title: "Rhea",
+    status: "mainnet",
+    body: "NEAR's DEX for the buybacks: 30% of each round's payout buys $1UP for the lockers.",
+    points: ["Locally a mock swap with the same interface", "Its 50M $1UP liquidity seed is minted at launch"],
+  },
+  {
+    title: "NEAR randomness",
+    status: "demo",
+    body: "The jackpot is drawn from the block's random seed at a round's close.",
+    points: ["Pyth Entropy only runs on EVM chains, so NEAR's own randomness is used (D-27)"],
+  },
+  {
+    title: "Local chain and tests",
+    status: "demo",
+    body: "One command runs a real NEAR node and deploys everything; the same tooling runs the tests.",
+    points: [
+      "near-sandbox for the local chain (pnpm demo)",
+      "near-workspaces for end-to-end tests on a sandbox chain",
+      "near-api-js 7 in the app, keeper, bots and the MCP server",
+    ],
+  },
+  {
+    title: "AI agents (MCP)",
+    status: "demo",
+    body: "An MCP server lets an AI agent trade on OneUp: read markets, quote, open and close, set triggers, claim lives.",
+    points: ["Registered for Claude Code in .mcp.json; signs as the demo account or a bot"],
+  },
+];
+
 export function About() {
   return (
     <div className="flex flex-col gap-4">
@@ -165,31 +277,29 @@ export function About() {
           </ul>
         </section>
 
-        <section className="p-5">
+        <section id="built" className="scroll-mt-4 p-5">
           <h2 className="text-lg font-extrabold">Built on NEAR</h2>
-          <ul className="mt-3 flex flex-col gap-2 text-sm text-[var(--muted)]">
-            <li>
-              <b className="text-[var(--text)]">NEAR Intents.</b> Pay from another chain in one signature: the official Verifier
-              and PoA factory (release 0.4.2) run here, intents are signed with the official SDK, and OneUp&apos;s solver fills
-              them with <code>execute_intents</code>. Only the bridge step is simulated on this local chain.
-            </li>
-            <li>
-              <b className="text-[var(--text)]">Dynamic NFTs.</b> An Extra Life&apos;s image is a pixel heart drawn on chain,
-              filling as it pays back; wallets and markets see it change.
-            </li>
-            <li>
-              <b className="text-[var(--text)]">A Sputnik DAO owns the house.</b> The same code mainnet DAOs run; listing and
-              pausing markets are council votes.
-            </li>
-            <li>
-              <b className="text-[var(--text)]">Session keys and gasless trades.</b> One-tap trading uses a function-call key
-              that can only trade (it can&apos;t move funds), and its trades can go as meta transactions a relayer pays for.
-            </li>
-            <li>
-              <b className="text-[var(--text)]">Standards all the way down.</b> NEP-141 tokens, NEP-171 NFTs with NEP-178
-              approvals, NEP-245 balances in NEAR Intents, and NEP-297 events, which the app reads for its feed and your
-              history.
-            </li>
+          <p className="label mt-1 max-w-3xl">Every NEAR tool and standard OneUp uses, and whether it runs in this demo, is simulated here, or is the mainnet plan.</p>
+          <ul className="mt-4 grid gap-3 md:grid-cols-2">
+            {NEAR.map((n) => (
+              <li key={n.title} className="rounded-xl border border-[var(--line)] p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <b>{n.title}</b>
+                  <span className="shrink-0 rounded-md px-2 py-0.5 text-[11px] font-bold" style={{ background: STATUS[n.status].bg, color: STATUS[n.status].fg }}>
+                    {STATUS[n.status].label}
+                  </span>
+                </div>
+                <p className="mt-1 text-sm text-[var(--muted)]">{n.body}</p>
+                <ul className="mt-2 flex flex-col gap-1 text-sm">
+                  {n.points.map((p) => (
+                    <li key={p} className="flex gap-2">
+                      <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--primary)]" aria-hidden />
+                      <span>{p}</span>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
           </ul>
         </section>
 

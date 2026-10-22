@@ -8,6 +8,7 @@ import { USDC, fmtUsdc } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import type { Standing } from "@/lib/server/activity";
 import { PixelCoin, PixelHeart } from "./Pixel";
+import { Jackpot } from "./Jackpot";
 
 type Period = "round" | "day" | "all";
 
@@ -66,6 +67,8 @@ export function Leaderboard() {
           ))}
         </div>
       </div>
+
+      <Jackpot />
 
       {mine && (
         <div className="panel num flex flex-wrap items-center gap-x-6 gap-y-1 p-4 text-sm">

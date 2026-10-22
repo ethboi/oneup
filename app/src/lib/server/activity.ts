@@ -13,7 +13,7 @@ export interface ActivityItem {
   seq: number;
   /** ms since epoch, from the block. */
   t: number;
-  kind: "liquidated" | "lost" | "won" | "opened" | "life" | "lock" | "epoch" | "sold" | "backed";
+  kind: "liquidated" | "lost" | "won" | "opened" | "life" | "lock" | "epoch" | "sold" | "backed" | "jackpot";
   /** Short account names: "bot3", "demo". */
   who?: string;
   text: string;
@@ -47,6 +47,7 @@ type HistoryEntry = { t: number } & (
   | { kind: "trade"; trade: TradeRecord }
   | { kind: "deposit" | "withdraw" | "claim_usdc"; amount: string }
   | { kind: "backed"; amount: string; cap_ppm: string }
+  | { kind: "jackpot"; amount: string; tickets: string }
   | { kind: "claim_oneup"; amount: string }
   | { kind: "life" | "lock"; token_id: string }
   | { kind: "bought" | "sold"; what: "Extra Life" | "$1UP lock"; price: string; other: string }
@@ -201,6 +202,10 @@ export function toItems(ev: Event, executor: string, t: number, c: Record<string
       const who = short(String(d.account_id));
       mine(String(d.account_id), { t, kind: "backed", amount: String(d.amount), cap_ppm: String(d.cap_ppm) });
       out.feed.push({ t, kind: "backed", who, text: `${who} backed the house with ${usd(String(d.amount))}` });
+    } else if (ev.standard === "oneup" && ev.event === "jackpot_won") {
+      const who = short(String(d.account_id));
+      mine(String(d.account_id), { t, kind: "jackpot", amount: String(d.amount), tickets: String(d.tickets) });
+      out.feed.push({ t, kind: "jackpot", who, text: `${who} won the ${usd(String(d.amount))} jackpot` });
     } else if (ev.standard === "oneup" && ev.event === "epoch_closed") {
       const s = d.summary as Record<string, string | number>;
       const lives = Number(s.lives_minted);

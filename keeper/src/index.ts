@@ -15,6 +15,7 @@ import { parseArgs } from "node:util";
 import { Account, KeyPair, actions, type KeyPairString } from "near-api-js";
 import {
   OneUp,
+  USDC,
   accountSender,
   atProfitCap,
   isLiquidatable,
@@ -139,7 +140,33 @@ async function handleEpoch() {
       await runBuyback(e);
       return;
     }
-    if (r === "waiting for mints") return; // next tick
+    if (r === "waiting for mints" || r === "waiting for recall") return; // next tick
+  }
+}
+
+/** D-27: keeps the house's idle pool in the vault, recalls it when more must be on hand, and brings the
+ *  interest home into the jackpot about once a minute. */
+let lastHarvest = 0;
+async function handleTreasury() {
+  if (!d.contracts.vault) return;
+  const t = await oneup.treasury();
+  const deployed = BigInt(t.deployed);
+  const allowed = BigInt(t.deployable);
+  const step = 1_000n * USDC; // not worth a transaction below this
+  if (deployed > allowed) {
+    await keeper.recall(deployed - allowed);
+    log(`treasury: recalled ${fmt((deployed - allowed).toString())} (more must be on hand)`);
+  } else if (allowed - deployed >= step) {
+    await keeper.deployToVault(allowed - deployed);
+    log(`treasury: deployed ${fmt((allowed - deployed).toString())} to the vault`);
+  }
+  if (Date.now() - lastHarvest > 60_000) {
+    lastHarvest = Date.now();
+    const dep = await oneup.vaultDeposit();
+    if (dep && BigInt(dep.interest) >= USDC) {
+      await keeper.harvest();
+      log(`treasury: ${fmt(dep.interest)} of interest into the jackpot`);
+    }
   }
 }
 
@@ -237,6 +264,7 @@ async function tick() {
     ["orders", handleOrders],
     ["positions", handlePositions],
     ["epoch", handleEpoch],
+    ["treasury", handleTreasury],
   ];
   for (const [name, fn] of steps) {
     try {

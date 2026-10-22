@@ -168,6 +168,16 @@ function Footer({ go }: { go: (t: Tab) => void }) {
             Rust contracts (near-sdk), NEAR Intents deposits, a Sputnik DAO owning the house, gasless one-tap trading, and an MCP server
             for AI agents.
           </p>
+          <button
+            type="button"
+            className={`${link} label mt-1.5`}
+            onClick={() => {
+              go("About");
+              setTimeout(() => document.getElementById("built")?.scrollIntoView({ behavior: "smooth" }), 50);
+            }}
+          >
+            Every NEAR tool we use
+          </button>
         </div>
       </div>
       <div className="label mt-6 flex flex-col gap-2 border-t border-[var(--line)] pt-4 sm:flex-row sm:items-baseline sm:justify-between">

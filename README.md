@@ -120,7 +120,13 @@ worth tens of millions (it paid at $3M under the first design).
 Leaving early costs up to half, less as the lock runs down, and the penalty goes to the people still locked. Or
 sell the lock on the market: it's an NFT.
 
-**Market.** List an Extra Life or a lock for a USDC price; the buyer pays and the NFT moves in one step. Each
+**The pool at work, and the jackpot.** The part of the pool the house doesn't need on hand (it keeps 1.2× the
+worst-case payout plus 10%) earns interest in a vault: a 5% mock here, USDC lending on Ethereum through NEAR
+Intents and a Chain Signatures account on mainnet. All the interest builds a jackpot, drawn every four rounds
+among that period's losers, a ticket per $1 of net loss ([D-27](docs/decisions.md)).
+
+**Market.** List an Extra Life or a lock for a USDC price; the buyer pays and the NFT moves in one step. Sellers
+pay 2%, which goes to the house pool as profit ([D-28](docs/decisions.md)). Each
 market can use up to half the pool, so no single market takes all the capacity. The owner lists markets.
 
 ## Fair to late players

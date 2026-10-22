@@ -71,6 +71,27 @@ open, min, cap_ppm, owed}` for backing `amount` now, `get_owner()` → `(owner, 
 `position_closed {pnl, cut, payout}`, `liquidated`, `epoch_closed {house_net, reserve, surplus, el_pot,
 bb_pot}`.
 
+## house: the pool at work and the jackpot (D-27)
+
+| Method | Caller | Does |
+|---|---|---|
+| `set_vault(vault)` | owner | the yield vault |
+| `deploy(amount)` | keeper (or owner, operator) | sends pool USDC to the vault, up to `pool − 1.2 × liability − float_ppm × pool` |
+| `recall(amount)` | anyone | brings deployed USDC home |
+| `harvest()` | anyone | brings the vault's interest home into the jackpot |
+| `get_treasury() → {vault, deployed, deployable, jackpot, tickets, draw_epoch}` | view | |
+| `get_tickets(account_id) → U128` | view | this period's tickets ($1 of net loss each, USDC units) |
+
+A round's close gains a `recalling` step before it pays, and the close of every `jackpot_epochs`-th round draws
+the jackpot: events `jackpot_won {epoch, account_id, amount, tickets, total_tickets}` or `jackpot_rolled {epoch,
+jackpot}`. Params `float_ppm` (100000) and `jackpot_epochs` (4).
+
+## mock-vault (localnet)
+
+A stand-in for USDC lending: `ft_on_transfer` deposits, `withdraw(amount)` returns principal,
+`withdraw_interest() → U128` sends accrued interest (minted from mock USDC's faucet, up to 10,000 a call),
+`deposit_of(account_id) → {principal, interest, updated}`. Fixed `apr_ppm` over `year_s` seconds.
+
 ## extra-life (NEP-171 + NEP-177 metadata + NEP-181 enumeration)
 
 Each pot goes two thirds to losers' lives and one third to Backer Lives, each side passing on what it can't

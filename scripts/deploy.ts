@@ -58,7 +58,7 @@ export async function deploy(opts: { home: string; rpcUrl: string; epochLengthS:
 
   console.log("Deploying OneUp");
   step("accounts");
-  const names = ["usdc", "oracle", "house", "life", "oneup", "ve", "swap", "market"] as const;
+  const names = ["usdc", "oracle", "house", "life", "oneup", "ve", "swap", "market", "vault"] as const;
   const c = {} as Record<(typeof names)[number], Account>;
   for (const n of names) c[n] = await create(n, "30");
   const keeper = await create("keeper", "100");
@@ -76,6 +76,7 @@ export async function deploy(opts: { home: string; rpcUrl: string; epochLengthS:
     ve: "oneup_ve",
     swap: "mock_swap",
     market: "oneup_market",
+    vault: "mock_vault",
   };
   for (const n of names) await c[n].deployContract(WASM(code[n]));
 
@@ -106,16 +107,21 @@ export async function deploy(opts: { home: string; rpcUrl: string; epochLengthS:
   await call(root, id("oneup"), "new", { house: id("house"), rhea_seed: rootId, treasury: rootId });
   await call(root, id("ve"), "new", { owner: rootId, house: id("house"), oneup: id("oneup") });
   await call(root, id("swap"), "new", { owner: rootId, usdc: id("usdc"), oneup: id("oneup") });
-  await call(root, id("market"), "new", { usdc: id("usdc"), nft_contracts: [id("life"), id("ve")] });
+  // D-28: 2% of each sale goes to the house pool as profit
+  await call(root, id("market"), "new", { usdc: id("usdc"), nft_contracts: [id("life"), id("ve")], house: id("house"), fee_ppm: "20000" });
+  // D-27: a 5% vault standing in for USDC lending on Ethereum; its year is 52 demo rounds, so the yield shows
+  await call(root, id("vault"), "new", { usdc: id("usdc"), apr_ppm: "50000", year_s: opts.epochLengthS * 52 });
 
   step("wiring");
   await call(root, id("house"), "set_life", { life: id("life") });
   await call(root, id("house"), "set_token_and_ve", { oneup: id("oneup"), ve: id("ve") });
   await call(root, id("house"), "set_swap", { swap: id("swap") });
+  await call(root, id("house"), "set_vault", { vault: id("vault") });
+  await call(root, id("house"), "set_marketplace", { marketplace: id("market") });
   for (const m of MARKETS) await call(root, id("house"), "add_market", { market_id: m.id, feed_id: m.feedId, max_leverage: 100 });
 
   step("token registrations");
-  for (const a of [id("house"), id("life"), id("ve"), id("swap"), id("market")]) {
+  for (const a of [id("house"), id("life"), id("ve"), id("swap"), id("market"), id("vault")]) {
     await call(root, id("usdc"), "mint", { receiver_id: a, amount: "0" });
   }
   for (const a of [id("ve"), id("swap"), keeper.accountId, demo.accountId, ...bots.map((b) => b.accountId)]) {
@@ -236,6 +242,7 @@ export async function deploy(opts: { home: string; rpcUrl: string; epochLengthS:
       oracle: id("oracle"),
       swap: id("swap"),
       market: id("market"),
+      vault: id("vault"),
       dao: dao.accountId,
     },
     intents: {

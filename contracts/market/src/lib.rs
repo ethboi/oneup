@@ -16,6 +16,8 @@ use near_sdk::{
     PromiseOrValue,
 };
 
+/** The most the house can take of a sale. */
+const MAX_FEE_PPM: u128 = 100_000;
 const GAS_NFT_TRANSFER: Gas = Gas::from_tgas(20);
 const GAS_ON_BOUGHT: Gas = Gas::from_tgas(25);
 const GAS_FT_TRANSFER: Gas = Gas::from_tgas(10);
@@ -64,6 +66,7 @@ trait Nft {
 #[ext_contract(ext_ft)]
 trait Ft {
     fn ft_transfer(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>);
+    fn ft_transfer_call(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>, msg: String) -> U128;
 }
 
 #[near(contract_state)]
@@ -75,13 +78,29 @@ pub struct Market {
     listings: IterableMap<(AccountId, TokenId), Listing>,
     /// USDC owed to sellers after a failed payout.
     owed: LookupMap<AccountId, u128>,
+    /// D-28: the house takes `fee_ppm` of each sale (its share counts as house profit).
+    house: Option<AccountId>,
+    fee_ppm: u128,
 }
 
 #[near]
 impl Market {
     #[init]
-    pub fn new(usdc: AccountId, nft_contracts: Vec<AccountId>) -> Self {
-        Self { usdc, nft_contracts, listings: IterableMap::new(StorageKey::Listings), owed: LookupMap::new(StorageKey::Owed) }
+    pub fn new(usdc: AccountId, nft_contracts: Vec<AccountId>, house: Option<AccountId>, fee_ppm: Option<U128>) -> Self {
+        let fee_ppm = fee_ppm.map_or(0, |f| f.0);
+        require!(fee_ppm <= MAX_FEE_PPM, "Fee above 10%");
+        Self {
+            usdc,
+            nft_contracts,
+            listings: IterableMap::new(StorageKey::Listings),
+            owed: LookupMap::new(StorageKey::Owed),
+            house,
+            fee_ppm,
+        }
+    }
+
+    pub fn get_fee(&self) -> (Option<AccountId>, U128) {
+        (self.house.clone(), U128(self.fee_ppm))
     }
 
     /// Seller only: takes a listing down. (The approval stays on the NFT until revoked, but nothing can be
@@ -121,14 +140,20 @@ impl Market {
             env::log_str(&format!("{} #{} couldn't move; refunding {}", listing.nft_contract, listing.token_id, buyer));
             return amount;
         }
-        self.pay(listing.seller.clone(), listing.price.0);
+        // the house's cut (D-28), rounded down; the seller gets the rest
+        let fee = if self.house.is_some() { listing.price.0 * self.fee_ppm / 1_000_000 } else { 0 };
+        self.pay(listing.seller.clone(), listing.price.0 - fee);
+        if fee > 0 {
+            self.pay_house(fee);
+        }
         near_sdk::log!(
-            r#"EVENT_JSON:{{"standard":"oneup_market","version":"1.0.0","event":"sold","data":[{{"nft_contract":"{}","token_id":"{}","seller":"{}","buyer":"{}","price":"{}"}}]}}"#,
+            r#"EVENT_JSON:{{"standard":"oneup_market","version":"1.0.0","event":"sold","data":[{{"nft_contract":"{}","token_id":"{}","seller":"{}","buyer":"{}","price":"{}","fee":"{}"}}]}}"#,
             listing.nft_contract,
             listing.token_id,
             listing.seller,
             buyer,
-            listing.price.0
+            listing.price.0,
+            fee
         );
         U128(amount.0 - listing.price.0)
     }
@@ -141,6 +166,16 @@ impl Market {
             return false;
         }
         true
+    }
+
+    /// After the house's cut: what it refused (or a failed transfer) is owed to it.
+    #[private]
+    pub fn on_fee_paid(&mut self, house: AccountId, amount: U128, #[callback_result] used: Result<U128, PromiseError>) {
+        let back = amount.0 - used.map_or(0, |u| u.0.min(amount.0));
+        if back > 0 {
+            let o = self.owed.get(&house).copied().unwrap_or(0);
+            self.owed.insert(house, o + back);
+        }
     }
 
     /// A seller collects USDC whose payout failed.
@@ -193,6 +228,18 @@ impl NonFungibleTokenApprovalReceiver for Market {
 }
 
 impl Market {
+    /// The house's cut, as a `market_fee` deposit into its pool. If it fails it's owed to the house like a
+    /// failed seller payout, collectable with `collect`.
+    fn pay_house(&self, amount: u128) {
+        let house = self.house.clone().expect("house");
+        ext_ft::ext(self.usdc.clone())
+            .with_attached_deposit(NearToken::from_yoctonear(1))
+            .with_static_gas(GAS_FT_TRANSFER.saturating_mul(3))
+            .ft_transfer_call(house.clone(), U128(amount), None, r#"{"market_fee":{}}"#.into())
+            .then(Self::ext(env::current_account_id()).with_static_gas(GAS_ON_PAID).on_fee_paid(house, U128(amount)))
+            .detach();
+    }
+
     fn pay(&self, seller: AccountId, amount: u128) {
         ext_ft::ext(self.usdc.clone())
             .with_attached_deposit(NearToken::from_yoctonear(1))
@@ -220,7 +267,7 @@ mod tests {
     fn setup() -> Market {
         ctx("owner");
         near_sdk::mock::with_mocked_blockchain(|b| drop(b.take_storage()));
-        Market::new(acc("usdc"), vec![acc("life"), acc("ve")])
+        Market::new(acc("usdc"), vec![acc("life"), acc("ve")], None, None)
     }
 
     fn list(m: &mut Market, nft: &str, token: &str, seller: &str, price: u128) {
@@ -325,5 +372,23 @@ mod tests {
         ctx("market");
         m.on_paid(acc("alice"), U128(5), Err(PromiseError::Failed));
         assert_eq!(m.get_owed(acc("alice")).0, 5);
+    }
+
+    #[test]
+    fn the_house_takes_its_cut() {
+        ctx("market");
+        let mut m = Market::new(acc("usdc"), vec![acc("life"), acc("ve")], Some(acc("house")), Some(U128(20_000)));
+        let l = Listing { nft_contract: acc("ve"), token_id: "12".into(), seller: acc("alice"), approval_id: 7, price: U128(50_000_000), listed_at: 0 };
+        // the buyer still pays the price and gets the change; 2% (1 USDC) goes to the house
+        assert_eq!(m.on_bought(l, acc("bob"), U128(60_000_000), Ok(())).0, 10_000_000);
+        let logs = near_sdk::test_utils::get_logs();
+        assert!(logs.iter().any(|l| l.contains(r#""price":"50000000","fee":"1000000""#)), "{logs:?}");
+    }
+
+    #[test]
+    #[should_panic(expected = "Fee above 10%")]
+    fn the_fee_is_capped() {
+        ctx("market");
+        Market::new(acc("usdc"), vec![], Some(acc("house")), Some(U128(100_001)));
     }
 }

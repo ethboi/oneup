@@ -33,6 +33,8 @@ enum DepositMsg {
     },
     /// From the NEAR Intents Verifier only: credit this account's free balance (D-21).
     For { account_id: AccountId },
+    /// From the marketplace only: its cut of a sale, into the pool as house profit (D-28).
+    MarketFee {},
 }
 
 #[near]
@@ -105,6 +107,11 @@ impl House {
                         Event::Deposit { account_id: sender_id.clone(), amount }.emit();
                         self.internal_place_open(sender_id, market_id, side, margin, leverage, triggers);
                     }
+                }
+                DepositMsg::MarketFee {} => {
+                    require!(self.marketplace.as_ref() == Some(&sender_id), "Only the marketplace pays fees");
+                    self.pool += amount.0;
+                    self.epoch.fees.0 += amount.0;
                 }
                 DepositMsg::For { account_id } => {
                     require!(self.from_intents(&sender_id), "Only NEAR Intents deposits name an account");

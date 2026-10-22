@@ -316,6 +316,44 @@ seed gets none. When the allocation runs out, backings still mint their Backer L
 Redeeming a backing against spare pool capital was considered and left out: it makes backing an LP vault,
 which D-22 avoided, and shrinks the pool when traders need it most. The exit is still the market.
 
+## D-27 · The pool works while it waits; its interest is a jackpot · **Decided (22 Oct 2026)**
+
+Most of the pool sits idle most of the time: it's there to pay winners in the worst case. Now the part the
+house doesn't need on hand earns interest, and all of it goes to a jackpot.
+
+**On hand and at work.** Winners are paid by crediting balances inside the house, so the solvency rule (D-1) is
+unchanged: it's about what the house owes, and deployed USDC is still the house's. What must be cash is what can
+leave: withdrawals and each round's payout. So the house always keeps `1.2 × worst-case payout + float_ppm`
+(10%) of the pool on hand and deploys the rest (`deploy`, keeper only, capped in the contract); when the limit
+falls the keeper recalls (`recall`, anyone), and a round's close recalls whatever its payout needs before it pays
+(a "recalling" step), so the pool after the payout always covers what's deployed.
+
+**Where it earns.** On localnet a mock vault pays a fixed 5% (its year is 52 demo rounds, so it shows). On
+mainnet the house would lend USDC on Ethereum through NEAR Intents, holding the position from its own Chain
+Signatures account, with the DAO choosing the market. Of the sources compared (Oct 2026), plain USDC lending on
+Aave v3 or a conservative Morpho vault (about 4.5–5%, withdrawable at once) fits best; sUSDS (3.6–3.8%) is the
+simplest fallback. Ruled out for the house: sUSDe (a 7-day unstaking cooldown and funding-rate risk exactly when
+money is needed), Pendle fixed-rate tokens (locked to maturity), tokenized T-bills (KYC, minimums), and, for now,
+Rhea Lend on NEAR (attractive with no bridge, but hacked for $18.4M in April 2026).
+
+**A jackpot, not a drip.** Paid per round, the yield on a $350K pool is about $48 a day: invisible. Instead it
+all builds a jackpot (`harvest`, anyone), drawn at the close of every `jackpot_epochs` rounds (4: monthly with
+weekly rounds, 40 minutes in the demo). Each dollar of a wallet's net loss in the period is a ticket (the same
+net loss D-24 uses, so wash trading earns no extra tickets); the draw credits the winner's balance and clears the
+tickets, and with no tickets the jackpot rolls over. The same expected value as paying the yield out, but people
+can see it and want it.
+
+**Randomness.** Pyth Entropy is for EVM chains, so the draw uses NEAR's block random seed at the close. A
+validator could bias it slightly; for large jackpots the draw's block should be fixed in advance (commit-reveal).
+
+## D-28 · The house takes 2% of marketplace sales · **Decided (22 Oct 2026)**
+
+Extra Lives and locks change hands on the built-in market (D-17) for free. Now the seller pays 2% of the price
+(`fee_ppm`, capped at 10%), sent to the house as a `market_fee` deposit: it joins the pool and counts toward the
+round's house result (`fees` in the epoch summary), so it flows to Extra Lives and buybacks like trading
+profit. Only the marketplace the owner set can pay it in, and a fee the house refuses is owed
+to it like a failed seller payout. Buyers pay the listed price as before.
+
  · **Noted**
 
 - Rounding dust from sharing buybacks by weight stays in `ve` (no sweep).

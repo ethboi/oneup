@@ -9,7 +9,7 @@ import { Icon, type IconName } from "./Icon";
 export interface ActivityItem {
   seq: number;
   t: number;
-  kind: "liquidated" | "lost" | "won" | "opened" | "life" | "lock" | "epoch" | "sold" | "backed";
+  kind: "liquidated" | "lost" | "won" | "opened" | "life" | "lock" | "epoch" | "sold" | "backed" | "jackpot";
   who?: string;
   text: string;
   /** On a sale: what sold, its price and (when seen live) its value then (lib/server/activity.ts). */
@@ -26,6 +26,7 @@ const LOOK: Record<ActivityItem["kind"], { icon: IconName; color: string }> = {
   epoch: { icon: "shield", color: "var(--text)" },
   sold: { icon: "cart", color: "var(--primary)" },
   backed: { icon: "shield", color: "var(--info)" },
+  jackpot: { icon: "trophy", color: "var(--accent)" },
 };
 
 /** Polls the feed and keeps the newest `keep` items, newest first. */
