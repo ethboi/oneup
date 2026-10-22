@@ -212,7 +212,11 @@ function Console({
   const streak = useStreak(me);
   const [range, setRange] = useState<number>(RANGES[1][1]);
   const now = useNow();
-  const pts = (history[market] ?? []).filter((p, i, a) => p.t >= now * 1000 - range || i === a.length - 1);
+  // the window, plus the last price before it so the line runs in from the left edge
+  const all = history[market] ?? [];
+  const from = now * 1000 - range;
+  const first = all.findIndex((p) => p.t >= from);
+  const pts = first === -1 ? all.slice(-1) : all.slice(Math.max(0, first - 1));
   const change = pts.length > 1 ? (pts[pts.length - 1].p / pts[0].p - 1) * 100 : 0;
   return (
     <div key={fx?.kind === "liquidated" || (fx?.kind === "win" && fx.tier === 3) ? fx.id : "case"} className={`case order-2 min-w-0 p-3 sm:p-5 ${fx?.kind === "liquidated" || (fx?.kind === "win" && fx.tier === 3) ? "shake" : ""}`}>
@@ -249,6 +253,7 @@ function Console({
         <div className="relative">
           <PriceChart
             points={pts}
+            span={range}
             marks={marks}
             alarm={mood.state === "danger" || mood.state === "critical"}
             readout={

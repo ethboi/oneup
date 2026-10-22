@@ -83,8 +83,11 @@ export function PriceChart({
   alarm,
   readout,
   gauge,
+  span,
 }: {
   points: { t: number; p: number }[];
+  /** The window shown, in ms, ending now: the time axis stays put while the line scrolls through it. */
+  span?: number;
   marks?: Mark[];
   alarm?: boolean;
   readout?: React.ReactNode;
@@ -142,8 +145,8 @@ export function PriceChart({
   // the newest price eases in from the one before; the line then holds it out to the present
   const k = now === null ? 1 : Math.min(1, Math.max(0, (now - last.t) / EASE_MS));
   const headP = prev.p + (last.p - prev.p) * (1 - (1 - k) ** 3);
-  const t0 = points[0].t;
   const t1 = now === null ? last.t : Math.max(last.t, now);
+  const t0 = span ? t1 - span : points[0].t;
   const plotR = W - PAD.r;
   const plotB = H - PAD.b;
   const x = (t: number) => PAD.l + ((t - t0) / Math.max(1, t1 - t0)) * (plotR - PAD.l);
@@ -181,9 +184,10 @@ export function PriceChart({
   const busy = [y(headP), ...shown.filter((s) => !s.edge).map((s) => y(s.m.price))];
   const tickDigits = Math.max(decimalsOf(step), 0);
 
+  // ticks are fixed distances back from now, so they never move or blink as the line scrolls
   const tStep = TIME_STEPS.find((s) => (t1 - t0) / s <= 5) ?? TIME_STEPS[TIME_STEPS.length - 1];
   const times: number[] = [];
-  for (let a = tStep; t1 - a >= t0 + (t1 - t0) * 0.06; a += tStep) times.push(a);
+  for (let a = tStep; a <= (t1 - t0) * 0.94; a += tStep) times.push(a);
 
   const onPointer = (e: React.PointerEvent) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -207,6 +211,9 @@ export function PriceChart({
         onPointerCancel={() => setHover(null)}
       >
         <defs>
+          <clipPath id="lcd-plot">
+            <rect x={PAD.l} y={0} width={plotR - PAD.l + 4} height={plotB} />
+          </clipPath>
           <linearGradient id="lcd-fill" x1="0" x2="0" y1="0" y2="1">
             <stop offset="0" stopColor="var(--lcd-2)" stopOpacity="0.7" />
             <stop offset="1" stopColor="var(--lcd-2)" stopOpacity="0.1" />
@@ -236,8 +243,10 @@ export function PriceChart({
         <text x={x(t1)} y={H - 5} fontSize="10" fill="var(--lcd-3)" textAnchor="end">
           now
         </text>
-        <path d={`${line} L${x(t1)} ${plotB} L${x(t0)} ${plotB} Z`} fill="url(#lcd-fill)" />
-        <path d={line} fill="none" stroke="var(--lcd-ink)" strokeWidth="2.5" strokeLinejoin="round" />
+        <g clipPath="url(#lcd-plot)">
+          <path d={`${line} L${x(t1)} ${plotB} L${x(points[0].t)} ${plotB} Z`} fill="url(#lcd-fill)" />
+          <path d={line} fill="none" stroke="var(--lcd-ink)" strokeWidth="2.5" strokeLinejoin="round" />
+        </g>
         {shown.map(({ m, edge }) =>
           edge ? null : (
             <line
