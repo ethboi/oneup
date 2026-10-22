@@ -467,6 +467,9 @@ function RoundOver() {
   );
 }
 
+/** How long a trade arriving on the tape flashes (its animation in globals.css runs this long). */
+const FLASH_MS = 1100;
+
 /** How long ago, in the tape's few characters. */
 const agoShort = (ms: number) => {
   const s = Math.max(0, Math.round(ms / 1000));
@@ -478,6 +481,13 @@ function TradesTape({ market, info }: { market: string; info?: Market }) {
   const feed = useActivity(300);
   const now = useNow();
   const rows = feed.filter((a) => a.trade?.market === market).slice(0, 40);
+  // trades that arrive while you watch flash in, for FLASH_MS from when they first showed; the first batch the
+  // tape (or a newly picked market) loads is already history and doesn't
+  const seen = useRef<{ market: string; at: Map<number, number> } | null>(null);
+  const t = Date.now();
+  if (rows.length && (!seen.current || seen.current.market !== market)) seen.current = { market, at: new Map(rows.map((a) => [a.seq, 0])) };
+  else if (seen.current) for (const a of rows) if (!seen.current.at.has(a.seq)) seen.current.at.set(a.seq, t);
+  const fresh = (seq: number) => t - (seen.current?.at.get(seq) ?? 0) < FLASH_MS;
   const long = info ? BigInt(info.long_liability) : 0n;
   const short = info ? BigInt(info.short_liability) : 0n;
   // whole percents that add up to 100
@@ -510,7 +520,12 @@ function TradesTape({ market, info }: { market: string; info?: Market }) {
         {rows.map((a) => {
           const tr = a.trade!;
           return (
-            <li key={a.seq} className="tape-row border-b border-[var(--line)]/50 py-[5px] last:border-0" title={a.text}>
+            <li
+              key={a.seq}
+              className={`tape-row border-b border-[var(--line)]/50 py-[5px] last:border-0 ${fresh(a.seq) ? "tape-new" : ""}`}
+              style={{ "--flash": tr.side === "Long" ? "var(--long)" : "var(--short)" } as React.CSSProperties}
+              title={a.text}
+            >
               <span className="font-bold" style={{ color: tr.side === "Long" ? "var(--long)" : "var(--short)", opacity: tr.open ? 1 : 0.6 }}>
                 {tr.open ? "" : "× "}
                 {fmtPrice(BigInt(tr.price))}

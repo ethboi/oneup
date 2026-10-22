@@ -1576,3 +1576,17 @@ kbd {
     animation: none;
   }
 }
+/* a trade arriving on the tape flashes in its side's colour, then settles */
+.tape-new {
+  animation: tape-new 1.1s ease-out;
+}
+@keyframes tape-new {
+  from {
+    background: color-mix(in srgb, var(--flash) 32%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tape-new {
+    animation: none;
+  }
+}
