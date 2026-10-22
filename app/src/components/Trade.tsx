@@ -341,16 +341,12 @@ export function Trade() {
         />
         <div className="order-4 min-w-0">
           <Below positions={positions} orders={orders} focused={focused?.id} pick={pick} />
-          <div className="mt-4 hidden lg:block">
-            <Jackpot />
-          </div>
         </div>
       </div>
       <div ref={formRef} id="order-form" className="order-3 flex flex-col gap-4">
         <OrderForm t={ticket} />
-        <div className="lg:hidden">
-          <Jackpot compact />
-        </div>
+        {/* under the form on every screen: on a desktop it fills the column beside the tall chart */}
+        <Jackpot compact />
       </div>
       {!formVisible && <TradeBar t={ticket} />}
     </div>

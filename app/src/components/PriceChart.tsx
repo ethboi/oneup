@@ -367,7 +367,7 @@ export function PriceChart({
           <g key={v}>
             <line x1={PAD.l} x2={plotR} y1={y(v)} y2={y(v)} stroke="var(--lcd-2)" strokeWidth="1" opacity="0.6" />
             <line x1={plotR} x2={plotR + 4} y1={y(v)} y2={y(v)} stroke="var(--lcd-3)" strokeWidth="1" />
-            {busy.every((b) => Math.abs(b - y(v)) > 13) && y(v) >= PAD.t + 6 && y(v) <= plotB - 6 && (
+            {busy.every((b) => Math.abs(b - y(v)) > 17) && y(v) >= PAD.t + 6 && y(v) <= plotB - 6 && (
               <text x={plotR + AXIS_TEXT} y={y(v) + 4} fontSize="11" fill="var(--lcd-3)" className="num">
                 {v.toFixed(Math.max(tickDigits, digits))}
               </text>
@@ -380,6 +380,8 @@ export function PriceChart({
         <line x1={PAD.l} x2={plotR} y1={plotB} y2={plotB} stroke="var(--lcd-3)" strokeWidth="1" opacity="0.6" />
         {times.map((a) => (
           <g key={a}>
+            {/* graph paper: the time ticks ruled up the screen, as faint as the price levels */}
+            <line x1={x(t1 - a)} x2={x(t1 - a)} y1={PAD.t - 6} y2={plotB} stroke="var(--lcd-2)" strokeWidth="1" opacity="0.6" />
             <line x1={x(t1 - a)} x2={x(t1 - a)} y1={plotB} y2={plotB + 4} stroke="var(--lcd-3)" />
             <text x={x(t1 - a)} y={H - 5} fontSize="10" fill="var(--lcd-3)" textAnchor="middle" className="num">
               {ago(a)}
@@ -392,14 +394,22 @@ export function PriceChart({
         {zone && (
           <g clipPath="url(#lcd-plot)">
             <defs>
+              {/* a light wash that deepens toward the target or the stop, under a dither of lit pixels so the
+                  shading reads as part of the screen rather than painted on it */}
               <linearGradient id="zone-profit" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1={zone.yE} y2={zone.profitTo}>
-                <stop offset="0" stopColor="var(--long)" stopOpacity="0.2" />
-                <stop offset="1" stopColor="var(--long)" stopOpacity="0.6" />
+                <stop offset="0" stopColor="var(--long)" stopOpacity="0.06" />
+                <stop offset="1" stopColor="var(--long)" stopOpacity="0.3" />
               </linearGradient>
               <linearGradient id="zone-loss" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1={zone.yE} y2={zone.lossTo}>
-                <stop offset="0" stopColor="var(--short)" stopOpacity="0.24" />
-                <stop offset="1" stopColor="var(--short)" stopOpacity="0.6" />
+                <stop offset="0" stopColor="var(--short)" stopOpacity="0.08" />
+                <stop offset="1" stopColor="var(--short)" stopOpacity="0.32" />
               </linearGradient>
+              <pattern id="dots-profit" width="4" height="4" patternUnits="userSpaceOnUse">
+                <rect width="2" height="2" fill="var(--long)" />
+              </pattern>
+              <pattern id="dots-loss" width="4" height="4" patternUnits="userSpaceOnUse">
+                <rect width="2" height="2" fill="var(--short)" />
+              </pattern>
               <clipPath id="zone-above">
                 <rect x={zone.x0} y={0} width={W} height={Math.max(0, zone.yE)} />
               </clipPath>
@@ -408,8 +418,16 @@ export function PriceChart({
               </clipPath>
             </defs>
             {/* between the line and the entry: above it in one colour, below it in the other */}
-            <path d={`${line} L${x(t1)} ${zone.yE} L${x(points[0].t)} ${zone.yE} Z`} fill={`url(#zone-${zone.upIsProfit ? "profit" : "loss"})`} clipPath="url(#zone-above)" />
-            <path d={`${line} L${x(t1)} ${zone.yE} L${x(points[0].t)} ${zone.yE} Z`} fill={`url(#zone-${zone.upIsProfit ? "loss" : "profit"})`} clipPath="url(#zone-below)" />
+            {(["above", "below"] as const).map((side) => {
+              const kind = (side === "above") === zone.upIsProfit ? "profit" : "loss";
+              const d = `${line} L${x(t1)} ${zone.yE} L${x(points[0].t)} ${zone.yE} Z`;
+              return (
+                <g key={side} clipPath={`url(#zone-${side})`}>
+                  <path d={d} fill={`url(#zone-${kind})`} />
+                  <path d={d} fill={`url(#dots-${kind})`} opacity="0.4" />
+                </g>
+              );
+            })}
           </g>
         )}
         <g clipPath="url(#lcd-plot)">
