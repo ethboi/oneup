@@ -1428,3 +1428,28 @@ body {
   border-radius: 3px;
   background: var(--edge);
 }
+
+/* the chart's draggable lines: a resize cursor where a trigger can be grabbed */
+.chart-grab {
+  cursor: ns-resize;
+}
+/* buttons printed on the LCD, beside a position's profit pill */
+.chart-actions button {
+  height: 18px;
+  padding: 0 7px;
+  border-radius: 3px;
+  border: 1.5px solid var(--lcd-ink);
+  background: var(--lcd);
+  color: var(--lcd-ink);
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+.chart-actions button:hover:not(:disabled) {
+  background: var(--lcd-ink);
+  color: var(--lcd);
+}
+.chart-actions button:disabled {
+  opacity: 0.5;
+}

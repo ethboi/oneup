@@ -161,7 +161,18 @@ export function PriceChart({
   span,
   candles: asCandles,
   fill,
+  triggers,
+  entryActions,
 }: {
+  /** Drag to set the focused position's take-profit and stop-loss: from its entry line (toward profit makes a
+   *  take-profit, toward loss a stop-loss), or by an existing one's line or tag; dropped back on the entry it
+   *  clears. `check` says what a price would make or lose, or why it won't work; `set` saves it (null clears). */
+  triggers?: {
+    check: (kind: "tp" | "sl", price: number) => { text: string; bad?: boolean };
+    set: (kind: "tp" | "sl", price: number | null) => Promise<unknown>;
+  };
+  /** Buttons beside the focused position's profit pill on the entry line (Close, Reverse). */
+  entryActions?: React.ReactNode;
   /** On a desktop, grow to fill the window's height (keeping room for the positions' tabs below). */
   fill?: boolean;
   points: { t: number; p: number }[];
@@ -184,6 +195,9 @@ export function PriceChart({
   const narrow = W < 480;
   const H = narrow ? 300 : Math.max(420, tall ?? 0);
   const [hover, setHover] = useState<number | null>(null);
+  // a trigger being dragged: its kind once known (a drag from the entry line picks it by direction), the price
+  // under the pointer, and whether it's being saved
+  const [drag, setDrag] = useState<{ from: "entry" | "tp" | "sl"; kind: "tp" | "sl" | null; price: number; saving?: boolean } | null>(null);
   const now = useClock();
 
   const header = (
@@ -334,7 +348,43 @@ export function PriceChart({
   const bars = asCandles ? candles(points, t0, cSize, headP) : null;
   const cW = Math.max(2, ((plotR - PAD.l) * cSize) / Math.max(1, t1 - t0) * 0.62);
 
+  // the focused position's entry, and which way is profit: a drag picks take-profit or stop-loss by direction
+  const focus = marks.find((m) => m.kind === "entry" && m.cap !== undefined);
+  const profitUp = focus ? focus.cap! > focus.price : true;
+  const priceAt = (py: number) => lo + (1 - (py - PAD.t) / (plotB - PAD.t)) * (hi - lo);
+  // within this many px of the entry line, a dragged trigger clears
+  const SNAP = 6;
+  const startDrag = (from: "entry" | "tp" | "sl") => (e: React.PointerEvent) => {
+    if (!triggers || drag?.saving) return;
+    e.stopPropagation();
+    // the whole chart follows the pointer until it's released, even off the line
+    e.currentTarget.closest("svg")?.setPointerCapture(e.pointerId);
+    const m = from === "entry" ? focus : marks.find((x) => x.kind === from && x.pos === focus?.pos);
+    setDrag({ from, kind: from === "entry" ? null : from, price: m?.price ?? last.p });
+    setHover(null);
+  };
+  const moveDrag = (e: React.PointerEvent) => {
+    if (!drag || drag.saving || !focus) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    const price = Math.min(hi, Math.max(lo, priceAt(e.clientY - r.top)));
+    const up = price > focus.price;
+    const near = Math.abs(y(price) - y(focus.price)) < SNAP;
+    setDrag({ ...drag, price, kind: drag.from === "entry" ? (near ? null : up === profitUp ? "tp" : "sl") : drag.kind });
+  };
+  const endDrag = () => {
+    if (!drag || drag.saving || !focus || !triggers) return setDrag(null);
+    const near = Math.abs(y(drag.price) - y(focus.price)) < SNAP;
+    if (!drag.kind || (drag.from === "entry" && near)) return setDrag(null);
+    if (!near && triggers.check(drag.kind, drag.price).bad) return setDrag(null);
+    const save = { ...drag, saving: true };
+    setDrag(save);
+    triggers.set(drag.kind, near ? null : drag.price).finally(() => setDrag(null));
+  };
+  const dragNear = drag && focus ? Math.abs(y(drag.price) - y(focus.price)) < SNAP : false;
+  const dragNote = drag?.kind && focus ? (dragNear ? { text: drag.from === "entry" ? "" : "release to clear" } : triggers?.check(drag.kind, drag.price)) : null;
+
   const onPointer = (e: React.PointerEvent) => {
+    if (drag) return moveDrag(e);
     const r = e.currentTarget.getBoundingClientRect();
     const t = t0 + ((e.clientX - r.left - PAD.l) / (plotR - PAD.l)) * (t1 - t0);
     let best = 0;
@@ -352,8 +402,9 @@ export function PriceChart({
         aria-label={`Price chart, last ${last.p.toFixed(digits)}`}
         onPointerMove={onPointer}
         onPointerDown={onPointer}
+        onPointerUp={endDrag}
         onPointerLeave={() => setHover(null)}
-        onPointerCancel={() => setHover(null)}
+        onPointerCancel={() => (setHover(null), setDrag(null))}
       >
         <defs>
           <clipPath id="lcd-plot">
@@ -557,7 +608,42 @@ export function PriceChart({
             )}
           </g>
         ))}
-        {h && (
+        {/* grab areas: the focused entry line, and its take-profit and stop-loss lines and tags */}
+        {triggers &&
+          focus &&
+          shown
+            .filter(({ m, edge }) => !edge && m.pos === focus.pos && (m.kind === "entry" || m.kind === "tp" || m.kind === "sl"))
+            .map(({ m }) => (
+              <g key={`grab-${m.label}`} className="chart-grab" onPointerDown={startDrag(m.kind as "entry" | "tp" | "sl")}>
+                <title>{m.kind === "entry" ? "Drag toward profit for a take-profit, toward loss for a stop-loss" : "Drag to move; drop on the entry to clear"}</title>
+                <line x1={PAD.l} x2={plotR} y1={y(m.price)} y2={y(m.price)} stroke="transparent" strokeWidth="12" />
+                <rect x={plotR + 4} y={y(m.price) - 9} width={PAD.r - 6} height="18" fill="transparent" />
+              </g>
+            ))}
+        {drag?.kind && (
+          <g pointerEvents="none">
+            <line x1={PAD.l} x2={plotR + 4} y1={y(drag.price)} y2={y(drag.price)} stroke="var(--lcd-ink)" strokeWidth="2" strokeDasharray={DASH.tp} opacity={dragNear ? 0.35 : 1} />
+            <rect x={plotR + 4} y={y(drag.price) - 9} width={PAD.r - 6} height="18" rx="2" fill="var(--lcd-ink)" />
+            <text x={plotR + AXIS_TEXT} y={y(drag.price) + 5} fontSize="12" fontWeight="700" fill="var(--lcd)" className="num">
+              {drag.price.toFixed(digits)}
+            </text>
+            <text
+              x={plotR - 8}
+              y={y(drag.price) - 6}
+              fontSize="12"
+              fontWeight="800"
+              textAnchor="end"
+              fill={dragNote?.bad ? "#b02a2a" : "var(--lcd-ink)"}
+              stroke="var(--lcd)"
+              strokeWidth="3"
+              paintOrder="stroke"
+              className="num"
+            >
+              {drag.saving ? "Saving…" : `${drag.kind === "tp" ? "Take profit" : "Stop loss"}${dragNote?.text ? ` · ${dragNote.text}` : ""}`}
+            </text>
+          </g>
+        )}
+        {h && !drag && (
           <g pointerEvents="none">
             <line x1={x(h.t)} x2={x(h.t)} y1={PAD.t} y2={plotB} stroke="var(--lcd-3)" strokeDasharray="2 3" />
             <line x1={x(h.t)} x2={plotR + 4} y1={y(h.p)} y2={y(h.p)} stroke="var(--lcd-3)" strokeDasharray="2 3" />
@@ -571,7 +657,17 @@ export function PriceChart({
         )}
       </svg>
       {header}
-      {h && (
+      {entryActions &&
+        !drag &&
+        pills
+          .filter((p) => p.key === focus?.label)
+          .map((p) => (
+            // beside the profit pill, on the entry line
+            <div key={p.key} className="chart-actions absolute flex gap-1" style={{ right: W - (plotR - p.w - 10), top: p.y - 21 }}>
+              {entryActions}
+            </div>
+          ))}
+      {h && !drag && (
         <div
           className="display num pointer-events-none absolute rounded-md border border-[var(--lcd-ink)] bg-[var(--lcd)] px-2 py-1 text-xs text-[var(--lcd-ink)]"
           style={{ top: PAD.t, ...(x(h.t) > W / 2 ? { right: W - x(h.t) + 10 } : { left: x(h.t) + 10 }) }}

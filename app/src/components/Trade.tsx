@@ -583,7 +583,7 @@ function Console({
   /** Markets you have a position in. */
   held: Set<string>;
 }) {
-  const { prices, history, me } = useOneUp();
+  const { prices, history, me, o, tx, run } = useOneUp();
   const mood = useMood(mine, prices[market]);
   const tilt = useTilt(me);
   useTensionSound(mood);
@@ -610,6 +610,50 @@ function Console({
   const first = all.findIndex((p) => p.t >= from);
   const pts = first === -1 ? all.slice(-1) : all.slice(Math.max(0, first - 1));
   const change = pts.length > 1 ? (pts[pts.length - 1].p / pts[0].p - 1) * 100 : 0;
+  // the position on the chart: drag its triggers there, and close or reverse it from its entry line
+  const pos = mine[0];
+  const mark = prices[market];
+  const triggers = pos
+    ? {
+        check: (kind: "tp" | "sl", price: number) => chartTriggerCheck(pos, kind, price, mark),
+        set: (kind: "tp" | "sl", price: number | null) => {
+          const at = price === null ? null : numberToPrice(price);
+          const keep = (x: string | null) => (x ? BigInt(x) : null);
+          const name = kind === "tp" ? "take profit" : "stop loss";
+          return run(`${at === null ? "Clear" : "Set"} ${name} on #${pos.id}`, () =>
+            tx.setTriggers(pos.id, {
+              takeProfit: kind === "tp" ? at : keep(pos.triggers.take_profit),
+              stopLoss: kind === "sl" ? at : keep(pos.triggers.stop_loss),
+            }),
+          );
+        },
+      }
+    : undefined;
+  const hold = pos ? Math.max(0, pos.opened_at + MIN_HOLD_S - now) : 0;
+  const reverse = () => {
+    if (!pos) return;
+    const other: Side = pos.side === "Long" ? "Short" : "Long";
+    const margin = BigInt(pos.margin);
+    run(`Reverse #${pos.id} to ${other.toLowerCase()} ${pos.leverage}×`, async () => {
+      await tx.placeClose(pos.id);
+      // the close pays back when it fills, so the open's margin comes from the balance now, topped up from the wallet
+      const free = BigInt(await o.balance(me));
+      const top = margin > free ? margin - free : 0n;
+      if (top > 0n) await tx.depositAndOpen(top, pos.market_id, other, margin, pos.leverage);
+      else await tx.placeOpen(pos.market_id, other, margin, pos.leverage);
+    });
+  };
+  const entryActions =
+    pos && pos.close_order === null ? (
+      <>
+        <button type="button" disabled={hold > 0} onClick={() => run(`Close #${pos.id}`, () => tx.placeClose(pos.id))} title={hold > 0 ? "Positions are held at least a minute" : "Close at the next price"}>
+          {hold > 0 ? `Close ${hold}s` : "Close"}
+        </button>
+        <button type="button" disabled={hold > 0} onClick={reverse} title={`Close, then open a ${pos.side === "Long" ? "short" : "long"} of the same size`}>
+          Reverse
+        </button>
+      </>
+    ) : undefined;
   return (
     <div key={fx?.kind === "liquidated" || (fx?.kind === "win" && fx.tier === 3) ? fx.id : "case"} id="chart" className={`case order-2 min-w-0 scroll-mt-4 p-3 sm:p-5 ${fx?.kind === "liquidated" || (fx?.kind === "win" && fx.tier === 3) ? "shake" : ""}`}>
       <MarketBar
@@ -631,6 +675,8 @@ function Console({
         <div className="relative">
           <PriceChart
             fill
+            triggers={triggers}
+            entryActions={entryActions}
             points={pts}
             span={range}
             candles={style === "candles"}
@@ -1308,6 +1354,21 @@ function hint(side: Side, entry: bigint | undefined, margin: bigint, leverage: n
   if (kind === "sl" && stopHit(side, entry, at)) return { text: `Must be ${side === "Long" ? "below" : "above"} the price`, bad: true };
   if (kind === "sl" && liq && stopHit(side, at, liq)) return { text: "Past liquidation", bad: true };
   const v = pnl(side, margin, leverage, entry, at);
+  const capped = v > maxLiability(margin) ? maxLiability(margin) : v;
+  const sign = capped >= 0n ? "+" : "−";
+  return { text: `${sign}$${fmtUsdc(capped < 0n ? -capped : capped, 0)} (${sign}${Math.abs((Number(capped) / Number(margin)) * 100).toFixed(0)}%)` };
+}
+
+/** A trigger dragged on the chart: whether it can work from the current price, then what it makes or loses
+ *  from the position's entry. */
+function chartTriggerCheck(p: Position, kind: "tp" | "sl", price: number, mark: bigint | undefined) {
+  const margin = BigInt(p.margin);
+  const liq = liquidationPrice(p.side, BigInt(p.entry_price), p.leverage);
+  const x = String(price);
+  const now = hint(p.side, mark, margin, p.leverage, x, kind, liq);
+  if (now?.bad) return now;
+  // a take-profit under the entry (or a stop over it) is fine: it just closes at a smaller loss (or a profit)
+  const v = pnl(p.side, margin, p.leverage, BigInt(p.entry_price), numberToPrice(price));
   const capped = v > maxLiability(margin) ? maxLiability(margin) : v;
   const sign = capped >= 0n ? "+" : "−";
   return { text: `${sign}$${fmtUsdc(capped < 0n ? -capped : capped, 0)} (${sign}${Math.abs((Number(capped) / Number(margin)) * 100).toFixed(0)}%)` };
