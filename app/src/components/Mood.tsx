@@ -104,7 +104,10 @@ export function Gauge({ mood }: { mood: Mood }) {
       role="img"
       aria-label={`Liquidation ${pct(g.liq)} away, ${g.capped ? "profit cap" : "take profit"} ${pct(g.target)} away`}
     >
-      <span style={danger ? { color: "#c43636" } : undefined}>LIQ {pct(g.liq)}</span>
+      <span className="whitespace-nowrap" style={danger ? { color: "#c43636" } : undefined}>
+        Liq {pct(g.liq)}
+        <span className="hidden sm:inline"> away</span>
+      </span>
       <span className="relative h-3 w-28 sm:w-40">
         <span className="absolute inset-x-0 top-1/2 h-[3px] -translate-y-1/2 bg-[var(--lcd-3)]" />
         <span className="absolute top-0 h-3 w-[2px] bg-[var(--lcd-3)]" style={{ left: at(g.entry) }} />
@@ -113,8 +116,9 @@ export function Gauge({ mood }: { mood: Mood }) {
           style={{ left: at(g.mark), background: danger ? "#c43636" : hot ? "#f2b705" : "var(--lcd-ink)" }}
         />
       </span>
-      <span style={hot ? { color: "#7a5a00" } : undefined}>
-        {g.capped ? "MAX" : "TP"} {pct(g.target)}
+      <span className="whitespace-nowrap" style={hot ? { color: "#7a5a00" } : undefined}>
+        {g.capped ? "Max win" : "TP"} {pct(g.target)}
+        <span className="hidden sm:inline"> away</span>
       </span>
     </span>
   );

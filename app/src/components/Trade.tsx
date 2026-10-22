@@ -42,6 +42,25 @@ const RANGES = [
 
 const MIN_HOLD_S = 60;
 
+/** Line or candles, remembered in this browser. */
+function useChartStyle(): ["line" | "candles", (s: "line" | "candles") => void] {
+  const [style, set] = useState<"line" | "candles">("line");
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("oneup.chart") === "candles") set("candles");
+    } catch {}
+  }, []);
+  return [
+    style,
+    (s) => {
+      set(s);
+      try {
+        localStorage.setItem("oneup.chart", s);
+      } catch {}
+    },
+  ];
+}
+
 export function Trade() {
   const { o, me, prices } = useOneUp();
   const markets = usePoll(() => o.markets(), [], 5000) ?? [];
@@ -98,6 +117,8 @@ export function Trade() {
         kind: "entry",
         pos: p.id,
         pnl: net === null ? undefined : { usd: Number(net) / 1e6, pct: (Number(net) / Number(margin)) * 100 },
+        // the price of the 9× profit cap: a move of 9 ÷ leverage
+        cap: priceToNumber(entry) * (1 + ((p.side === "Long" ? 1 : -1) * 9) / p.leverage),
       },
       { price: priceToNumber(liquidationPrice(p.side, entry, p.leverage)), label: `#${p.id} liq`, kind: "liq", pos: p.id },
       ...(p.triggers.take_profit ? [{ price: priceToNumber(BigInt(p.triggers.take_profit)), label: `#${p.id} TP`, kind: "tp" as const, pos: p.id }] : []),
@@ -244,6 +265,7 @@ function Console({
   const revenge = useRevengeFlash();
   const streak = useStreak(me);
   const [range, setRange] = useState<number>(RANGES[1][1]);
+  const [style, setStyle] = useChartStyle();
   const now = useNow();
   // the window, plus the last price before it so the line runs in from the left edge
   const all = history[market] ?? [];
@@ -273,12 +295,21 @@ function Console({
           );
         })}
       </div>
-      <div className="chip-track shrink-0 self-start sm:mt-1" role="group" aria-label="Chart range">
+      <div className="flex shrink-0 gap-2 self-start sm:mt-1">
+      <div className="chip-track" role="group" aria-label="Chart style">
+        {(["line", "candles"] as const).map((k) => (
+          <button key={k} type="button" className="chip" aria-pressed={style === k} onClick={() => setStyle(k)}>
+            {k === "line" ? "Line" : "Candles"}
+          </button>
+        ))}
+      </div>
+      <div className="chip-track" role="group" aria-label="Chart range">
         {RANGES.map(([name, ms]) => (
           <button key={name} type="button" className="chip num" aria-pressed={range === ms} onClick={() => setRange(ms)}>
             {name}
           </button>
         ))}
+      </div>
       </div>
       </div>
       <div className="bezel px-3 pb-5 pt-3 sm:px-5">
@@ -287,6 +318,7 @@ function Console({
           <PriceChart
             points={pts}
             span={range}
+            candles={style === "candles"}
             marks={marks}
             alarm={mood.state === "danger" || mood.state === "critical"}
             readout={
@@ -836,7 +868,8 @@ function EditTriggers({ p }: { p: Position }) {
 
 export function fmtPrice(p: bigint) {
   const v = priceToNumber(p);
-  const digits = v < 10 ? 4 : v < 1000 ? 2 : 0;
+  // cents on BTC and ETH too: a $0.80 move matters at 50×
+  const digits = v < 10 ? 4 : 2;
   return v.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
 

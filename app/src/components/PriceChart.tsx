@@ -19,6 +19,44 @@ export interface Mark {
   pnl?: { usd: number; pct: number };
   /** Another position's entry: a faint line only, with no label, zone or effect on the scale. */
   faint?: boolean;
+  /** On an entry: the price where the position hits its 9× profit cap (its green zone deepens toward this
+   *  when there's no take-profit). */
+  cap?: number;
+}
+
+/** Candle widths: the first that puts at most 48 across the window. */
+const CANDLE_STEPS = [2_000, 5_000, 10_000, 15_000, 30_000, 60_000, 120_000, 300_000];
+
+type Candle = { t: number; o: number; h: number; l: number; c: number };
+
+/** Buckets prices into candles of `size` ms from `from`; each opens at the close before it. */
+function candles(points: { t: number; p: number }[], from: number, size: number, head: number): Candle[] {
+  const out: Candle[] = [];
+  let prevClose = points[0].p;
+  for (const pt of points) {
+    const t = Math.floor(pt.t / size) * size;
+    if (t < from - size) {
+      prevClose = pt.p;
+      continue;
+    }
+    const c = out[out.length - 1];
+    if (c && c.t === t) {
+      c.h = Math.max(c.h, pt.p);
+      c.l = Math.min(c.l, pt.p);
+      c.c = pt.p;
+    } else {
+      out.push({ t, o: prevClose, h: Math.max(prevClose, pt.p), l: Math.min(prevClose, pt.p), c: pt.p });
+    }
+    prevClose = pt.p;
+  }
+  // the newest price eases in, as on the line
+  const c = out[out.length - 1];
+  if (c) {
+    c.c = head;
+    c.h = Math.max(c.h, head);
+    c.l = Math.min(c.l, head);
+  }
+  return out;
 }
 
 const DASH = { entry: "6 4", liq: "2 3", tp: "10 3 2 3", sl: "10 3 2 3" } as const;
@@ -90,10 +128,13 @@ export function PriceChart({
   readout,
   gauge,
   span,
+  candles: asCandles,
 }: {
   points: { t: number; p: number }[];
   /** The window shown, in ms, ending now: the time axis stays put while the line scrolls through it. */
   span?: number;
+  /** Draw candles instead of a line. */
+  candles?: boolean;
   marks?: Mark[];
   alarm?: boolean;
   readout?: React.ReactNode;
@@ -107,7 +148,7 @@ export function PriceChart({
   const H = narrow ? 300 : 420;
   // room at the top for the readout, at the bottom for the time axis
   // the right edge holds the price tag, plus the mark labels when a position is shown
-  const PAD = { l: 10, r: narrow ? 70 : marks.length ? 128 : 84, t: narrow && gauge ? 58 : 36, b: 22 };
+  const PAD = { l: 10, r: narrow ? 78 : marks.length ? 160 : 90, t: narrow && gauge ? 58 : 36, b: 22 };
   const [hover, setHover] = useState<number | null>(null);
   const now = useClock();
 
@@ -166,13 +207,24 @@ export function PriceChart({
       .slice(0, -1)
       .map((pt, i) => `${i ? "L" : "M"}${x(pt.t).toFixed(1)} ${y(pt.p).toFixed(1)}`)
       .join(" ") + ` L${x(last.t).toFixed(1)} ${y(headP).toFixed(1)} L${x(t1).toFixed(1)} ${y(headP).toFixed(1)}`;
-  const digits = last.p < 10 ? 4 : last.p < 1000 ? 2 : 0;
+  // cents on BTC and ETH too: a $0.80 move matters at 50×
+  const digits = last.p < 10 ? 4 : 2;
   const h = hover === null ? null : points[hover];
 
   // one position here: its marks don't need its number
   const many = new Set(marks.map((m) => m.label.split(" ")[0])).size > 1;
   const name = (m: Mark) => (many && !narrow ? m.label : m.label.replace(/^#\d+ /, ""));
   const shown = marks.map((m) => ({ m, edge: m.price > hi ? "up" : m.price < lo ? "down" : null }));
+  // how far the price has come from entry, and how far liquidation is (always on a phone when it's close)
+  const pctFrom = (a: number, b: number) => ((b - a) / a) * 100;
+  const away = (m: Mark) => {
+    if (m.kind === "entry" && !narrow) {
+      const d = pctFrom(m.price, last.p);
+      return ` · ${d >= 0 ? "+" : "−"}${Math.abs(d).toFixed(2)}%`;
+    }
+    if (m.kind === "liq" && (!narrow || alarm)) return ` · ${Math.abs(pctFrom(last.p, m.price)).toFixed(1)}%`;
+    return "";
+  };
 
   // right-edge labels: the price first, then each mark, nudged apart so none overlap
   const labels = [
@@ -180,7 +232,7 @@ export function PriceChart({
     ...shown.map(({ m, edge }) => ({
       key: m.label,
       y: edge === "up" ? PAD.t : edge === "down" ? plotB : y(m.price),
-      text: `${edge === "up" ? "▲ " : edge === "down" ? "▼ " : ""}${name(m)}${narrow ? "" : ` ${m.price.toFixed(digits)}`}`,
+      text: `${edge === "up" ? "▲ " : edge === "down" ? "▼ " : ""}${name(m)}${narrow ? "" : ` ${m.price.toFixed(digits)}`}${away(m)}`,
       head: false,
       kind: m.kind,
     })),
@@ -193,19 +245,19 @@ export function PriceChart({
   for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) ticks.push(v);
   const busy = [y(headP), ...shown.filter((s) => !s.edge).map((s) => y(s.m.price))];
 
-  // each position's zones: entry to take-profit in green, entry to stop-loss (or liquidation) in red, each
-  // fading in from the entry line
+  // each position's zone runs from entry to the price now: green in profit, deepening toward the take-profit (or
+  // the 9× cap), red in loss, deepening toward the stop-loss (or liquidation). It grows and shrinks with the price
   const clampY = (p: number) => Math.min(plotB, Math.max(PAD.t, y(p)));
   const zones = marks
-    .filter((m) => m.kind === "entry" && m.pos !== undefined)
+    .filter((m) => m.kind === "entry" && m.pos !== undefined && m.pnl)
     .flatMap((e) => {
       const mine = marks.filter((m) => m.pos === e.pos);
-      const tp = mine.find((m) => m.kind === "tp");
-      const loss = mine.find((m) => m.kind === "sl") ?? mine.find((m) => m.kind === "liq");
-      return [
-        ...(tp ? [{ key: `${e.pos}p`, a: clampY(e.price), b: clampY(tp.price), loss: false }] : []),
-        ...(loss ? [{ key: `${e.pos}l`, a: clampY(e.price), b: clampY(loss.price), loss: true }] : []),
-      ];
+      const loss = e.pnl!.usd < 0;
+      const toward = loss
+        ? (mine.find((m) => m.kind === "sl") ?? mine.find((m) => m.kind === "liq"))?.price
+        : (mine.find((m) => m.kind === "tp")?.price ?? e.cap);
+      if (toward === undefined) return [];
+      return [{ key: `${e.pos}`, a: clampY(e.price), b: clampY(headP), from: y(e.price), to: y(toward), loss }];
     });
   // live profit on each visible entry line
   const pills = shown
@@ -215,7 +267,8 @@ export function PriceChart({
       const sign = usd >= 0 ? "+" : "−";
       const amount = `${sign}$${Math.abs(usd).toLocaleString("en-US", { maximumFractionDigits: Math.abs(usd) >= 1000 ? 0 : 2, minimumFractionDigits: Math.abs(usd) >= 1000 ? 0 : 2 })}`;
       const text = narrow ? amount : `${amount} (${sign}${Math.abs(pct).toFixed(1)}%)`;
-      return { key: m.label, y: y(m.price), text, up: usd >= 0, w: (text.length + 2) * 7.4 + 12 };
+      // kept below the readout when the entry sits near the top
+      return { key: m.label, y: Math.max(PAD.t + 20, y(m.price)), text, up: usd >= 0, w: (text.length + 2) * 7.4 + 12 };
     });
   const tickDigits = Math.max(decimalsOf(step), 0);
 
@@ -223,6 +276,10 @@ export function PriceChart({
   const tStep = TIME_STEPS.find((s) => (t1 - t0) / s <= 5) ?? TIME_STEPS[TIME_STEPS.length - 1];
   const times: number[] = [];
   for (let a = tStep; a <= (t1 - t0) * 0.94; a += tStep) times.push(a);
+
+  const cSize = CANDLE_STEPS.find((s) => (t1 - t0) / s <= 48) ?? CANDLE_STEPS[CANDLE_STEPS.length - 1];
+  const bars = asCandles ? candles(points, t0, cSize, headP) : null;
+  const cW = Math.max(2, ((plotR - PAD.l) * cSize) / Math.max(1, t1 - t0) * 0.62);
 
   const onPointer = (e: React.PointerEvent) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -282,17 +339,43 @@ export function PriceChart({
         {zones.map((z) => (
           <g key={z.key}>
             <defs>
-              <linearGradient id={`zone-${z.key}`} gradientUnits="userSpaceOnUse" x1="0" x2="0" y1={z.a} y2={z.b}>
-                <stop offset="0" stopColor={z.loss ? "var(--short)" : "var(--long)"} stopOpacity="0" />
-                <stop offset="1" stopColor={z.loss ? "var(--short)" : "var(--long)"} stopOpacity="0.32" />
+              <linearGradient id={`zone-${z.key}`} gradientUnits="userSpaceOnUse" x1="0" x2="0" y1={z.from} y2={z.to}>
+                <stop offset="0" stopColor={z.loss ? "var(--short)" : "var(--long)"} stopOpacity="0.12" />
+                <stop offset="1" stopColor={z.loss ? "var(--short)" : "var(--long)"} stopOpacity="0.6" />
               </linearGradient>
             </defs>
             <rect x={PAD.l} width={plotR - PAD.l} y={Math.min(z.a, z.b)} height={Math.abs(z.b - z.a)} fill={`url(#zone-${z.key})`} />
           </g>
         ))}
         <g clipPath="url(#lcd-plot)">
-          <path d={`${line} L${x(t1)} ${plotB} L${x(points[0].t)} ${plotB} Z`} fill="url(#lcd-fill)" />
-          <path d={line} fill="none" stroke="var(--lcd-ink)" strokeWidth="2.5" strokeLinejoin="round" />
+          {bars ? (
+            bars.map((c) => {
+              const cx = x(c.t + cSize / 2);
+              const up = c.c >= c.o;
+              const top = y(Math.max(c.o, c.c));
+              return (
+                <g key={c.t}>
+                  <line x1={cx} x2={cx} y1={y(c.h)} y2={y(c.l)} stroke="var(--lcd-ink)" strokeWidth="1.5" />
+                  {/* up candles hollow, down candles solid: the monochrome screen's way of telling them apart */}
+                  <rect
+                    x={cx - cW / 2}
+                    y={top}
+                    width={cW}
+                    height={Math.max(1.5, y(Math.min(c.o, c.c)) - top)}
+                    fill={up ? "var(--lcd)" : "var(--lcd-ink)"}
+                    stroke="var(--lcd-ink)"
+                    strokeWidth="1.5"
+                  />
+                </g>
+              );
+            })
+          ) : (
+            <>
+              {/* the fill would muddy a position's zone, so it only shows on its own */}
+              {zones.length === 0 && <path d={`${line} L${x(t1)} ${plotB} L${x(points[0].t)} ${plotB} Z`} fill="url(#lcd-fill)" />}
+              <path d={line} fill="none" stroke="var(--lcd-ink)" strokeWidth="2.5" strokeLinejoin="round" />
+            </>
+          )}
         </g>
         {shown.map(({ m, edge }) =>
           edge ? null : (
@@ -304,7 +387,7 @@ export function PriceChart({
               y1={y(m.price)}
               y2={y(m.price)}
               stroke={m.kind === "liq" ? "var(--lcd-ink)" : "var(--lcd-3)"}
-              strokeWidth={m.kind === "liq" ? 2 : 1.5}
+              strokeWidth={m.kind === "liq" ? (alarm ? 3.5 : 2) : 1.5}
               strokeDasharray={DASH[m.kind]}
             />
           ),
@@ -342,7 +425,7 @@ export function PriceChart({
                 </text>
               </>
             ) : (
-              <text x={plotR + 6} y={placed[i] + 4} fontSize="11" fill="var(--lcd-ink)" className="num">
+              <text x={plotR + 6} y={placed[i] + 4} fontSize="11" fontWeight={alarm && l.kind === "liq" ? 800 : undefined} fill="var(--lcd-ink)" className="num">
                 {l.text}
               </text>
             )}
