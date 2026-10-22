@@ -394,10 +394,15 @@ export function PriceChart({
 
   return (
     <div ref={ref} className="lcd relative">
+      {/* far behind the price: a pixel skyline and clouds, drifting slowly in the screen's own shade */}
+      <div className="lcd-scenery" aria-hidden style={{ left: PAD.l, right: PAD.r, top: PAD.t, bottom: PAD.b }}>
+        <div className="lcd-clouds" />
+        <div className="lcd-skyline" />
+      </div>
       <svg
         width={W}
         height={H}
-        className="display block touch-pan-y select-none"
+        className="display relative block touch-pan-y select-none"
         role="img"
         aria-label={`Price chart, last ${last.p.toFixed(digits)}`}
         onPointerMove={onPointer}
@@ -410,6 +415,9 @@ export function PriceChart({
           <clipPath id="lcd-plot">
             <rect x={PAD.l} y={0} width={plotR - PAD.l + 4} height={plotB} />
           </clipPath>
+          <filter id="lcd-smear" x="-5%" y="-5%" width="110%" height="110%">
+            <feGaussianBlur stdDeviation="2 1" />
+          </filter>
           <linearGradient id="lcd-fill" x1="0" x2="0" y1="0" y2="1">
             <stop offset="0" stopColor="var(--lcd-2)" stopOpacity="0.7" />
             <stop offset="1" stopColor="var(--lcd-2)" stopOpacity="0.1" />
@@ -508,6 +516,8 @@ export function PriceChart({
             <>
               {/* the fill would muddy a position's zone, so it only shows on its own */}
               {!zone && <path d={`${line} L${x(t1)} ${plotB} L${x(points[0].t)} ${plotB} Z`} fill="url(#lcd-fill)" />}
+              {/* LCD smear: the slow pixels an old screen leaves just behind the line as it scrolls */}
+              <path d={line} fill="none" stroke="var(--lcd-ink)" strokeWidth="3" strokeLinejoin="round" opacity="0.18" transform="translate(4 1)" filter="url(#lcd-smear)" />
               <path d={line} fill="none" stroke="var(--lcd-ink)" strokeWidth="2.5" strokeLinejoin="round" />
             </>
           )}

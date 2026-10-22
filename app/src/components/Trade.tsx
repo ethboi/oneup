@@ -24,7 +24,7 @@ import {
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { PriceChart, type Mark } from "./PriceChart";
 import { fmtClock, useNow } from "./Header";
-import { PixelHeart } from "./Pixel";
+import { PixelCoin, PixelHeart } from "./Pixel";
 import { Icon } from "./Icon";
 import { Popover } from "./Popover";
 import { useTilt } from "@/lib/tilt";
@@ -657,7 +657,11 @@ function Console({
   const drawIn = treasury && ep ? Math.max(0, (treasury.draw_epoch - ep.id) * dep.epochLengthS + ep.started_at + dep.epochLengthS - now) : null;
   const jackpotLine =
     treasury?.vault && drawIn !== null ? (
-      <span className="text-sm">
+      <span className="flex items-center gap-1.5 text-sm">
+        {/* the coin turns faster in the last round before the draw */}
+        <span className={`coin-spin ${drawIn < dep.epochLengthS ? "fast" : ""}`} aria-hidden>
+          <PixelCoin size={16} />
+        </span>
         Jackpot ${fmtUsdc(BigInt(treasury.jackpot), 0)} · draws in {fmtDuration(drawIn)}
       </span>
     ) : undefined;

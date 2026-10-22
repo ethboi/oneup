@@ -1487,3 +1487,69 @@ kbd {
     animation: none;
   }
 }
+
+
+/* the LCD's scenery (components/PriceChart.tsx): a pixel skyline along the bottom and clouds up top, in the
+   screen's second shade and faint, drifting slowly left like a handheld game's background */
+.lcd-scenery {
+  position: absolute;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0.32;
+}
+.lcd-scenery > div {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: var(--lcd-2);
+  mask-repeat: repeat-x;
+  -webkit-mask-repeat: repeat-x;
+}
+.lcd-skyline {
+  bottom: 0;
+  height: 64px;
+  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22240%22%20height%3D%2264%22%20shape-rendering%3D%22crispEdges%22%3E%3Crect%20x%3D%220%22%20y%3D%2244%22%20width%3D%2220%22%20height%3D%2220%22/%3E%3Crect%20x%3D%2228%22%20y%3D%2248%22%20width%3D%2212%22%20height%3D%2216%22/%3E%3Crect%20x%3D%2240%22%20y%3D%2228%22%20width%3D%2220%22%20height%3D%2236%22/%3E%3Crect%20x%3D%2252%22%20y%3D%2220%22%20width%3D%224%22%20height%3D%228%22/%3E%3Crect%20x%3D%2260%22%20y%3D%2244%22%20width%3D%2228%22%20height%3D%2220%22/%3E%3Crect%20x%3D%2288%22%20y%3D%2236%22%20width%3D%2212%22%20height%3D%2228%22/%3E%3Crect%20x%3D%22108%22%20y%3D%2244%22%20width%3D%2212%22%20height%3D%2220%22/%3E%3Crect%20x%3D%22120%22%20y%3D%2236%22%20width%3D%2228%22%20height%3D%2228%22/%3E%3Crect%20x%3D%22140%22%20y%3D%2228%22%20width%3D%224%22%20height%3D%228%22/%3E%3Crect%20x%3D%22148%22%20y%3D%2248%22%20width%3D%2228%22%20height%3D%2216%22/%3E%3Crect%20x%3D%22180%22%20y%3D%2248%22%20width%3D%2228%22%20height%3D%2216%22/%3E%3Crect%20x%3D%22216%22%20y%3D%2244%22%20width%3D%2212%22%20height%3D%2220%22/%3E%3Crect%20x%3D%22228%22%20y%3D%2244%22%20width%3D%2212%22%20height%3D%2220%22/%3E%3C/svg%3E");
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22240%22%20height%3D%2264%22%20shape-rendering%3D%22crispEdges%22%3E%3Crect%20x%3D%220%22%20y%3D%2244%22%20width%3D%2220%22%20height%3D%2220%22/%3E%3Crect%20x%3D%2228%22%20y%3D%2248%22%20width%3D%2212%22%20height%3D%2216%22/%3E%3Crect%20x%3D%2240%22%20y%3D%2228%22%20width%3D%2220%22%20height%3D%2236%22/%3E%3Crect%20x%3D%2252%22%20y%3D%2220%22%20width%3D%224%22%20height%3D%228%22/%3E%3Crect%20x%3D%2260%22%20y%3D%2244%22%20width%3D%2228%22%20height%3D%2220%22/%3E%3Crect%20x%3D%2288%22%20y%3D%2236%22%20width%3D%2212%22%20height%3D%2228%22/%3E%3Crect%20x%3D%22108%22%20y%3D%2244%22%20width%3D%2212%22%20height%3D%2220%22/%3E%3Crect%20x%3D%22120%22%20y%3D%2236%22%20width%3D%2228%22%20height%3D%2228%22/%3E%3Crect%20x%3D%22140%22%20y%3D%2228%22%20width%3D%224%22%20height%3D%228%22/%3E%3Crect%20x%3D%22148%22%20y%3D%2248%22%20width%3D%2228%22%20height%3D%2216%22/%3E%3Crect%20x%3D%22180%22%20y%3D%2248%22%20width%3D%2228%22%20height%3D%2216%22/%3E%3Crect%20x%3D%22216%22%20y%3D%2244%22%20width%3D%2212%22%20height%3D%2220%22/%3E%3Crect%20x%3D%22228%22%20y%3D%2244%22%20width%3D%2212%22%20height%3D%2220%22/%3E%3C/svg%3E");
+  animation: lcd-drift-240 90s linear infinite;
+}
+.lcd-clouds {
+  top: 8%;
+  height: 56px;
+  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22420%22%20height%3D%2256%22%20shape-rendering%3D%22crispEdges%22%3E%3Crect%20x%3D%2248%22%20y%3D%224%22%20width%3D%2224%22%20height%3D%226%22/%3E%3Crect%20x%3D%2236%22%20y%3D%2210%22%20width%3D%2254%22%20height%3D%226%22/%3E%3Crect%20x%3D%2230%22%20y%3D%2216%22%20width%3D%2272%22%20height%3D%226%22/%3E%3Crect%20x%3D%2236%22%20y%3D%2222%22%20width%3D%2260%22%20height%3D%226%22/%3E%3Crect%20x%3D%22275%22%20y%3D%2228%22%20width%3D%2220%22%20height%3D%225%22/%3E%3Crect%20x%3D%22265%22%20y%3D%2233%22%20width%3D%2245%22%20height%3D%225%22/%3E%3Crect%20x%3D%22260%22%20y%3D%2238%22%20width%3D%2260%22%20height%3D%225%22/%3E%3Crect%20x%3D%22265%22%20y%3D%2243%22%20width%3D%2250%22%20height%3D%225%22/%3E%3C/svg%3E");
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22420%22%20height%3D%2256%22%20shape-rendering%3D%22crispEdges%22%3E%3Crect%20x%3D%2248%22%20y%3D%224%22%20width%3D%2224%22%20height%3D%226%22/%3E%3Crect%20x%3D%2236%22%20y%3D%2210%22%20width%3D%2254%22%20height%3D%226%22/%3E%3Crect%20x%3D%2230%22%20y%3D%2216%22%20width%3D%2272%22%20height%3D%226%22/%3E%3Crect%20x%3D%2236%22%20y%3D%2222%22%20width%3D%2260%22%20height%3D%226%22/%3E%3Crect%20x%3D%22275%22%20y%3D%2228%22%20width%3D%2220%22%20height%3D%225%22/%3E%3Crect%20x%3D%22265%22%20y%3D%2233%22%20width%3D%2245%22%20height%3D%225%22/%3E%3Crect%20x%3D%22260%22%20y%3D%2238%22%20width%3D%2260%22%20height%3D%225%22/%3E%3Crect%20x%3D%22265%22%20y%3D%2243%22%20width%3D%2250%22%20height%3D%225%22/%3E%3C/svg%3E");
+  animation: lcd-drift-420 150s linear infinite;
+}
+@keyframes lcd-drift-240 {
+  to {
+    mask-position: -240px 0;
+    -webkit-mask-position: -240px 0;
+  }
+}
+@keyframes lcd-drift-420 {
+  to {
+    mask-position: -420px 0;
+    -webkit-mask-position: -420px 0;
+  }
+}
+/* a pixel coin turning, by the jackpot on the LCD; quicker as the draw nears */
+.coin-spin {
+  display: inline-flex;
+  animation: coin-spin 1.6s steps(8) infinite;
+}
+.coin-spin.fast {
+  animation-duration: 0.7s;
+}
+@keyframes coin-spin {
+  0%, 100% {
+    transform: scaleX(1);
+  }
+  50% {
+    transform: scaleX(0.15);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lcd-scenery > div,
+  .coin-spin {
+    animation: none;
+  }
+}
