@@ -193,8 +193,7 @@ export function PriceChart({
   for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) ticks.push(v);
   const busy = [y(headP), ...shown.filter((s) => !s.edge).map((s) => y(s.m.price))];
 
-  // each position's zones, in the screen's own shades: entry to take-profit lit up, entry to stop-loss (or
-  // liquidation) hatched
+  // each position's zones: entry to take-profit in green, entry to stop-loss (or liquidation) in red
   const clampY = (p: number) => Math.min(plotB, Math.max(PAD.t, y(p)));
   const zones = marks
     .filter((m) => m.kind === "entry" && m.pos !== undefined)
@@ -249,9 +248,6 @@ export function PriceChart({
           <clipPath id="lcd-plot">
             <rect x={PAD.l} y={0} width={plotR - PAD.l + 4} height={plotB} />
           </clipPath>
-          <pattern id="lcd-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-            <line x1="0" y1="0" x2="0" y2="6" stroke="var(--lcd-ink)" strokeWidth="1.2" opacity="0.16" />
-          </pattern>
           <linearGradient id="lcd-fill" x1="0" x2="0" y1="0" y2="1">
             <stop offset="0" stopColor="var(--lcd-2)" stopOpacity="0.7" />
             <stop offset="1" stopColor="var(--lcd-2)" stopOpacity="0.1" />
@@ -288,8 +284,8 @@ export function PriceChart({
             width={plotR - PAD.l}
             y={Math.min(z.a, z.b)}
             height={Math.abs(z.b - z.a)}
-            fill={z.loss ? "url(#lcd-hatch)" : "#fff"}
-            opacity={z.loss ? 1 : 0.18}
+            fill={z.loss ? "var(--short)" : "var(--long)"}
+            opacity="0.13"
           />
         ))}
         <g clipPath="url(#lcd-plot)">

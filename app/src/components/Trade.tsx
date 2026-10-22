@@ -45,8 +45,19 @@ const MIN_HOLD_S = 60;
 export function Trade() {
   const { o, me, prices } = useOneUp();
   const markets = usePoll(() => o.markets(), [], 5000) ?? [];
-  const [market, setMarket] = useState("NEAR-USD");
+  const [market, setMarketState] = useState("NEAR-USD");
   const positions = usePoll(() => o.positions(me), [me]) ?? [];
+  // until you pick a market or a position, the chart follows your top position
+  const chose = useRef(false);
+  const setMarket = (m: string) => {
+    chose.current = true;
+    setMarketState(m);
+  };
+  const top = positions[0];
+  useEffect(() => {
+    if (!chose.current && top && top.market_id !== market) setMarketState(top.market_id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [top?.id]);
   const orders = usePoll(() => o.orders(me), [me]) ?? [];
   const ticket = useTicket(market, markets.find((m) => m.id === market)?.max_leverage ?? 100);
   // the phone trade bar only shows while the form itself is scrolled away
@@ -60,10 +71,14 @@ export function Trade() {
     return () => io.disconnect();
   }, []);
 
-  // the chart details one position: the one picked below, or the newest in this market; the rest show faintly
+  // the chart details one position: the one picked below, or the top one in this market; the rest show faintly
   const [focus, setFocus] = useState<number | null>(null);
+  useEffect(() => {
+    chose.current = false;
+    setFocus(null);
+  }, [me]);
   const here = positions.filter((p) => p.market_id === market);
-  const focused = here.find((p) => p.id === focus) ?? here.reduce<Position | undefined>((a, p) => (!a || p.id > a.id ? p : a), undefined);
+  const focused = here.find((p) => p.id === focus) ?? here[0];
   const pick = (p: Position) => {
     setFocus(p.id);
     setMarket(p.market_id);
