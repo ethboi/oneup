@@ -27,6 +27,8 @@ export function Solvency() {
   const liability = big(s.liability);
   const reserve = big(s.reserve);
   const used = pct(liability, pool);
+  // this epoch: what traders lost to the house less what it paid winners
+  const houseNet = epoch ? big(epoch.losses) - big(epoch.payouts) : 0n;
 
   return (
     <div className="flex flex-col gap-4">
@@ -40,6 +42,16 @@ export function Solvency() {
           Every trade that would push this past 100% is refused, so there is never a payout queue. Both sides of each market
           are counted, because positions close at different times.
         </p>
+        {epoch && (
+          <p className="mt-3 text-sm">
+            This epoch so far, traders lost <b className="num">${fmtUsdc(big(epoch.losses), 0)}</b> to the house and it paid winners{" "}
+            <b className="num">${fmtUsdc(big(epoch.payouts), 0)}</b>: the house is{" "}
+            <b className="num" style={{ color: houseNet >= 0n ? "var(--long)" : "var(--short)" }}>
+              {houseNet >= 0n ? "up" : "down"} ${fmtUsdc(houseNet < 0n ? -houseNet : houseNet, 0)}
+            </b>
+            .
+          </p>
+        )}
         {pool < big(s.seed) && (
           <p className="mt-3 flex items-center gap-2 text-sm">
             <Icon name="info" />

@@ -29,8 +29,10 @@ export interface TradeRecord {
   /** 1e8 units. */
   entry_price: string;
   exit_price: string;
-  /** Signed USDC, 6 decimals. */
+  /** Signed USDC, 6 decimals, before the winner's cut. */
   pnl: string;
+  /** The winner's cut, USDC 6 decimals (0 on a loss; missing on records indexed before it was kept). */
+  cut?: string;
   reason: "Close" | "Liquidation" | "TakeProfit" | "Target" | "Stop";
   opened_t: number;
   closed_t: number;
@@ -170,6 +172,7 @@ export function toItems(ev: Event, executor: string, t: number, c: Record<string
             entry_price: o.entry_price,
             exit_price: String(d.price),
             pnl: String(d.pnl),
+            cut: String(d.cut ?? 0),
             reason: d.reason as TradeRecord["reason"],
             opened_t: o.t,
             closed_t: t,

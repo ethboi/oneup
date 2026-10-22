@@ -3,11 +3,14 @@
 import { useEffect, useState } from "react";
 import { USDC, fmtUsdc, ONEUP } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
-import { Logo, PixelCoin } from "./Pixel";
+import { Logo, PixelCoin, PixelHeart } from "./Pixel";
 import { Icon } from "./Icon";
 import { Popover } from "./Popover";
 import { MuteButton } from "./Sounds";
 import { openBadges } from "./Achievements";
+import { useHistory } from "./History";
+import { emitFx, winTier } from "@/lib/fx";
+import { sfx } from "@/lib/sound";
 import { endSession, saveSession, sessionAllowance, startSession } from "@/lib/session";
 import { intentsBalances, payFromChain } from "@/lib/intents";
 
@@ -16,8 +19,8 @@ export interface NavTab {
   badge?: "lives";
 }
 
-/** One bar: brand, the section tabs (desktop), the house's result this round and the epoch clock as plain text, Demo,
- *  and your account. */
+/** One bar: brand, the section tabs (desktop), your result this round and the epoch clock as plain text, Demo, and
+ *  your account. */
 export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string; go: (t: string) => void }) {
   const { o, d, me } = useOneUp();
   const epoch = usePoll(() => o.epoch(), []);
@@ -25,9 +28,7 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
   const now = useNow();
   const left = epoch ? Math.max(0, epoch.started_at + d.epochLengthS - now) : 0;
   const alive = lives?.filter((l) => !l.expired && !l.full_heal).length ?? 0;
-  // the house's result this round: what traders lost to it less what it paid winners. Positive at the
-  // round's end is what pays the Extra Lives
-  const house = epoch ? BigInt(epoch.losses) - BigInt(epoch.payouts) : null;
+  const round = useMyRound(me, epoch?.started_at);
 
   return (
     <header className="mb-4 flex items-center gap-2 border-b border-[var(--line)] py-3 sm:gap-4 lg:mb-5">
@@ -46,14 +47,26 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
         </div>
       </nav>
       <dl className="num flex min-w-0 flex-1 justify-end gap-4 text-right lg:flex-none">
-        <div title="What traders lost to the house this round, less what it paid winners. A profit at the end of the round pays the Extra Lives.">
-          <dt className="label leading-tight">
-            House<span className="hidden sm:inline"> this round</span>
-          </dt>
-          <dd className="font-extrabold leading-tight" style={house === null || house === 0n ? undefined : { color: house > 0n ? "var(--long)" : "var(--short)" }}>
-            {house === null ? "…" : `${house > 0n ? "+" : house < 0n ? "−" : ""}$${fmtUsdc(house < 0n ? -house : house, 0)}`}
-          </dd>
-        </div>
+        {round && (
+          <div
+            title={
+              round.net < 0n
+                ? "Your net loss this round. When the round ends it becomes an Extra Life and a $1UP lock, sized from the house's profit."
+                : "Your net profit this round, after the winner's cut."
+            }
+          >
+            <dt className="label leading-tight">This round</dt>
+            <dd className="flex items-center justify-end gap-1 font-extrabold leading-tight" style={{ color: round.net < 0n ? "var(--short)" : "var(--long)" }}>
+              {round.net < 0n ? "−" : "+"}${fmtUsdc(round.net < 0n ? -round.net : round.net, 0)}
+              {round.net < 0n && (
+                <span className="flex items-center" aria-label="Extra Life at the end of the round">
+                  <PixelHeart size={16} />
+                  <span className="hidden text-xs text-[var(--heart)] sm:inline">+1</span>
+                </span>
+              )}
+            </dd>
+          </div>
+        )}
         <div>
           <dt className="label leading-tight">Epoch {epoch?.id ?? "…"}</dt>
           <dd className="font-extrabold leading-tight">{fmtClock(left)}</dd>
@@ -67,8 +80,12 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
 }
 
 /** Localnet tools: act as any demo account, and get test USDC. */
+/** Wins to preview the close effect with, one per tier (lib/fx.ts winTier). */
+const PREVIEW_WINS = [20, 200, 1_200, 5_000];
+
 function DemoMenu() {
-  const { me, setMe, accounts, tx, run } = useOneUp();
+  const { o, me, setMe, accounts, tx, run } = useOneUp();
+  const markets = usePoll(() => o.markets(), [], 30_000) ?? [];
   const [amount, setAmount] = useState("10000");
   const amt = BigInt(Math.floor(Number(amount) || 0)) * USDC;
   return (
@@ -103,6 +120,28 @@ function DemoMenu() {
               <Icon name="faucet" />
               Faucet
             </button>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="label">Preview a win on the chart (nothing is traded)</span>
+            <div className="flex gap-1.5">
+              {PREVIEW_WINS.map((usd) => (
+                <button
+                  key={usd}
+                  type="button"
+                  className="chip num flex-1 px-0"
+                  onClick={() => {
+                    close();
+                    const pnl = BigInt(usd) * USDC;
+                    const tier = winTier(pnl, 100_000n * USDC);
+                    sfx(tier === 3 ? "jackpot" : "win");
+                    // the chart shows one market: send it to each, the one on screen plays it
+                    markets.forEach((m, i) => emitFx({ kind: "win", market: m.id, positionId: -1 - i, pnl: pnl.toString(), tier }));
+                  }}
+                >
+                  ${usd.toLocaleString("en-US")}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -319,3 +358,19 @@ export function useNow(ms = 1000) {
 export const fmtClock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 export const fmtOneup = (x?: string, digits = 0) =>
   x === undefined ? "…" : (Number(BigInt(x) / (ONEUP / 1000n)) / 1000).toLocaleString("en-US", { maximumFractionDigits: digits });
+
+/**
+ * Your result this round, or null before your first close in it. A net loss comes from the house itself (the
+ * pending Extra Life, exact); a profit from your closes since the round began, after the winner's cut.
+ */
+function useMyRound(me: string, startedAt?: number) {
+  const { o } = useOneUp();
+  const pending = usePoll(() => o.pendingLife(me), [me]);
+  const history = useHistory(me);
+  if (startedAt === undefined || pending === undefined) return null;
+  if (BigInt(pending) > 0n) return { net: -BigInt(pending) };
+  const closes = (history?.items ?? []).filter((i) => i.kind === "trade" && i.trade.closed_t >= startedAt * 1000);
+  if (closes.length === 0) return null;
+  const net = closes.reduce((s, i) => (i.kind === "trade" ? s + BigInt(i.trade.pnl) - BigInt(i.trade.cut ?? 0) : s), 0n);
+  return net > 0n ? { net } : null;
+}

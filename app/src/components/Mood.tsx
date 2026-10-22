@@ -188,9 +188,10 @@ export function Burst({ fx }: { fx: CloseFx & { id: number } }) {
             {tier === 3 && <span className="win-amount win-banner display">BIG WIN</span>}
             <span
               className={`win-amount display num ${tier === 3 ? "win-huge" : ""}`}
-              style={tier === 3 ? { fontSize: w.size } : { fontSize: w.size, animationDuration: `${w.hold - 100}ms` }}
+              // capped by the screen's width so a big number still fits on a phone
+              style={tier === 3 ? { fontSize: `min(${w.size}px, 12vw)` } : { fontSize: `min(${w.size}px, 10vw)`, animationDuration: `${w.hold - 100}ms` }}
             >
-              +${fmtUsdc(won)}
+              +${fmtUsdc(won, won >= 1_000n * 1_000_000n ? 0 : 2)}
             </span>
           </span>
         )}
