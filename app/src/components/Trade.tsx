@@ -91,7 +91,8 @@ function MarketBar(props: {
   const info = markets.find((m) => m.id === market);
   const long = info ? BigInt(info.long_liability) : 0n;
   const short = info ? BigInt(info.short_liability) : 0n;
-  const longPct = long + short > 0n ? Number((long * 1000n) / (long + short)) / 10 : null;
+  // whole percents that add up to 100
+  const longPct = long + short > 0n ? Math.round(Number((long * 1000n) / (long + short)) / 10) : null;
   const sm = solvency?.markets.find((m) => m.id === market);
   const room = sm ? BigInt(sm.capacity) - BigInt(sm.liability) : null;
   const lastTick = (history[market] ?? []).at(-1)?.t ?? 0;
@@ -479,7 +480,8 @@ function TradesTape({ market, info }: { market: string; info?: Market }) {
   const rows = feed.filter((a) => a.trade?.market === market).slice(0, 40);
   const long = info ? BigInt(info.long_liability) : 0n;
   const short = info ? BigInt(info.short_liability) : 0n;
-  const longPct = long + short > 0n ? Number((long * 1000n) / (long + short)) / 10 : 50;
+  // whole percents that add up to 100
+  const longPct = long + short > 0n ? Math.round(Number((long * 1000n) / (long + short)) / 10) : 50;
   return (
     <section className="panel tape order-2 hidden min-h-0 flex-col 2xl:flex" aria-label={`${market} trades`}>
       <div className="flex items-baseline justify-between px-3.5 pt-3">
@@ -508,7 +510,7 @@ function TradesTape({ market, info }: { market: string; info?: Market }) {
         {rows.map((a) => {
           const tr = a.trade!;
           return (
-            <li key={a.seq} className="tape-row py-[3px]" title={a.text}>
+            <li key={a.seq} className="tape-row border-b border-[var(--line)]/50 py-[5px] last:border-0" title={a.text}>
               <span className="font-bold" style={{ color: tr.side === "Long" ? "var(--long)" : "var(--short)", opacity: tr.open ? 1 : 0.6 }}>
                 {tr.open ? "" : "× "}
                 {fmtPrice(BigInt(tr.price))}
