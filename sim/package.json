@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "tsx src/run.ts",
+    "backers": "tsx src/backers.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
