@@ -1416,3 +1416,15 @@ body {
   color: var(--primary);
   box-shadow: inset 0 -2px 0 var(--primary);
 }
+/* a thin scrollbar in the panel's own colours, not the browser's grey */
+.tape ol {
+  scrollbar-width: thin;
+  scrollbar-color: var(--edge) transparent;
+}
+.tape ol::-webkit-scrollbar {
+  width: 6px;
+}
+.tape ol::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: var(--edge);
+}

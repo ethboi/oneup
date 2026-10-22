@@ -26,7 +26,8 @@ export interface Mark {
   since?: number;
 }
 
-/** Candle widths: the first that puts at most 48 across the window. */
+/** Candle widths: the first that puts at most 24 across the window. Prices arrive every few seconds, so a
+ *  thinner candle would mostly be a flat dash. */
 const CANDLE_STEPS = [2_000, 5_000, 10_000, 15_000, 30_000, 60_000, 120_000, 300_000];
 
 type Candle = { t: number; o: number; h: number; l: number; c: number };
@@ -329,7 +330,7 @@ export function PriceChart({
   const times: number[] = [];
   for (let a = tStep; a <= (t1 - t0) * 0.94; a += tStep) times.push(a);
 
-  const cSize = CANDLE_STEPS.find((s) => (t1 - t0) / s <= 48) ?? CANDLE_STEPS[CANDLE_STEPS.length - 1];
+  const cSize = CANDLE_STEPS.find((s) => (t1 - t0) / s <= 24) ?? CANDLE_STEPS[CANDLE_STEPS.length - 1];
   const bars = asCandles ? candles(points, t0, cSize, headP) : null;
   const cW = Math.max(2, ((plotR - PAD.l) * cSize) / Math.max(1, t1 - t0) * 0.62);
 

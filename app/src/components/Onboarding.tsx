@@ -1,14 +1,21 @@
 "use client";
 
-// First visit: the whole idea in three steps. Dismissed once, remembered in this browser.
+// First visit: the whole idea in three steps. Gone once dismissed (remembered in this browser) or once the
+// account has traded: by then it knows.
 
 import { useEffect, useState } from "react";
+import { useOneUp, usePoll } from "@/lib/oneup";
+import { useHistory } from "./History";
 import { Icon } from "./Icon";
 import { PixelHeart } from "./Pixel";
 
 const KEY = "oneup.onboarded";
 
 export function Onboarding() {
+  const { o, me } = useOneUp();
+  const positions = usePoll(() => o.positions(me), [me]);
+  const history = useHistory(me);
+  const traded = (positions?.length ?? 0) > 0 || (history?.items ?? []).some((i) => i.kind === "trade");
   const [show, setShow] = useState(false);
   useEffect(() => {
     try {
@@ -17,7 +24,7 @@ export function Onboarding() {
       setShow(true);
     }
   }, []);
-  if (!show) return null;
+  if (!show || traded) return null;
   const close = () => {
     setShow(false);
     try {

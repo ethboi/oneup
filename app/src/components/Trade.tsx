@@ -426,7 +426,12 @@ function TradesTape({ market, info }: { market: string; info?: Market }) {
   return (
     <section className="panel tape order-2 hidden min-h-0 flex-col 2xl:flex" aria-label={`${market} trades`}>
       <div className="flex items-baseline justify-between px-3.5 pt-3">
-        <h3 className="font-extrabold">Trades</h3>
+        <h3 className="flex items-center gap-1.5 font-extrabold">
+          Trades
+          <span className="text-[var(--muted)]" title="Green is a long, red a short; × marks a close." aria-label="Green is a long, red a short; × marks a close.">
+            <Icon name="info" size={14} />
+          </span>
+        </h3>
         <span className="label">{market}</span>
       </div>
       {/* the house's book on this market: whose max wins it holds more of */}
@@ -457,7 +462,6 @@ function TradesTape({ market, info }: { market: string; info?: Market }) {
           );
         })}
       </ol>
-      <p className="label border-t border-[var(--line)] px-3.5 py-2">Colour is the side; × is a close.</p>
     </section>
   );
 }
