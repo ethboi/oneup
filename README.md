@@ -12,7 +12,7 @@ Aerodrome, a vote-escrow lock that earns protocol revenue by size and time left.
 what made them hard to live with: no payout queue (the house refuses trades it couldn't cover), claims that
 expire so late players aren't crowded out, and locks that earn buybacks without gauge votes or bribes.
 
-Built at NEAR HACKATHON. Rust contracts on NEAR (near-sdk), a TypeScript keeper, bots and simulation, and a
+Built at NEAR HACKATHON by ethboi ([@ethboi_](https://x.com/ethboi_) on X). Rust contracts on NEAR (near-sdk), a TypeScript keeper, bots and simulation, and a
 Next.js app, all running on a local NEAR chain with one command.
 
 ## Run it

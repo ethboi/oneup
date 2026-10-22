@@ -145,9 +145,19 @@ function Footer({ go }: { go: (t: Tab) => void }) {
           </p>
         </div>
       </div>
-      <p className="label mt-6 border-t border-[var(--line)] pt-4">
-        A proof of concept running on a local NEAR chain with test money. The contracts haven&apos;t been audited: don&apos;t use real funds.
-      </p>
+      <div className="label mt-6 flex flex-col gap-2 border-t border-[var(--line)] pt-4 sm:flex-row sm:items-baseline sm:justify-between">
+        <p>A proof of concept running on a local NEAR chain with test money. The contracts haven&apos;t been audited: don&apos;t use real funds.</p>
+        <p className="shrink-0">
+          Built by{" "}
+          <a className={link} href="https://github.com/ethboi" target="_blank" rel="noreferrer">
+            ethboi
+          </a>{" "}
+          ·{" "}
+          <a className={link} href="https://x.com/ethboi_" target="_blank" rel="noreferrer">
+            @ethboi_ on X
+          </a>
+        </p>
+      </div>
     </footer>
   );
 }

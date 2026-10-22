@@ -82,7 +82,12 @@ export function About() {
       <section className="case relative overflow-hidden p-5 sm:p-8">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
           <div className="flex-1">
-            <p className="label">Our entry for NEAR HACKATHON, November 2026</p>
+            <p className="label">
+              Our entry for NEAR HACKATHON, November 2026, by{" "}
+              <a className="font-bold text-[var(--text)] underline decoration-dotted underline-offset-2" href="https://x.com/ethboi_" target="_blank" rel="noreferrer">
+                ethboi
+              </a>
+            </p>
             <h1 className="display mt-2 text-4xl leading-tight sm:text-5xl">Lose a trade, get a life.</h1>
             <p className="mt-3 max-w-xl text-[var(--muted)]">
               OneUp is a perpetuals exchange on NEAR where losing isn&apos;t the end of the story. Trade against a house
