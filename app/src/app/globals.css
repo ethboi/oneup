@@ -1065,3 +1065,32 @@ body {
   color: var(--on-fill);
   background: var(--long-fill);
 }
+
+/* the chart's head marker pops on each new price, and the price tag flashes as the tick arrives */
+.tick-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: tick-pulse 0.45s ease-out;
+}
+@keyframes tick-pulse {
+  0% {
+    transform: scale(2.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.tick-tag {
+  animation: tick-tag 0.6s ease-out;
+}
+@keyframes tick-tag {
+  0% {
+    fill: var(--lcd-3);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tick-pulse,
+  .tick-tag {
+    animation: none;
+  }
+}

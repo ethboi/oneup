@@ -60,13 +60,13 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
             <button
               type="button"
               className="bar-cell font-extrabold"
-              style={{ color: "var(--jackpot)" }}
               onClick={() => go("Leaders")}
               title="The jackpot: the house's idle USDC earns interest, and one loser's ticket takes it all. Tap for your tickets."
               aria-label={`Jackpot $${fmtUsdc(jackpot, 2)}`}
             >
-              <PixelCoin size={16} />
-              ${fmtUsdc(jackpot, jackpot < 1_000n * USDC ? 2 : 0)}
+              {/* labelled, so it doesn't read as your own money */}
+              <span className="label font-normal">Jackpot</span>
+              <span style={{ color: "var(--jackpot)" }}>${fmtUsdc(jackpot, jackpot < 100n * USDC ? 2 : 0)}</span>
             </button>
           )}
           <span className="bar-cell" title={`Round ${epoch?.id ?? ""} ends in ${fmtClock(left)}, with Extra Lives and $1UP locks for its losers`}>
