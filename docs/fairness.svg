@@ -4,23 +4,23 @@
 <text x="52" y="46" font-size="12.5" fill="#5d6877">USDC recovered within a year per $1 lost, by week of the loss · median of 20 simulated runs</text>
 <line x1="52" x2="710" y1="320" y2="320" stroke="#dde2e8"/>
 <text x="44" y="324" font-size="12" text-anchor="end" fill="#5d6877">0¢</text>
-<line x1="52" x2="710" y1="234.66666666666666" y2="234.66666666666666" stroke="#dde2e8"/>
-<text x="44" y="238.66666666666666" font-size="12" text-anchor="end" fill="#5d6877">10¢</text>
-<line x1="52" x2="710" y1="149.33333333333331" y2="149.33333333333331" stroke="#dde2e8"/>
-<text x="44" y="153.33333333333331" font-size="12" text-anchor="end" fill="#5d6877">20¢</text>
-<line x1="52" x2="710" y1="64" y2="64" stroke="#dde2e8"/>
-<text x="44" y="68" font-size="12" text-anchor="end" fill="#5d6877">30¢</text>
+<line x1="52" x2="710" y1="256" y2="256" stroke="#dde2e8"/>
+<text x="44" y="260" font-size="12" text-anchor="end" fill="#5d6877">10¢</text>
+<line x1="52" x2="710" y1="192" y2="192" stroke="#dde2e8"/>
+<text x="44" y="196" font-size="12" text-anchor="end" fill="#5d6877">20¢</text>
+<line x1="52" x2="710" y1="128.00000000000003" y2="128.00000000000003" stroke="#dde2e8"/>
+<text x="44" y="132.00000000000003" font-size="12" text-anchor="end" fill="#5d6877">30¢</text>
 <text x="52" y="346" font-size="12" text-anchor="middle" fill="#5d6877">week 1</text>
 <text x="291.27272727272725" y="346" font-size="12" text-anchor="middle" fill="#5d6877">week 53</text>
 <text x="530.5454545454545" y="346" font-size="12" text-anchor="middle" fill="#5d6877">week 105</text>
 <text x="710" y="346" font-size="12" text-anchor="middle" fill="#5d6877">week 144</text>
-<path d="M52.0 210.0 L111.8 228.2 L171.6 205.6 L231.5 230.6 L291.3 235.1 L351.1 232.7 L410.9 237.7 L470.7 239.0 L530.5 237.7 L590.4 246.3 L650.2 226.7 L710.0 229.7" fill="none" stroke="#2a78d6" stroke-width="2.5"/>
-<path d="M52.0 251.7 L111.8 238.5 L171.6 189.7 L231.5 170.0 L291.3 158.1 L351.1 179.8 L410.9 207.0 L470.7 231.5 L530.5 239.4 L590.4 247.9 L650.2 251.9 L710.0 262.8" fill="none" stroke="#eb6834" stroke-width="2.5"/>
-<path d="M52.0 86.8 L111.8 120.0 L171.6 125.0 L231.5 180.2 L291.3 206.5 L351.1 224.7 L410.9 237.9 L470.7 243.4 L530.5 258.0 L590.4 264.8 L650.2 257.8 L710.0 270.1" fill="none" stroke="#1baf7a" stroke-width="2.5" stroke-dasharray="6 5"/>
-<line x1="718" x2="734" y1="229.73124360370815" y2="229.73124360370815" stroke="#2a78d6" stroke-width="2.5"/>
-<text x="740" y="233.73124360370815" font-size="12.5" fill="#12161b">OneUp 10.6¢</text>
-<line x1="718" x2="734" y1="262.8215597889117" y2="262.8215597889117" stroke="#eb6834" stroke-width="2.5"/>
-<text x="740" y="266.8215597889117" font-size="12.5" fill="#12161b">Papertrade-style 6.7¢</text>
-<line x1="718" x2="734" y1="280.8215597889117" y2="280.8215597889117" stroke="#1baf7a" stroke-width="2.5" stroke-dasharray="4 3"/>
-<text x="740" y="284.8215597889117" font-size="12.5" fill="#12161b">OneUp, no expiry 5.8¢</text>
+<path d="M52.0 236.0 L111.8 253.3 L171.6 233.5 L231.5 254.4 L291.3 255.4 L351.1 255.4 L410.9 259.7 L470.7 260.5 L530.5 259.4 L590.4 264.0 L650.2 247.2 L710.0 253.6" fill="none" stroke="#2a78d6" stroke-width="2.5"/>
+<path d="M52.0 268.8 L111.8 258.9 L171.6 222.3 L231.5 207.5 L291.3 198.6 L351.1 214.9 L410.9 235.3 L470.7 253.6 L530.5 259.5 L590.4 266.0 L650.2 268.9 L710.0 277.1" fill="none" stroke="#eb6834" stroke-width="2.5"/>
+<path d="M52.0 92.0 L111.8 137.7 L171.6 153.9 L231.5 206.0 L291.3 236.3 L351.1 251.0 L410.9 267.2 L470.7 275.0 L530.5 283.3 L590.4 287.8 L650.2 283.2 L710.0 290.6" fill="none" stroke="#1baf7a" stroke-width="2.5" stroke-dasharray="6 5"/>
+<line x1="718" x2="734" y1="253.6374722606723" y2="253.6374722606723" stroke="#2a78d6" stroke-width="2.5"/>
+<text x="740" y="257.6374722606723" font-size="12.5" fill="#12161b">OneUp 10.4¢</text>
+<line x1="718" x2="734" y1="277.1161698416838" y2="277.1161698416838" stroke="#eb6834" stroke-width="2.5"/>
+<text x="740" y="281.1161698416838" font-size="12.5" fill="#12161b">Papertrade-style 6.7¢</text>
+<line x1="718" x2="734" y1="295.1161698416838" y2="295.1161698416838" stroke="#1baf7a" stroke-width="2.5" stroke-dasharray="4 3"/>
+<text x="740" y="299.1161698416838" font-size="12.5" fill="#12161b">OneUp, no expiry 4.6¢</text>
 </svg>

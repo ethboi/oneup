@@ -72,24 +72,24 @@ bb_pot}`.
 
 ## extra-life (NEP-171 + NEP-177 metadata + NEP-181 enumeration)
 
-Payout uses a product accumulator so claims are O(1). Each epoch pays `pay_j = r × owed_remaining_j` with
-`r = el_pot / Σ owed_remaining ≤ 1`, so every token's remaining owed shrinks by the same factor:
+Each pot is shared by what each life was originally owed, capped at what it's still owed (D-25, maths §6).
+Lives minted together (an epoch's cohort, or Backer Lives minted between two pots) are always paid the same
+fraction, so the contract keeps groups, each with its total owed and the fraction paid:
 
 ```
-ACC_e      = ACC_{e−1} × (1 − r_e)                      # 1e27 fixed point
-remaining  = owed × ACC_now / ACC_at_mint
-paid_total = owed − remaining
+δ          = pot / Σ owed_g                 # over earning groups; a group that would pass 1 is filled and the rest shared again
+frac_g    += δ                              # 1e18 fixed point, ≤ 1e18
+paid_total = owed × frac_g                  # rounded down
 claimable  = paid_total − claimed
 ```
 
-When `ACC` reaches 0 (everything owed was paid) a new era starts at 1e27; tokens from older eras are Full
-Heals.
+A pot is O(groups earning): at most 14 cohorts plus the bootstrap round's backer groups. A claim is O(1).
 
 | Method | Caller | Does |
 |---|---|---|
-| `mint_batch(epoch, items: [{owner, face, cap_ppm}])` | `house` | one token per loser; `ACC_at_mint` = current ACC, so the same epoch's pot pays them (D-4) |
+| `mint_batch(epoch, items: [{owner, face, cap_ppm}])` | `house` | one token per loser, in the epoch's group, so the same epoch's pot pays them (D-4) |
 | `mint_backer(owner, face, cap_ppm) → "b<n>"` | `house` | a Backer Life (D-22): never expires, shares pots from the moment it's minted |
-| `ft_on_transfer(sender_id, amount, msg)` | USDC, sender `house` | `{"epoch_pot":{"epoch":e}}` → applies `r_e` |
+| `ft_on_transfer(sender_id, amount, msg)` | USDC, sender `house` | `{"epoch_pot":{"epoch":e}}` → shares the pot across the earning groups, returns what lives couldn't use |
 | `expire(through_epoch) → U128` | `house` | lives minted in `through_epoch` or earlier stop earning (D-13); returns the total still owed, which the house mirrors |
 | `claim(token_ids)` | token owner | sends claimable USDC (1–30 tokens); a token that pays out loses its market approvals, so a listing can't be emptied before it sells |
 | `nft_transfer…` | standard | unclaimed USDC moves with the token |

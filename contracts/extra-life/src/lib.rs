@@ -5,6 +5,8 @@
 //!
 //! Backer Lives (D-22) are minted for backing the house pool: token id `"b<n>"`, one per backing, and they
 //! never expire. Claiming a token drops its approvals, so a listing can't be drained before it sells.
+//!
+//! Each pot is shared by what each life was originally owed, capped at what it's still owed (D-25, acc.rs).
 
 use near_contract_standards::non_fungible_token::approval::NonFungibleTokenApproval;
 use near_contract_standards::non_fungible_token::core::{NonFungibleTokenCore, NonFungibleTokenResolver};
@@ -24,7 +26,7 @@ use oneup_math as math;
 use std::collections::HashMap;
 
 mod acc;
-pub use acc::{remaining_as_of, Accumulator, Snapshot};
+pub use acc::{share_pot, Group, ONE};
 
 const GAS_FT_TRANSFER: Gas = Gas::from_tgas(15);
 const GAS_CLAIM_CALLBACK: Gas = Gas::from_tgas(20);
@@ -38,7 +40,8 @@ pub struct Life {
     pub face: u128,
     pub cap_ppm: u128,
     pub owed: u128,
-    pub at: Snapshot,
+    /// The group it's paid with (`cohort_key` or `backer_key`).
+    pub group: u64,
     pub claimed: u128,
     /// A Backer Life (D-22): minted for backing the house pool, never expires.
     pub backer: bool,
@@ -70,14 +73,14 @@ pub struct LifeInfo {
     pub backer: bool,
 }
 
-/// Every life minted in one epoch shares a snapshot, so the group expires in one step.
-#[near(serializers = [borsh])]
-#[derive(Clone, Debug)]
-pub struct Cohort {
-    pub owed: u128,
-    pub at: Snapshot,
-    /// Snapshot when the group expired; its lives' balances are frozen there.
-    pub expired_at: Option<Snapshot>,
+/// An epoch's lives are paid as one group, so the group expires in one step.
+pub fn cohort_key(epoch: u64) -> u64 {
+    epoch << 1
+}
+
+/// Backer Lives minted between two pots join at the same point, so they're paid as one group (and never expire).
+pub fn backer_key(pots: u64) -> u64 {
+    (pots << 1) | 1
 }
 
 #[near(serializers = [json])]
@@ -94,7 +97,7 @@ enum StorageKey {
     Enumeration,
     Approval,
     Lives,
-    Cohorts,
+    Groups,
 }
 
 #[allow(dead_code)]
@@ -111,10 +114,13 @@ pub struct ExtraLife {
     usdc: AccountId,
     tokens: NonFungibleToken,
     lives: LookupMap<TokenId, Life>,
-    acc: Accumulator,
+    groups: LookupMap<u64, Group>,
+    /// Groups still earning: each pot is shared across these.
+    earning: Vec<u64>,
+    /// Pots received, which numbers the backer groups.
+    pots: u64,
     /// USDC received and not yet claimed. Claims never exceed it.
     held: u128,
-    cohorts: LookupMap<u64, Cohort>,
     /// Next epoch whose lives may expire (the seed, epoch 0, never does).
     next_expiry: u64,
     /// Number of the next Backer Life.
@@ -141,9 +147,10 @@ impl ExtraLife {
             house,
             usdc,
             lives: LookupMap::new(StorageKey::Lives),
-            acc: Accumulator::default(),
+            groups: LookupMap::new(StorageKey::Groups),
+            earning: vec![],
+            pots: 0,
             held: 0,
-            cohorts: LookupMap::new(StorageKey::Cohorts),
             next_expiry: 1,
             next_backer: 1,
         }
@@ -160,18 +167,19 @@ impl ExtraLife {
                 continue;
             }
             let id = token_id(epoch, &item.owner);
-            let at = self.acc.add(owed);
-            match self.cohorts.get_mut(&epoch) {
-                Some(c) => {
-                    require!(c.at == at && c.expired_at.is_none(), "Epoch's lives already settled");
-                    c.owed += owed;
+            let key = cohort_key(epoch);
+            match self.groups.get_mut(&key) {
+                Some(g) => {
+                    require!(g.frac == 0 && !g.expired, "Epoch's lives already settled");
+                    g.owed += owed;
                 }
                 None => {
                     require!(epoch == 0 || epoch >= self.next_expiry, "Epoch already expired");
-                    self.cohorts.insert(epoch, Cohort { owed, at, expired_at: None });
+                    self.groups.insert(key, Group { owed, ..Default::default() });
+                    self.earning.push(key);
                 }
             }
-            let life = Life { epoch, face: item.face.0, cap_ppm: item.cap_ppm.0, owed, at, claimed: 0, backer: false };
+            let life = Life { epoch, face: item.face.0, cap_ppm: item.cap_ppm.0, owed, group: key, claimed: 0, backer: false };
             let description = format!(
                 "Earns up to {} USDC from OneUp house profit ({}× of {} face value).",
                 fmt_usdc(owed),
@@ -186,7 +194,7 @@ impl ExtraLife {
 
     /// House only: a Backer Life for `face` USDC backing the house pool, `owed = face × cap`. Token id
     /// `"b<n>"`, one per backing. It never expires (epoch 0, outside any cohort) and shares every pot from
-    /// now on, pro rata like the others.
+    /// now on, by what it's owed like the others.
     pub fn mint_backer(&mut self, owner: AccountId, face: U128, cap_ppm: U128) -> TokenId {
         require!(env::predecessor_account_id() == self.house, "Only the house");
         let owed = math::owed(face.0, cap_ppm.0);
@@ -194,8 +202,16 @@ impl ExtraLife {
         let n = self.next_backer;
         self.next_backer += 1;
         let id = format!("b{n}");
-        let at = self.acc.add(owed);
-        let life = Life { epoch: 0, face: face.0, cap_ppm: cap_ppm.0, owed, at, claimed: 0, backer: true };
+        // no pot since this group was opened, so its lives all start unpaid
+        let key = backer_key(self.pots);
+        match self.groups.get_mut(&key) {
+            Some(g) => g.owed += owed,
+            None => {
+                self.groups.insert(key, Group { owed, ..Default::default() });
+                self.earning.push(key);
+            }
+        }
+        let life = Life { epoch: 0, face: face.0, cap_ppm: cap_ppm.0, owed, group: key, claimed: 0, backer: true };
         let description = format!(
             "Earns up to {} USDC from OneUp house profit ({}× of {} USDC backing the house pool).",
             fmt_usdc(owed),
@@ -212,25 +228,33 @@ impl ExtraLife {
         require!(env::predecessor_account_id() == self.house, "Only the house");
         while self.next_expiry <= through_epoch {
             let e = self.next_expiry;
-            if let Some(mut c) = self.cohorts.get(&e).cloned() {
-                let left = self.acc.expire(c.owed, c.at);
-                c.expired_at = Some(self.acc.snapshot());
-                self.cohorts.insert(e, c);
-                env::log_str(&format!("epoch {e} lives expired with {left} unpaid"));
+            let key = cohort_key(e);
+            if let Some(g) = self.groups.get_mut(&key) {
+                g.expired = true;
+                env::log_str(&format!("epoch {e} lives expired with {} unpaid", g.remaining()));
+                self.earning.retain(|k| *k != key);
             }
             self.next_expiry += 1;
         }
-        U128(self.acc.total_remaining)
+        U128(self.owed_remaining())
     }
 
-    /// USDC from the house: an epoch's pot, shared pro rata to what each life is still owed.
-    /// Returns the unused part (when lives are owed less than the pot).
+    /// USDC from the house: an epoch's pot, shared by what each earning life was owed, each capped at what it's
+    /// still owed (D-25). Returns the unused part (when lives are owed less than the pot).
     pub fn ft_on_transfer(&mut self, sender_id: AccountId, amount: U128, msg: String) -> PromiseOrValue<U128> {
         require!(env::predecessor_account_id() == self.usdc, "Only USDC");
         require!(sender_id == self.house, "Only the house sends pots");
         let PotMsg::EpochPot { epoch } =
             near_sdk::serde_json::from_str(&msg).unwrap_or_else(|_| env::panic_str("Bad pot message"));
-        let used = self.acc.apply_pot(amount.0);
+        let mut groups: Vec<Group> = self.earning.iter().map(|k| self.groups.get(k).cloned().unwrap_or_default()).collect();
+        let used = share_pot(&mut groups, amount.0);
+        for (k, g) in self.earning.iter().zip(groups) {
+            self.groups.insert(*k, g);
+        }
+        // groups paid in full stop earning
+        let groups = &self.groups;
+        self.earning.retain(|k| groups.get(k).is_some_and(|g| !g.full()));
+        self.pots += 1;
         self.held += used;
         env::log_str(&format!("epoch {epoch} pot {used} of {}", amount.0));
         PromiseOrValue::Value(U128(amount.0 - used))
@@ -300,7 +324,7 @@ impl ExtraLife {
     }
 
     pub fn total_owed_remaining(&self) -> U128 {
-        U128(self.acc.total_remaining)
+        U128(self.owed_remaining())
     }
 
     pub fn held(&self) -> U128 {
@@ -329,13 +353,16 @@ impl ExtraLife {
     }
 
     fn paid(&self, life: &Life) -> u128 {
-        let frozen = self.cohorts.get(&life.epoch).and_then(|c| c.expired_at).filter(|_| !life.backer);
-        let now = frozen.unwrap_or_else(|| self.acc.snapshot());
-        life.owed - remaining_as_of(life.owed, life.at, now)
+        self.groups.get(&life.group).map_or(0, |g| g.paid(life.owed))
     }
 
     fn expired(&self, life: &Life) -> bool {
-        !life.backer && self.cohorts.get(&life.epoch).is_some_and(|c| c.expired_at.is_some())
+        !life.backer && self.groups.get(&life.group).is_some_and(|g| g.expired)
+    }
+
+    /// Still owed to the lives that are earning, which the house mirrors.
+    fn owed_remaining(&self) -> u128 {
+        self.earning.iter().filter_map(|k| self.groups.get(k)).map(Group::remaining).sum()
     }
 
     fn claimable(&self, life: &Life) -> u128 {

@@ -33,8 +33,8 @@ export function Lives() {
       <Explainer line="Every loss in an epoch the house ends in profit becomes an Extra Life that pays you back in USDC.">
         When an epoch ends, the house&apos;s profit is shared across that epoch&apos;s losers by how much they lost: that
         share is the life&apos;s face value. It can earn up to face × its cap (2.0× when the pool is small, down to 1.2× at
-        $1M). Each epoch, 60% of half the surplus above the reserve is shared across all earning lives by what they&apos;re
-        still owed. A life earns for {expiry ?? 13} epochs after the one it&apos;s minted in, then keeps what it earned.
+        $1M). Each epoch, 60% of half the surplus above the reserve is shared across all earning lives by what they
+        were owed, so every life pays back at the same steady rate. A life earns for {expiry ?? 13} epochs after the one it&apos;s minted in, then keeps what it earned.
         Sell one on the market and its unclaimed USDC goes with it.
       </Explainer>
 

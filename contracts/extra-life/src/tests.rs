@@ -48,12 +48,14 @@ fn v1_v5_mint_and_pay() {
     assert_eq!(a.owed.0, 1_840 * USDC);
     assert_eq!(c.total_owed_remaining().0, 36_840 * USDC);
 
-    assert_eq!(pot(&mut c, 18_000), 0);
+    // all of it used, less a few micro-USDC of rounding (lives are paid down, never up)
+    let dust = pot(&mut c, 18_000);
+    assert!(dust <= 3);
     let paid = |c: &ExtraLife, id: &str| c.life_info(id.into()).unwrap().paid.0 / USDC;
     assert_eq!((paid(&c, "1:alice"), paid(&c, "1:bob"), paid(&c, "0:seed")), (899, 4_885, 12_214));
 
     // a pot bigger than everything owed pays all in full and returns the rest
-    assert_eq!(pot(&mut c, 50_000), 31_160 * USDC);
+    assert_eq!(pot(&mut c, 50_000), 31_160 * USDC - dust);
     let a = c.life_info("1:alice".into()).unwrap();
     assert!(a.full_heal);
     assert_eq!(a.claimable.0, 1_840 * USDC);
@@ -262,9 +264,10 @@ fn backer_earns_only_from_later_pots() {
     c.mint_batch(1, vec![item("alice", 1_000, 1_000_000)]);
     pot(&mut c, 500); // all Alice's
     let b = backer(&mut c, "bob", 500);
-    pot(&mut c, 500); // 500 : 500 owed → 250 each
-    assert_eq!(c.life_info(b).unwrap().paid.0, 250 * USDC);
-    assert_eq!(c.life_info("1:alice".into()).unwrap().paid.0, 750 * USDC);
+    // shared by what each was owed (D-25): Alice 1_000, Bob 500, so 2 : 1 even though Alice is half paid
+    pot(&mut c, 500);
+    assert_eq!(c.life_info(b).unwrap().paid.0, 166_666_666);
+    assert_eq!(c.life_info("1:alice".into()).unwrap().paid.0, 833_333_334); // the pot is spent exactly: 500 in all
 }
 
 #[test]

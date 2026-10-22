@@ -71,7 +71,9 @@ flowchart LR
 joins the pool for good, and the backer gets a **Backer Life**: an Extra Life that never expires, paid from
 the same profit as the losers' lives. It's owed the average of the Extra Life curve over the backing, so the
 first dollar earns 2.0× and the last 1.2×; to get out early, sell it on the market. Backers are losers by
-choice ([D-22](docs/decisions.md)). The Solvency tab shows the round and the curve.
+choice ([D-22](docs/decisions.md)). The Solvency tab shows the round and the curve. How long a full round
+takes to pay back depends on volume: with traders losing $250K a week, half in about 43 weeks and all of it in
+about 86 (`pnpm --filter @oneup/sim backers`).
 
 ## The rules
 
@@ -92,8 +94,9 @@ covers every open position and no USDC is created or lost.
 **Extra Lives.** At each epoch's end, the house's net result (losses taken − payouts made) is split among
 that epoch's losers in proportion to their losses: that's each Extra Life's face value, so fake losses from
 a long/short pair only create claims as big as the cut they paid. A life can earn up to *cap × face*; the
-cap is 2.0× at an empty pool, falling to 1.2× at $1M. Lives are paid from 60% of half the surplus, pro rata
-to what each is still owed (O(1) per claim via a product accumulator). A life earns for the epoch it's
+cap is 2.0× at an empty pool, falling to 1.2× at $1M. Lives are paid from 60% of half the surplus, by what
+each was owed: every earning life gets the same fraction of its cap each epoch, so it pays back in a straight
+line ([D-25](docs/decisions.md)). A life earns for the epoch it's
 minted in and 13 after, then stops and keeps what it earned. Lives are NEP-171 NFTs: sell one and its
 unclaimed USDC goes with it.
 
@@ -121,13 +124,13 @@ taken from its docs. Each loss is followed for a year.
 
 | USDC back within a year per $1 lost | Weeks 1–39 | 40–78 | 79–117 | 118–156 |
 |---|---|---|---|---|
-| **OneUp** | 13.0¢ | 10.3¢ | 9.3¢ | 10.2¢ |
-| OneUp without life expiry | 24.0¢ | 13.3¢ | 8.7¢ | 7.0¢ |
+| **OneUp** | 13.5¢ | 10.5¢ | 9.5¢ | 10.4¢ |
+| OneUp without life expiry | 28.5¢ | 13.3¢ | 7.1¢ | 5.7¢ |
 | Papertrade-style | 13.0¢ | 17.3¢ | 10.7¢ | 7.8¢ |
 
 Year-1 losers take **0%** of year-3 payouts under OneUp, against **12%** under Papertrade-style rules,
-where loss tokens earn forever. The middle row is OneUp as first specified: claims piled up faster than
-they were paid, so later losers recovered less. Making lives expire after 13 epochs fixed it
+where loss tokens earn forever. The middle row is OneUp without expiry, as first specified: claims piled
+up faster than they were paid, so later losers recovered less. Making lives expire after 13 epochs fixed it
 ([decision D-13](docs/decisions.md)).
 
 ## What's in the repo
@@ -135,7 +138,7 @@ they were paid, so later losers recovered less. Making lives expire after 13 epo
 | Path | What |
 |---|---|
 | [`contracts/house`](contracts/house) | Pool, orders, delayed fills, solvency, cut, liquidation, epoch close, emissions, buybacks |
-| [`contracts/extra-life`](contracts/extra-life) | Extra Life NFTs (NEP-171), payout accumulator, expiry, claims |
+| [`contracts/extra-life`](contracts/extra-life) | Extra Life NFTs (NEP-171), payouts by group, expiry, claims |
 | [`contracts/oneup-token`](contracts/oneup-token) | $1UP (NEP-141), fixed supply |
 | [`contracts/ve`](contracts/ve) | $1UP locks (NFTs), decaying weight (O(1) tally), buyback rewards, early exit, losers' locks |
 | [`contracts/market`](contracts/market) | Marketplace for Extra Lives and locks, priced in USDC |

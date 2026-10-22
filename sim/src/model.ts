@@ -70,10 +70,15 @@ export function flows(opts: { epochs: number; start: number; peak: number; mid: 
 }
 
 // OneUp (docs/maths.md §5–6)
-export function oneup(fs: Flow[], seed = 25_000, utilisation = 0.5, expiry = Infinity): { cohorts: Cohort[]; pool: number[] } {
+/**
+ * `share`: how each epoch's pot is split across earning lives. "owed" (D-25, the contracts) shares it by what
+ * each life was owed when minted, each capped at what it's still owed (any excess goes round again);
+ * "remaining" (before D-25) shared it by what each is still owed, so a half-paid life earned half as fast.
+ */
+export function oneup(fs: Flow[], seed = 25_000, utilisation = 0.5, expiry = Infinity, share: "owed" | "remaining" = "owed"): { cohorts: Cohort[]; pool: number[] } {
   let pool = seed;
-  // Each life cohort: what it's still owed. The seed is cohort −1 at 1.0×.
-  const owed: { epoch: number; remaining: number }[] = [{ epoch: -1, remaining: seed }];
+  // Each life cohort: what it was owed and what it's still owed. The seed is cohort −1 at 1.0×.
+  const owed: { epoch: number; face: number; remaining: number }[] = [{ epoch: -1, face: seed, remaining: seed }];
   const cohorts: Cohort[] = fs.map((f, epoch) => cohort(epoch, f.losses, fs.length));
   const poolSeries: number[] = [];
   fs.forEach((f, e) => {
@@ -81,7 +86,7 @@ export function oneup(fs: Flow[], seed = 25_000, utilisation = 0.5, expiry = Inf
     const houseNet = f.losses - f.payouts;
     if (houseNet > 0) {
       const cap = 2.0 - 0.8 * Math.min(pool, 1_000_000) / 1_000_000;
-      owed.push({ epoch: e, remaining: houseNet * cap });
+      owed.push({ epoch: e, face: houseNet * cap, remaining: houseNet * cap });
     }
     const liability = utilisation * pool;
     const reserve = Math.max(1.2 * liability, seed);
@@ -91,11 +96,30 @@ export function oneup(fs: Flow[], seed = 25_000, utilisation = 0.5, expiry = Inf
     const totalOwed = owed.reduce((s, o) => s + o.remaining, 0);
     const pot = Math.min(0.6 * payout, totalOwed);
     const buyback = 0.3 * payout + (0.6 * payout - pot);
-    if (pot > 0) {
-      for (const o of owed) {
-        const pay = (pot * o.remaining) / totalOwed;
-        o.remaining -= pay;
-        if (o.epoch >= 0) credit(cohorts[o.epoch], e, pay);
+    const pay = (o: (typeof owed)[number], amount: number) => {
+      o.remaining -= amount;
+      if (o.epoch >= 0) credit(cohorts[o.epoch], e, amount);
+    };
+    if (pot > 0 && share === "remaining") {
+      for (const o of owed) pay(o, (pot * o.remaining) / totalOwed);
+    } else if (pot > 0) {
+      // water-filling: an equal fraction of each life's original owed, lives that would pass their cap are
+      // filled and the rest shared again
+      let left = pot;
+      let open = owed.filter((o) => o.remaining > 1e-9);
+      while (left > 1e-9 && open.length) {
+        const rate = left / open.reduce((s, o) => s + o.face, 0);
+        const full = open.filter((o) => o.remaining <= rate * o.face);
+        if (full.length === 0) {
+          for (const o of open) pay(o, rate * o.face);
+          left = 0;
+        } else {
+          for (const o of full) {
+            left -= o.remaining;
+            pay(o, o.remaining);
+          }
+          open = open.filter((o) => o.remaining > 1e-9);
+        }
       }
     }
     pool -= pot + buyback;
@@ -161,9 +185,9 @@ export function papertrade(fs: Flow[], seed = 25_000) {
 
 export const LIFE_EXPIRY_EPOCHS = 13;
 
-export function run(fs: Flow[], seed = 25_000, expiry = LIFE_EXPIRY_EPOCHS): RunResult {
-  const o = oneup(fs, seed, 0.5, expiry);
-  const n = oneup(fs, seed, 0.5, Infinity);
+export function run(fs: Flow[], seed = 25_000, expiry = LIFE_EXPIRY_EPOCHS, share: "owed" | "remaining" = "owed"): RunResult {
+  const o = oneup(fs, seed, 0.5, expiry, share);
+  const n = oneup(fs, seed, 0.5, Infinity, share);
   const p = papertrade(fs, seed);
   return { oneup: o.cohorts, oneupNoExpiry: n.cohorts, papertrade: p.cohorts, ptEarlyShare: p.earlyShare, ptPeakQueue: p.peakQueue, oneupPool: o.pool, ptLp: p.lp };
 }

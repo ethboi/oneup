@@ -223,8 +223,8 @@ Now anyone can **back** the pool (`{"back":{}}`, at least 10 USDC) until the tot
 
 - **joins the pool for good and raises the reserve floor** (D-12), so it is only ever repaid from house
   profit, never paid out as surplus;
-- **mints a Backer Life**: an Extra Life that never expires, paid from the same pots as losers' lives, pro
-  rata to what it is still owed;
+- **mints a Backer Life**: an Extra Life that never expires, paid from the same pots as losers' lives, by
+  what it was owed (D-25);
 - **is owed the curve's average over the backing**: losers' lives are capped at 2.0× at an empty pool,
   falling to 1.2× at $1M (`life_cap_ppm`); a backing of `x` into a pool of `p` is owed the average of that
   curve over `[p, p + x]` (`backer_cap_ppm`). Early dollars earn more, and splitting a backing into pieces
@@ -260,6 +260,33 @@ zero share the epoch's face value and $1UP, by net loss. Splitting the legs acro
 but then the winning wallet's cut (10–25%) is the cost, which D-16's farming numbers already price in. The app warns about, and the order
 form refuses, a trigger already past the price; the contract allows it, since the newer-price rule makes
 it harmless.
+
+## D-25 · Pots are shared by what each life was owed · **Decided (22 Oct 2026)**
+
+Each epoch's Extra Life pot was shared by what each life was **still** owed. A half-paid life then earned
+half as fast as a new one of the same size, and every life slowed as it got paid while new losers' lives kept
+arriving at full weight. For the bootstrap round (D-22) that meant backers got half their money back within a
+year at healthy volume, but the last 1% took years: `pnpm --filter @oneup/sim backers` puts "paid in full" at
+7–10 years whatever the volume.
+
+Now the pot is shared by what each life was **originally** owed, each capped at what it's still owed; a life
+that would pass its cap is filled exactly and the rest is shared again among the others (water-filling). Every
+earning life is paid the same fraction of its owed each epoch, so it finishes in a straight line:
+
+| Traders lose a week | Backers paid in full, before | After |
+|---|---|---|
+| $100K | 9.9 years | 3.3 years |
+| $250K | 8.1 years | 86 weeks |
+| $1M | 7.2 years | 42 weeks |
+
+Losers are no worse off: in the fairness simulation each quarter's losers get back slightly more within a
+year (13.5¢, 10.5¢, 9.5¢, 10.4¢ per $1 against 13.0¢, 10.3¢, 9.3¢, 10.2¢) and year-1 losers still take none
+of year 3's payouts, because expiry (D-13), not the sharing rule, is what keeps old lives from crowding out new
+ones.
+
+In the contract, lives minted together (an epoch's cohort, or the Backer Lives minted between two pots) are
+always paid the same fraction, so the accumulator is a list of groups with a paid fraction each: a pot is
+O(groups earning), at most 14 cohorts plus the bootstrap round's backer groups, and a claim stays O(1).
 
  · **Noted**
 

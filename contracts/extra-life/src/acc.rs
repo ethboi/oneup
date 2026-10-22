@@ -1,100 +1,108 @@
-//! Pro-rata payout to every unpaid Extra Life in O(1) per epoch and per claim (maths §6).
+//! Each epoch's pot shared by what each life was originally owed, each capped at what it's still owed (D-25,
+//! maths §6).
 //!
-//! Each epoch pays `pay_j = r × remaining_j` with `r = pot / Σ remaining`, so every life's remaining
-//! balance is multiplied by the same `(1 − r)`. We keep the running product `acc`; a life minted at
-//! `acc_at_mint` has `remaining = owed × acc_now / acc_at_mint`.
+//! Lives minted together (an epoch's cohort, or the Backer Lives minted between two pots) join at once and are
+//! always paid the same fraction of what they're owed, so a group is enough: it keeps its total owed and the
+//! fraction `frac` paid so far (1e18 = all of it). A pot raises every earning group's `frac` by the same amount,
+//! `pot / Σ owed`; a group that would pass 1 is filled exactly and the rest is shared again (water-filling). A
+//! life's paid is `owed × frac`, so a claim is O(1) and a pot is O(groups earning): at most the 14 epoch
+//! cohorts plus the bootstrap round's backer groups.
 //!
-//! `acc` shrinks every epoch, so when it falls below 1e9 it is multiplied by 1e9 and `scale` goes up
-//! (Liquity's stability-pool technique). A life two or more scales behind has under 1e-9 of its
-//! balance left and counts as fully paid. When everything is paid (`Σ remaining = 0`) a new era starts.
-//! Rounding: `acc` and `remaining` round up, so lives are never paid more than the pots received.
+//! Sharing by original owed (rather than by what's still owed) keeps each life earning at a steady rate until
+//! it's paid, so a large Backer Life finishes in a straight line instead of slowing to a crawl as newer lives
+//! crowd it out.
+//!
+//! Rounding: paid rounds down per life and per group, and each step is the largest that spends no more than is
+//! left (a binary search over a few units' width), so lives are never paid more than the pots received and a
+//! pot isn't left with dust.
 
 use near_sdk::near;
-use oneup_math::mul_div_ceil;
+use oneup_math::mul_div;
 
-pub const ACC_ONE: u128 = 1_000_000_000_000_000_000;
-pub const SCALE_STEP: u128 = 1_000_000_000;
-
-#[near(serializers = [borsh, json])]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Snapshot {
-    pub era: u32,
-    pub scale: u32,
-    pub acc: u128,
-}
+/// `frac` of a group that has been paid in full.
+pub const ONE: u128 = 1_000_000_000_000_000_000;
 
 #[near(serializers = [borsh])]
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Accumulator {
-    pub era: u32,
-    pub scale: u32,
-    pub acc: u128,
-    /// Σ remaining over every unpaid life (exact; per-life values round up around it).
-    pub total_remaining: u128,
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub struct Group {
+    /// Σ owed by the group's lives.
+    pub owed: u128,
+    /// Fraction of `owed` paid so far, 1e18 = in full.
+    pub frac: u128,
+    /// Out of its earning window: its lives keep what they earned and earn no more.
+    pub expired: bool,
 }
 
-impl Default for Accumulator {
-    fn default() -> Self {
-        Self { era: 0, scale: 0, acc: ACC_ONE, total_remaining: 0 }
-    }
-}
-
-impl Accumulator {
-    pub fn snapshot(&self) -> Snapshot {
-        Snapshot { era: self.era, scale: self.scale, acc: self.acc }
+impl Group {
+    /// What a life owed `owed` in this group has been paid so far.
+    pub fn paid(&self, owed: u128) -> u128 {
+        mul_div(owed, self.frac.min(ONE), ONE).min(owed)
     }
 
-    /// A new life owed `owed` joins at the current snapshot.
-    pub fn add(&mut self, owed: u128) -> Snapshot {
-        self.total_remaining += owed;
-        self.snapshot()
+    /// What the group as a whole has been paid.
+    pub fn total_paid(&self) -> u128 {
+        self.paid(self.owed)
     }
 
-    /// Applies an epoch's pot. Returns the amount used (≤ pot); the rest goes back to the sender.
-    pub fn apply_pot(&mut self, pot: u128) -> u128 {
-        if self.total_remaining == 0 || pot == 0 {
-            return 0;
-        }
-        let used = pot.min(self.total_remaining);
-        let left = self.total_remaining - used;
-        if left == 0 {
-            *self = Accumulator { era: self.era + 1, ..Default::default() };
-            return used;
-        }
-        let mut acc = mul_div_ceil(self.acc, left, self.total_remaining);
-        if acc < SCALE_STEP {
-            acc *= SCALE_STEP;
-            self.scale += 1;
-        }
-        self.acc = acc;
-        self.total_remaining = left;
-        used
+    pub fn remaining(&self) -> u128 {
+        self.owed - self.total_paid()
     }
 
-    pub fn remaining(&self, owed: u128, at: Snapshot) -> u128 {
-        remaining_as_of(owed, at, self.snapshot())
-    }
-
-    /// Takes a group of lives (all minted at one snapshot) out of the payout pool: they stop earning.
-    /// Returns what they were still owed.
-    pub fn expire(&mut self, owed: u128, at: Snapshot) -> u128 {
-        let left = self.remaining(owed, at);
-        self.total_remaining = self.total_remaining.saturating_sub(left);
-        left
+    pub fn full(&self) -> bool {
+        self.frac >= ONE
     }
 }
 
-/// What a life minted at `at` and owed `owed` still had left at snapshot `now`.
-pub fn remaining_as_of(owed: u128, at: Snapshot, now: Snapshot) -> u128 {
-    if at.era != now.era {
-        return 0;
+/// Shares `pot` across `groups` (the ones earning) by what each was owed, each capped at what it's still
+/// owed. Returns the amount used (≤ pot), which is exactly how much the groups' paid went up.
+pub fn share_pot(groups: &mut [Group], pot: u128) -> u128 {
+    let mut left = pot;
+    let mut open: Vec<usize> = (0..groups.len()).filter(|&i| !groups[i].full() && groups[i].owed > 0).collect();
+    while !open.is_empty() && left > 0 {
+        let total: u128 = open.iter().map(|&i| groups[i].owed).sum();
+        // the largest equal step that spends no more than what's left: paid rounds down per group, so the plain
+        // quotient can leave a unit or two unspent, or (after earlier pots' floors) spend one too many
+        let mut lo = mul_div(left.saturating_sub(open.len() as u128), ONE, total);
+        let mut hi = mul_div(left + open.len() as u128, ONE, total) + 1;
+        while lo + 1 < hi {
+            let mid = lo + (hi - lo) / 2;
+            if raise(groups, &open, mid) <= left {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        let delta = lo;
+        let (filling, rest): (Vec<usize>, Vec<usize>) = open.iter().partition(|&&i| ONE - groups[i].frac <= delta);
+        if filling.is_empty() {
+            if delta == 0 {
+                break;
+            }
+            for i in rest {
+                let before = groups[i].total_paid();
+                groups[i].frac += delta;
+                left -= groups[i].total_paid() - before;
+            }
+            break;
+        }
+        for i in filling {
+            let before = groups[i].total_paid();
+            groups[i].frac = ONE;
+            left -= groups[i].total_paid() - before;
+        }
+        open = rest;
     }
-    match now.scale - at.scale {
-        0 => mul_div_ceil(owed, now.acc, at.acc),
-        1 => mul_div_ceil(owed, now.acc, at.acc * SCALE_STEP),
-        _ => 0,
-    }
-    .min(owed)
+    pot - left
+}
+
+/// How much raising `open`'s fractions by `delta` would pay (each capped at what it's still owed).
+fn raise(groups: &[Group], open: &[usize], delta: u128) -> u128 {
+    open.iter()
+        .map(|&i| {
+            let g = &groups[i];
+            Group { frac: (g.frac + delta).min(ONE), ..g.clone() }.total_paid() - g.total_paid()
+        })
+        .sum()
 }
 
 #[cfg(test)]
@@ -102,85 +110,86 @@ mod tests {
     use super::*;
     use proptest::prelude::*;
 
+    fn group(owed: u128) -> Group {
+        Group { owed, ..Default::default() }
+    }
+
     #[test]
-    fn v5_pro_rata() {
+    fn v5_pot_shared_by_owed() {
         // the doc's V5: owed 1_840 / 10_000 / 25_000, pot 18_000
-        let mut a = Accumulator::default();
-        let s = [a.add(1_840), a.add(10_000), a.add(25_000)];
-        assert_eq!(a.apply_pot(18_000), 18_000);
-        let paid: Vec<u128> = [1_840u128, 10_000, 25_000].iter().zip(s).map(|(o, s)| o - a.remaining(*o, s)).collect();
+        let mut g = [group(1_840 * 1_000_000), group(10_000 * 1_000_000), group(25_000 * 1_000_000)];
+        let used = share_pot(&mut g, 18_000 * 1_000_000);
+        let paid: Vec<u128> = g.iter().map(|x| x.total_paid() / 1_000_000).collect();
         assert_eq!(paid, vec![899, 4_885, 12_214]);
-        assert_eq!(a.total_remaining, 36_840 - 18_000);
+        assert!(used <= 18_000 * 1_000_000 && used > 18_000 * 1_000_000 - 10);
     }
 
     #[test]
-    fn paid_in_full_starts_a_new_era() {
-        let mut a = Accumulator::default();
-        let s = a.add(1_000);
-        assert_eq!(a.apply_pot(5_000), 1_000);
-        assert_eq!(a.remaining(1_000, s), 0);
-        assert_eq!(a.era, 1);
-        let s2 = a.add(500);
-        assert_eq!(a.remaining(500, s2), 500);
+    fn a_half_paid_life_keeps_its_full_share() {
+        // the old rule (share by what's left) would give the half-paid one a third of the next pot; this one a half
+        let mut g = [group(1_000), group(1_000)];
+        g[0].frac = ONE / 2;
+        share_pot(&mut g, 400);
+        assert_eq!((g[0].total_paid(), g[1].total_paid()), (500 + 200, 200));
     }
 
     #[test]
-    fn late_joiner_only_shares_later_pots() {
-        let mut a = Accumulator::default();
-        let early = a.add(1_000);
-        a.apply_pot(500);
-        let late = a.add(1_000);
-        a.apply_pot(750); // r = 750 / 1_500 = 0.5
-        assert_eq!(a.remaining(1_000, early), 250);
-        assert_eq!(a.remaining(1_000, late), 500);
+    fn a_group_that_fills_passes_the_rest_on() {
+        let mut g = [group(1_000), group(10_000)];
+        g[0].frac = ONE * 9 / 10; // 100 left
+        let used = share_pot(&mut g, 2_000);
+        assert!(g[0].full());
+        assert_eq!(g[0].total_paid(), 1_000);
+        // 100 to fill the first, the other 1_900 to the second
+        assert_eq!(g[1].total_paid(), 1_900);
+        assert_eq!(used, 100 + g[1].total_paid());
     }
 
     #[test]
-    fn rescales_over_many_epochs() {
-        let mut a = Accumulator::default();
-        let s = a.add(10u128.pow(15));
-        for _ in 0..40 {
-            a.add(10u128.pow(15)); // new lives keep joining
-            let pot = a.total_remaining * 99 / 100; // r ≈ 0.99 every epoch
-            a.apply_pot(pot);
-        }
-        assert_eq!(a.era, 0);
-        assert!(a.scale >= 2);
-        let late = a.add(10u128.pow(12));
-        a.apply_pot(a.total_remaining / 2);
-        assert!(a.remaining(10u128.pow(15), s) <= 1);
-        let r = a.remaining(10u128.pow(12), late);
-        assert!(r.abs_diff(10u128.pow(12) / 2) <= 10u128.pow(12) / 1_000, "late life {r}");
+    fn more_than_owed_returns_the_rest() {
+        let mut g = [group(1_000), group(500)];
+        assert_eq!(share_pot(&mut g, 10_000), 1_500);
+        assert!(g.iter().all(Group::full));
     }
 
     #[test]
-    fn expired_group_stops_earning() {
-        let mut a = Accumulator::default();
-        let old = a.add(1_000);
-        a.apply_pot(500); // old: 500 left
-        let young = a.add(1_000);
-        let frozen = a.snapshot();
-        assert_eq!(a.expire(1_000, old), 500);
-        assert_eq!(a.total_remaining, 1_000);
-        a.apply_pot(500); // all to the young group now
-        assert_eq!(remaining_as_of(1_000, old, frozen), 500);
-        assert_eq!(a.remaining(1_000, young), 500);
+    fn lives_in_a_group_are_paid_the_same_fraction() {
+        let mut g = [Group { owed: 3_000, ..Default::default() }];
+        share_pot(&mut g, 1_500);
+        assert_eq!((g[0].paid(1_000), g[0].paid(2_000)), (500, 1_000));
     }
 
     proptest! {
-        /// Lives are never paid more than the pots received, and never more than they're owed.
+        /// Groups are never paid more than the pots received, never more than they're owed, and the lives in a
+        /// group never more than the group.
         #[test]
-        fn never_overpays(steps in prop::collection::vec((0u128..1_000_000_000_000, 0u128..1_000_000_000_000), 1..40)) {
-            let mut a = Accumulator::default();
-            let mut lives: Vec<(u128, Snapshot)> = vec![];
+        fn never_overpays(
+            owed in prop::collection::vec(1u128..10_000_000_000_000, 1..16),
+            pots in prop::collection::vec(0u128..5_000_000_000_000, 1..30),
+            split in 1u128..1_000,
+        ) {
+            let mut g: Vec<Group> = owed.iter().map(|&o| group(o)).collect();
             let mut received = 0u128;
-            for (owed, pot) in steps {
-                if owed > 0 { lives.push((owed, a.add(owed))); }
-                received += a.apply_pot(pot);
-                let paid: u128 = lives.iter().map(|(o, s)| o - a.remaining(*o, *s)).sum();
-                prop_assert!(paid <= received + lives.len() as u128, "paid {} received {}", paid, received);
-                for (o, s) in &lives { prop_assert!(a.remaining(*o, *s) <= *o); }
+            for pot in pots {
+                received += share_pot(&mut g, pot);
+                let paid: u128 = g.iter().map(Group::total_paid).sum();
+                prop_assert_eq!(paid, received);
+                for x in &g {
+                    prop_assert!(x.total_paid() <= x.owed);
+                    // two lives splitting the group: never more than the group together
+                    let a = x.owed * split / 1_000;
+                    prop_assert!(x.paid(a) + x.paid(x.owed - a) <= x.total_paid());
+                }
             }
+        }
+
+        /// Every earning group moves by the same fraction of what it was owed, until it fills.
+        #[test]
+        fn equal_fractions(owed in prop::collection::vec(1_000_000u128..10_000_000_000_000, 2..10), pot in 1_000_000u128..1_000_000_000_000) {
+            let mut g: Vec<Group> = owed.iter().map(|&o| group(o)).collect();
+            share_pot(&mut g, pot);
+            let open: Vec<&Group> = g.iter().filter(|x| !x.full()).collect();
+            for w in open.windows(2) { prop_assert_eq!(w[0].frac, w[1].frac); }
         }
     }
 }

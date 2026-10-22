@@ -127,8 +127,17 @@ bb_pot  = 0.3 × P + (0.6 × P − el_pot)          # buybacks get whatever the 
                                                 # the remaining 0.1 × P simply stays in the pool
 ```
 
-Each unpaid Extra Life `j`: `pay_j = floor(el_pot × owed_remaining_j / Σ owed_remaining)`.
-When `paid_j = owed_j` it becomes a **Full Heal** and stops earning.
+Each earning Extra Life `j` is paid the same fraction `δ` of what it was owed, capped at what it's still owed
+(D-25):
+
+```
+δ      = el_pot / Σ owed_j                      # over lives still earning
+pay_j  = min(owed_j × δ, owed_remaining_j)
+```
+
+A life the cap stops is filled exactly and what it couldn't take is shared again, with the same rule, among the
+rest (water-filling). Amounts round down, so lives are never paid more than the pot. When `paid_j = owed_j` it
+becomes a **Full Heal** and stops earning.
 
 **Expiry (D-13).** A life minted in epoch `m` shares the pots of epochs `m … m + LIFE_EXPIRY` (13 by default),
 then expires: it keeps what it earned (still claimable) and drops out of `Σ owed_remaining`. Before paying
