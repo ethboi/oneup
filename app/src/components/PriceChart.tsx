@@ -2,9 +2,9 @@
 
 // The console's LCD: price line from the app's polled history, in four shades of green, with entry,
 // liquidation, take-profit and stop-loss marks told apart by dash pattern and label (the screen has no
-// colours to spare). Drawn at the
-// container's real width with a crosshair readout that follows a mouse or a finger. The time axis slides
-// with the clock and each new price eases in, so the line moves steadily between oracle updates.
+// colours to spare). The scale fits the price; marks too far away to draw wait at the edge with an arrow.
+// Drawn at the container's real width with a crosshair readout that follows a mouse or a finger. The time
+// axis slides with the clock and each new price eases in, so the line moves steadily between oracle updates.
 
 import { useEffect, useState } from "react";
 import { useWidth } from "@/lib/useWidth";
@@ -39,37 +39,115 @@ function useClock(): number | null {
   return now;
 }
 
-/** `alarm`: a position here is near liquidation, so its liquidation line blinks. */
-export function PriceChart({ points, marks = [], alarm }: { points: { t: number; p: number }[]; marks?: Mark[]; alarm?: boolean }) {
+/** A round step near `span / n`: 1, 2, 2.5 or 5 × a power of ten. */
+function niceStep(span: number, n: number) {
+  const raw = span / n;
+  const mag = 10 ** Math.floor(Math.log10(raw));
+  return ([1, 2, 2.5, 5, 10].find((f) => f * mag >= raw) ?? 10) * mag;
+}
+
+/** The fewest decimals that print `step` exactly. */
+function decimalsOf(step: number) {
+  for (let d = 0; d < 8; d++) if (Math.abs(step * 10 ** d - Math.round(step * 10 ** d)) < 1e-6) return d;
+  return 8;
+}
+
+/** Time-axis steps: the first that puts at most five ticks across the window. */
+const TIME_STEPS = [5_000, 10_000, 15_000, 30_000, 60_000, 120_000, 300_000, 600_000];
+const ago = (ms: number) => (ms >= 60_000 ? `−${ms / 60_000}m` : `−${ms / 1000}s`);
+
+/** The scale never spans less than 0.1% of the price, so one-tick moves don't fill the screen. */
+const MIN_SPAN = 0.001;
+/** Marks this close to the price (0.5%) always join the scale. */
+const NEAR_MARK = 0.005;
+/** Label spacing on the right edge, in px. */
+const GAP = 15;
+
+/** Moves sorted label positions apart by at least `gap`, keeping them inside [top, bottom]. */
+function spread(ys: number[], gap: number, top: number, bottom: number) {
+  const out = ys.slice();
+  for (let i = 1; i < out.length; i++) out[i] = Math.max(out[i], out[i - 1] + gap);
+  if (out.length && out[out.length - 1] > bottom) out[out.length - 1] = bottom;
+  for (let i = out.length - 2; i >= 0; i--) out[i] = Math.min(out[i], out[i + 1] - gap);
+  if (out.length && out[0] < top) for (let i = 0; i < out.length; i++) out[i] = Math.max(out[i], top + i * gap);
+  return out;
+}
+
+/**
+ * `alarm`: a position here is near liquidation, so its liquidation line blinks. `readout` and `gauge` are printed
+ * on the screen's top edge; on a phone they take a row each.
+ */
+export function PriceChart({
+  points,
+  marks = [],
+  alarm,
+  readout,
+  gauge,
+}: {
+  points: { t: number; p: number }[];
+  marks?: Mark[];
+  alarm?: boolean;
+  readout?: React.ReactNode;
+  gauge?: React.ReactNode;
+}) {
   const [ref, W] = useWidth();
   const narrow = W < 480;
-  const H = narrow ? 210 : 250;
-  const PAD = { l: 10, r: narrow ? 64 : 84, t: 34, b: 14 }; // room at the top for the readout the console prints on screen
+  const H = narrow ? 230 : 260;
+  // room at the top for the readout, at the bottom for the time axis
+  const PAD = { l: 10, r: narrow ? 70 : 128, t: narrow && gauge ? 58 : 36, b: 22 };
   const [hover, setHover] = useState<number | null>(null);
   const now = useClock();
 
+  const header = (
+    <div
+      className={`display num pointer-events-none absolute left-3 right-3 top-2 flex text-[var(--lcd-ink)] ${narrow ? "flex-col items-start gap-1" : "items-baseline justify-between gap-3"}`}
+    >
+      {readout}
+      {gauge}
+    </div>
+  );
+
   if (points.length < 2) {
     return (
-      <div ref={ref} className="lcd flex h-[210px] items-center justify-center sm:h-[250px]">
+      <div ref={ref} className="lcd relative flex h-[230px] items-center justify-center sm:h-[260px]">
+        {header}
         <span className="display text-[var(--lcd-3)]">Waiting for prices…</span>
       </div>
     );
   }
-  const values = points.map((x) => x.p).concat(marks.map((m) => m.price));
-  let lo = Math.min(...values);
-  let hi = Math.max(...values);
-  const pad = (hi - lo || hi * 0.002) * 0.15;
-  lo -= pad;
-  hi += pad;
   const last = points[points.length - 1];
   const prev = points[points.length - 2];
+  // the scale fits the price, not the marks: a liquidation line 2% away would flatten a 0.02% move to nothing.
+  // Marks near the line join the scale; the rest wait at the edge with an arrow.
+  let lo = Math.min(...points.map((x) => x.p));
+  let hi = Math.max(...points.map((x) => x.p));
+  const min = last.p * MIN_SPAN;
+  if (hi - lo < min) {
+    const mid = (hi + lo) / 2;
+    lo = mid - min / 2;
+    hi = mid + min / 2;
+  }
+  // within a range of the line, or 0.5% of the price, whichever is wider: entry and triggers usually are
+  const reach = Math.max(hi - lo, last.p * NEAR_MARK);
+  for (const m of marks) {
+    if (m.price >= lo - reach && m.price <= hi + reach) {
+      lo = Math.min(lo, m.price);
+      hi = Math.max(hi, m.price);
+    }
+  }
+  const pad = (hi - lo) * 0.12;
+  lo -= pad;
+  hi += pad;
+
   // the newest price eases in from the one before; the line then holds it out to the present
   const k = now === null ? 1 : Math.min(1, Math.max(0, (now - last.t) / EASE_MS));
   const headP = prev.p + (last.p - prev.p) * (1 - (1 - k) ** 3);
   const t0 = points[0].t;
   const t1 = now === null ? last.t : Math.max(last.t, now);
-  const x = (t: number) => PAD.l + ((t - t0) / Math.max(1, t1 - t0)) * (W - PAD.l - PAD.r);
-  const y = (p: number) => PAD.t + (1 - (p - lo) / (hi - lo)) * (H - PAD.t - PAD.b);
+  const plotR = W - PAD.r;
+  const plotB = H - PAD.b;
+  const x = (t: number) => PAD.l + ((t - t0) / Math.max(1, t1 - t0)) * (plotR - PAD.l);
+  const y = (p: number) => PAD.t + (1 - (p - lo) / (hi - lo)) * (plotB - PAD.t);
   const line =
     points
       .slice(0, -1)
@@ -78,9 +156,38 @@ export function PriceChart({ points, marks = [], alarm }: { points: { t: number;
   const digits = last.p < 10 ? 4 : last.p < 1000 ? 2 : 0;
   const h = hover === null ? null : points[hover];
 
+  // one position here: its marks don't need its number
+  const many = new Set(marks.map((m) => m.label.split(" ")[0])).size > 1;
+  const name = (m: Mark) => (many && !narrow ? m.label : m.label.replace(/^#\d+ /, ""));
+  const shown = marks.map((m) => ({ m, edge: m.price > hi ? "up" : m.price < lo ? "down" : null }));
+
+  // right-edge labels: the price first, then each mark, nudged apart so none overlap
+  const labels = [
+    { key: "head", y: y(headP), text: last.p.toFixed(digits), head: true, kind: undefined as Mark["kind"] | undefined },
+    ...shown.map(({ m, edge }) => ({
+      key: m.label,
+      y: edge === "up" ? PAD.t : edge === "down" ? plotB : y(m.price),
+      text: `${edge === "up" ? "▲ " : edge === "down" ? "▼ " : ""}${name(m)}${narrow ? "" : ` ${m.price.toFixed(digits)}`}`,
+      head: false,
+      kind: m.kind,
+    })),
+  ].sort((a, b) => a.y - b.y);
+  const placed = spread(labels.map((l) => l.y), GAP, PAD.t + 4, plotB - 2);
+
+  // price grid at round numbers; a label that would sit on a mark or the price is left off
+  const step = niceStep(hi - lo, narrow ? 3 : 4);
+  const ticks: number[] = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) ticks.push(v);
+  const busy = [y(headP), ...shown.filter((s) => !s.edge).map((s) => y(s.m.price))];
+  const tickDigits = Math.max(decimalsOf(step), 0);
+
+  const tStep = TIME_STEPS.find((s) => (t1 - t0) / s <= 5) ?? TIME_STEPS[TIME_STEPS.length - 1];
+  const times: number[] = [];
+  for (let a = tStep; t1 - a >= t0 + (t1 - t0) * 0.06; a += tStep) times.push(a);
+
   const onPointer = (e: React.PointerEvent) => {
     const r = e.currentTarget.getBoundingClientRect();
-    const t = t0 + ((e.clientX - r.left - PAD.l) / (W - PAD.l - PAD.r)) * (t1 - t0);
+    const t = t0 + ((e.clientX - r.left - PAD.l) / (plotR - PAD.l)) * (t1 - t0);
     let best = 0;
     for (let i = 1; i < points.length; i++) if (Math.abs(points[i].t - t) < Math.abs(points[best].t - t)) best = i;
     setHover(best);
@@ -99,52 +206,88 @@ export function PriceChart({ points, marks = [], alarm }: { points: { t: number;
         onPointerLeave={() => setHover(null)}
         onPointerCancel={() => setHover(null)}
       >
-        {/* a faint price grid: four levels across the range */}
-        {[0.2, 0.4, 0.6, 0.8].map((f) => {
-          const v = lo + (hi - lo) * f;
-          return (
-            <g key={f}>
-              <line x1={PAD.l} x2={W - PAD.r} y1={y(v)} y2={y(v)} stroke="var(--lcd-2)" strokeWidth="1" opacity="0.6" />
-              {/* on the left, so they never collide with the price and the entry/liq labels on the right */}
+        <defs>
+          <linearGradient id="lcd-fill" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0" stopColor="var(--lcd-2)" stopOpacity="0.7" />
+            <stop offset="1" stopColor="var(--lcd-2)" stopOpacity="0.1" />
+          </linearGradient>
+        </defs>
+        {ticks.map((v) => (
+          <g key={v}>
+            <line x1={PAD.l} x2={plotR} y1={y(v)} y2={y(v)} stroke="var(--lcd-2)" strokeWidth="1" opacity="0.6" />
+            {/* on the left, so they never collide with the price and the mark labels on the right */}
+            {busy.every((b) => Math.abs(b - y(v)) > 11) && y(v) - PAD.t > 12 && (
               <text x={PAD.l + 4} y={y(v) - 4} fontSize="10" fill="var(--lcd-3)" className="num">
-                {v.toFixed(digits)}
+                {v.toFixed(tickDigits)}
               </text>
-            </g>
-          );
-        })}
-        <path d={`${line} L${x(t1)} ${H - PAD.b} L${x(t0)} ${H - PAD.b} Z`} fill="var(--lcd-2)" opacity="0.45" />
+            )}
+          </g>
+        ))}
+        {/* time axis: how long ago, with the present at the head */}
+        <line x1={PAD.l} x2={plotR} y1={plotB} y2={plotB} stroke="var(--lcd-3)" strokeWidth="1" opacity="0.6" />
+        {times.map((a) => (
+          <g key={a}>
+            <line x1={x(t1 - a)} x2={x(t1 - a)} y1={plotB} y2={plotB + 4} stroke="var(--lcd-3)" />
+            <text x={x(t1 - a)} y={H - 5} fontSize="10" fill="var(--lcd-3)" textAnchor="middle" className="num">
+              {ago(a)}
+            </text>
+          </g>
+        ))}
+        <text x={x(t1)} y={H - 5} fontSize="10" fill="var(--lcd-3)" textAnchor="end">
+          now
+        </text>
+        <path d={`${line} L${x(t1)} ${plotB} L${x(t0)} ${plotB} Z`} fill="url(#lcd-fill)" />
         <path d={line} fill="none" stroke="var(--lcd-ink)" strokeWidth="2.5" strokeLinejoin="round" />
-        {marks.map((m) => (
-          <g key={m.label} className={alarm && m.kind === "liq" ? "blink" : undefined}>
+        {shown.map(({ m, edge }) =>
+          edge ? null : (
             <line
+              key={m.label}
+              className={alarm && m.kind === "liq" ? "blink" : undefined}
               x1={PAD.l}
-              x2={W - PAD.r}
+              x2={plotR}
               y1={y(m.price)}
               y2={y(m.price)}
               stroke={m.kind === "liq" ? "var(--lcd-ink)" : "var(--lcd-3)"}
               strokeWidth={m.kind === "liq" ? 2 : 1.5}
               strokeDasharray={DASH[m.kind]}
             />
-            <text x={W - PAD.r + 6} y={y(m.price) + 4} fontSize="12" fill="var(--lcd-ink)">
-              {narrow ? m.label.replace(/^#\d+ /, "") : m.label}
-            </text>
+          ),
+        )}
+        {/* the present price, ruled across so it reads against the marks */}
+        <line x1={x(t1)} x2={plotR + 2} y1={y(headP)} y2={y(headP)} stroke="var(--lcd-ink)" strokeWidth="1" />
+        <rect x={x(t1) - 4} y={y(headP) - 4} width="8" height="8" fill="var(--lcd-ink)" />
+        {labels.map((l, i) => (
+          <g key={l.key} className={alarm && l.kind === "liq" ? "blink" : undefined}>
+            {/* a leader when the label had to move off its line */}
+            {Math.abs(placed[i] - l.y) > 2 && (
+              <line x1={plotR} x2={plotR + 4} y1={l.y} y2={placed[i]} stroke="var(--lcd-3)" strokeWidth="1" />
+            )}
+            {l.head ? (
+              <>
+                <rect x={plotR + 4} y={placed[i] - 9} width={PAD.r - 8} height="18" rx="2" fill="var(--lcd-ink)" />
+                <text x={plotR + 8} y={placed[i] + 5} fontSize="13" fontWeight="700" fill="var(--lcd)" className="num">
+                  {l.text}
+                </text>
+              </>
+            ) : (
+              <text x={plotR + 6} y={placed[i] + 4} fontSize="11" fill="var(--lcd-ink)" className="num">
+                {l.text}
+              </text>
+            )}
           </g>
         ))}
-        <rect x={x(t1) - 4} y={y(headP) - 4} width="8" height="8" fill="var(--lcd-ink)" />
-        <text x={W - PAD.r + 6} y={y(headP) - 8} fontSize="14" fontWeight="700" fill="var(--lcd-ink)" className="num">
-          {last.p.toFixed(digits)}
-        </text>
         {h && (
           <g pointerEvents="none">
-            <line x1={x(h.t)} x2={x(h.t)} y1={PAD.t} y2={H - PAD.b} stroke="var(--lcd-3)" strokeDasharray="2 3" />
+            <line x1={x(h.t)} x2={x(h.t)} y1={PAD.t} y2={plotB} stroke="var(--lcd-3)" strokeDasharray="2 3" />
             <rect x={x(h.t) - 5} y={y(h.p) - 5} width="10" height="10" fill="var(--lcd)" stroke="var(--lcd-ink)" strokeWidth="2" />
           </g>
         )}
       </svg>
+      {header}
       {h && (
         <div
-          className="display num pointer-events-none absolute top-2 rounded-md border border-[var(--lcd-ink)] bg-[var(--lcd)] px-2 py-1 text-xs text-[var(--lcd-ink)]"
-          style={x(h.t) > W / 2 ? { right: W - x(h.t) + 10 } : { left: x(h.t) + 10 }}
+          className="display num pointer-events-none absolute rounded-md border border-[var(--lcd-ink)] bg-[var(--lcd)] px-2 py-1 text-xs text-[var(--lcd-ink)]"
+          style={{ top: PAD.t, ...(x(h.t) > W / 2 ? { right: W - x(h.t) + 10 } : { left: x(h.t) + 10 }) }}
         >
           <div className="text-sm">{h.p.toFixed(digits)}</div>
           <div>{new Date(h.t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</div>

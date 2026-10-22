@@ -161,6 +161,22 @@ function Loaded({ d, children }: { d: Deployment; children: ReactNode }) {
     };
     tick();
     const i = setInterval(tick, 1000);
+    // the server has been watching too: start the chart from its last 30 minutes rather than empty
+    fetch("/api/prices")
+      .then((r) => (r.ok ? r.json() : {}))
+      .then((past: Record<string, { t: number; p: number }[]>) => {
+        if (!live) return;
+        setHistory((h) => {
+          const out = { ...h };
+          for (const [k, pts] of Object.entries(past)) {
+            const mine = out[k] ?? [];
+            const before = pts.filter((x) => x.t < (mine[0]?.t ?? Infinity));
+            out[k] = before.concat(mine).slice(-1800);
+          }
+          return out;
+        });
+      })
+      .catch(() => {});
     return () => {
       live = false;
       clearInterval(i);

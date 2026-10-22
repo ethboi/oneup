@@ -247,7 +247,29 @@ function Console({
       <div className="bezel px-3 pb-5 pt-3 sm:px-5">
         <div className="stripes mb-3" aria-hidden />
         <div className="relative">
-          <PriceChart points={pts} marks={marks} alarm={mood.state === "danger" || mood.state === "critical"} />
+          <PriceChart
+            points={pts}
+            marks={marks}
+            alarm={mood.state === "danger" || mood.state === "critical"}
+            readout={
+              // the readout is printed on the screen, in LCD ink
+              <span className="flex items-baseline gap-2">
+                <span className="font-[family-name:var(--font-display)] text-base">{market}</span>
+                {pts.length > 1 && (
+                  <span className="text-sm">
+                    {change >= 0 ? "▲" : "▼"} {Math.abs(change).toFixed(2)}%
+                  </span>
+                )}
+                {streak && streak.n >= 2 && (
+                  <span className="text-sm" title={`${streak.n} ${streak.win ? "wins" : "losses"} in a row`}>
+                    · {streak.win ? "W" : "L"}
+                    {streak.n}
+                  </span>
+                )}
+              </span>
+            }
+            gauge={mood.state !== "none" && mood.gauge ? <Gauge mood={mood} /> : undefined}
+          />
           <MoodGlow mood={mood} />
           {fx && <Burst fx={fx} />}
           {(revenge || tilt > 0) && (
@@ -263,26 +285,6 @@ function Console({
               )}
             </div>
           )}
-          {mood.state !== "none" && (
-            <div className="pointer-events-none absolute right-3 top-2.5">
-              <Gauge mood={mood} />
-            </div>
-          )}
-          {/* the readout is printed on the screen, in LCD ink */}
-          <div className="display num pointer-events-none absolute left-3 top-2 flex items-baseline gap-2 text-[var(--lcd-ink)]">
-            <span className="font-[family-name:var(--font-display)] text-base">{market}</span>
-            {pts.length > 1 && (
-              <span className="text-sm">
-                {change >= 0 ? "▲" : "▼"} {Math.abs(change).toFixed(2)}%
-              </span>
-            )}
-            {streak && streak.n >= 2 && (
-              <span className="text-sm" title={`${streak.n} ${streak.win ? "wins" : "losses"} in a row`}>
-                · {streak.win ? "W" : "L"}
-                {streak.n}
-              </span>
-            )}
-          </div>
         </div>
       </div>
 
