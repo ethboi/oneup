@@ -213,6 +213,26 @@ function Sparkline({ points, color }: { points: { t: number; p: number }[]; colo
   );
 }
 
+/** The chart's window: 1 minute unless you've picked another, remembered in this browser. */
+function useChartRange(): [number, (r: number) => void] {
+  const [range, set] = useState<number>(RANGES[0][1]);
+  useEffect(() => {
+    try {
+      const r = Number(localStorage.getItem("oneup.range"));
+      if (RANGES.some(([, ms]) => ms === r)) set(r);
+    } catch {}
+  }, []);
+  return [
+    range,
+    (r) => {
+      set(r);
+      try {
+        localStorage.setItem("oneup.range", String(r));
+      } catch {}
+    },
+  ];
+}
+
 /** Line or candles, remembered in this browser. */
 function useChartStyle(): ["line" | "candles", (s: "line" | "candles") => void] {
   const [style, set] = useState<"line" | "candles">("line");
@@ -440,7 +460,7 @@ function Console({
   const fx = useCloseFx(market);
   const revenge = useRevengeFlash();
   const streak = useStreak(me);
-  const [range, setRange] = useState<number>(RANGES[1][1]);
+  const [range, setRange] = useChartRange();
   const [style, setStyle] = useChartStyle();
   const now = useNow();
   // the window, plus the last price before it so the line runs in from the left edge
