@@ -414,7 +414,7 @@ function useTicket(market: string, maxLeverage: number) {
   const blocked = !quote?.allowed || m === 0n || (!viaAsset && topUp > wallet) || badTrigger || intentStep !== null;
   const label = viaAsset
     ? `${side} ${market} with ${viaAsset.symbol} on ${viaAsset.chain}`
-    : `${topUp > 0n ? `Deposit $${fmtUsdc(topUp, 0)} & ` : ""}${side} ${market}`;
+    : `${topUp > 0n ? "Deposit & " : ""}${side} ${market.split("-")[0]}`;
   const triggers = { takeProfit: tpAt, stopLoss: slAt };
   const submit = () =>
     viaAsset
@@ -538,6 +538,12 @@ function OrderForm({ t }: { t: Ticket }) {
   // what a full loss would bring: an Extra Life of at most the loss × today's cap, and up to 20 $1UP per $1
   const lifeUpTo = owed(m, lifeCapPpm(pool));
   const oneupUpTo = Number(m / USDC) * Number(ONEUP_PER_USDC);
+  // "Pay with" stays out of the way until it's wanted, or the wallet can't cover the trade
+  const [payOpen, setPayWith] = useState(false);
+  const showPayWith = payOpen || t.payWith !== "wallet" || topUp > wallet;
+  const [why, setWhy] = useState(false);
+  // a loss of 90% of margin liquidates: the move against you that takes
+  const liqMove = 90 / leverage;
 
   return (
     <div className="panel flex flex-col gap-4 p-4">
@@ -561,17 +567,29 @@ function OrderForm({ t }: { t: Ticket }) {
       </div>
 
       <label className="flex flex-col gap-1">
-        <span className="label flex items-center justify-between">
-          <span>Margin</span>
-          {free + wallet >= USDC && (
-            <button type="button" className="chip" onClick={() => setMargin(String(Math.floor(Number((free + wallet) / USDC))))}>
-              Max ${fmtUsdc(free + wallet, 0)}
-            </button>
-          )}
-        </span>
+        <span className="label">Margin</span>
         <span className="field">
           <input className="input num" value={margin} onChange={(e) => setMargin(e.target.value)} inputMode="decimal" aria-label="Margin" />
           <span className="field-unit">USDC</span>
+        </span>
+        <span className="chip-track" role="group" aria-label="Margin presets">
+          {[50, 100, 500]
+            .filter((x) => BigInt(x) * USDC <= free + wallet)
+            .map((x) => (
+              <button key={x} type="button" className="chip num flex-1 px-0" aria-pressed={margin === String(x)} onClick={() => setMargin(String(x))}>
+                ${x}
+              </button>
+            ))}
+          {free + wallet >= USDC && (
+            <button
+              type="button"
+              className="chip num flex-1 px-0"
+              aria-pressed={margin === String(Math.floor(Number((free + wallet) / USDC)))}
+              onClick={() => setMargin(String(Math.floor(Number((free + wallet) / USDC))))}
+            >
+              Max
+            </button>
+          )}
         </span>
         <span className="label num">
           {t.viaAsset
@@ -582,7 +600,12 @@ function OrderForm({ t }: { t: Ticket }) {
         </span>
       </label>
 
-      {d.intents && (
+      {d.intents && !showPayWith && (
+        <button type="button" className="label -mt-2 self-start underline decoration-dotted underline-offset-2" onClick={() => setPayWith(true)}>
+          Pay from another chain
+        </button>
+      )}
+      {d.intents && showPayWith && (
         <label className="flex flex-col gap-1">
           <span className="label">Pay with</span>
           <select className="input" value={t.payWith} onChange={(e) => t.setPayWith(e.target.value)} aria-label="Pay with">
@@ -599,7 +622,9 @@ function OrderForm({ t }: { t: Ticket }) {
       <label className="flex flex-col gap-1">
         <span className="label flex justify-between">
           <span>Leverage</span>
-          <span className="num text-base font-extrabold text-[var(--text)]">{leverage}×</span>
+          <span className="num text-base font-extrabold" style={{ color: leverage >= 50 ? "var(--short)" : "var(--text)" }}>
+            {leverage}×
+          </span>
         </span>
         <input
           type="range"
@@ -619,32 +644,48 @@ function OrderForm({ t }: { t: Ticket }) {
               </button>
             ))}
         </span>
+        <span className="label num" style={leverage >= 50 ? { color: "var(--short)" } : undefined}>
+          A {liqMove < 1 ? liqMove.toFixed(2) : liqMove.toFixed(1)}% move against you liquidates
+        </span>
       </label>
 
-      <dl className="grid grid-cols-2 gap-y-2 text-sm">
-        <dt className="label">Position size</dt>
-        <dd className="num text-right">${fmtUsdc(m * BigInt(leverage), 0)}</dd>
-        <dt className="label">Max profit (9× margin)</dt>
-        <dd className="num text-right">${fmtUsdc(maxLiability(m), 0)}</dd>
-        <dt className="label">Winner&apos;s cut</dt>
-        <dd className="num text-right">{quote ? `${(Number(quote.cut_ppm) / 1e4).toFixed(1)}%` : "…"}</dd>
-        <dt className="label">Liquidation price</dt>
-        <dd className="num text-right">
-          {liq ? fmtPrice(liq) : "…"}
-          {liq && price ? <span className="label"> ({away(price, liq)} away)</span> : null}
-        </dd>
-      </dl>
+      {/* what's at stake first, the details under it */}
+      <div className="num flex flex-col gap-1 rounded-xl bg-[var(--panel-2)] px-3 py-2.5">
+        <div className="flex items-baseline justify-between gap-2">
+          <span>
+            You risk <b>${fmtUsdc(m, 0)}</b>
+          </span>
+          <span>
+            win up to <b style={{ color: "var(--long)" }}>${fmtUsdc(maxLiability(m), 0)}</b>
+          </span>
+        </div>
+        <div className="label flex flex-wrap gap-x-3">
+          <span>Liq {liq ? fmtPrice(liq) : "…"}{liq && price ? ` (${away(price, liq)} away)` : ""}</span>
+          <span>Cut {quote ? `${(Number(quote.cut_ppm) / 1e4).toFixed(1)}%` : "…"}</span>
+          <span>Size ${fmtUsdc(m * BigInt(leverage), 0)}</span>
+        </div>
+      </div>
 
       <TriggerFields side={side} entry={price} margin={m} leverage={leverage} liq={liq} tp={t.tp} setTp={t.setTp} sl={t.sl} setSl={t.setSl} />
 
       {/* the promise, where the decision is made */}
       {m > 0n && (
-        <div className="flex gap-3 border-t border-[var(--line)] pt-3 text-sm">
-          <PixelHeart size={22} className="mt-0.5 shrink-0" />
-          <p>
-            <b>If it loses</b>, you get an Extra Life that can pay back up to <b className="num">${fmtUsdc(lifeUpTo, 0)}</b>, plus up to{" "}
-            <b className="num">{oneupUpTo.toLocaleString("en-US")} $1UP</b> locked for 2 years. Both are sized from the house&apos;s profit.
-          </p>
+        <div className="border-t border-[var(--line)] pt-3 text-sm">
+          <div className="flex items-center gap-2">
+            <PixelHeart size={18} className="shrink-0" />
+            <span className="num min-w-0 flex-1">
+              Lose it → Extra Life up to <b>${fmtUsdc(lifeUpTo, 0)}</b> + <b>{oneupUpTo.toLocaleString("en-US")} $1UP</b>
+            </span>
+            <button type="button" className="label shrink-0 underline decoration-dotted underline-offset-2" aria-expanded={why} onClick={() => setWhy(!why)}>
+              {why ? "Hide" : "How"}
+            </button>
+          </div>
+          {why && (
+            <p className="label mt-1.5">
+              If this trade loses, you get an Extra Life that can pay back up to ${fmtUsdc(lifeUpTo, 0)} from house profit, plus up to{" "}
+              {oneupUpTo.toLocaleString("en-US")} $1UP locked for 2 years. Both are sized from what the house makes this round.
+            </p>
+          )}
         </div>
       )}
 
@@ -658,7 +699,14 @@ function OrderForm({ t }: { t: Ticket }) {
         onClick={t.submit}
       >
         {!blocked && <Icon name={side === "Long" ? "up" : "down"} size={20} />}
-        {t.label}
+        <span className="flex flex-col items-center leading-tight">
+          {t.label}
+          {m > 0n && (
+            <span className="num text-xs font-bold opacity-85">
+              ${fmtUsdc(m, 0)} at {leverage}×
+            </span>
+          )}
+        </span>
       </button>
       {t.intentStep ? (
         <p className="label -mt-1 flex items-center justify-center gap-2" role="status">
