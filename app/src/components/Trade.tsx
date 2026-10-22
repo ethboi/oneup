@@ -15,6 +15,7 @@ import {
   priceToNumber,
   stopHit,
   targetHit,
+  type EpochSummary,
   type Market,
   type Order,
   type Position,
@@ -409,6 +410,52 @@ function Account({ t, positions }: { t: Ticket; positions: Position[] }) {
   );
 }
 
+/** When a round closes, the LCD prints what it did for a few seconds: what losers got back, in Extra Lives and
+ *  $1UP buyback, or that the house made nothing to share. */
+function RoundOver() {
+  const { o } = useOneUp();
+  const epoch = usePoll(() => o.epoch(), [], 5000);
+  const [shown, setShown] = useState<EpochSummary | null>(null);
+  const seen = useRef<number | null>(null);
+  useEffect(() => {
+    if (!epoch) return;
+    // the first round seen is where we came in, not a close
+    if (seen.current === null || epoch.id <= seen.current) {
+      seen.current = epoch.id;
+      return;
+    }
+    seen.current = epoch.id;
+    let live = true;
+    o.epochSummary(epoch.id - 1).then((x) => live && x && setShown(x));
+    const t = setTimeout(() => setShown(null), 7000);
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+  }, [epoch?.id, o]);
+  if (!shown) return null;
+  const lives = BigInt(shown.lives_pot);
+  const buyback = BigInt(shown.buyback_pot);
+  const net = BigInt(shown.house_net);
+  return (
+    <div className="round-over pointer-events-none absolute inset-0 flex items-center justify-center" role="status">
+      <div className="round-over-card display text-center">
+        <div className="text-2xl">ROUND {shown.epoch} OVER</div>
+        {net > 0n ? (
+          <>
+            <div className="mt-2 text-lg">
+              +{shown.lives_minted} EXTRA {shown.lives_minted === 1 ? "LIFE" : "LIVES"} · ${fmtUsdc(lives, lives < 1_000n * USDC ? 2 : 0)} TO LIVES
+            </div>
+            <div className="text-sm">${fmtUsdc(buyback, buyback < 1_000n * USDC ? 2 : 0)} BUYS BACK $1UP FOR THE LOCKS</div>
+          </>
+        ) : (
+          <div className="mt-2 text-sm">THE HOUSE MADE NOTHING TO SHARE THIS ROUND</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /** How long ago, in the tape's few characters. */
 const agoShort = (ms: number) => {
   const s = Math.max(0, Math.round(ms / 1000));
@@ -702,6 +749,7 @@ function Console({
             gauge={mood.state !== "none" && mood.gauge ? <Gauge mood={mood} /> : jackpotLine}
           />
           <MoodGlow mood={mood} />
+          <RoundOver />
           {fx && <Burst fx={fx} />}
           {(revenge || tilt > 0) && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center" role="status">
@@ -747,6 +795,26 @@ function OrderForm({ t }: { t: Ticket }) {
   const spendable = free + wallet;
   const levPos = levToPos(leverage, maxLeverage);
   const hot = leverage >= 50;
+  const marginRef = useRef<HTMLInputElement>(null);
+  // desktop keys: L and S pick the side, [ and ] step the leverage stops, M goes to the margin; never while
+  // typing, and Enter only places the order from the margin field, so a stray key can't trade
+  useEffect(() => {
+    const stops = LEVERAGE_STOPS.filter((x) => x <= maxLeverage);
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement;
+      if (e.metaKey || e.ctrlKey || e.altKey || el.closest("input, textarea, select, [contenteditable]")) return;
+      const k = e.key.toLowerCase();
+      if (k === "l") setSide("Long");
+      else if (k === "s") setSide("Short");
+      else if (k === "]") setLeverage(stops.find((x) => x > leverage) ?? stops[stops.length - 1]);
+      else if (k === "[") setLeverage([...stops].reverse().find((x) => x < leverage) ?? stops[0]);
+      else if (k === "m") marginRef.current?.select();
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [leverage, maxLeverage, setSide, setLeverage]);
 
   return (
     <div className="panel ticket flex flex-col gap-3.5 p-4">
@@ -777,7 +845,16 @@ function OrderForm({ t }: { t: Ticket }) {
       <div className="flex flex-col gap-1.5">
         <span className="field">
           <span className="field-lead label">Margin</span>
-          <input className="input num text-right" value={margin} onChange={(e) => setMargin(e.target.value)} inputMode="decimal" aria-label="Margin" />
+          <input
+            ref={marginRef}
+            className="input num text-right"
+            value={margin}
+            onChange={(e) => setMargin(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && !blocked && t.submit()}
+            inputMode="decimal"
+            aria-label="Margin"
+            aria-keyshortcuts="M"
+          />
           <span className="field-unit">USDC</span>
         </span>
         <span className="chip-track" role="group" aria-label="Margin presets">
@@ -947,6 +1024,10 @@ function OrderForm({ t }: { t: Ticket }) {
 
       <div className="label flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <span>{t.viaAsset ? `Via NEAR Intents: a solver swaps your ${t.viaAsset.symbol} for USDC. Simulated on this local chain.` : "Fills at the next oracle price."}</span>
+        {/* the keys, where a keyboard is */}
+        <span className="hidden w-full lg:block" aria-hidden>
+          Keys: <kbd>L</kbd> <kbd>S</kbd> side · <kbd>[</kbd> <kbd>]</kbd> leverage · <kbd>M</kbd> margin, then <kbd>Enter</kbd>
+        </span>
         {d.intents && !showPayWith && (
           <button type="button" className="underline decoration-dotted underline-offset-2 hover:text-[var(--text)]" onClick={() => setPayWith(true)}>
             Pay from another chain
