@@ -11,7 +11,7 @@ import { heartbeat, lowHpBeep, shimmer } from "@/lib/sound";
 import { useFx, type FxEvent } from "@/lib/fx";
 import { setMusicTension } from "@/lib/music";
 import { nearMisses } from "@/lib/achievements";
-import { PixelCoin, PixelHeart } from "./Pixel";
+import { PixelAmount, PixelCoin, PixelHeart } from "./Pixel";
 
 export interface Mood {
   state: "none" | "calm" | "danger" | "critical" | "hot";
@@ -142,12 +142,12 @@ export function useCloseFx(market: string) {
 
 type CloseFx = Extract<FxEvent, { market: string }>;
 
-/** Each win tier's burst: coins thrown, how far, the amount's size, how long it holds. */
+/** Each win tier's burst: coins thrown, how far, the amount's height in px, how long it holds. */
 const WIN = [
-  { coins: 8, reach: 0.75, size: 26, hold: 1800 },
-  { coins: 14, reach: 1, size: 34, hold: 2400 },
-  { coins: 24, reach: 1.3, size: 44, hold: 2800 },
-  { coins: 36, reach: 1.6, size: 58, hold: 3400 },
+  { coins: 8, reach: 0.75, size: 30, hold: 1800 },
+  { coins: 14, reach: 1, size: 40, hold: 2400 },
+  { coins: 24, reach: 1.3, size: 52, hold: 2800 },
+  { coins: 36, reach: 1.6, size: 66, hold: 3400 },
 ] as const;
 
 /** A coin's throw: fixed per index so renders agree. */
@@ -187,11 +187,10 @@ export function Burst({ fx }: { fx: CloseFx & { id: number } }) {
           <span className="absolute flex flex-col items-center">
             {tier === 3 && <span className="win-amount win-banner display">BIG WIN</span>}
             <span
-              className={`win-amount display num ${tier === 3 ? "win-huge" : ""}`}
-              // capped by the screen's width so a big number still fits on a phone
-              style={tier === 3 ? { fontSize: `min(${w.size}px, 12vw)` } : { fontSize: `min(${w.size}px, 10vw)`, animationDuration: `${w.hold - 100}ms` }}
+              className={`win-amount ${tier === 3 ? "win-huge" : ""}`}
+              style={tier === 3 ? undefined : { animationDuration: `${w.hold - 100}ms` }}
             >
-              +${fmtUsdc(won, won >= 1_000n * 1_000_000n ? 0 : 2)}
+              <PixelAmount text={`+$${fmtUsdc(won, won >= 1_000n * 1_000_000n ? 0 : 2)}`} height={w.size} />
             </span>
           </span>
         )}
