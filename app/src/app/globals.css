@@ -470,7 +470,6 @@ body {
   }
   .market-tile[aria-pressed="true"] {
     border-color: var(--primary);
-    background: color-mix(in srgb, var(--primary) 6%, var(--field));
     box-shadow: 0 2px 0 var(--primary);
   }
   .market-tile:active {
@@ -480,10 +479,9 @@ body {
     outline: 3px solid var(--info);
     outline-offset: 2px;
   }
-  /* a new price flashes its direction for a moment */
+  /* a new price flashes its direction for a moment, in the digits themselves */
   .tick-flash {
-    animation: tick-flash 0.8s ease-out;
-    border-radius: 4px;
+    animation: tick-flash 0.9s ease-out;
   }
   .tick-up {
     --tick: var(--long);
@@ -492,11 +490,9 @@ body {
     --tick: var(--short);
   }
   @keyframes tick-flash {
-    0% {
-      background: color-mix(in srgb, var(--tick) 22%, transparent);
-    }
-    100% {
-      background: transparent;
+    0%,
+    30% {
+      color: var(--tick);
     }
   }
 
