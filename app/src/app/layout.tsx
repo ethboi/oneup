@@ -14,7 +14,16 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${pixel.variable} ${rounded.variable}`}>
+    // the theme goes on <html> before anything paints: your pick, else dark (lib/theme.ts; the key is spelled out
+    // here because a server component can't read a value from a client module)
+    <html lang="en" className={`${pixel.variable} ${rounded.variable}`} suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem("oneup.theme");document.documentElement.dataset.theme=t==="light"?"light":"dark"}catch(e){document.documentElement.dataset.theme="dark"}`,
+          }}
+        />
+      </head>
       <body>{children}</body>
     </html>
   );

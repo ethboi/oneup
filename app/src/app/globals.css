@@ -60,6 +60,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
+    color-scheme: dark;
     --bg: #15162a;
     --grille: rgb(255 255 255 / 0.035);
     --panel: #212339;
@@ -93,6 +94,43 @@
     --series-2: #d95926;
     --series-3: #199e70;
   }
+}
+
+/* the same, when dark is picked in the header (lib/theme.ts) */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #15162a;
+  --grille: rgb(255 255 255 / 0.035);
+  --panel: #212339;
+  --panel-2: #2a2d47;
+  --edge: #474b6c;
+  --line: #363a52;
+  --panel-edge: #33375a;
+  --panel-lip: #0c0d1a;
+  --input-edge: #40445f;
+  --field: #1a1c29;
+  --panel-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 3px 0 var(--panel-lip), 0 16px 28px -18px rgb(0 0 0 / 0.8);
+  --text: #eceef6;
+  --muted: #9ba0b9;
+  --accent: #ffc83d;
+  --jackpot: #ffc83d;
+  --heart: #ff4fa3;
+  --long: #2fb466;
+  --short: #ec5050;
+  --long-fill: #1b7f47;
+  --short-fill: #c43636;
+  --primary: #c81e6c;
+  --info: #5aa9ff;
+  --case: #262941;
+  --bezel: #13141f;
+  --stripe-1: #d6327f;
+  --stripe-2: #5b6bd6;
+  --wordmark: #8f9cf0;
+  --series-long: #3a86dc;
+  --series-short: #d6732a;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
 }
 
 body {

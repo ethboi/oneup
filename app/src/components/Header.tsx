@@ -10,6 +10,7 @@ import { MuteButton } from "./Sounds";
 import { openBadges } from "./Achievements";
 import { useHistory } from "./History";
 import { emitFx, winTier } from "@/lib/fx";
+import { setTheme, useTheme } from "@/lib/theme";
 import { sfx } from "@/lib/sound";
 import { endSession, saveSession, sessionAllowance, startSession } from "@/lib/session";
 import { intentsBalances, payFromChain } from "@/lib/intents";
@@ -130,6 +131,7 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
       {/* the tools: one height, close together */}
       <div className="hdr-tools flex shrink-0 items-center gap-2">
         <MuteButton />
+        <ThemeButton />
         <DemoMenu />
         <AccountMenu />
       </div>
@@ -439,6 +441,19 @@ function useMyRound(me: string, startedAt?: number) {
 }
 
 /** The reading tabs, under one "More" in the bar (the phone's bottom bar has its own). */
+/** Light or dark, on tablets and desktops (phones have it in the sound menu, where the header has room). */
+function ThemeButton() {
+  const theme = useTheme();
+  const next = theme === "dark" ? "light" : "dark";
+  return (
+    <div className="hidden sm:block">
+      <button type="button" className="btn btn-ghost" aria-label={`Switch to ${next} mode`} title={`Switch to ${next} mode`} onClick={() => setTheme(next)}>
+        <Icon name={theme === "dark" ? "sun" : "moon"} />
+      </button>
+    </div>
+  );
+}
+
 function MoreTabs({ tabs, tab, go }: { tabs: NavTab[]; tab: string; go: (t: string) => void }) {
   const [open, setOpen] = useState(false);
   // the label shows the current tab only for the ones that live under More at every width
