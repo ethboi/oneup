@@ -6,13 +6,13 @@
 
 import { useEffect, useState } from "react";
 import { useOneUp, usePoll } from "@/lib/oneup";
-import { ACHIEVEMENTS, SKINS, earned, readFlags, skinUnlocked } from "@/lib/achievements";
+import { ACHIEVEMENTS, GROUPS, SKINS, badgeStates, readFlags, skinUnlocked, type BadgeState, type Rarity } from "@/lib/achievements";
 import { sfx } from "@/lib/sound";
 import { useHistory } from "./History";
 import { Icon } from "./Icon";
 
-/** The badges this account has, once its history has loaded. */
-export function useBadges(): Set<string> | null {
+/** Each badge's state for this account (earned, when, progress), once its history has loaded. */
+export function useBadgeStates(): Map<string, BadgeState> | null {
   const { o, me } = useOneUp();
   const history = useHistory(me);
   const lives = usePoll(() => o.lives(me), [me], 5000);
@@ -25,8 +25,25 @@ export function useBadges(): Set<string> | null {
     return () => window.removeEventListener("oneup-flags", read);
   }, [me]);
   if (!history?.synced || !lives || !locks) return null;
-  return earned(history.items, lives, locks, flags);
+  return badgeStates(history.items, lives, locks, flags);
 }
+
+/** The badges this account has, once its history has loaded. */
+export function useBadges(): Set<string> | null {
+  const states = useBadgeStates();
+  if (!states) return null;
+  return new Set([...states].filter(([, b]) => b.got).map(([id]) => id));
+}
+
+/** Each rarity's colour and name. */
+export const RARITY: Record<Rarity, { color: string; name: string }> = {
+  common: { color: "var(--long)", name: "Common" },
+  rare: { color: "var(--info)", name: "Rare" },
+  epic: { color: "var(--heart)", name: "Epic" },
+  legendary: { color: "var(--accent)", name: "Legendary" },
+};
+
+const when = (t: number) => new Date(t).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
 
 const seenKey = (account: string) => `oneup.badges.${account}`;
 
@@ -68,11 +85,11 @@ export function AchievementWatcher() {
       onClick={() => (setShown(null), openBadges())}
       role="status"
     >
-      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--on-color)]">
+      <span className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--on-color)]" style={{ background: RARITY[a.rarity].color }}>
         <Icon name="trophy" size={20} />
       </span>
       <span>
-        <span className="label block">Achievement unlocked</span>
+        <span className="label block">Achievement unlocked · {RARITY[a.rarity].name}</span>
         <b className="block">{a.name}</b>
         <span className="label block">{a.how}</span>
       </span>
@@ -106,6 +123,7 @@ export function useSkin(): [string, (s: string) => void] {
 
 export function BadgesDialog() {
   const [open, setOpen] = useState(false);
+  const states = useBadgeStates();
   const have = useBadges();
   const [skin, setSkin] = useSkin();
   useEffect(() => {
@@ -136,25 +154,27 @@ export function BadgesDialog() {
             <Icon name="x" />
           </button>
         </div>
-        <ul className="grid gap-2 sm:grid-cols-2">
-          {ACHIEVEMENTS.map((a) => {
-            const got = have?.has(a.id);
+        <div className="flex flex-wrap gap-3 text-sm">
+          {(Object.keys(RARITY) as Rarity[]).map((r) => {
+            const all = ACHIEVEMENTS.filter((a) => a.rarity === r);
             return (
-              <li key={a.id} className="flex items-center gap-3 rounded-lg border border-[var(--line)] p-3" style={got ? undefined : { opacity: 0.55 }}>
-                <span
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
-                  style={{ background: got ? "var(--accent)" : "var(--panel-2)", color: got ? "var(--on-color)" : "var(--muted)" }}
-                >
-                  <Icon name={got ? "trophy" : "lock"} size={17} />
-                </span>
-                <span className="min-w-0">
-                  <b className="block">{a.name}</b>
-                  <span className="label block">{a.how}</span>
-                </span>
-              </li>
+              <span key={r} className="flex items-center gap-1.5">
+                <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: RARITY[r].color }} />
+                {RARITY[r].name} <span className="label num">{all.filter((a) => have?.has(a.id)).length}/{all.length}</span>
+              </span>
             );
           })}
-        </ul>
+        </div>
+        {GROUPS.map((g) => (
+          <section key={g}>
+            <h3 className="mb-2 font-extrabold">{g}</h3>
+            <ul className="grid gap-2 sm:grid-cols-2">
+              {ACHIEVEMENTS.filter((a) => a.group === g).map((a) => (
+                <Badge key={a.id} a={a} b={states?.get(a.id)} />
+              ))}
+            </ul>
+          </section>
+        ))}
         <div>
           <h3 className="font-extrabold">Console skins</h3>
           <div className="mt-2 flex flex-wrap gap-2">
@@ -181,5 +201,47 @@ export function BadgesDialog() {
         </div>
       </div>
     </div>
+  );
+}
+
+function Badge({ a, b }: { a: (typeof ACHIEVEMENTS)[number]; b?: BadgeState }) {
+  const got = !!b?.got;
+  const r = RARITY[a.rarity];
+  return (
+    <li
+      className="flex gap-3 rounded-lg border p-3"
+      style={{ borderColor: got ? r.color : "var(--line)", background: got ? `color-mix(in srgb, ${r.color} 7%, transparent)` : undefined }}
+    >
+      <span
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+        style={{ background: got ? r.color : "var(--panel-2)", color: got ? "var(--on-color)" : "var(--muted)" }}
+      >
+        <Icon name={got ? "trophy" : "lock"} size={18} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-baseline justify-between gap-2">
+          <b className={got ? "" : "text-[var(--muted)]"}>{a.name}</b>
+          <span className="shrink-0 text-xs font-bold" style={{ color: r.color }}>
+            {r.name}
+          </span>
+        </span>
+        <span className="block text-sm">{a.how}</span>
+        <span className="label block">{a.detail}</span>
+        {got ? (
+          b?.at && <span className="label num mt-1 block">Earned {when(b.at)}</span>
+        ) : (
+          b?.progress && (
+            <span className="mt-1.5 flex items-center gap-2">
+              <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--panel-2)]">
+                <span className="block h-full rounded-full" style={{ width: `${(b.progress.n / b.progress.of) * 100}%`, background: r.color }} />
+              </span>
+              <span className="label num">
+                {b.progress.n}/{b.progress.of}
+              </span>
+            </span>
+          )
+        )}
+      </span>
+    </li>
   );
 }
