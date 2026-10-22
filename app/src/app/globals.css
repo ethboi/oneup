@@ -439,46 +439,69 @@ body {
     background: linear-gradient(var(--stripe-1) 0 2px, transparent 2px 5px, var(--stripe-2) 5px 7px);
   }
   /* market picker above the screen: plain text, the selected one underlined */
-  /* market tiles: small cards, the picked one raised in the accent like a pressed key */
-  .market-tile {
+  /* the bar above the chart: a market pill and a strip of cells, both quiet field-coloured boxes */
+  .bar-pill,
+  .bar-strip {
     display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
-    /* phones: three across, no sparkline */
-    flex: 1 0 0;
-    min-width: 104px;
-    padding: 7px 9px;
+    align-items: center;
+    min-height: 40px;
     border: 1px solid var(--line);
-    border-radius: 12px;
+    border-radius: 10px;
     background: var(--field);
-    text-align: left;
-    transition:
-      border-color 0.15s,
-      box-shadow 0.15s,
-      transform 0.06s;
   }
-  @media (min-width: 640px) {
-    .market-tile {
-      flex: 0 0 auto;
-      min-width: 150px;
-      padding: 8px 10px;
-    }
+  .bar-pill {
+    gap: 8px;
+    padding: 0 10px;
+    transition: border-color 0.15s;
   }
-  .market-tile:hover {
-    border-color: color-mix(in srgb, var(--primary) 45%, var(--line));
-  }
-  .market-tile[aria-pressed="true"] {
+  .bar-pill:hover,
+  .bar-pill[aria-expanded="true"] {
     border-color: var(--primary);
-    box-shadow: 0 2px 0 var(--primary);
   }
-  .market-tile:active {
-    transform: translateY(1px);
-  }
-  .market-tile:focus-visible {
+  .bar-pill:focus-visible,
+  .bar-select:focus-visible {
     outline: 3px solid var(--info);
     outline-offset: 2px;
   }
+  .bar-sep {
+    width: 1px;
+    height: 18px;
+    background: var(--line);
+  }
+  .bar-strip {
+    overflow-x: auto;
+    font-size: 13px;
+  }
+  .bar-cell {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+    height: 100%;
+    padding: 0 10px;
+    white-space: nowrap;
+  }
+  .bar-cell + .bar-cell {
+    border-left: 1px solid var(--line);
+  }
+  .bar-select {
+    appearance: none;
+    background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238a8fa6' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 0 center;
+    padding-right: 16px;
+    font-weight: 800;
+    cursor: pointer;
+    /* as wide as the chosen option, where supported */
+    field-sizing: content;
+  }
+  .live-dot {
+    animation: live-dot 1.6s ease-in-out infinite;
+  }
+  @keyframes live-dot {
+    50% {
+      opacity: 0.35;
+    }
+  }
+
   /* a new price flashes its direction for a moment, in the digits themselves */
   .tick-flash {
     animation: tick-flash 0.9s ease-out;
@@ -1003,6 +1026,7 @@ body {
   .coin-rain,
   .win-flash,
   .tick-flash,
+  .live-dot,
   .win-amount,
   .heart-crack,
   .heart-plus,

@@ -15,6 +15,7 @@ import {
   priceToNumber,
   stopHit,
   targetHit,
+  type Market,
   type Order,
   type Position,
   type Side,
@@ -42,7 +43,158 @@ const RANGES = [
 
 const MIN_HOLD_S = 60;
 
-/** A market's last few minutes as a small line, for its tile. */
+/**
+ * The bar above the chart: the market (a pill that opens the list of markets), a strip of what the house knows
+ * about it (how its exposure splits between longs and shorts, the room left before trades are refused, the
+ * leverage cap), the chart's style and window, and whether prices are live.
+ */
+function MarketBar(props: {
+  market: string;
+  setMarket: (m: string) => void;
+  markets: Market[];
+  held: Set<string>;
+  style: "line" | "candles";
+  setStyle: (s: "line" | "candles") => void;
+  range: number;
+  setRange: (r: number) => void;
+}) {
+  const { market, setMarket, markets, held, style, setStyle, range, setRange } = props;
+  const { o, prices, history } = useOneUp();
+  const solvency = usePoll(() => o.solvency(), [], 5000);
+  const now = useNow();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const off = (e: MouseEvent) => ref.current && !ref.current.contains(e.target as Node) && setOpen(false);
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", off);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("mousedown", off);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+
+  // change over the last 5 minutes, and the latest tick's direction
+  const stat = (m: string) => {
+    const h = (history[m] ?? []).filter((x) => x.t >= now * 1000 - 300_000);
+    const ch = h.length > 1 ? (h[h.length - 1].p / h[0].p - 1) * 100 : null;
+    const down = h.length > 1 && h[h.length - 1].p < h[h.length - 2].p;
+    return { h, ch, down };
+  };
+  const me = stat(market);
+  const info = markets.find((m) => m.id === market);
+  const long = info ? BigInt(info.long_liability) : 0n;
+  const short = info ? BigInt(info.short_liability) : 0n;
+  const longPct = long + short > 0n ? Number((long * 1000n) / (long + short)) / 10 : null;
+  const sm = solvency?.markets.find((m) => m.id === market);
+  const room = sm ? BigInt(sm.capacity) - BigInt(sm.liability) : null;
+  const lastTick = (history[market] ?? []).at(-1)?.t ?? 0;
+  const live = now * 1000 - lastTick < 5_000;
+  const pct = (ch: number | null) => (ch === null ? "–" : `${ch >= 0 ? "+" : "−"}${Math.abs(ch).toFixed(2)}%`);
+  const tone = (ch: number | null) => (ch === null ? "var(--muted)" : ch >= 0 ? "var(--long)" : "var(--short)");
+
+  return (
+    // desktop: market, stats, chart controls in one row; phones: market and controls, then the stats
+    <div className="mb-3 flex flex-wrap items-center gap-2">
+      <div ref={ref} className="relative min-w-0 flex-1 lg:flex-none">
+        <button type="button" className="bar-pill num w-full lg:w-auto" aria-expanded={open} aria-haspopup="listbox" onClick={() => setOpen(!open)}>
+          <b className="text-[15px] sm:text-base">{market.split("-")[0]}</b>
+          <span className="bar-sep" aria-hidden />
+          <span key={prices[market]?.toString()} className={`tick-flash truncate text-[15px] font-extrabold sm:text-base ${me.down ? "tick-down" : "tick-up"}`}>
+            {prices[market] ? `$${fmtPrice(prices[market])}` : "…"}
+          </span>
+          <span className="ml-auto hidden pl-3 text-sm font-bold sm:inline" style={{ color: tone(me.ch) }}>
+            {pct(me.ch)}
+          </span>
+          <span className="ml-auto shrink-0 sm:ml-0">
+            <Icon name="chevron" size={16} />
+          </span>
+        </button>
+        {open && (
+          <ul role="listbox" aria-label="Market" className="panel absolute left-0 top-full z-30 mt-1.5 w-[min(400px,calc(100vw-32px))] p-1.5">
+            {markets.map((m) => {
+              const st = stat(m.id);
+              return (
+                <li key={m.id}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={m.id === market}
+                    onClick={() => {
+                      setMarket(m.id);
+                      setOpen(false);
+                    }}
+                    className="num flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left hover:bg-[var(--panel-2)] aria-selected:bg-[var(--panel-2)]"
+                  >
+                    <span className="w-24 shrink-0 whitespace-nowrap">
+                      <b>{m.id.split("-")[0]}</b>
+                      <span className="text-[var(--muted)]">-{m.id.split("-")[1]}</span>
+                    </span>
+                    <span className="flex-1 font-bold">{prices[m.id] ? fmtPrice(prices[m.id]) : "…"}</span>
+                    <span className="hidden sm:block">
+                      <Sparkline points={st.h} color={tone(st.ch)} />
+                    </span>
+                    <span className="w-16 text-right text-sm font-bold" style={{ color: tone(st.ch) }}>
+                      {pct(st.ch)}
+                    </span>
+                    <span className="w-2">{held.has(m.id) && <span className="block h-2 w-2 rounded-full bg-[var(--primary)]" aria-label="You have a position here" />}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+      <div className="bar-strip num order-3 w-full lg:order-2 lg:w-auto" role="group" aria-label={`${market} stats`}>
+        <span className="bar-cell" title="How the market's open max wins split between longs and shorts">
+          <span className="label">Longs</span>
+          <b style={{ color: "var(--long)" }}>{longPct === null ? "–" : `${longPct.toFixed(0)}%`}</b>
+          <span className="label">Shorts</span>
+          <b style={{ color: "var(--short)" }}>{longPct === null ? "–" : `${(100 - longPct).toFixed(0)}%`}</b>
+        </span>
+        <span className="bar-cell" title="How much more max win this market can take before new trades are refused">
+          <span className="label">Room</span>
+          <b>{room === null ? "…" : `$${fmtCompact(room)}`}</b>
+        </span>
+      </div>
+      <div className="bar-strip num order-2 lg:order-3 lg:ml-auto" role="group" aria-label="Chart">
+        <label className="bar-cell">
+          <span className="sr-only">Chart style</span>
+          <select className="bar-select" value={style} onChange={(e) => setStyle(e.target.value as "line" | "candles")}>
+            <option value="line">Line</option>
+            <option value="candles">Candles</option>
+          </select>
+        </label>
+        <label className="bar-cell">
+          <span className="sr-only">Chart window</span>
+          <select className="bar-select num" value={range} onChange={(e) => setRange(Number(e.target.value))}>
+            {RANGES.map(([name, ms]) => (
+              <option key={name} value={ms}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <span className="bar-cell" title={live ? "Prices are updating" : "No new price for a few seconds"}>
+          <span className={`h-1.5 w-1.5 rounded-full ${live ? "live-dot" : ""}`} style={{ background: live ? "var(--long)" : "var(--muted)" }} />
+          <b className="hidden text-xs sm:inline" style={{ color: live ? "var(--long)" : "var(--muted)" }}>
+            {live ? "Live" : "Paused"}
+          </b>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** $1.2M, $854K, $950. */
+function fmtCompact(units: bigint) {
+  const v = Number(units) / 1e6;
+  return v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : v >= 1e3 ? `${(v / 1e3).toFixed(0)}K` : v.toFixed(0);
+}
+
+/** A market's last few minutes as a small line, for the market list. */
 function Sparkline({ points, color }: { points: { t: number; p: number }[]; color: string }) {
   const W = 56;
   const H = 22;
@@ -158,7 +310,7 @@ export function Trade() {
         <Console
           market={market}
           setMarket={setMarket}
-          markets={markets.filter((m) => m.live).map((m) => m.id)}
+          markets={markets.filter((m) => m.live)}
           marks={marks}
           mine={focused ? [focused] : []}
           held={new Set(positions.map((p) => p.market_id))}
@@ -275,7 +427,7 @@ function Console({
 }: {
   market: string;
   setMarket: (m: string) => void;
-  markets: string[];
+  markets: Market[];
   marks: Mark[];
   mine: Position[];
   /** Markets you have a position in. */
@@ -299,58 +451,16 @@ function Console({
   const change = pts.length > 1 ? (pts[pts.length - 1].p / pts[0].p - 1) * 100 : 0;
   return (
     <div key={fx?.kind === "liquidated" || (fx?.kind === "win" && fx.tier === 3) ? fx.id : "case"} id="chart" className={`case order-2 min-w-0 scroll-mt-4 p-3 sm:p-5 ${fx?.kind === "liquidated" || (fx?.kind === "win" && fx.tier === 3) ? "shake" : ""}`}>
-      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
-      <div className="-mx-1 flex min-w-0 flex-1 gap-1.5 overflow-x-auto px-1 pb-1.5 pt-0.5 sm:gap-2" role="group" aria-label="Market">
-        {markets.map((m) => {
-          const h = (history[m] ?? []).filter((x) => x.t >= now * 1000 - 300_000);
-          const ch = h.length > 1 ? (h[h.length - 1].p / h[0].p - 1) * 100 : null;
-          const [base, quote] = m.split("-");
-          const color = ch === null ? "var(--muted)" : ch >= 0 ? "var(--long)" : "var(--short)";
-          const open = positionsHere.has(m);
-          return (
-            <button key={m} aria-pressed={m === market} onClick={() => setMarket(m)} className="market-tile num shrink-0">
-              <span className="flex w-full items-center justify-between gap-2 text-sm">
-                <span>
-                  <b>{base}</b>
-                  <span className="text-[var(--muted)]">-{quote}</span>
-                </span>
-                {open && <span className="h-2 w-2 rounded-full bg-[var(--primary)]" title="You have a position here" aria-label="You have a position here" />}
-              </span>
-              <span className="flex w-full items-end justify-between gap-3">
-                <span>
-                  {/* keyed by the price so each new one flashes, green up or red down */}
-                  <span key={prices[m]?.toString()} className={`tick-flash block text-[15px] font-extrabold sm:text-base ${h.length > 1 && h[h.length - 1].p < h[h.length - 2].p ? "tick-down" : "tick-up"}`}>
-                    {prices[m] ? fmtPrice(prices[m]) : "…"}
-                  </span>
-                  <span className="text-xs font-bold" style={{ color }}>
-                    {ch === null ? "–" : `${ch >= 0 ? "▲" : "▼"} ${Math.abs(ch).toFixed(2)}%`}
-                  </span>
-                </span>
-                <span className="hidden sm:block">
-                  <Sparkline points={h} color={color} />
-                </span>
-              </span>
-            </button>
-          );
-        })}
-      </div>
-      <div className="flex shrink-0 gap-2 self-start sm:mt-1">
-      <div className="chip-track" role="group" aria-label="Chart style">
-        {(["line", "candles"] as const).map((k) => (
-          <button key={k} type="button" className="chip" aria-pressed={style === k} onClick={() => setStyle(k)}>
-            {k === "line" ? "Line" : "Candles"}
-          </button>
-        ))}
-      </div>
-      <div className="chip-track" role="group" aria-label="Chart range">
-        {RANGES.map(([name, ms]) => (
-          <button key={name} type="button" className="chip num" aria-pressed={range === ms} onClick={() => setRange(ms)}>
-            {name}
-          </button>
-        ))}
-      </div>
-      </div>
-      </div>
+      <MarketBar
+        market={market}
+        setMarket={setMarket}
+        markets={markets}
+        held={positionsHere}
+        style={style}
+        setStyle={setStyle}
+        range={range}
+        setRange={setRange}
+      />
       <div className="bezel px-3 pb-5 pt-3 sm:px-5">
         <div className="stripes mb-3" aria-hidden />
         <div className="relative">

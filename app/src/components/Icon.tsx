@@ -5,6 +5,7 @@ const PATHS = {
   up: "M3 17l6-6 4 4 8-8M14 7h7v7",
   down: "M3 7l6 6 4-4 8 8M14 17h7v-7",
   x: "M6 6l12 12M18 6L6 18",
+  chevron: "M6 9l6 6 6-6",
   check: "M5 12.5l4.5 4.5L19 7.5",
   wallet: "M4 7h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM4 7l2.5-3H16M16 13.5h.01",
   deposit: "M12 3v11M7.5 9.5L12 14l4.5-4.5M4 19h16",
