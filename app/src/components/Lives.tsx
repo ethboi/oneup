@@ -30,7 +30,7 @@ export function Lives() {
 
   return (
     <div className="flex flex-col gap-5">
-      <Explainer line="Every loss in a round the house ends in profit becomes an Extra Life that pays you back in USDC.">
+      <Explainer title="Extra Lives" line="Every loss in a round the house ends in profit becomes an Extra Life that pays you back in USDC.">
         When a round ends, the house&apos;s profit is shared across that round&apos;s losers by how much they lost: that
         share is the life&apos;s face value. It can earn up to face × its cap (2.0× when the pool is small, down to 1.2× at
         $1M). Each epoch, 60% of half the surplus above the reserve is shared across all earning lives by what they

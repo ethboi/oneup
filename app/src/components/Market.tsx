@@ -82,7 +82,7 @@ export function Market() {
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_360px] lg:items-start">
       <div className="flex min-w-0 flex-col gap-5">
-        <Explainer line={<>Buy and sell Extra Lives and $1UP locks for USDC. You have <b className="num text-[var(--text)]">{usd(wallet)}</b> in your wallet.</>}>
+        <Explainer title="Market" line={<>Buy and sell Extra Lives and $1UP locks for USDC. You have <b className="num text-[var(--text)]">{usd(wallet)}</b> in your wallet.</>}>
           Buy someone&apos;s Extra Life and its USDC payouts are yours. Buy a lock and you get its $1UP when it ends, and its share
           of buybacks until then. You pay from your wallet&apos;s USDC and the NFT moves to you in the same step; if it was
           sold elsewhere first, your USDC comes straight back. Sellers pay 2% of the price, which goes into the house pool

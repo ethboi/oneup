@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { useWidth } from "@/lib/useWidth";
+import { PageTitle } from "./ui";
 
 interface Results {
   params: { seeds: number; lifeExpiryEpochs: number; window: number; measured: number };
@@ -34,6 +35,11 @@ export function Fairness() {
   const [first, , , last] = r.quarters.oneup;
 
   return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <PageTitle>Fairness</PageTitle>
+        <p className="label mt-1.5">Why a late loser gets back about what an early one does, from the simulator.</p>
+      </div>
     <div className="panel p-5">
         <p className="text-lg">
           A dollar lost in year 3 gets back <span className="num font-bold">{cents(last)}</span> within a year, about what a
@@ -48,7 +54,7 @@ export function Fairness() {
         </p>
         <Chart r={r} />
 
-        <div className="-mx-5 mt-5 border-t border-[var(--line)] px-5 pt-5 text-lg font-extrabold">USDC back within a year per $1 lost, by when the loss happened</div>
+        <h2 className="-mx-5 mt-5 border-t border-[var(--line)] px-5 pt-5 text-lg font-extrabold">USDC back within a year per $1 lost, by when the loss happened</h2>
         {/* phones: periods down, rules across, so it fits without scrolling */}
         <table className="num mt-3 w-full text-sm md:hidden">
           <thead>
@@ -102,6 +108,7 @@ export function Fairness() {
             ))}
           </tbody>
         </table>
+    </div>
     </div>
   );
 }

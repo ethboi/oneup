@@ -50,7 +50,7 @@ export function Leaderboard() {
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-extrabold">Leaderboard</h1>
+          <h1 className="page-title">Leaderboard</h1>
           <p className="label">Profit after the winner&apos;s cut, from every closed trade.</p>
         </div>
         <div className="chip-track" role="group" aria-label="Period">

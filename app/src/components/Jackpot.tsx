@@ -33,7 +33,7 @@ export function Jackpot({ compact }: { compact?: boolean }) {
   const odds = total + BigInt(pending ?? "0") > 0n ? (Number(myTickets) / Number(total + BigInt(pending ?? "0"))) * 100 : 0;
 
   return (
-    <div className={`panel ${compact ? "p-4" : "p-5"}`}>
+    <div className={`panel panel-jackpot ${compact ? "p-4" : "p-5"}`}>
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <PixelCoin size={22} />

@@ -51,7 +51,7 @@ export function Locks() {
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_340px] lg:items-start">
       <div className="flex min-w-0 flex-col gap-5">
-        <Explainer line="Locked $1UP earns the house's buybacks, shared by weight: the amount × the rounds left ÷ 104.">
+        <Explainer title="Locks" line="Locked $1UP earns the house's buybacks, shared by weight: the amount × the rounds left ÷ 104.">
           Each epoch, 30% of the house&apos;s payout buys back $1UP for everyone locked. A lock&apos;s weight counts from the
           round after it&apos;s made and shrinks as it runs down. Leaving early costs up to half, less as the lock runs down,
           and the penalty goes to everyone still locked. Losers&apos; $1UP arrives already locked for {MAX} rounds. A lock is an
@@ -199,7 +199,7 @@ function LockForm() {
   const years = epochs / 52;
   return (
     <div className="panel flex flex-col gap-3 p-4">
-      <div className="text-lg font-extrabold">Lock $1UP</div>
+      <h2 className="text-lg font-extrabold">Lock $1UP</h2>
       <span className="field">
         <input className="input num" value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="$1UP amount" inputMode="decimal" />
         <span className="field-unit">$1UP</span>

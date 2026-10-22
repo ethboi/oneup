@@ -1,23 +1,27 @@
 @import "tailwindcss";
 
 /*
- * Handheld console, kept polished: the page is the shell, panels sit raised, and the price chart is the
- * LCD. The retro lives in the console, the pixel type and the hearts; controls are standard.
+ * Handheld console, kept polished: the page is the plastic shell (with a speaker grille's dots), panels are
+ * moulded parts standing on a hard lip like the keys, headings are printed in the pixel face, and the price
+ * chart is the LCD. Controls stay standard.
  */
 :root {
   --font-display: var(--font-pixel), ui-monospace, monospace;
   --font-body: var(--font-rounded), ui-rounded, system-ui, sans-serif;
 
-  --bg: #dcdfe8; /* console shell */
-  --panel: #f7f8fb;
-  --panel-2: #eceef4;
+  --bg: #d8d7e6; /* console shell: lavender plastic */
+  --grille: rgb(47 44 84 / 0.07); /* the shell's speaker-grille dots */
+  --panel: #fbfbfe;
+  --panel-2: #eeedf5;
   --edge: #1c1b29; /* outlines */
   --line: #c9ccd9; /* quiet separators inside panels */
   /* panels sit raised, not outlined: a light edge, a top highlight and a soft drop */
-  --panel-edge: #d3d6e0;
+  --panel-edge: #cfcedf;
+  /* the hard lip a moulded part stands on, like a key's edge */
+  --panel-lip: #bdbcd2;
   --input-edge: #c3c7d4;
   --field: #ffffff;
-  --panel-shadow: inset 0 1px 0 rgb(255 255 255 / 0.9), 0 1px 2px rgb(28 27 41 / 0.06), 0 10px 28px -14px rgb(28 27 41 / 0.28);
+  --panel-shadow: inset 0 1px 0 rgb(255 255 255 / 0.95), 0 3px 0 var(--panel-lip), 0 14px 24px -18px rgb(28 27 41 / 0.35);
   --text: #1c1b29;
   --muted: #5e6178;
   --accent: #f2b705; /* coin */
@@ -35,8 +39,8 @@
   --on-color: #1c1b29;
 
   /* the handheld: plastic case and slate screen surround */
-  --case: #e9ebf1;
-  --bezel: #4a4d63;
+  --case: #ecebf4;
+  --bezel: #3b3d56;
   --stripe-1: #a3195b;
   --stripe-2: #2f3c94;
   --wordmark: #2f3c94;
@@ -56,15 +60,17 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #171823;
-    --panel: #222434;
-    --panel-2: #2b2e42;
+    --bg: #15162a;
+    --grille: rgb(255 255 255 / 0.035);
+    --panel: #212339;
+    --panel-2: #2a2d47;
     --edge: #474b6c;
     --line: #363a52;
-    --panel-edge: #343850;
+    --panel-edge: #33375a;
+    --panel-lip: #0c0d1a;
     --input-edge: #40445f;
     --field: #1a1c29;
-    --panel-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px -14px rgb(0 0 0 / 0.7);
+    --panel-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 3px 0 var(--panel-lip), 0 16px 28px -18px rgb(0 0 0 / 0.8);
     --text: #eceef6;
     --muted: #9ba0b9;
     --accent: #ffc83d;
@@ -76,7 +82,7 @@
     --short-fill: #c43636;
     --primary: #c81e6c;
     --info: #5aa9ff;
-    --case: #262838;
+    --case: #262941;
     --bezel: #13141f;
     --stripe-1: #d6327f;
     --stripe-2: #5b6bd6;
@@ -90,7 +96,9 @@
 }
 
 body {
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image: radial-gradient(var(--grille) 1.2px, transparent 1.6px);
+  background-size: 9px 9px;
   color: var(--text);
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
@@ -117,6 +125,31 @@ body {
     border: 1px solid var(--panel-edge);
     border-radius: 16px;
     box-shadow: var(--panel-shadow);
+  }
+  /* the jackpot's panel: a prize cabinet, edged and warmed in coin gold */
+  .panel-jackpot {
+    border-color: color-mix(in srgb, var(--accent) 55%, var(--panel-edge));
+    background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 14%, var(--panel)), var(--panel) 55%);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.5),
+      0 3px 0 color-mix(in srgb, var(--jackpot) 55%, var(--panel-edge)),
+      0 14px 24px -18px rgb(28 27 41 / 0.35);
+  }
+  /* headings are printed in the pixel face; numbers inside them keep the rounded one (see .display .num) */
+  h2,
+  .page-title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: 0.01em;
+  }
+  .page-title {
+    font-size: 30px;
+    line-height: 1.1;
+  }
+  @media (min-width: 640px) {
+    .page-title {
+      font-size: 36px;
+    }
   }
 
   .label {
@@ -423,6 +456,8 @@ body {
   .lcd {
     background-color: var(--lcd);
     background-image:
+      /* glass: a soft sheen from the top left */
+      linear-gradient(150deg, rgb(255 255 255 / 0.22), rgb(255 255 255 / 0) 38%),
       repeating-linear-gradient(0deg, rgb(30 42 22 / 0.07) 0 1px, transparent 1px 3px),
       repeating-linear-gradient(90deg, rgb(30 42 22 / 0.07) 0 1px, transparent 1px 3px);
     border-radius: 8px;
@@ -444,6 +479,27 @@ body {
   .stripes {
     height: 7px;
     background: linear-gradient(var(--stripe-1) 0 2px, transparent 2px 5px, var(--stripe-2) 5px 7px);
+  }
+  /* the faceplate's print between the stripes, like a handheld's screen surround */
+  .faceplate {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .faceplate > .stripes {
+    flex: 1;
+  }
+  .faceplate > .stripes:last-child {
+    flex: 0 0 28px;
+  }
+  .faceplate-print {
+    font-family: var(--font-body);
+    font-size: 10.5px;
+    font-weight: 800;
+    font-style: italic;
+    letter-spacing: 0.06em;
+    color: #a9abc6;
+    white-space: nowrap;
   }
   /* market picker above the screen: plain text, the selected one underlined */
   /* the bar above the chart: a market pill and a strip of cells, both quiet field-coloured boxes */

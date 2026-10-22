@@ -503,7 +503,11 @@ function Console({
         setRange={setRange}
       />
       <div className="bezel px-3 pb-5 pt-3 sm:px-5">
-        <div className="stripes mb-3" aria-hidden />
+        <div className="faceplate mb-3" aria-hidden>
+          <span className="stripes" />
+          <span className="faceplate-print hidden sm:inline">DOT MATRIX WITH EXTRA LIVES</span>
+          <span className="stripes" />
+        </div>
         <div className="relative">
           <PriceChart
             points={pts}

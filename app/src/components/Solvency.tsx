@@ -7,6 +7,7 @@ import { fmtUsdc, ppmToNumber, type EpochSummary } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { Icon } from "./Icon";
 import { Governance } from "./Governance";
+import { PageTitle } from "./ui";
 
 const big = (x?: string) => (x === undefined ? 0n : BigInt(x));
 const pct = (a: bigint, b: bigint) => (b === 0n ? 0 : Number((a * 10_000n) / b) / 100);
@@ -31,6 +32,10 @@ export function Solvency() {
 
   return (
     <div className="flex flex-col gap-4">
+      <div>
+        <PageTitle>Solvency</PageTitle>
+        <p className="label mt-1.5">Why the house can&apos;t go bust, live from the chain.</p>
+      </div>
       <div className="panel p-5">
         <p className="text-lg">
           If every open position hit its max win at once, the house would pay{" "}
@@ -90,7 +95,7 @@ export function Solvency() {
         </div>
 
         <div className="-mx-5 mt-5 flex flex-wrap items-baseline justify-between gap-2 border-t border-[var(--line)] px-5 pt-5">
-          <div className="text-lg font-extrabold">Per market: max wins against its cap (half the pool)</div>
+          <h2 className="text-lg font-extrabold">Per market: max wins against its cap (half the pool)</h2>
           <div className="flex gap-4 text-sm">
             <Legend color="var(--series-long)" label="Longs" />
             <Legend color="var(--series-short)" label="Shorts" />
@@ -136,7 +141,7 @@ export function Solvency() {
         </div>
 
         <div className="-mx-5 mt-5 overflow-x-auto border-t border-[var(--line)] px-5 pt-5">
-          <div className="text-lg font-extrabold">Rounds</div>
+          <h2 className="text-lg font-extrabold">Rounds</h2>
           {(history ?? []).length === 0 ? (
             <p className="label mt-2">No closed rounds yet.</p>
           ) : (

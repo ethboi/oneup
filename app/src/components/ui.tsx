@@ -19,12 +19,18 @@ export function Section({ title, action, children }: { title: React.ReactNode; a
   );
 }
 
+/** A tab's name, printed in the pixel face. */
+export function PageTitle({ children }: { children: React.ReactNode }) {
+  return <h1 className="page-title text-[var(--text)]">{children}</h1>;
+}
+
 /** One plain line; the longer explanation stays folded until asked for. */
-export function Explainer({ line, children }: { line: React.ReactNode; children: React.ReactNode }) {
+export function Explainer({ title, line, children }: { title?: string; line: React.ReactNode; children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="text-sm text-[var(--muted)]">
-      <p>
+      {title && <PageTitle>{title}</PageTitle>}
+      <p className={title ? "mt-1.5" : undefined}>
         {line}{" "}
         <button type="button" className="font-bold text-[var(--text)] underline decoration-dotted underline-offset-2" onClick={() => setOpen(!open)} aria-expanded={open}>
           {open ? "Hide" : "How it works"}
