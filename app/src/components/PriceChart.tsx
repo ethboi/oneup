@@ -106,7 +106,8 @@ export function PriceChart({
   const narrow = W < 480;
   const H = narrow ? 300 : 420;
   // room at the top for the readout, at the bottom for the time axis
-  const PAD = { l: 10, r: narrow ? 70 : 128, t: narrow && gauge ? 58 : 36, b: 22 };
+  // the right edge holds the price tag, plus the mark labels when a position is shown
+  const PAD = { l: 10, r: narrow ? 70 : marks.length ? 128 : 84, t: narrow && gauge ? 58 : 36, b: 22 };
   const [hover, setHover] = useState<number | null>(null);
   const now = useClock();
 
@@ -336,7 +337,8 @@ export function PriceChart({
             )}
             {l.head ? (
               <>
-                <rect x={plotR + 4} y={placed[i] - 9} width={PAD.r - 8} height="18" rx="2" fill="var(--lcd-ink)" />
+                {/* sized to the price, about 7.6px a character at 13px */}
+                <rect x={plotR + 4} y={placed[i] - 9} width={Math.min(PAD.r - 8, l.text.length * 7.6 + 10)} height="18" rx="2" fill="var(--lcd-ink)" />
                 <text x={plotR + 8} y={placed[i] + 5} fontSize="13" fontWeight="700" fill="var(--lcd)" className="num">
                   {l.text}
                 </text>
