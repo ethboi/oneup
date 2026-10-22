@@ -13,6 +13,10 @@ export interface Mark {
   price: number;
   label: string;
   kind: "entry" | "liq" | "tp" | "sl";
+  /** The position it belongs to, so its zones can be shaded. */
+  pos?: number;
+  /** On an entry: the position's profit if closed now (USDC, after the winner's cut) and as % of margin. */
+  pnl?: { usd: number; pct: number };
 }
 
 const DASH = { entry: "6 4", liq: "2 3", tp: "10 3 2 3", sl: "10 3 2 3" } as const;
@@ -95,7 +99,7 @@ export function PriceChart({
 }) {
   const [ref, W] = useWidth();
   const narrow = W < 480;
-  const H = narrow ? 230 : 260;
+  const H = narrow ? 300 : 420;
   // room at the top for the readout, at the bottom for the time axis
   const PAD = { l: 10, r: narrow ? 70 : 128, t: narrow && gauge ? 58 : 36, b: 22 };
   const [hover, setHover] = useState<number | null>(null);
@@ -112,7 +116,7 @@ export function PriceChart({
 
   if (points.length < 2) {
     return (
-      <div ref={ref} className="lcd relative flex h-[230px] items-center justify-center sm:h-[260px]">
+      <div ref={ref} className="lcd relative flex h-[300px] items-center justify-center sm:h-[420px]">
         {header}
         <span className="display text-[var(--lcd-3)]">Waiting for prices…</span>
       </div>
@@ -182,6 +186,30 @@ export function PriceChart({
   const ticks: number[] = [];
   for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) ticks.push(v);
   const busy = [y(headP), ...shown.filter((s) => !s.edge).map((s) => y(s.m.price))];
+
+  // each position's zones: entry to take-profit in green, entry to stop-loss (or liquidation) in red
+  const clampY = (p: number) => Math.min(plotB, Math.max(PAD.t, y(p)));
+  const zones = marks
+    .filter((m) => m.kind === "entry" && m.pos !== undefined)
+    .flatMap((e) => {
+      const mine = marks.filter((m) => m.pos === e.pos);
+      const tp = mine.find((m) => m.kind === "tp");
+      const loss = mine.find((m) => m.kind === "sl") ?? mine.find((m) => m.kind === "liq");
+      return [
+        ...(tp ? [{ key: `${e.pos}p`, a: clampY(e.price), b: clampY(tp.price), color: "var(--long)" }] : []),
+        ...(loss ? [{ key: `${e.pos}l`, a: clampY(e.price), b: clampY(loss.price), color: "var(--short)" }] : []),
+      ];
+    });
+  // live profit on each visible entry line
+  const pills = shown
+    .filter(({ m, edge }) => !edge && m.kind === "entry" && m.pnl)
+    .map(({ m }) => {
+      const { usd, pct } = m.pnl!;
+      const sign = usd >= 0 ? "+" : "−";
+      const amount = `${sign}$${Math.abs(usd).toLocaleString("en-US", { maximumFractionDigits: Math.abs(usd) >= 1000 ? 0 : 2, minimumFractionDigits: Math.abs(usd) >= 1000 ? 0 : 2 })}`;
+      const text = narrow ? amount : `${amount} (${sign}${Math.abs(pct).toFixed(1)}%)`;
+      return { key: m.label, y: y(m.price), text, up: usd >= 0, w: text.length * 7 + 12 };
+    });
   const tickDigits = Math.max(decimalsOf(step), 0);
 
   // ticks are fixed distances back from now, so they never move or blink as the line scrolls
@@ -243,6 +271,9 @@ export function PriceChart({
         <text x={x(t1)} y={H - 5} fontSize="10" fill="var(--lcd-3)" textAnchor="end">
           now
         </text>
+        {zones.map((z) => (
+          <rect key={z.key} x={PAD.l} width={plotR - PAD.l} y={Math.min(z.a, z.b)} height={Math.abs(z.b - z.a)} fill={z.color} opacity="0.13" />
+        ))}
         <g clipPath="url(#lcd-plot)">
           <path d={`${line} L${x(t1)} ${plotB} L${x(points[0].t)} ${plotB} Z`} fill="url(#lcd-fill)" />
           <path d={line} fill="none" stroke="var(--lcd-ink)" strokeWidth="2.5" strokeLinejoin="round" />
@@ -262,6 +293,14 @@ export function PriceChart({
             />
           ),
         )}
+        {pills.map((p) => (
+          <g key={p.key}>
+            <rect x={plotR - p.w - 6} y={p.y - 18} width={p.w} height="15" rx="3" fill={p.up ? "var(--long-fill)" : "var(--short-fill)"} />
+            <text x={plotR - 12} y={p.y - 7} fontSize="11" fontWeight="700" textAnchor="end" fill="var(--on-fill)" className="num">
+              {p.text}
+            </text>
+          </g>
+        ))}
         {/* the present price, ruled across so it reads against the marks */}
         <line x1={x(t1)} x2={plotR + 2} y1={y(headP)} y2={y(headP)} stroke="var(--lcd-ink)" strokeWidth="1" />
         <rect x={x(t1) - 4} y={y(headP) - 4} width="8" height="8" fill="var(--lcd-ink)" />

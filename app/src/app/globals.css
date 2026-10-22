@@ -333,6 +333,31 @@ body {
     border-color: var(--text);
     color: var(--panel);
   }
+  /* a row of chips in one recessed track, like the Long/Short switch: the picked one is a raised key */
+  .chip-track {
+    display: flex;
+    gap: 3px;
+    padding: 3px;
+    border-radius: 12px;
+    background: var(--panel-2);
+    box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.12);
+  }
+  .chip-track > .chip {
+    border-color: transparent;
+    background: transparent;
+    border-radius: 9px;
+  }
+  .chip-track > .chip:hover {
+    background: color-mix(in srgb, var(--text) 7%, transparent);
+  }
+  .chip-track > .chip[aria-pressed="true"] {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: var(--on-fill);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.22),
+      0 2px 0 color-mix(in srgb, var(--primary) 72%, #000);
+  }
   .chip:focus-visible {
     outline: 3px solid var(--info);
     outline-offset: 2px;

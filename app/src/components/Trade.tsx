@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ONEUP_PER_USDC,
+  PPM,
   USDC,
   fmtUsdc,
   lifeCapPpm,
@@ -42,7 +43,7 @@ const RANGES = [
 const MIN_HOLD_S = 60;
 
 export function Trade() {
-  const { o, me } = useOneUp();
+  const { o, me, prices } = useOneUp();
   const markets = usePoll(() => o.markets(), [], 5000) ?? [];
   const [market, setMarket] = useState("NEAR-USD");
   const positions = usePoll(() => o.positions(me), [me]) ?? [];
@@ -59,18 +60,32 @@ export function Trade() {
     return () => io.disconnect();
   }, []);
 
+  const mark = prices[market];
   const marks: Mark[] = positions
     .filter((p) => p.market_id === market)
-    .flatMap((p) => [
-      { price: priceToNumber(BigInt(p.entry_price)), label: `#${p.id} entry`, kind: "entry" as const },
-      {
-        price: priceToNumber(liquidationPrice(p.side, BigInt(p.entry_price), p.leverage)),
-        label: `#${p.id} liq`,
-        kind: "liq" as const,
-      },
-      ...(p.triggers.take_profit ? [{ price: priceToNumber(BigInt(p.triggers.take_profit)), label: `#${p.id} TP`, kind: "tp" as const }] : []),
-      ...(p.triggers.stop_loss ? [{ price: priceToNumber(BigInt(p.triggers.stop_loss)), label: `#${p.id} SL`, kind: "sl" as const }] : []),
-    ]);
+    .flatMap((p) => {
+      const entry = BigInt(p.entry_price);
+      const margin = BigInt(p.margin);
+      // what closing now would pay
+      const net = mark ? afterCut(pnl(p.side, margin, p.leverage, entry, mark), p.cut_ppm) : null;
+      return [
+        {
+          price: priceToNumber(entry),
+          label: `#${p.id} entry`,
+          kind: "entry" as const,
+          pos: p.id,
+          pnl: net === null ? undefined : { usd: Number(net) / 1e6, pct: (Number(net) / Number(margin)) * 100 },
+        },
+        {
+          price: priceToNumber(liquidationPrice(p.side, entry, p.leverage)),
+          label: `#${p.id} liq`,
+          kind: "liq" as const,
+          pos: p.id,
+        },
+        ...(p.triggers.take_profit ? [{ price: priceToNumber(BigInt(p.triggers.take_profit)), label: `#${p.id} TP`, kind: "tp" as const, pos: p.id }] : []),
+        ...(p.triggers.stop_loss ? [{ price: priceToNumber(BigInt(p.triggers.stop_loss)), label: `#${p.id} SL`, kind: "sl" as const, pos: p.id }] : []),
+      ];
+    });
 
   return (
     // Phones: one column in the order banner, chart, order form, then positions and activity (the left column
@@ -240,7 +255,7 @@ function Console({
           );
         })}
       </div>
-      <div className="flex shrink-0 gap-1 sm:pt-2" role="group" aria-label="Chart range">
+      <div className="chip-track shrink-0 self-start sm:mt-1" role="group" aria-label="Chart range">
         {RANGES.map(([name, ms]) => (
           <button key={name} type="button" className="chip num" aria-pressed={range === ms} onClick={() => setRange(ms)}>
             {name}
@@ -376,7 +391,7 @@ function OrderForm({ t }: { t: Ticket }) {
           onChange={(e) => setLeverage(Number(e.target.value))}
           style={{ "--fill": `${((leverage - 1) / Math.max(1, maxLeverage - 1)) * 100}%` } as React.CSSProperties}
         />
-        <span className="flex gap-1.5" role="group" aria-label="Leverage presets">
+        <span className="chip-track" role="group" aria-label="Leverage presets">
           {[2, 5, 10, 25, 50, 100]
             .filter((x) => x <= maxLeverage)
             .map((x) => (
@@ -487,7 +502,8 @@ function Positions({ positions, orders }: { positions: Position[]; orders: Order
     () =>
       positions.map((p) => {
         const mark = prices[p.market_id];
-        const v = mark ? pnl(p.side, BigInt(p.margin), p.leverage, BigInt(p.entry_price), mark) : 0n;
+        // shown after the winner's cut: what closing now would pay
+        const v = mark ? afterCut(pnl(p.side, BigInt(p.margin), p.leverage, BigInt(p.entry_price), mark), p.cut_ppm) : 0n;
         return { p, mark, v, hold: Math.max(0, p.opened_at + MIN_HOLD_S - now) };
       }),
     [positions, prices, now],
@@ -608,6 +624,9 @@ function CloseButton({ p, hold, wide }: { p: Position; hold: number; wide?: bool
     </button>
   );
 }
+
+/** A position's profit after the winner's cut (which rounds up); a loss is unchanged. */
+const afterCut = (v: bigint, cutPpm: string) => (v > 0n ? v - (v * BigInt(cutPpm) + PPM - 1n) / PPM : v);
 
 /** How far the mark is from a price, as a percentage of the mark. */
 const away = (mark: bigint, to: bigint) => `${((Math.abs(Number(to - mark)) / Number(mark)) * 100).toFixed(1)}%`;
