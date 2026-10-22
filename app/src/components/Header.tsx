@@ -46,32 +46,35 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
           ))}
         </div>
       </nav>
-      <dl className="num flex min-w-0 flex-1 justify-end gap-4 text-right lg:flex-none">
-        {round && (
-          <div
-            title={
-              round.net < 0n
-                ? "Your net loss this round. When the round ends it becomes an Extra Life and a $1UP lock, sized from the house's profit."
-                : "Your net profit this round, after the winner's cut."
-            }
-          >
-            <dt className="label leading-tight">This round</dt>
-            <dd className="flex items-center justify-end gap-1 font-extrabold leading-tight" style={{ color: round.net < 0n ? "var(--short)" : "var(--long)" }}>
-              {round.net < 0n ? "−" : "+"}${fmtUsdc(round.net < 0n ? -round.net : round.net, 0)}
+      {/* the round's clock and your result in it, one strip like the chart's market bar */}
+      <div className="flex min-w-0 flex-1 justify-end lg:flex-none">
+        <div className="bar-strip num min-h-[38px] text-sm">
+          <span className="bar-cell" title={`Round ${epoch?.id ?? ""} ends in ${fmtClock(left)}, with Extra Lives and $1UP locks for its losers`}>
+            <span className="label hidden sm:inline">Round {epoch?.id ?? "…"}</span>
+            <b>{fmtClock(left)}</b>
+          </span>
+          {round && (
+            <span
+              className="bar-cell"
+              title={
+                round.net < 0n
+                  ? "Your net loss this round. When the round ends it becomes an Extra Life and a $1UP lock, sized from the house's profit."
+                  : "Your net profit this round, after the winner's cut."
+              }
+            >
+              <span className="label hidden sm:inline">You</span>
+              <b style={{ color: round.net < 0n ? "var(--short)" : "var(--long)" }}>
+                {round.net < 0n ? "−" : "+"}${fmtUsdc(round.net < 0n ? -round.net : round.net, (round.net < 0n ? -round.net : round.net) < 100n * USDC ? 2 : 0)}
+              </b>
               {round.net < 0n && (
-                <span className="flex items-center" aria-label="Extra Life at the end of the round">
-                  <PixelHeart size={16} />
-                  <span className="hidden text-xs text-[var(--heart)] sm:inline">+1</span>
+                <span aria-label="Extra Life at the end of the round">
+                  <PixelHeart size={14} />
                 </span>
               )}
-            </dd>
-          </div>
-        )}
-        <div>
-          <dt className="label leading-tight">Epoch {epoch?.id ?? "…"}</dt>
-          <dd className="font-extrabold leading-tight">{fmtClock(left)}</dd>
+            </span>
+          )}
         </div>
-      </dl>
+      </div>
       <MuteButton />
       <DemoMenu />
       <AccountMenu />
