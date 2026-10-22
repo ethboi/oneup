@@ -2,7 +2,7 @@
 // files. Browsers only allow sound after the page has been interacted with, so the context is created on
 // first use (always after a click here). Muting is per browser.
 
-export type Sfx = "send" | "fill" | "win" | "lose" | "liquidated" | "plusOne" | "life" | "claim" | "error" | "tilt" | "badge" | "heal" | "round" | "revenge";
+export type Sfx = "send" | "fill" | "win" | "jackpot" | "lose" | "liquidated" | "plusOne" | "life" | "claim" | "error" | "tilt" | "badge" | "heal" | "round" | "revenge";
 
 const KEY = "oneup.muted";
 const VOLUME = 0.12;
@@ -88,6 +88,14 @@ const SOUNDS: Record<Sfx, () => Tone[]> = {
   send: () => [{ note: "A5", at: 0, len: 0.04, gain: 0.6 }, { note: "E6", at: 0.05, len: 0.05, gain: 0.6 }],
   fill: () => [{ note: "B5", at: 0, len: 0.07 }, { note: "E6", at: 0.07, len: 0.22 }],
   win: () => run(["C5", "E5", "G5", "C6"], 0.07).concat({ note: "G6", at: 0.28, len: 0.25 }),
+  // a huge win: the win run, then a coin-shower of high notes and a held chord
+  jackpot: () =>
+    run(["C5", "E5", "G5", "C6", "E6", "G6"], 0.06).concat(
+      run(["C7", "G6", "C7", "G6", "C7"], 0.05, "square", 0.6, 0.4),
+      { note: "C6", at: 0.7, len: 0.6, gain: 0.8 },
+      { note: "E6", at: 0.7, len: 0.6, gain: 0.7 },
+      { note: "G6", at: 0.7, len: 0.6, gain: 0.7 },
+    ),
   lose: () => run(["G4", "D#4", "C4"], 0.14, "triangle", 1.6),
   liquidated: () => [{ freq: 520, to: 70, at: 0, len: 0.6, gain: 0.8 }],
   // the hopeful turn after a loss: the Extra Life is on its way

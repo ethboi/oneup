@@ -122,10 +122,12 @@ body {
     font-size: 12.5px;
   }
 
-  /* standard buttons: a flat fill (--btn-bg, set by the variant or inline for Long/Short), a thin edge,
-     a faint shadow; hover shifts the colour toward the text colour, so it works in both themes */
+  /* standard buttons: a flat fill (--btn-bg, set by the variant or inline for Long/Short) standing on a
+     darker edge of the same colour, like a console's keys: pressing one sinks it onto the edge. Hover shifts
+     the fill toward the text colour, so it works in both themes */
   .btn {
     --btn-bg: var(--panel);
+    --btn-edge: color-mix(in srgb, var(--btn-bg) 72%, #000);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -137,18 +139,19 @@ body {
     font-weight: 800;
     font-size: 14px;
     box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.2),
-      0 1px 2px rgb(0 0 0 / 0.1);
+      inset 0 1px 0 rgb(255 255 255 / 0.22),
+      0 2px 0 var(--btn-edge);
     transition:
       background-color 0.15s,
-      transform 0.06s;
+      transform 0.06s,
+      box-shadow 0.06s;
   }
   .btn:hover:not(:disabled) {
     background: color-mix(in srgb, var(--btn-bg) 90%, var(--text));
   }
   .btn:active:not(:disabled) {
-    transform: translateY(1px);
-    box-shadow: none;
+    transform: translateY(2px);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12);
   }
   /* disabled always reads as disabled, whatever colour the button was given inline */
   .btn:disabled {
@@ -157,9 +160,66 @@ body {
     border-color: var(--panel-edge) !important;
     cursor: not-allowed;
     box-shadow: none;
+    transform: translateY(2px);
+  }
+  /* the one action a screen is for: taller, with a deeper edge */
+  .btn-big {
+    min-height: 52px;
+    font-size: 17px;
+    border-radius: 12px;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.22),
+      0 4px 0 var(--btn-edge);
+  }
+  .btn-big:active:not(:disabled) {
+    transform: translateY(4px);
+  }
+  .btn-big:disabled {
+    transform: translateY(4px);
+  }
+
+  /* Long / Short: two segments in one recessed track; the picked one is a raised key in its colour, the
+     other keeps its colour in the text so Short never looks like a plain button */
+  .segmented {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 13px;
+    background: var(--panel-2);
+    box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.12);
+  }
+  .segmented > button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 42px;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--seg, var(--muted));
+    transition:
+      background-color 0.15s,
+      color 0.15s;
+  }
+  .segmented > button:hover {
+    background: color-mix(in srgb, var(--seg, var(--text)) 10%, transparent);
+  }
+  .segmented > button[aria-checked="true"] {
+    background: var(--seg-fill);
+    color: var(--on-fill);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.22),
+      0 2px 0 color-mix(in srgb, var(--seg-fill) 72%, #000);
+  }
+  .segmented > button:focus-visible {
+    outline: 3px solid var(--info);
+    outline-offset: 2px;
   }
   .btn-ghost {
     --btn-bg: var(--field);
+    --btn-edge: var(--input-edge);
     border-color: var(--input-edge);
   }
   /* the primary action (class name kept from the first palette) */
@@ -226,7 +286,7 @@ body {
     border: 1px solid var(--input-edge);
     background: var(--field);
     border-radius: 999px;
-    padding: 3px 10px;
+    padding: 4px 11px;
     font-size: 12px;
     font-weight: 800;
     color: var(--muted);
@@ -428,6 +488,11 @@ body {
     .btn,
     .input {
       min-height: 44px;
+    }
+    .chip {
+      min-height: 34px;
+      padding: 6px 12px;
+      font-size: 13px;
     }
     .input {
       font-size: 16px;
@@ -708,6 +773,89 @@ body {
 .coin-fly {
   animation: coin-fly 1.1s cubic-bezier(0.2, 0.7, 0.4, 1) both;
 }
+/* what a win paid, struck in coin gold on the screen: pops in with the coins, holds, then floats off */
+.win-amount {
+  font-size: 34px;
+  color: #f2b705;
+  text-shadow:
+    2px 0 0 var(--lcd-ink),
+    -2px 0 0 var(--lcd-ink),
+    0 2px 0 var(--lcd-ink),
+    0 -2px 0 var(--lcd-ink),
+    3px 3px 0 var(--lcd-ink);
+  animation: win-amount 2.3s ease-out both;
+}
+.win-banner {
+  font-size: 28px;
+  letter-spacing: 0.08em;
+  margin-bottom: 2px;
+}
+/* the biggest wins pulse while they hold */
+.win-huge {
+  animation-name: win-amount, win-pulse;
+  animation-duration: 3.3s, 0.45s;
+  animation-iteration-count: 1, 5;
+  animation-timing-function: ease-out, ease-in-out;
+  animation-delay: 0s, 0.4s;
+}
+@keyframes win-pulse {
+  50% {
+    filter: brightness(1.35);
+  }
+}
+/* a gold flash across the screen for big wins */
+.win-flash {
+  background: radial-gradient(circle at 50% 55%, rgb(242 183 5 / 0.55), rgb(242 183 5 / 0) 70%);
+  animation: win-flash 0.9s ease-out both;
+}
+@keyframes win-flash {
+  0% {
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.coin-rain {
+  animation: coin-rain 1.6s cubic-bezier(0.45, 0, 0.8, 0.6) both;
+}
+@keyframes coin-rain {
+  0% {
+    transform: translateY(-30px) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(320px) rotate(220deg);
+    opacity: 0.9;
+  }
+}
+@keyframes win-amount {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.6);
+  }
+  12% {
+    opacity: 1;
+    transform: translateY(0) scale(1.12);
+  }
+  20% {
+    transform: scale(1);
+  }
+  75% {
+    opacity: 1;
+    transform: translateY(-6px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-26px);
+  }
+}
 @keyframes coin-fly {
   0% {
     transform: translate(0, 20px) scale(0.4);
@@ -765,6 +913,9 @@ body {
   .blink,
   .shake,
   .coin-fly,
+  .coin-rain,
+  .win-flash,
+  .win-amount,
   .heart-crack,
   .heart-plus,
   .revenge,
@@ -777,11 +928,14 @@ body {
   .spin {
     animation: none;
   }
-  .btn {
+  .btn,
+  .segmented > button {
     transition: none;
   }
   /* bursts are motion: without it, just the +1 heart */
   .coin-fly,
+  .coin-rain,
+  .win-flash,
   .heart-crack {
     display: none;
   }

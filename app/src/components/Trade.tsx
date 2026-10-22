@@ -215,7 +215,7 @@ function Console({
   const pts = (history[market] ?? []).filter((p, i, a) => p.t >= now * 1000 - range || i === a.length - 1);
   const change = pts.length > 1 ? (pts[pts.length - 1].p / pts[0].p - 1) * 100 : 0;
   return (
-    <div key={fx?.kind === "liquidated" ? fx.id : "case"} className={`case order-2 min-w-0 p-3 sm:p-5 ${fx?.kind === "liquidated" ? "shake" : ""}`}>
+    <div key={fx?.kind === "liquidated" || (fx?.kind === "win" && fx.tier === 3) ? fx.id : "case"} className={`case order-2 min-w-0 p-3 sm:p-5 ${fx?.kind === "liquidated" || (fx?.kind === "win" && fx.tier === 3) ? "shake" : ""}`}>
       <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
       <div className="-mx-1 flex min-w-0 flex-1 gap-1.5 overflow-x-auto px-1 pb-1 pt-0.5" role="group" aria-label="Market">
         {markets.map((m) => {
@@ -302,17 +302,17 @@ function OrderForm({ t }: { t: Ticket }) {
 
   return (
     <div className="panel flex flex-col gap-4 p-4">
-      <div className="grid grid-cols-2 gap-3" role="radiogroup" aria-label="Side">
+      <div className="segmented" role="radiogroup" aria-label="Side">
         {(["Long", "Short"] as const).map((s) => (
           <button
             key={s}
+            type="button"
             role="radio"
             aria-checked={side === s}
             onClick={() => setSide(s)}
-            className="btn py-2 text-base"
             style={{
-              "--btn-bg": side === s ? (s === "Long" ? "var(--long-fill)" : "var(--short-fill)") : "var(--field)",
-              color: side === s ? "var(--on-fill)" : "var(--muted)",
+              "--seg": s === "Long" ? "var(--long)" : "var(--short)",
+              "--seg-fill": s === "Long" ? "var(--long-fill)" : "var(--short-fill)",
             } as React.CSSProperties}
           >
             <Icon name={s === "Long" ? "up" : "down"} size={18} />
@@ -371,11 +371,11 @@ function OrderForm({ t }: { t: Ticket }) {
           onChange={(e) => setLeverage(Number(e.target.value))}
           style={{ "--fill": `${((leverage - 1) / Math.max(1, maxLeverage - 1)) * 100}%` } as React.CSSProperties}
         />
-        <span className="flex flex-wrap gap-1.5" role="group" aria-label="Leverage presets">
+        <span className="flex gap-1.5" role="group" aria-label="Leverage presets">
           {[2, 5, 10, 25, 50, 100]
             .filter((x) => x <= maxLeverage)
             .map((x) => (
-              <button key={x} type="button" className="chip num" aria-pressed={leverage === x} onClick={() => setLeverage(x)}>
+              <button key={x} type="button" className="chip num flex-1 px-0" aria-pressed={leverage === x} onClick={() => setLeverage(x)}>
                 {x}×
               </button>
             ))}
@@ -413,11 +413,12 @@ function OrderForm({ t }: { t: Ticket }) {
       {topUp > wallet && <p className="text-sm text-[var(--short)]">Not enough USDC in your wallet. Get some from the faucet in the Demo menu.</p>}
 
       <button
-        className="btn py-3 text-base"
+        className="btn btn-big mb-1"
         style={{ "--btn-bg": side === "Long" ? "var(--long-fill)" : "var(--short-fill)", color: "var(--on-fill)" } as React.CSSProperties}
         disabled={blocked}
         onClick={t.submit}
       >
+        {!blocked && <Icon name={side === "Long" ? "up" : "down"} size={20} />}
         {t.label}
       </button>
       {t.intentStep ? (

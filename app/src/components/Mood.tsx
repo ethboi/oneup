@@ -6,7 +6,7 @@
 // liquidation shakes the case. Sound follows the mute button; motion follows reduced-motion.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { liquidationPrice, type Position } from "@oneup/sdk";
+import { fmtUsdc, liquidationPrice, type Position } from "@oneup/sdk";
 import { heartbeat, lowHpBeep, shimmer } from "@/lib/sound";
 import { useFx, type FxEvent } from "@/lib/fx";
 import { nearMisses } from "@/lib/achievements";
@@ -130,27 +130,66 @@ export function useCloseFx(market: string) {
     if (!("market" in e) || e.market !== market) return;
     const id = Date.now();
     setFx({ ...e, id });
-    setTimeout(() => setFx((f) => (f?.id === id ? null : f)), 1600);
+    // a win holds a little longer so the amount can be read, longer still the bigger it is
+    setTimeout(() => setFx((f) => (f?.id === id ? null : f)), e.kind === "win" ? WIN[e.tier ?? 1].hold : 1600);
   });
   return fx;
 }
 
 type CloseFx = Extract<FxEvent, { market: string }>;
 
+/** Each win tier's burst: coins thrown, how far, the amount's size, how long it holds. */
+const WIN = [
+  { coins: 8, reach: 0.75, size: 26, hold: 1800 },
+  { coins: 14, reach: 1, size: 34, hold: 2400 },
+  { coins: 24, reach: 1.3, size: 44, hold: 2800 },
+  { coins: 36, reach: 1.6, size: 58, hold: 3400 },
+] as const;
+
+/** A coin's throw: fixed per index so renders agree. */
+const throwOf = (i: number, n: number, reach: number) => ({
+  dx: Math.round(Math.cos((i / n) * Math.PI * 2 + i * 0.7) * (90 + (i % 3) * 40) * reach),
+  dy: Math.round((-60 - (i % 4) * 35) * reach),
+  d: (i % 5) * 0.04 + (i >= 14 ? 0.12 : 0),
+});
+
+/** Coins falling across the whole screen, for the biggest wins. */
+const RAIN = Array.from({ length: 18 }, (_, i) => ({ x: ((i * 37) % 100) + 0.5, d: (i % 6) * 0.11 + 0.15, s: 16 + (i % 3) * 4 }));
+
 export function Burst({ fx }: { fx: CloseFx & { id: number } }) {
-  // fixed scatter so renders agree; the key restarts the animation for each close
-  const coins = useMemo(
-    () => Array.from({ length: 14 }, (_, i) => ({ dx: Math.round(Math.cos((i / 14) * Math.PI * 2) * (90 + (i % 3) * 40)), dy: -60 - (i % 4) * 35, d: (i % 5) * 0.04 })),
-    [],
-  );
+  // the key restarts the animation for each close
   if (fx.kind === "win") {
+    const won = fx.pnl ? BigInt(fx.pnl) : 0n;
+    const tier = fx.tier ?? 1;
+    const w = WIN[tier];
     return (
-      <div key={fx.id} className="pointer-events-none absolute inset-0 flex items-center justify-center" aria-hidden>
-        {coins.map((c, i) => (
-          <span key={i} className="coin-fly absolute" style={{ "--dx": `${c.dx}px`, "--dy": `${c.dy}px`, animationDelay: `${c.d}s` } as React.CSSProperties}>
-            <PixelCoin size={22} />
+      <div key={fx.id} className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden" aria-hidden>
+        {tier >= 2 && <div className="win-flash absolute inset-0" />}
+        {tier === 3 &&
+          RAIN.map((r, i) => (
+            <span key={`r${i}`} className="coin-rain absolute top-0" style={{ left: `${r.x}%`, animationDelay: `${r.d}s` }}>
+              <PixelCoin size={r.s} />
+            </span>
+          ))}
+        {Array.from({ length: w.coins }, (_, i) => {
+          const c = throwOf(i, w.coins, w.reach);
+          return (
+            <span key={i} className="coin-fly absolute" style={{ "--dx": `${c.dx}px`, "--dy": `${c.dy}px`, animationDelay: `${c.d}s` } as React.CSSProperties}>
+              <PixelCoin size={tier >= 2 ? 26 : 22} />
+            </span>
+          );
+        })}
+        {won > 0n && (
+          <span className="absolute flex flex-col items-center">
+            {tier === 3 && <span className="win-amount win-banner display">BIG WIN</span>}
+            <span
+              className={`win-amount display num ${tier === 3 ? "win-huge" : ""}`}
+              style={tier === 3 ? { fontSize: w.size } : { fontSize: w.size, animationDuration: `${w.hold - 100}ms` }}
+            >
+              +${fmtUsdc(won)}
+            </span>
           </span>
-        ))}
+        )}
       </div>
     );
   }
