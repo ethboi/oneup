@@ -1477,27 +1477,6 @@ kbd {
   text-align: center;
 }
 
-/* a round's close, printed on the LCD for a few seconds */
-.round-over-card {
-  padding: 14px 22px;
-  border: 3px solid var(--lcd-ink);
-  border-radius: 6px;
-  background: var(--lcd);
-  color: var(--lcd-ink);
-  box-shadow: 4px 4px 0 var(--lcd-ink);
-  animation: round-over-in 0.35s steps(4) both;
-}
-@keyframes round-over-in {
-  from {
-    transform: scale(0.6);
-    opacity: 0;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .round-over-card {
-    animation: none;
-  }
-}
 
 
 /* the LCD's scenery (components/PriceChart.tsx): pixel landscape along the bottom and clouds up top, in the

@@ -15,7 +15,6 @@ import {
   priceToNumber,
   stopHit,
   targetHit,
-  type EpochSummary,
   type Market,
   type Order,
   type Position,
@@ -411,62 +410,6 @@ function Account({ t, positions }: { t: Ticket; positions: Position[] }) {
   );
 }
 
-/** When a round closes, the LCD prints what it did for a few seconds: what losers got back, in Extra Lives and
- *  $1UP buyback, or that the house made nothing to share. */
-function RoundOver() {
-  const { o } = useOneUp();
-  const epoch = usePoll(() => o.epoch(), [], 5000);
-  const [shown, setShown] = useState<EpochSummary | null>(null);
-  const seen = useRef<number | null>(null);
-  useEffect(() => {
-    if (!epoch) return;
-    // the first round seen is where we came in, not a close
-    if (seen.current === null || epoch.id <= seen.current) {
-      seen.current = epoch.id;
-      return;
-    }
-    seen.current = epoch.id;
-    let live = true;
-    (async () => {
-      // the new round can start a few seconds before the old one's summary is written: ask again until it is
-      for (let i = 0; i < 10 && live; i++) {
-        const x = await o.epochSummary(epoch.id - 1).catch(() => null);
-        if (x) return live && setShown(x);
-        await new Promise((r) => setTimeout(r, 1500));
-      }
-    })();
-    return () => {
-      live = false;
-    };
-  }, [epoch?.id, o]);
-  useEffect(() => {
-    if (!shown) return;
-    const t = setTimeout(() => setShown(null), 7000);
-    return () => clearTimeout(t);
-  }, [shown]);
-  if (!shown) return null;
-  const lives = BigInt(shown.lives_pot);
-  const buyback = BigInt(shown.buyback_pot);
-  const net = BigInt(shown.house_net);
-  return (
-    <div className="round-over pointer-events-none absolute inset-0 flex items-center justify-center" role="status">
-      <div className="round-over-card display text-center">
-        <div className="text-2xl">ROUND {shown.epoch} OVER</div>
-        {net > 0n ? (
-          <>
-            <div className="mt-2 text-lg">
-              +{shown.lives_minted} EXTRA {shown.lives_minted === 1 ? "LIFE" : "LIVES"} · ${fmtUsdc(lives, lives < 1_000n * USDC ? 2 : 0)} TO LIVES
-            </div>
-            <div className="text-sm">${fmtUsdc(buyback, buyback < 1_000n * USDC ? 2 : 0)} BUYS BACK $1UP FOR THE LOCKS</div>
-          </>
-        ) : (
-          <div className="mt-2 text-sm">THE HOUSE MADE NOTHING TO SHARE THIS ROUND</div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 /** How long a trade arriving on the tape flashes (its animation in globals.css runs this long). */
 const FLASH_MS = 1100;
 
@@ -780,7 +723,6 @@ function Console({
             gauge={mood.state !== "none" && mood.gauge ? <Gauge mood={mood} /> : jackpotLine}
           />
           <MoodGlow mood={mood} />
-          <RoundOver />
           {fx && <Burst fx={fx} />}
           {(revenge || tilt > 0) && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center" role="status">
