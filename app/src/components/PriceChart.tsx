@@ -193,7 +193,8 @@ export function PriceChart({
   for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) ticks.push(v);
   const busy = [y(headP), ...shown.filter((s) => !s.edge).map((s) => y(s.m.price))];
 
-  // each position's zones: entry to take-profit in green, entry to stop-loss (or liquidation) in red
+  // each position's zones: entry to take-profit in green, entry to stop-loss (or liquidation) in red, each
+  // fading in from the entry line
   const clampY = (p: number) => Math.min(plotB, Math.max(PAD.t, y(p)));
   const zones = marks
     .filter((m) => m.kind === "entry" && m.pos !== undefined)
@@ -277,16 +278,17 @@ export function PriceChart({
         <text x={x(t1)} y={H - 5} fontSize="10" fill="var(--lcd-3)" textAnchor="end">
           now
         </text>
+        {/* each zone deepens away from entry, so the colour grows with the profit or loss */}
         {zones.map((z) => (
-          <rect
-            key={z.key}
-            x={PAD.l}
-            width={plotR - PAD.l}
-            y={Math.min(z.a, z.b)}
-            height={Math.abs(z.b - z.a)}
-            fill={z.loss ? "var(--short)" : "var(--long)"}
-            opacity="0.13"
-          />
+          <g key={z.key}>
+            <defs>
+              <linearGradient id={`zone-${z.key}`} gradientUnits="userSpaceOnUse" x1="0" x2="0" y1={z.a} y2={z.b}>
+                <stop offset="0" stopColor={z.loss ? "var(--short)" : "var(--long)"} stopOpacity="0" />
+                <stop offset="1" stopColor={z.loss ? "var(--short)" : "var(--long)"} stopOpacity="0.32" />
+              </linearGradient>
+            </defs>
+            <rect x={PAD.l} width={plotR - PAD.l} y={Math.min(z.a, z.b)} height={Math.abs(z.b - z.a)} fill={`url(#zone-${z.key})`} />
+          </g>
         ))}
         <g clipPath="url(#lcd-plot)">
           <path d={`${line} L${x(t1)} ${plotB} L${x(points[0].t)} ${plotB} Z`} fill="url(#lcd-fill)" />
