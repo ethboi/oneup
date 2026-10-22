@@ -100,7 +100,8 @@ export function Gauge({ mood }: { mood: Mood }) {
   const hot = mood.state === "hot";
   return (
     <span
-      className="display num flex items-center gap-2 text-sm text-[var(--lcd-ink)]"
+      // phones: the bar takes what the two readings leave, so a long one never runs off the screen
+      className="display num flex w-full items-center gap-2 text-sm text-[var(--lcd-ink)] sm:w-auto"
       role="img"
       aria-label={`Liquidation ${pct(g.liq)} away, ${g.capped ? "profit cap" : "take profit"} ${pct(g.target)} away`}
     >
@@ -108,7 +109,7 @@ export function Gauge({ mood }: { mood: Mood }) {
         Liq {pct(g.liq)}
         <span className="hidden sm:inline"> away</span>
       </span>
-      <span className="relative h-3 w-28 sm:w-40">
+      <span className="relative h-3 min-w-8 flex-1 sm:w-40 sm:flex-none">
         <span className="absolute inset-x-0 top-1/2 h-[3px] -translate-y-1/2 bg-[var(--lcd-3)]" />
         <span className="absolute top-0 h-3 w-[2px] bg-[var(--lcd-3)]" style={{ left: at(g.entry) }} />
         <span

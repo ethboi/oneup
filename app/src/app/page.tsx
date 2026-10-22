@@ -79,7 +79,7 @@ export default function Home() {
           tab={tab}
           go={(t) => go(t as Tab)}
         />
-        <div className={tab === "Trade" ? undefined : "mx-auto max-w-[1280px]"}>
+        <div className={tab === "Trade" ? undefined : "mx-auto max-w-[1280px] 2xl:max-w-[1440px]"}>
           {/* the three-step intro belongs on the trading screen, not every page */}
           {tab === "Trade" && <Onboarding />}
           {tab === "Trade" && <Trade />}

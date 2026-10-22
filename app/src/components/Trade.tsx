@@ -171,7 +171,8 @@ function MarketBar(props: {
           <dd>{info ? `${info.max_leverage}×` : "…"}</dd>
         </div>
       </dl>
-      <div className="bar-strip num order-2 lg:order-3 lg:ml-auto" role="group" aria-label="Chart">
+      {/* phones: a row of its own, so the market pill keeps its price */}
+      <div className="bar-strip num order-2 w-full justify-between lg:order-3 lg:ml-auto lg:w-auto lg:justify-start" role="group" aria-label="Chart">
         {/* laid out, not folded into menus: one tap to switch, as on a trading screen */}
         <span className="bar-cell !px-1" role="group" aria-label="Chart style">
           {(["line", "candles"] as const).map((k) => (
@@ -620,7 +621,7 @@ function Console({
       <div className="bezel px-3 pb-5 pt-3 sm:px-5">
         <div className="faceplate mb-3" aria-hidden>
           <span className="stripes" />
-          <span className="faceplate-print hidden sm:inline">DOT MATRIX WITH EXTRA LIVES</span>
+          <span className="faceplate-print hidden sm:inline">PERPS WITH EXTRA LIVES</span>
           <span className="stripes" />
         </div>
         <div className="relative">
