@@ -1404,6 +1404,7 @@ body {
 }
 /* one-tap choices in a bar strip (the chart's style and window) */
 .bar-opt {
+  position: relative;
   height: 100%;
   padding: 0 9px;
   font-weight: 800;
@@ -1414,7 +1415,17 @@ body {
 }
 .bar-opt[aria-pressed="true"] {
   color: var(--primary);
-  box-shadow: inset 0 -2px 0 var(--primary);
+}
+/* the underline spans the word, not the button's padding */
+.bar-opt[aria-pressed="true"]::after {
+  content: "";
+  position: absolute;
+  left: 9px;
+  right: 9px;
+  bottom: 1px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--primary);
 }
 /* a thin scrollbar in the panel's own colours, not the browser's grey */
 .tape ol {
