@@ -349,6 +349,11 @@ body {
     background: transparent;
     border-radius: 9px;
   }
+  /* a keyboard focus ring inside a track: thinner, so it doesn't shout over the pressed key */
+  .chip-track > .chip:focus-visible {
+    outline-width: 2px;
+    outline-offset: 1px;
+  }
   .chip-track > .chip:hover {
     background: color-mix(in srgb, var(--text) 7%, transparent);
   }

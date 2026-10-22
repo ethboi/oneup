@@ -33,7 +33,8 @@ import { Burst, Gauge, MoodGlow, useCloseFx, useMood, useTensionSound } from "./
 import { ActivityList, useActivity } from "./Activity";
 import { HistoryList } from "./History";
 import { ShareButton, type CardData } from "./PnlCard";
-import { Jackpot } from "./Jackpot";
+import { Jackpot, fmtDuration } from "./Jackpot";
+import { useHistory } from "./History";
 
 /** Chart windows: the app keeps up to 30 minutes of prices it has seen. */
 const RANGES = [
@@ -79,7 +80,8 @@ function MarketBar(props: {
 
   // change over the last 5 minutes, and the latest tick's direction
   const stat = (m: string) => {
-    const h = (history[m] ?? []).filter((x) => x.t >= now * 1000 - 300_000);
+    // over the chart's window, so the bar and the chart agree
+    const h = (history[m] ?? []).filter((x) => x.t >= now * 1000 - range);
     const ch = h.length > 1 ? (h[h.length - 1].p / h[0].p - 1) * 100 : null;
     const down = h.length > 1 && h[h.length - 1].p < h[h.length - 2].p;
     return { h, ch, down };
@@ -93,6 +95,7 @@ function MarketBar(props: {
   const room = sm ? BigInt(sm.capacity) - BigInt(sm.liability) : null;
   const lastTick = (history[market] ?? []).at(-1)?.t ?? 0;
   const live = now * 1000 - lastTick < 5_000;
+  const windowName = RANGES.find(([, ms]) => ms === range)?.[0] ?? "";
   const pct = (ch: number | null) => (ch === null ? "–" : `${ch >= 0 ? "+" : "−"}${Math.abs(ch).toFixed(2)}%`);
   const tone = (ch: number | null) => (ch === null ? "var(--muted)" : ch >= 0 ? "var(--long)" : "var(--short)");
 
@@ -107,7 +110,7 @@ function MarketBar(props: {
             {prices[market] ? `$${fmtPrice(prices[market])}` : "…"}
           </span>
           <span className="ml-auto hidden pl-3 text-sm font-bold sm:inline" style={{ color: tone(me.ch) }}>
-            {pct(me.ch)}
+            {pct(me.ch)} <span className="label font-normal">· {windowName}</span>
           </span>
           <span className="ml-auto shrink-0 sm:ml-0">
             <Icon name="chevron" size={16} />
@@ -338,11 +341,16 @@ export function Trade() {
         />
         <div className="order-4 min-w-0">
           <Below positions={positions} orders={orders} focused={focused?.id} pick={pick} />
+          <div className="mt-4 hidden lg:block">
+            <Jackpot />
+          </div>
         </div>
       </div>
       <div ref={formRef} id="order-form" className="order-3 flex flex-col gap-4">
         <OrderForm t={ticket} />
-        <Jackpot compact />
+        <div className="lg:hidden">
+          <Jackpot compact />
+        </div>
       </div>
       {!formVisible && <TradeBar t={ticket} />}
     </div>
@@ -465,6 +473,17 @@ function Console({
   const [range, setRange] = useChartRange();
   const [style, setStyle] = useChartStyle();
   const now = useNow();
+  // with no position on the chart, its top row shows the jackpot
+  const { o: one, d: dep } = useOneUp();
+  const treasury = usePoll(() => one.treasury(), [], 5000);
+  const ep = usePoll(() => one.epoch(), [], 10_000);
+  const drawIn = treasury && ep ? Math.max(0, (treasury.draw_epoch - ep.id) * dep.epochLengthS + ep.started_at + dep.epochLengthS - now) : null;
+  const jackpotLine =
+    treasury?.vault && drawIn !== null ? (
+      <span className="text-sm">
+        Jackpot ${fmtUsdc(BigInt(treasury.jackpot), 0)} · draws in {fmtDuration(drawIn)}
+      </span>
+    ) : undefined;
   // the window, plus the last price before it so the line runs in from the left edge
   const all = history[market] ?? [];
   const from = now * 1000 - range;
@@ -498,7 +517,7 @@ function Console({
                 <span className="font-[family-name:var(--font-display)] text-base">{market}</span>
                 {pts.length > 1 && (
                   <span className="text-sm">
-                    {change >= 0 ? "▲" : "▼"} {Math.abs(change).toFixed(2)}%
+                    {change >= 0 ? "▲" : "▼"} {Math.abs(change).toFixed(2)}% · {RANGES.find(([, ms]) => ms === range)?.[0]}
                   </span>
                 )}
                 {streak && streak.n >= 2 && (
@@ -509,7 +528,7 @@ function Console({
                 )}
               </span>
             }
-            gauge={mood.state !== "none" && mood.gauge ? <Gauge mood={mood} /> : undefined}
+            gauge={mood.state !== "none" && mood.gauge ? <Gauge mood={mood} /> : jackpotLine}
           />
           <MoodGlow mood={mood} />
           {fx && <Burst fx={fx} />}
@@ -589,7 +608,7 @@ function OrderForm({ t }: { t: Ticket }) {
               aria-pressed={margin === String(Math.floor(Number((free + wallet) / USDC)))}
               onClick={() => setMargin(String(Math.floor(Number((free + wallet) / USDC))))}
             >
-              Max
+              Max ${fmtCompact(free + wallet)}
             </button>
           )}
         </span>
@@ -602,11 +621,6 @@ function OrderForm({ t }: { t: Ticket }) {
         </span>
       </label>
 
-      {d.intents && !showPayWith && (
-        <button type="button" className="label -mt-2 self-start underline decoration-dotted underline-offset-2" onClick={() => setPayWith(true)}>
-          Pay from another chain
-        </button>
-      )}
       {d.intents && showPayWith && (
         <label className="flex flex-col gap-1">
           <span className="label">Pay with</span>
@@ -721,6 +735,13 @@ function OrderForm({ t }: { t: Ticket }) {
       ) : (
         <p className="label -mt-1 text-center">Fills at the next oracle price. No fees, no funding.</p>
       )}
+      {d.intents && !showPayWith && (
+        <button type="button" className="label -mt-1 self-center underline decoration-dotted underline-offset-2" onClick={() => setPayWith(true)}>
+          Pay from another chain
+        </button>
+      )}
+
+
     </div>
   );
 }
@@ -782,7 +803,7 @@ function Positions({ positions, orders, focused, pick }: { positions: Position[]
   const pending = orders.filter((x) => "Open" in x.kind);
   return (
     <div>
-      {rows.length === 0 && pending.length === 0 && <p className="label py-2">No open positions. Pick a side and a size to open one.</p>}
+      {rows.length === 0 && pending.length === 0 && <NoPositions />}
       <div className="flex flex-col md:hidden">
         {rows.map(({ p, mark, v, hold }) => (
           <div
@@ -883,6 +904,41 @@ function Positions({ positions, orders, focused, pick }: { positions: Position[]
           {"Open" in x.kind && `${x.kind.Open.side} ${x.market_id} ${x.kind.Open.leverage}×`}: filling at the next oracle price
         </p>
       ))}
+    </div>
+  );
+}
+
+/** No open positions: your last few closed trades, so the panel isn't empty. */
+function NoPositions() {
+  const { me } = useOneUp();
+  const h = useHistory(me);
+  const trades = (h?.items ?? []).filter((i) => i.kind === "trade").slice(0, 3);
+  return (
+    <div className="py-2">
+      <p className="label">No open positions. Pick a side and a size to open one.</p>
+      {trades.length > 0 && (
+        <>
+          <p className="label mt-3">Your last trades</p>
+          <ul className="num mt-1 flex flex-col text-sm">
+            {trades.map((i) => {
+              if (i.kind !== "trade") return null;
+              const t = i.trade;
+              const pnl = BigInt(t.pnl) - BigInt(t.cut ?? 0);
+              return (
+                <li key={i.seq} className="flex items-center justify-between gap-3 border-t border-[var(--line)] py-2 first:border-0">
+                  <span>
+                    <span style={{ color: t.side === "Long" ? "var(--long)" : "var(--short)" }}>{t.side}</span> {t.market_id} {t.leverage}×
+                    {t.reason === "Liquidation" && <span className="label"> · liquidated</span>}
+                  </span>
+                  <b style={{ color: pnl >= 0n ? "var(--long)" : "var(--short)" }}>
+                    {pnl >= 0n ? "+" : "−"}${fmtUsdc(pnl < 0n ? -pnl : pnl)}
+                  </b>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
     </div>
   );
 }
