@@ -1,6 +1,6 @@
 // Pixel sprites drawn from character grids, outlined in ink automatically so they read on any surface.
 
-import { COIN_ROWS as COIN, HEART_ROWS as HEART, SPRITES, pixelText } from "@/lib/sprites";
+import { COIN_ROWS as COIN, HEART_ROWS as HEART, LOCK_ROWS, SPRITES, pixelText } from "@/lib/sprites";
 
 interface SpriteProps {
   rows: string[];
@@ -71,6 +71,11 @@ export function PixelHeart({ size = 24, fill = 1, live, className, label }: { si
 
 export function PixelCoin({ size = 18 }: { size?: number }) {
   return <Sprite rows={COIN} colors={{ "#": "var(--accent)", "|": "color-mix(in srgb, var(--accent) 60%, #7a5200)" }} size={size} />;
+}
+
+/** A $1UP lock: a gold padlock. */
+export function PixelLock({ size = 24 }: { size?: number }) {
+  return <Sprite rows={LOCK_ROWS} colors={{ "#": "#6b7088", G: "var(--accent)", K: "var(--edge)" }} size={size} />;
 }
 
 /** The OneUp mark: a heart with a +1 badge. */

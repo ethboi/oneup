@@ -1,6 +1,7 @@
 "use client";
 
-// List an Extra Life or a lock on the marketplace, or take it down. Shared by the Lives and Locks cards.
+// List an Extra Life or a lock on the marketplace, re-price it or take it down. Shared by the Lives, Locks and
+// Market tabs.
 
 import { useState } from "react";
 import { USDC, fmtUsdc, type Listing } from "@oneup/sdk";
@@ -18,15 +19,20 @@ export function Sell({ nft, tokenId, suggested, listings, compact }: { nft: stri
   const { tx, run } = useOneUp();
   const listing = listings.find((l) => l.nft_contract === nft && l.token_id === tokenId);
   const [open, setOpen] = useState(false);
-  const [price, setPrice] = useState(() => (Number(suggested) / Number(USDC)).toFixed(0));
+  const [price, setPrice] = useState(() => (Number(suggested) / Number(USDC)).toFixed(2));
 
-  if (listing) {
+  if (listing && !open) {
     return (
       <div className={`${mt} flex items-center justify-between gap-2 rounded-lg border border-dashed border-[var(--line)] px-3 py-2 text-sm`}>
         <span className="num">For sale at ${fmtUsdc(BigInt(listing.price))}</span>
-        <button className="btn btn-ghost px-3 py-1" onClick={() => run("Take down listing", () => tx.delist(nft, tokenId))}>
-          Take down
-        </button>
+        <span className="flex gap-1.5">
+          <button className="btn btn-ghost px-3 py-1" onClick={() => setOpen(true)}>
+            Re-price
+          </button>
+          <button className="btn btn-ghost px-3 py-1" onClick={() => run("Take down listing", () => tx.delist(nft, tokenId))}>
+            Take down
+          </button>
+        </span>
       </div>
     );
   }
@@ -38,7 +44,8 @@ export function Sell({ nft, tokenId, suggested, listings, compact }: { nft: stri
       </button>
     );
   }
-  const raw = BigInt(Math.floor(Number(price) || 0)) * USDC;
+  // cents count: a small life can be worth under a dollar
+  const raw = BigInt(Math.floor((Number(price) || 0) * Number(USDC)));
   return (
     <div className={`${mt} flex items-center gap-2`}>
       <span className="field flex-1">
@@ -50,7 +57,7 @@ export function Sell({ nft, tokenId, suggested, listings, compact }: { nft: stri
         disabled={raw === 0n}
         onClick={() => run(`List for $${price}`, () => tx.list(nft, tokenId, raw)).then((ok) => ok && setOpen(false))}
       >
-        List
+        {listing ? "Update" : "List"}
       </button>
       <button className="btn btn-ghost shrink-0 px-2.5" onClick={() => setOpen(false)} aria-label="Cancel">
         <Icon name="x" />

@@ -7,6 +7,7 @@
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { ONEUP, OneUp } from "@oneup/sdk";
 
 export interface ActivityItem {
   seq: number;
@@ -16,6 +17,9 @@ export interface ActivityItem {
   /** Short account names: "bot3", "demo". */
   who?: string;
   text: string;
+  /** On a sale: what changed hands and its price; `value` is what it was worth then (USDC 1e6), when the sale
+   *  was seen live (an old sale found by a rescan can't be valued after the fact). */
+  sale?: { nft: "life" | "lock"; token_id: string; price: string; value?: string };
 }
 
 /** One closed trade: its open and close events joined by position id. */
@@ -221,7 +225,13 @@ export function toItems(ev: Event, executor: string, t: number, c: Record<string
       const what = d.nft_contract === c.life ? "Extra Life" : "$1UP lock";
       const buyer = String(d.buyer);
       const seller = String(d.seller);
-      out.feed.push({ t, kind: "sold", who: short(buyer), text: `${short(buyer)} bought ${short(seller)}'s ${what} for ${usd(String(d.price))}` });
+      out.feed.push({
+        t,
+        kind: "sold",
+        who: short(buyer),
+        text: `${short(buyer)} bought ${short(seller)}'s ${what} for ${usd(String(d.price))}`,
+        sale: { nft: d.nft_contract === c.life ? "life" : "lock", token_id: String(d.token_id), price: String(d.price) },
+      });
       mine(buyer, { t, kind: "bought", what, price: String(d.price), other: seller });
       mine(seller, { t, kind: "sold", what, price: String(d.price), other: buyer });
     } else if (ev.standard === "nep141" && ev.event === "ft_transfer") {
@@ -264,7 +274,11 @@ function record(block: { t: number; logs: [string, string][] }, c: Record<string
       // not ours or malformed
     }
   }
-  for (const item of out.feed) state.items.push({ ...item, seq: ++state.seq });
+  for (const item of out.feed) {
+    // a live sale waits for its valuation (valueSales), so it reaches the feed with it
+    if (item.sale && Date.now() - item.t < 120_000) pendingSales.push(item);
+    else state.items.push({ ...item, seq: ++state.seq });
+  }
   for (const [account, item] of out.history) {
     const list = state.history.get(account) ?? [];
     list.push({ ...item, seq: ++state.seq } as HistoryItem);
@@ -272,6 +286,34 @@ function record(block: { t: number; logs: [string, string][] }, c: Record<string
     state.history.set(account, list);
   }
   if (state.items.length > KEEP) state.items.splice(0, state.items.length - KEEP);
+}
+
+const pendingSales: Omit<ActivityItem, "seq">[] = [];
+
+/** What a sold life or lock was worth as it sold: a life's USDC still to pay, a lock's $1UP if left today at
+ *  the swap price. The NFT has just moved, so its state is the state at the sale. */
+async function valueSales() {
+  if (pendingSales.length === 0) return;
+  const o = new OneUp(JSON.parse(readFileSync(resolve(process.cwd(), "../localnet.json"), "utf8")));
+  for (const item of pendingSales.splice(0)) {
+    const sale = item.sale!;
+    try {
+      if (sale.nft === "life") {
+        const l = await o.lifeInfo(sale.token_id);
+        if (l) sale.value = String(l.expired || l.full_heal ? BigInt(l.claimable) : BigInt(l.owed) - BigInt(l.paid) + BigInt(l.claimable));
+      } else {
+        const [l, out] = await Promise.all([o.lockInfo(sale.token_id), o.swapQuote(100_000_000n)]);
+        if (l && !l.withdrawn && BigInt(out) > 0n) {
+          const px = (100_000_000n * ONEUP) / BigInt(out); // USDC per whole $1UP
+          sale.value = String(((BigInt(l.amount) - BigInt(l.exit_penalty)) * px) / ONEUP);
+        }
+      }
+    } catch {
+      // unvalued: the sale still shows
+    }
+    state.items.push({ ...item, seq: ++state.seq });
+    state.dirty = true;
+  }
 }
 
 async function step() {
@@ -286,6 +328,7 @@ async function step() {
     const heights = Array.from({ length: Math.min(BATCH, target - state.next + 1) }, (_, i) => state.next! + i);
     const blocks = await Promise.all(heights.map((h) => readBlock(url, h, c).catch(() => null)));
     for (const b of blocks) if (b) record(b, c);
+    await valueSales();
     state.next += heights.length;
     state.dirty = true;
   }

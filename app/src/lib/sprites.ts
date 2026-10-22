@@ -26,6 +26,8 @@ const STEEL = "#6b7088";
 export const HEART_ROWS = [".##...##.", "####.####", "#########", "#########", ".#######.", "..#####..", "...###...", "....#...."];
 /** The heart with its white shine, as the brand draws it. */
 const SHINY_HEART = HEART_ROWS.map((r, y) => (y === 1 ? r.slice(0, 1) + "#" + "*" + r.slice(3) : r));
+/** A padlock: the $1UP lock's sprite. */
+export const LOCK_ROWS = ["..#####..", ".##...##.", ".#.....#.", ".#.....#.", "GGGGGGGGG", "GGGGKGGGG", "GGGKKKGGG", "GGGGKGGGG", "GGGGGGGGG"];
 export const COIN_ROWS = ["..####..", ".######.", "###||###", "###||###", "###||###", "###||###", ".######.", "..####.."];
 
 const heart = (color: string, fill?: number): SpriteDef => ({ rows: SHINY_HEART, colors: { "#": color, "*": WHITE }, fill });
