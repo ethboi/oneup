@@ -17,6 +17,7 @@ import { FullHeal } from "@/components/FullHeal";
 import { EpochResults } from "@/components/EpochResults";
 import { Onboarding } from "@/components/Onboarding";
 import { Icon, type IconName } from "@/components/Icon";
+import { Logo } from "@/components/Pixel";
 
 const TABS = ["Trade", "Extra Lives", "Locks", "Market", "Solvency", "Fairness", "About"] as const;
 type Tab = (typeof TABS)[number];
@@ -43,6 +44,18 @@ export default function Home() {
   };
   return (
     <OneUpProvider>
+      {/* what this is, on every page: a hackathon entry running on test money */}
+      <div className="bg-[var(--primary)] text-white">
+        <div className="mx-auto flex max-w-[1280px] items-center justify-center gap-x-2 px-4 py-1.5 text-center text-[12.5px] font-bold">
+          <span>
+            Our entry for <span className="font-extrabold">NEAR HACKATHON</span>, November 2026
+            <span className="hidden sm:inline"> · a proof of concept on a local NEAR chain, with test money only</span>
+          </span>
+          <button type="button" className="underline decoration-dotted underline-offset-2 opacity-80 hover:opacity-100" onClick={() => go("About")}>
+            About
+          </button>
+        </div>
+      </div>
       <div className="mx-auto max-w-[1280px] px-4 pb-24 lg:pb-16">
         <Header tabs={TABS.map((t) => ({ name: t, badge: t === "Extra Lives" ? ("lives" as const) : undefined }))} tab={tab} go={(t) => go(t as Tab)} />
         <Onboarding />
@@ -53,6 +66,7 @@ export default function Home() {
         {tab === "Solvency" && <Solvency />}
         {tab === "Fairness" && <Fairness />}
         {tab === "About" && <About />}
+        <Footer go={go} />
       </div>
 
       {/* phones: a bottom tab bar */}
@@ -85,5 +99,55 @@ export default function Home() {
       <FullHeal />
       <EpochResults />
     </OneUpProvider>
+  );
+}
+
+/** What OneUp is and where to read more, under every tab. */
+function Footer({ go }: { go: (t: Tab) => void }) {
+  const link = "font-bold text-[var(--text)] underline decoration-dotted underline-offset-2";
+  return (
+    <footer className="mt-10 border-t border-[var(--line)] pt-6 text-sm">
+      <div className="grid gap-6 sm:grid-cols-[1.4fr_1fr_1fr]">
+        <div className="flex items-start gap-3">
+          <Logo size={30} />
+          <div>
+            <b className="display text-base">OneUp</b>
+            <p className="label mt-0.5 max-w-sm">
+              Perps against a house that can&apos;t go bust. Lose a trade, get a life. Our entry for NEAR HACKATHON, November 2026.
+            </p>
+          </div>
+        </div>
+        <div>
+          <b className="block">Read more</b>
+          <ul className="label mt-1.5 flex flex-col gap-1">
+            <li>
+              <button type="button" className={link} onClick={() => go("About")}>
+                How it works
+              </button>
+            </li>
+            <li>
+              <button type="button" className={link} onClick={() => go("Solvency")}>
+                Why the house can&apos;t go bust
+              </button>
+            </li>
+            <li>
+              <button type="button" className={link} onClick={() => go("Fairness")}>
+                Fair to late players
+              </button>
+            </li>
+          </ul>
+        </div>
+        <div>
+          <b className="block">Built on NEAR</b>
+          <p className="label mt-1.5">
+            Rust contracts (near-sdk), NEAR Intents deposits, a Sputnik DAO owning the house, gasless one-tap trading, and an MCP server
+            for AI agents.
+          </p>
+        </div>
+      </div>
+      <p className="label mt-6 border-t border-[var(--line)] pt-4">
+        A proof of concept running on a local NEAR chain with test money. The contracts haven&apos;t been audited: don&apos;t use real funds.
+      </p>
+    </footer>
   );
 }
