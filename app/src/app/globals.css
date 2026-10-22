@@ -448,6 +448,111 @@ body {
   .slider:focus-visible {
     outline: none;
   }
+
+  /* the order ticket: label and value rows, as a trading terminal lists them */
+  .ticket-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .ticket-row > :last-child {
+    text-align: right;
+  }
+  /* a field's name inside it, on the left (the value sits on the right, by its unit) */
+  .field-lead {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+  }
+  .field .field-lead + .input {
+    padding-left: 72px;
+  }
+  .lev-readout {
+    min-width: 52px;
+    border-radius: 7px;
+    padding: 1px 8px;
+    font-size: 15px;
+    font-weight: 800;
+    text-align: center;
+    background: var(--panel-2);
+    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.12);
+  }
+  /* the leverage stops under the slider, each centred where it sits on the track (the thumb's 9px inset at
+     either end lines them up) */
+  .lev-stop {
+    position: absolute;
+    top: 0;
+    transform: translateX(calc(-50% + 9px - var(--at, 0) * 18px));
+    font-size: 11.5px;
+    font-weight: 800;
+    color: var(--muted);
+    padding: 0 3px;
+    border-radius: 5px;
+  }
+  .lev-stop:hover {
+    color: var(--text);
+  }
+  .lev-stop[aria-pressed="true"] {
+    color: var(--on-fill);
+    background: var(--primary);
+  }
+  /* the stepped slider's thumb: a square key, like the console's buttons */
+  .slider-steps::-webkit-slider-thumb {
+    width: 18px;
+    height: 18px;
+    margin-top: -6px;
+    border-radius: 4px;
+    background: var(--field);
+    border: 2px solid var(--primary);
+    box-shadow: 0 2px 0 color-mix(in srgb, var(--primary) 60%, #000);
+  }
+  .slider-steps::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    background: var(--field);
+    border: 2px solid var(--primary);
+    box-shadow: 0 2px 0 color-mix(in srgb, var(--primary) 60%, #000);
+  }
+  /* a checkbox drawn as a small key */
+  .check {
+    appearance: none;
+    flex: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 5px;
+    border: 1.5px solid var(--input-edge);
+    background: var(--field);
+    display: grid;
+    place-content: center;
+  }
+  .check:checked {
+    background: var(--primary);
+    border-color: var(--primary);
+  }
+  .check:checked::after {
+    content: "";
+    width: 9px;
+    height: 5px;
+    margin-top: -2px;
+    border-left: 2.5px solid var(--on-fill);
+    border-bottom: 2.5px solid var(--on-fill);
+    transform: rotate(-45deg);
+  }
+  .check:focus-visible {
+    outline: 3px solid var(--info);
+    outline-offset: 2px;
+  }
+  /* what a loss brings, set apart under the order's numbers */
+  .extra-life-note {
+    border-radius: 10px;
+    padding: 8px 10px;
+    background: color-mix(in srgb, var(--heart) 9%, var(--panel));
+    border: 1px dashed color-mix(in srgb, var(--heart) 45%, transparent);
+  }
   .slider:focus-visible::-webkit-slider-thumb {
     box-shadow: 0 0 0 4px color-mix(in srgb, var(--info) 30%, transparent);
   }
@@ -1202,4 +1307,25 @@ body {
   .tick-tag {
     animation: none;
   }
+}
+
+/* the market's numbers above the chart: a name over each value */
+.mkt-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 22px;
+  padding: 0 6px;
+}
+.mkt-stats dt {
+  font-size: 11.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.mkt-stats dd {
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.lev-stop[data-end] {
+  transform: none;
 }

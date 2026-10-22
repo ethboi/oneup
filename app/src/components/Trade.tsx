@@ -109,10 +109,7 @@ function MarketBar(props: {
           <span key={prices[market]?.toString()} className={`tick-flash truncate text-[15px] font-extrabold sm:text-base ${me.down ? "tick-down" : "tick-up"}`}>
             {prices[market] ? `$${fmtPrice(prices[market])}` : "…"}
           </span>
-          <span className="ml-auto hidden pl-3 text-sm font-bold sm:inline" style={{ color: tone(me.ch) }}>
-            {pct(me.ch)} <span className="label font-normal">· {windowName}</span>
-          </span>
-          <span className="ml-auto shrink-0 sm:ml-0">
+          <span className="ml-auto shrink-0 pl-1">
             <Icon name="chevron" size={16} />
           </span>
         </button>
@@ -151,18 +148,29 @@ function MarketBar(props: {
           </ul>
         )}
       </div>
-      <div className="bar-strip num order-3 w-full lg:order-2 lg:w-auto" role="group" aria-label={`${market} stats`}>
-        <span className="bar-cell" title="How the market's open max wins split between longs and shorts">
-          <span className="label">Longs</span>
-          <b style={{ color: "var(--long)" }}>{longPct === null ? "–" : `${longPct.toFixed(0)}%`}</b>
-          <span className="label">Shorts</span>
-          <b style={{ color: "var(--short)" }}>{longPct === null ? "–" : `${(100 - longPct).toFixed(0)}%`}</b>
-        </span>
-        <span className="bar-cell" title="How much more max win this market can take before new trades are refused">
-          <span className="label">Room</span>
-          <b>{room === null ? "…" : `$${fmtCompact(room)}`}</b>
-        </span>
-      </div>
+      {/* the market's numbers, each named above its value as a trading terminal prints them */}
+      <dl className="mkt-stats num order-3 w-full lg:order-2 lg:w-auto" aria-label={`${market} stats`}>
+        <div>
+          <dt>Change, {windowName}</dt>
+          <dd style={{ color: tone(me.ch) }}>{pct(me.ch)}</dd>
+        </div>
+        <div title="How the market's open max wins split between longs and shorts">
+          <dt>Longs / shorts</dt>
+          <dd>
+            <span style={{ color: "var(--long)" }}>{longPct === null ? "–" : `${longPct.toFixed(0)}%`}</span>
+            <span className="text-[var(--muted)]"> / </span>
+            <span style={{ color: "var(--short)" }}>{longPct === null ? "–" : `${(100 - longPct).toFixed(0)}%`}</span>
+          </dd>
+        </div>
+        <div title="How much more max win this market can take before new trades are refused">
+          <dt>Room</dt>
+          <dd>{room === null ? "…" : `$${fmtCompact(room)}`}</dd>
+        </div>
+        <div className="hidden sm:block">
+          <dt>Max leverage</dt>
+          <dd>{info ? `${info.max_leverage}×` : "…"}</dd>
+        </div>
+      </dl>
       <div className="bar-strip num order-2 lg:order-3 lg:ml-auto" role="group" aria-label="Chart">
         <label className="bar-cell">
           <span className="sr-only">Chart style</span>
@@ -553,6 +561,16 @@ function Console({
   );
 }
 
+/** Leverage stops under the slider: the common picks, and where the track's log scale puts most of its length. */
+const LEVERAGE_STOPS = [2, 5, 10, 25, 50, 100];
+/** The leverage slider runs 1× to the market's cap on a log scale, so 2×–10× aren't squeezed into the first tenth. */
+const levToPos = (lev: number, max: number) => (Math.log(Math.max(1, lev)) / Math.log(max)) * 100;
+const posToLev = (pos: number, max: number) => Math.max(1, Math.min(max, Math.round(Math.exp((pos / 100) * Math.log(max)))));
+
+/**
+ * The order ticket, laid out as on a trading terminal: side, what you can spend, margin, leverage on a slider,
+ * triggers, the button, then what the order would do as label and value rows.
+ */
 function OrderForm({ t }: { t: Ticket }) {
   const { d } = useOneUp();
   const { side, setSide, margin, setMargin, leverage, setLeverage, maxLeverage, m, quote, free, wallet, pool, topUp, blocked, price } = t;
@@ -564,9 +582,12 @@ function OrderForm({ t }: { t: Ticket }) {
   const [payOpen, setPayWith] = useState(false);
   const showPayWith = payOpen || t.payWith !== "wallet" || topUp > wallet;
   const [why, setWhy] = useState(false);
+  const spendable = free + wallet;
+  const levPos = levToPos(leverage, maxLeverage);
+  const hot = leverage >= 50;
 
   return (
-    <div className="panel flex flex-col gap-4 p-4">
+    <div className="panel ticket flex flex-col gap-3.5 p-4">
       <div className="segmented" role="radiogroup" aria-label="Side">
         {(["Long", "Short"] as const).map((s) => (
           <button
@@ -586,28 +607,33 @@ function OrderForm({ t }: { t: Ticket }) {
         ))}
       </div>
 
-      <label className="flex flex-col gap-1">
-        <span className="label">Margin</span>
+      <div className="ticket-row">
+        <span className="label">Available</span>
+        <span className="num font-bold">${fmtUsdc(spendable, spendable < 1_000n * USDC ? 2 : 0)} USDC</span>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
         <span className="field">
-          <input className="input num" value={margin} onChange={(e) => setMargin(e.target.value)} inputMode="decimal" aria-label="Margin" />
+          <span className="field-lead label">Margin</span>
+          <input className="input num text-right" value={margin} onChange={(e) => setMargin(e.target.value)} inputMode="decimal" aria-label="Margin" />
           <span className="field-unit">USDC</span>
         </span>
-        <span className="chip-track mt-1" role="group" aria-label="Margin presets">
+        <span className="chip-track" role="group" aria-label="Margin presets">
           {[50, 100, 500]
-            .filter((x) => BigInt(x) * USDC <= free + wallet)
+            .filter((x) => BigInt(x) * USDC <= spendable)
             .map((x) => (
               <button key={x} type="button" className="chip num flex-1 px-0" aria-pressed={margin === String(x)} onClick={() => setMargin(String(x))}>
                 ${x}
               </button>
             ))}
-          {free + wallet >= USDC && (
+          {spendable >= USDC && (
             <button
               type="button"
               className="chip num flex-1 px-0"
-              aria-pressed={margin === String(Math.floor(Number((free + wallet) / USDC)))}
-              onClick={() => setMargin(String(Math.floor(Number((free + wallet) / USDC))))}
+              aria-pressed={margin === String(Math.floor(Number(spendable / USDC)))}
+              onClick={() => setMargin(String(Math.floor(Number(spendable / USDC))))}
             >
-              Max ${fmtCompact(free + wallet)}
+              Max
             </button>
           )}
         </span>
@@ -616,7 +642,7 @@ function OrderForm({ t }: { t: Ticket }) {
             Paid from {t.viaAsset.symbol} on {t.viaAsset.chain}: bridged, swapped and deposited in one intent
           </span>
         )}
-      </label>
+      </div>
 
       {d.intents && showPayWith && (
         <label className="flex flex-col gap-1">
@@ -632,75 +658,49 @@ function OrderForm({ t }: { t: Ticket }) {
         </label>
       )}
 
-      <label className="flex flex-col gap-1">
-        <span className="label flex justify-between">
-          <span>Leverage</span>
-          <span className="num text-base font-extrabold" style={{ color: leverage >= 50 ? "var(--short)" : "var(--text)" }}>
+      <div className="flex flex-col gap-1">
+        <div className="ticket-row">
+          <span className="label">Leverage</span>
+          <span className="lev-readout num" style={{ color: hot ? "var(--short)" : undefined }}>
             {leverage}×
           </span>
-        </span>
-        <span className="chip-track mt-1" role="group" aria-label="Leverage presets">
-          {[2, 5, 10, 25, 50, 100]
-            .filter((x) => x <= maxLeverage)
-            .map((x) => (
-              <button key={x} type="button" className="chip num flex-1 px-0" aria-pressed={leverage === x} onClick={() => setLeverage(x)}>
-                {x}×
-              </button>
-            ))}
-        </span>
-      </label>
-
-      {/* what's at stake first, the details under it */}
-      <div className="num flex flex-col rounded-xl bg-[var(--panel-2)] px-3 py-2.5">
-        <div className="flex items-baseline justify-between gap-2">
-          <span>
-            You risk <b>${fmtUsdc(m, 0)}</b>
-          </span>
-          <span>
-            win up to <b style={{ color: "var(--long)" }}>${fmtUsdc(maxLiability(m), 0)}</b>
-          </span>
         </div>
-        <dl className="mt-1.5 grid grid-cols-3 gap-2 border-t border-[var(--line)] pt-2 text-sm">
-          <div className="min-w-0">
-            <dt className="label">Liquidation</dt>
-            <dd className="truncate font-bold">
-              {liq ? fmtPrice(liq) : "…"}
-              {liq && price && (
-                <span className="label font-normal" style={leverage >= 50 ? { color: "var(--short)" } : undefined}>
-                  {" "}
-                  {away(price, liq)}
-                </span>
-              )}
-            </dd>
-          </div>
-          <div className="min-w-0">
-            <dt className="label">Winner&apos;s cut</dt>
-            <dd className="font-bold">{quote ? `${(Number(quote.cut_ppm) / 1e4).toFixed(1)}%` : "…"}</dd>
-          </div>
-          <div className="min-w-0 text-right">
-            <dt className="label">Size</dt>
-            <dd className="font-bold">${fmtUsdc(m * BigInt(leverage), 0)}</dd>
-          </div>
-        </dl>
-        {/* the promise, where the decision is made */}
-        {m > 0n && (
-          <div className="mt-2 flex items-center gap-2 border-t border-[var(--line)] pt-2 text-sm">
-            <PixelHeart size={16} className="shrink-0" />
-            <span className="min-w-0 flex-1">
-              Lose it → Extra Life up to <b>${fmtUsdc(lifeUpTo, 0)}</b> + <b>{oneupUpTo.toLocaleString("en-US")} $1UP</b>
-            </span>
-            <button type="button" className="label shrink-0 underline decoration-dotted underline-offset-2" aria-expanded={why} onClick={() => setWhy(!why)}>
-              {why ? "Hide" : "How"}
+        <input
+          type="range"
+          className="slider slider-steps"
+          min={0}
+          max={100}
+          step={0.1}
+          value={levPos}
+          onChange={(e) => setLeverage(posToLev(Number(e.target.value), maxLeverage))}
+          // the log track's small steps round back to the same leverage: the keys move a whole 1× (Page keys 10×)
+          onKeyDown={(e) => {
+            const by = { ArrowLeft: -1, ArrowDown: -1, ArrowRight: 1, ArrowUp: 1, PageDown: -10, PageUp: 10 }[e.key];
+            if (by === undefined) return;
+            e.preventDefault();
+            setLeverage(Math.max(1, Math.min(maxLeverage, leverage + by)));
+          }}
+          aria-label="Leverage"
+          aria-valuetext={`${leverage}×`}
+          style={{ "--fill": `${levPos}%`, ...(hot ? { "--primary": "var(--short)" } : {}) } as React.CSSProperties}
+        />
+        {/* the stops, each where it sits on the track */}
+        <div className="relative h-5" role="group" aria-label="Leverage presets">
+          {LEVERAGE_STOPS.filter((x) => x <= maxLeverage).map((x) => (
+            <button
+              key={x}
+              type="button"
+              className="lev-stop num"
+              aria-pressed={leverage === x}
+              // the last stop ends at the track's end rather than hanging past it
+              style={(x === maxLeverage ? { right: 0 } : { left: `${levToPos(x, maxLeverage)}%`, "--at": levToPos(x, maxLeverage) / 100 }) as React.CSSProperties}
+              data-end={x === maxLeverage || undefined}
+              onClick={() => setLeverage(x)}
+            >
+              {x}×
             </button>
-          </div>
-        )}
-        {why && (
-          <p className="label mt-1.5">
-            If this trade loses, you get an Extra Life that can pay back up to ${fmtUsdc(lifeUpTo, 0)} from house profit, plus up to{" "}
-            {oneupUpTo.toLocaleString("en-US")} $1UP locked for 2 years, both sized from what the house makes this round, and a jackpot
-            ticket for each $1 lost.
-          </p>
-        )}
+          ))}
+        </div>
       </div>
 
       <TriggerFields side={side} entry={price} margin={m} leverage={leverage} liq={liq} tp={t.tp} setTp={t.setTp} sl={t.sl} setSl={t.setSl} />
@@ -709,7 +709,7 @@ function OrderForm({ t }: { t: Ticket }) {
       {topUp > wallet && <p className="text-sm text-[var(--short)]">Not enough USDC in your wallet. Get some from the faucet in the Demo menu.</p>}
 
       <button
-        className="btn btn-big mb-1"
+        className="btn btn-big"
         style={{ "--btn-bg": side === "Long" ? "var(--long-fill)" : "var(--short-fill)", color: "var(--on-fill)" } as React.CSSProperties}
         disabled={blocked}
         onClick={t.submit}
@@ -717,24 +717,80 @@ function OrderForm({ t }: { t: Ticket }) {
         {!blocked && <Icon name={side === "Long" ? "up" : "down"} size={20} />}
         {t.label}
       </button>
-      <div className="label -mt-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        {t.intentStep ? (
-          <span className="flex items-center gap-2" role="status">
-            <Icon name="spinner" /> {t.intentStep}
-          </span>
-        ) : t.viaAsset ? (
-          <span>Via NEAR Intents: a solver swaps your {t.viaAsset.symbol} for USDC. The bridge is simulated on this local chain.</span>
-        ) : (
-          <span>Fills at the next oracle price. No fees.</span>
-        )}
+      {t.intentStep && (
+        <span className="label flex items-center gap-2" role="status">
+          <Icon name="spinner" /> {t.intentStep}
+        </span>
+      )}
+
+      {/* what the order would do, as a terminal lists it */}
+      <dl className="num flex flex-col gap-1.5 border-t border-[var(--line)] pt-3 text-sm">
+        <div className="ticket-row">
+          <dt className="label">Liquidation price</dt>
+          <dd className="font-bold">
+            {liq ? fmtPrice(liq) : "…"}
+            {liq && price && (
+              <span className="font-normal" style={{ color: hot ? "var(--short)" : "var(--muted)" }}>
+                {" "}
+                ({away(price, liq)})
+              </span>
+            )}
+          </dd>
+        </div>
+        <div className="ticket-row">
+          <dt className="label">Position size</dt>
+          <dd className="font-bold">${fmtUsdc(m * BigInt(leverage), 0)}</dd>
+        </div>
+        <div className="ticket-row">
+          <dt className="label">You risk</dt>
+          <dd className="font-bold">${fmtUsdc(m, 0)}</dd>
+        </div>
+        <div className="ticket-row">
+          <dt className="label">Max win</dt>
+          <dd className="font-bold" style={{ color: "var(--long)" }}>
+            ${fmtUsdc(maxLiability(m), 0)}
+          </dd>
+        </div>
+        <div className="ticket-row">
+          <dt className="label">Winner&apos;s cut</dt>
+          <dd className="font-bold">{quote ? `${(Number(quote.cut_ppm) / 1e4).toFixed(1)}%` : "…"}</dd>
+        </div>
+        <div className="ticket-row">
+          <dt className="label">Fees</dt>
+          <dd className="font-bold">None</dd>
+        </div>
+      </dl>
+
+      {/* the promise, where the decision is made */}
+      {m > 0n && (
+        <div className="extra-life-note text-sm">
+          <div className="flex items-center gap-2">
+            <PixelHeart size={18} className="shrink-0" />
+            <span className="min-w-0 flex-1">
+              Lose it and get an Extra Life up to <b className="num">${fmtUsdc(lifeUpTo, 0)}</b> plus <b className="num">{oneupUpTo.toLocaleString("en-US")} $1UP</b>
+            </span>
+            <button type="button" className="label shrink-0 underline decoration-dotted underline-offset-2" aria-expanded={why} onClick={() => setWhy(!why)}>
+              {why ? "Hide" : "How"}
+            </button>
+          </div>
+          {why && (
+            <p className="label mt-1.5">
+              If this trade loses, you get an Extra Life that can pay back up to ${fmtUsdc(lifeUpTo, 0)} from house profit, plus up to{" "}
+              {oneupUpTo.toLocaleString("en-US")} $1UP locked for 2 years, both sized from what the house makes this round, and a jackpot
+              ticket for each $1 lost.
+            </p>
+          )}
+        </div>
+      )}
+
+      <div className="label flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <span>{t.viaAsset ? `Via NEAR Intents: a solver swaps your ${t.viaAsset.symbol} for USDC. Simulated on this local chain.` : "Fills at the next oracle price."}</span>
         {d.intents && !showPayWith && (
           <button type="button" className="underline decoration-dotted underline-offset-2 hover:text-[var(--text)]" onClick={() => setPayWith(true)}>
             Pay from another chain
           </button>
         )}
       </div>
-
-
     </div>
   );
 }
@@ -984,15 +1040,28 @@ function TriggerFields(props: {
 }) {
   const { side, entry, margin, leverage, liq, tp, setTp, sl, setSl } = props;
   const [open, setOpen] = useState(false);
-  if (!open && !tp && !sl) {
-    return (
-      <button type="button" className="chip self-start" onClick={() => setOpen(true)}>
-        + Take profit / stop loss
-      </button>
-    );
-  }
+  const on = open || !!tp || !!sl;
+  const toggle = (
+    <label className="flex cursor-pointer items-center gap-2 text-sm font-bold">
+      <input
+        type="checkbox"
+        className="check"
+        checked={on}
+        onChange={(e) => {
+          setOpen(e.target.checked);
+          if (!e.target.checked) {
+            setTp("");
+            setSl("");
+          }
+        }}
+      />
+      Take profit / stop loss
+    </label>
+  );
+  if (!on) return toggle;
   return (
     <div className="flex flex-col gap-2">
+      {toggle}
       <div className="grid grid-cols-2 gap-2">
         <TriggerInput label="Take profit" value={tp} set={setTp} hint={hint(side, entry, margin, leverage, tp, "tp", liq)} slider={{ side, entry, leverage, kind: "tp" }} />
         <TriggerInput label="Stop loss" value={sl} set={setSl} hint={hint(side, entry, margin, leverage, sl, "sl", liq)} slider={{ side, entry, leverage, kind: "sl" }} />
@@ -1050,7 +1119,7 @@ function TriggerInput(props: { label: string; value: string; set: (x: string) =>
       {slider && (
         <input
           type="range"
-          className="slider"
+          className="slider slider-steps"
           min={0}
           max={100}
           step={0.5}
