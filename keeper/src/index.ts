@@ -153,12 +153,14 @@ async function handleTreasury() {
   const deployed = BigInt(t.deployed);
   const allowed = BigInt(t.deployable);
   const step = 1_000n * USDC; // not worth a transaction below this
+  // aim for 80% of the limit, so new trades don't force a recall every few seconds
+  const target = (allowed * 8n) / 10n;
   if (deployed > allowed) {
-    await keeper.recall(deployed - allowed);
-    log(`treasury: recalled ${fmt((deployed - allowed).toString())} (more must be on hand)`);
-  } else if (allowed - deployed >= step) {
-    await keeper.deployToVault(allowed - deployed);
-    log(`treasury: deployed ${fmt((allowed - deployed).toString())} to the vault`);
+    await keeper.recall(deployed - target);
+    log(`treasury: recalled ${fmt((deployed - target).toString())} (more must be on hand)`);
+  } else if (target > deployed && target - deployed >= step) {
+    await keeper.deployToVault(target - deployed);
+    log(`treasury: deployed ${fmt((target - deployed).toString())} to the vault`);
   }
   if (Date.now() - lastHarvest > 60_000) {
     lastHarvest = Date.now();
