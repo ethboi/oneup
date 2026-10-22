@@ -67,7 +67,8 @@ export default function Home() {
           </button>
         </div>
       </div>
-      <div className="mx-auto max-w-[1280px] px-4 pb-24 lg:pb-16">
+      {/* the header spans the window; Trade uses all of it, the reading tabs keep a column */}
+      <div className="px-4 pb-24 lg:px-6 lg:pb-16">
         <Header
           tabs={TABS.map((t) => ({
             name: t,
@@ -78,19 +79,21 @@ export default function Home() {
           tab={tab}
           go={(t) => go(t as Tab)}
         />
-        {/* the three-step intro belongs on the trading screen, not every page */}
-        {tab === "Trade" && <Onboarding />}
-        {tab === "Trade" && <Trade />}
-        {tab === "Extra Lives" && <Lives />}
-        {tab === "Locks" && <Locks />}
-        {tab === "Market" && <Market />}
-        {tab === "Leaders" && <Leaderboard />}
-        {tab === "Backing" && <BackPage go={(t) => go(t as Tab)} />}
-        {tab === "$1UP" && <Tokenomics />}
-        {tab === "Solvency" && <Solvency />}
-        {tab === "Fairness" && <Fairness />}
-        {tab === "About" && <About />}
-        <Footer go={go} />
+        <div className={tab === "Trade" ? undefined : "mx-auto max-w-[1280px]"}>
+          {/* the three-step intro belongs on the trading screen, not every page */}
+          {tab === "Trade" && <Onboarding />}
+          {tab === "Trade" && <Trade />}
+          {tab === "Extra Lives" && <Lives />}
+          {tab === "Locks" && <Locks />}
+          {tab === "Market" && <Market />}
+          {tab === "Leaders" && <Leaderboard />}
+          {tab === "Backing" && <BackPage go={(t) => go(t as Tab)} />}
+          {tab === "$1UP" && <Tokenomics />}
+          {tab === "Solvency" && <Solvency />}
+          {tab === "Fairness" && <Fairness />}
+          {tab === "About" && <About />}
+          <Footer go={go} />
+        </div>
       </div>
 
       {/* phones: a bottom tab bar */}

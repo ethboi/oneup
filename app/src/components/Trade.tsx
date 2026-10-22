@@ -326,7 +326,7 @@ export function Trade() {
     // Phones: one column in the order banner, chart, order form, then positions and activity (the left column
     // dissolves via `contents` and `order` interleaves them), with a trade bar while the form is out of view.
     // Desktop: chart over positions and activity on the left, the form on the right.
-    <div className="flex flex-col gap-4 pb-24 lg:grid lg:grid-cols-[1fr_340px] lg:items-start lg:pb-0">
+    <div className="flex flex-col gap-4 pb-24 lg:grid lg:grid-cols-[1fr_340px] lg:items-start lg:pb-0 2xl:grid-cols-[1fr_380px]">
       <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
         <div className="order-1 empty:hidden">
           <LossBanner />
@@ -510,6 +510,7 @@ function Console({
         </div>
         <div className="relative">
           <PriceChart
+            fill
             points={pts}
             span={range}
             candles={style === "candles"}

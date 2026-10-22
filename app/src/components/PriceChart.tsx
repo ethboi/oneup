@@ -6,7 +6,7 @@
 // Drawn at the container's real width with a crosshair readout that follows a mouse or a finger. The time
 // axis slides with the clock and each new price eases in, so the line moves steadily between oracle updates.
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useWidth } from "@/lib/useWidth";
 
 export interface Mark {
@@ -108,8 +108,12 @@ const ago = (ms: number) => (ms >= 60_000 ? `−${ms / 60_000}m` : `−${ms / 10
 const MIN_SPAN = 0.001;
 /** Marks this close to the price (0.5%) always join the scale. */
 const NEAR_MARK = 0.005;
-/** Label spacing on the right edge, in px. */
-const GAP = 15;
+/** Tag spacing on the price axis, in px (a tag is 18px tall). */
+const GAP = 19;
+/** Spacing of the mark names inside the plot, in px. */
+const NAME_GAP = 13;
+/** Where the axis's text starts, past the slot for the tick's arrow. */
+const AXIS_TEXT = 22;
 
 /** Moves sorted label positions apart by at least `gap`, keeping them inside [top, bottom]. */
 function spread(ys: number[], gap: number, top: number, bottom: number) {
@@ -119,6 +123,28 @@ function spread(ys: number[], gap: number, top: number, bottom: number) {
   for (let i = out.length - 2; i >= 0; i--) out[i] = Math.min(out[i], out[i + 1] - gap);
   if (out.length && out[0] < top) for (let i = 0; i < out.length; i++) out[i] = Math.max(out[i], top + i * gap);
   return out;
+}
+
+/** How tall the chart can be to end this far above the window's bottom: the bezel under it and a peek of the
+ *  positions' tabs. Measured from the page top, so scrolling doesn't change it. */
+const FILL_BELOW = 120;
+const FILL_MAX = 1000;
+function useFillHeight(el: HTMLElement | null) {
+  const [h, setH] = useState<number | null>(null);
+  useEffect(() => {
+    if (!el) return;
+    const measure = () => setH(Math.min(FILL_MAX, Math.round(window.innerHeight - (el.getBoundingClientRect().top + window.scrollY) - FILL_BELOW)));
+    measure();
+    window.addEventListener("resize", measure);
+    // the onboarding intro above can close, moving the chart up
+    const ro = new ResizeObserver(measure);
+    ro.observe(document.body);
+    return () => {
+      window.removeEventListener("resize", measure);
+      ro.disconnect();
+    };
+  }, [el]);
+  return h;
 }
 
 /**
@@ -133,7 +159,10 @@ export function PriceChart({
   gauge,
   span,
   candles: asCandles,
+  fill,
 }: {
+  /** On a desktop, grow to fill the window's height (keeping room for the positions' tabs below). */
+  fill?: boolean;
   points: { t: number; p: number }[];
   /** The window shown, in ms, ending now: the time axis stays put while the line scrolls through it. */
   span?: number;
@@ -144,15 +173,15 @@ export function PriceChart({
   readout?: React.ReactNode;
   gauge?: React.ReactNode;
 }) {
-  const [ref, W] = useWidth();
+  const [widthRef, W] = useWidth();
+  const [el, setEl] = useState<HTMLDivElement | null>(null);
+  const ref = useCallback((n: HTMLDivElement | null) => (widthRef(n), setEl(n)), [widthRef]);
+  const tall = useFillHeight(fill ? el : null);
   // the chart details one position; the others only show where they came in
   const marks = allMarks.filter((m) => !m.faint);
   const faint = allMarks.filter((m) => m.faint);
   const narrow = W < 480;
-  const H = narrow ? 300 : 420;
-  // room at the top for the readout, at the bottom for the time axis
-  // the right edge holds the price tag, plus the mark labels when a position is shown
-  const PAD = { l: 10, r: narrow ? 92 : marks.length ? 160 : 104, t: narrow && gauge ? 58 : 36, b: 22 };
+  const H = narrow ? 300 : Math.max(420, tall ?? 0);
   const [hover, setHover] = useState<number | null>(null);
   const now = useClock();
 
@@ -196,6 +225,12 @@ export function PriceChart({
   const pad = (hi - lo) * 0.12;
   lo -= pad;
   hi += pad;
+  // cents on BTC and ETH too: a $0.80 move matters at 50×
+  const digits = last.p < 10 ? 4 : 2;
+  // room at the top for the readout, at the bottom for the time axis, and on the right for the price axis: as
+  // wide as its longest price, about 7.6px a character at 13px, past the arrow's slot
+  const chars = Math.max(...[hi, lo, ...marks.map((m) => m.price)].map((v) => v.toFixed(digits).length));
+  const PAD = { l: 10, r: Math.ceil(chars * 7.6 + AXIS_TEXT + 10), t: narrow && gauge ? 58 : 36, b: 22 };
 
   // the newest price eases in from the one before; the line then holds it out to the present
   const k = now === null ? 1 : Math.min(1, Math.max(0, (now - last.t) / EASE_MS));
@@ -211,8 +246,6 @@ export function PriceChart({
       .slice(0, -1)
       .map((pt, i) => `${i ? "L" : "M"}${x(pt.t).toFixed(1)} ${y(pt.p).toFixed(1)}`)
       .join(" ") + ` L${x(last.t).toFixed(1)} ${y(headP).toFixed(1)} L${x(t1).toFixed(1)} ${y(headP).toFixed(1)}`;
-  // cents on BTC and ETH too: a $0.80 move matters at 50×
-  const digits = last.p < 10 ? 4 : 2;
   // a fresh tick: which way it went, shown on the price tag for a moment
   const fresh = now !== null && now - last.t < TICK_MS && last.p !== prev.p;
   const tickUp = last.p > prev.p;
@@ -233,24 +266,36 @@ export function PriceChart({
     return "";
   };
 
-  // right-edge labels: the price first, then each mark, nudged apart so none overlap
+  // tags on the price axis: the price filled, each mark outlined, nudged apart so none overlap. A mark off the
+  // scale waits at the top or bottom with an arrow in the tag's arrow slot.
   const labels = [
-    { key: "head", y: y(headP), text: last.p.toFixed(digits), head: true, kind: undefined as Mark["kind"] | undefined },
+    { key: "head", y: y(headP), text: last.p.toFixed(digits), head: true, edge: null as "up" | "down" | null, kind: undefined as Mark["kind"] | undefined },
     ...shown.map(({ m, edge }) => ({
       key: m.label,
       y: edge === "up" ? PAD.t : edge === "down" ? plotB : y(m.price),
-      text: `${edge === "up" ? "▲ " : edge === "down" ? "▼ " : ""}${name(m)}${narrow ? "" : ` ${m.price.toFixed(digits)}`}${away(m)}`,
+      text: m.price.toFixed(digits),
       head: false,
+      edge,
       kind: m.kind,
     })),
   ].sort((a, b) => a.y - b.y);
-  const placed = spread(labels.map((l) => l.y), GAP, PAD.t + 4, plotB - 2);
+  const placed = spread(labels.map((l) => l.y), GAP, PAD.t + 4, plotB - 9);
+  // each mark's name sits inside the plot on the left, just above its line (the price is on its tag)
+  const names = shown
+    .map(({ m, edge }) => ({
+      key: m.label,
+      y: edge === "up" ? PAD.t + 12 : edge === "down" ? plotB - 6 : y(m.price) - 5,
+      text: `${edge === "up" ? "▲ " : edge === "down" ? "▼ " : ""}${name(m)}${away(m)}`,
+      kind: m.kind,
+    }))
+    .sort((a, b) => a.y - b.y);
+  const namesAt = spread(names.map((n) => n.y), NAME_GAP, PAD.t + 12, plotB - 4);
 
-  // price grid at round numbers; a label that would sit on a mark or the price is left off
-  const step = niceStep(hi - lo, narrow ? 3 : 4);
+  // price levels at round numbers on the axis; one that would sit under a tag is left off
+  const step = niceStep(hi - lo, narrow ? 4 : 6);
   const ticks: number[] = [];
   for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) ticks.push(v);
-  const busy = [y(headP), ...shown.filter((s) => !s.edge).map((s) => y(s.m.price))];
+  const busy = h ? [...placed, y(h.p)] : placed;
 
   // the focused position's shading fills between the price line and its entry, from when it opened: green on
   // the profit side, deepening toward the take-profit (or the 9× cap), red on the loss side, deepening toward the
@@ -321,14 +366,16 @@ export function PriceChart({
         {ticks.map((v) => (
           <g key={v}>
             <line x1={PAD.l} x2={plotR} y1={y(v)} y2={y(v)} stroke="var(--lcd-2)" strokeWidth="1" opacity="0.6" />
-            {/* on the left, so they never collide with the price and the mark labels on the right */}
-            {busy.every((b) => Math.abs(b - y(v)) > 11) && y(v) - PAD.t > 12 && (
-              <text x={PAD.l + 4} y={y(v) - 4} fontSize="10" fill="var(--lcd-3)" className="num">
-                {v.toFixed(tickDigits)}
+            <line x1={plotR} x2={plotR + 4} y1={y(v)} y2={y(v)} stroke="var(--lcd-3)" strokeWidth="1" />
+            {busy.every((b) => Math.abs(b - y(v)) > 13) && y(v) >= PAD.t + 6 && y(v) <= plotB - 6 && (
+              <text x={plotR + AXIS_TEXT} y={y(v) + 4} fontSize="11" fill="var(--lcd-3)" className="num">
+                {v.toFixed(Math.max(tickDigits, digits))}
               </text>
             )}
           </g>
         ))}
+        {/* the price axis: its own column on the right, as on a trading screen */}
+        <line x1={plotR} x2={plotR} y1={PAD.t - 6} y2={plotB} stroke="var(--lcd-3)" strokeWidth="1" opacity="0.6" />
         {/* time axis: how long ago, with the present at the head */}
         <line x1={PAD.l} x2={plotR} y1={plotB} y2={plotB} stroke="var(--lcd-3)" strokeWidth="1" opacity="0.6" />
         {times.map((a) => (
@@ -401,7 +448,7 @@ export function PriceChart({
               key={m.label}
               className={alarm && m.kind === "liq" ? "blink" : undefined}
               x1={PAD.l}
-              x2={plotR}
+              x2={plotR + 4}
               y1={y(m.price)}
               y2={y(m.price)}
               stroke={m.kind === "liq" ? "var(--lcd-ink)" : "var(--lcd-3)"}
@@ -425,6 +472,23 @@ export function PriceChart({
           .map((m) => (
             <line key={m.label} x1={PAD.l} x2={plotR} y1={y(m.price)} y2={y(m.price)} stroke="var(--lcd-3)" strokeWidth="1" strokeDasharray={DASH.entry} opacity="0.45" />
           ))}
+        {/* mark names, haloed in the screen's colour so they read over the line */}
+        {names.map((n, i) => (
+          <text
+            key={n.key}
+            className={`num ${alarm && n.kind === "liq" ? "blink" : ""}`}
+            x={PAD.l + 4}
+            y={namesAt[i]}
+            fontSize="11"
+            fontWeight={alarm && n.kind === "liq" ? 800 : 700}
+            fill="var(--lcd-ink)"
+            stroke="var(--lcd)"
+            strokeWidth="3"
+            paintOrder="stroke"
+          >
+            {n.text}
+          </text>
+        ))}
         {/* the present price, ruled across so it reads against the marks */}
         <line x1={x(t1)} x2={plotR + 2} y1={y(headP)} y2={y(headP)} stroke="var(--lcd-ink)" strokeWidth="1" />
         {/* keyed by the tick, so each new price pops the marker */}
@@ -444,7 +508,7 @@ export function PriceChart({
                   className={fresh ? "tick-tag" : undefined}
                   x={plotR + 4}
                   y={placed[i] - 9}
-                  width={Math.min(PAD.r - 2, l.text.length * 7.6 + 24)}
+                  width={PAD.r - 6}
                   height="18"
                   rx="2"
                   fill="var(--lcd-ink)"
@@ -459,16 +523,31 @@ export function PriceChart({
                 </text>
               </>
             ) : (
-              <text x={plotR + 6} y={placed[i] + 4} fontSize="11" fontWeight={alarm && l.kind === "liq" ? 800 : undefined} fill="var(--lcd-ink)" className="num">
-                {l.text}
-              </text>
+              <>
+                {/* a mark's price, outlined so it's never taken for the price itself */}
+                <rect x={plotR + 4} y={placed[i] - 8} width={PAD.r - 6} height="16" rx="2" fill="var(--lcd)" stroke="var(--lcd-ink)" strokeWidth="1.5" />
+                {l.edge && (
+                  <text x={plotR + 9} y={placed[i] + 4} fontSize="10" fill="var(--lcd-ink)">
+                    {l.edge === "up" ? "▲" : "▼"}
+                  </text>
+                )}
+                <text x={plotR + AXIS_TEXT} y={placed[i] + 4} fontSize="11" fontWeight={alarm && l.kind === "liq" ? 800 : 700} fill="var(--lcd-ink)" className="num">
+                  {l.text}
+                </text>
+              </>
             )}
           </g>
         ))}
         {h && (
           <g pointerEvents="none">
             <line x1={x(h.t)} x2={x(h.t)} y1={PAD.t} y2={plotB} stroke="var(--lcd-3)" strokeDasharray="2 3" />
+            <line x1={x(h.t)} x2={plotR + 4} y1={y(h.p)} y2={y(h.p)} stroke="var(--lcd-3)" strokeDasharray="2 3" />
             <rect x={x(h.t) - 5} y={y(h.p) - 5} width="10" height="10" fill="var(--lcd)" stroke="var(--lcd-ink)" strokeWidth="2" />
+            {/* the hovered price on the axis too */}
+            <rect x={plotR + 4} y={y(h.p) - 8} width={PAD.r - 6} height="16" rx="2" fill="var(--lcd-3)" />
+            <text x={plotR + AXIS_TEXT} y={y(h.p) + 4} fontSize="11" fontWeight="700" fill="var(--lcd)" className="num">
+              {h.p.toFixed(digits)}
+            </text>
           </g>
         )}
       </svg>
