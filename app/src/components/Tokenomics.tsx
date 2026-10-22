@@ -49,23 +49,35 @@ export function Tokenomics() {
   const backersUsed = round ? 7_500_000n * ONEUP - BigInt(round.oneup_left) : 0n;
   const perRound = EMISSIONS_TOTAL / EMISSION_EPOCHS;
   const last = (history ?? []).slice(-24);
-  const top = last.reduce((m, x) => (BigInt(x!.scheduled) > m ? BigInt(x!.scheduled) : m), perRound);
+  // scaled to the biggest release: the schedule's ceiling dwarfs what a small house releases
+  const top = last.reduce((m, x) => (BigInt(x!.released) > m ? BigInt(x!.released) : m), 1n);
 
   return (
     <div className="flex flex-col gap-5">
       <section className="case relative overflow-hidden p-5 sm:p-8">
-        <p className="label">Tokenomics</p>
-        <h1 className="display mt-2 text-3xl leading-tight sm:text-4xl">$1UP: earned by losing</h1>
-        <p className="mt-3 max-w-2xl text-[var(--muted)]">
-          A fixed billion, minted once. Nine in ten go to the people who lose trades, released only as fast as the house actually
-          makes money, and always locked for two years. Locks earn the house&apos;s buybacks. No team or investor allocation.
-        </p>
-        <dl className="num mt-5 grid max-w-3xl grid-cols-2 gap-4 sm:grid-cols-4">
-          <Stat label="Price" value={px > 0n ? `$${(Number(px) / 1e6).toFixed(4)}` : "…"} />
-          <Stat label="Supply" value="1,000,000,000" />
-          <Stat label="Released to losers" value={history ? fmtOneup(released.toString()) : "…"} />
-          <Stat label="Bought back" value={buybacks === undefined ? "…" : `$${fmtUsdc(buybacks, 0)}`} />
-        </dl>
+        <div className="flex items-center gap-8">
+          <div className="min-w-0 flex-1">
+          <p className="label">Tokenomics</p>
+          <h1 className="display mt-2 text-3xl leading-tight sm:text-4xl">$1UP: earned by losing</h1>
+          <p className="mt-3 max-w-2xl text-[var(--muted)]">
+            A fixed billion, minted once. Nine in ten go to the people who lose trades, released only as fast as the house actually
+            makes money, and always locked for two years. Locks earn the house&apos;s buybacks. No team or investor allocation.
+          </p>
+          <dl className="num mt-5 grid max-w-3xl grid-cols-2 gap-4 sm:grid-cols-4">
+            <Stat label="Price" value={px > 0n ? `$${(Number(px) / 1e6).toFixed(4)}` : "…"} />
+            <Stat label="Supply" value="1,000,000,000" />
+            <Stat label="Released to losers" value={history ? fmtOneup(released.toString()) : "…"} />
+            <Stat label="Bought back" value={buybacks === undefined ? "…" : `$${fmtUsdc(buybacks, 0)}`} />
+          </dl>
+          </div>
+          {/* the console's screen, as on About */}
+          <div className="bezel hidden shrink-0 p-4 md:block" aria-hidden>
+            <div className="lcd flex h-36 w-52 flex-col items-center justify-center gap-2">
+              <PixelLock size={56} />
+              <span className="display text-lg text-[var(--lcd-ink)]">$1UP LOCK</span>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section className="panel p-5">
@@ -122,18 +134,23 @@ export function Tokenomics() {
 
       <section className="panel p-5">
         <h2 className="text-lg font-extrabold">Released, round by round</h2>
-        <p className="label mt-1">Each bar is a round&apos;s schedule; the filled part is what house profit released to its losers.</p>
+        <p className="label mt-1">
+          What house profit released to each round&apos;s losers. The schedule allows up to {fmtOneup(perRound.toString())} a round; the rest
+          carries forward.
+        </p>
         {last.length === 0 ? (
           <p className="label mt-3">No rounds have closed yet.</p>
         ) : (
-          <div className="mt-4 flex h-32 items-end gap-1" role="img" aria-label="$1UP released per round against the schedule">
+          <div className="mt-4 flex h-40 items-end gap-1.5" role="img" aria-label="$1UP released per round against the schedule">
             {last.map((x) => {
-              const sched = BigInt(x!.scheduled) + 0n;
               const rel = BigInt(x!.released);
               return (
-                <div key={x!.epoch} className="relative flex h-full flex-1 items-end" title={`Round ${x!.epoch}: ${fmtOneup(x!.released)} of ${fmtOneup(x!.scheduled)} released`}>
-                  <div className="absolute bottom-0 w-full rounded-t-[3px] bg-[var(--panel-2)]" style={{ height: `${(Number(sched) / Number(top)) * 100}%` }} />
-                  <div className="absolute bottom-0 w-full rounded-t-[3px] bg-[var(--heart)]" style={{ height: `${Math.min(100, (Number(rel) / Number(top)) * 100)}%` }} />
+                <div key={x!.epoch} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1" title={`Round ${x!.epoch}: ${fmtOneup(x!.released)} of ${fmtOneup(x!.scheduled)} released`}>
+                  <span className="label num truncate text-[11px]">{fmtOneup(x!.released)}</span>
+                  <div className="flex min-h-0 w-full flex-1 items-end">
+                    <div className="w-full rounded-t-[4px] bg-[var(--heart)]" style={{ height: `${Math.max(2, (Number(rel) / Number(top)) * 100)}%` }} />
+                  </div>
+                  <span className="label num text-[11px]">{x!.epoch}</span>
                 </div>
               );
             })}

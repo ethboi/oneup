@@ -597,7 +597,7 @@ function OrderForm({ t }: { t: Ticket }) {
           <input className="input num" value={margin} onChange={(e) => setMargin(e.target.value)} inputMode="decimal" aria-label="Margin" />
           <span className="field-unit">USDC</span>
         </span>
-        <span className="chip-track" role="group" aria-label="Margin presets">
+        <span className="chip-track mt-1" role="group" aria-label="Margin presets">
           {[50, 100, 500]
             .filter((x) => BigInt(x) * USDC <= free + wallet)
             .map((x) => (
@@ -655,7 +655,7 @@ function OrderForm({ t }: { t: Ticket }) {
           onChange={(e) => setLeverage(Number(e.target.value))}
           style={{ "--fill": `${((leverage - 1) / Math.max(1, maxLeverage - 1)) * 100}%` } as React.CSSProperties}
         />
-        <span className="chip-track" role="group" aria-label="Leverage presets">
+        <span className="chip-track mt-1" role="group" aria-label="Leverage presets">
           {[2, 5, 10, 25, 50, 100]
             .filter((x) => x <= maxLeverage)
             .map((x) => (
@@ -670,7 +670,7 @@ function OrderForm({ t }: { t: Ticket }) {
       </label>
 
       {/* what's at stake first, the details under it */}
-      <div className="num flex flex-col gap-1 rounded-xl bg-[var(--panel-2)] px-3 py-2.5">
+      <div className="num flex flex-col rounded-xl bg-[var(--panel-2)] px-3 py-2.5">
         <div className="flex items-baseline justify-between gap-2">
           <span>
             You risk <b>${fmtUsdc(m, 0)}</b>
@@ -679,11 +679,23 @@ function OrderForm({ t }: { t: Ticket }) {
             win up to <b style={{ color: "var(--long)" }}>${fmtUsdc(maxLiability(m), 0)}</b>
           </span>
         </div>
-        <div className="label flex flex-wrap gap-x-3">
-          <span>Liq {liq ? fmtPrice(liq) : "…"}{liq && price ? ` (${away(price, liq)} away)` : ""}</span>
-          <span>Cut {quote ? `${(Number(quote.cut_ppm) / 1e4).toFixed(1)}%` : "…"}</span>
-          <span>Size ${fmtUsdc(m * BigInt(leverage), 0)}</span>
-        </div>
+        <dl className="mt-1.5 grid grid-cols-3 gap-2 border-t border-[var(--line)] pt-2 text-sm">
+          <div className="min-w-0">
+            <dt className="label">Liquidation</dt>
+            <dd className="truncate font-bold">
+              {liq ? fmtPrice(liq) : "…"}
+              {liq && price && <span className="label font-normal"> {away(price, liq)}</span>}
+            </dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="label">Winner&apos;s cut</dt>
+            <dd className="font-bold">{quote ? `${(Number(quote.cut_ppm) / 1e4).toFixed(1)}%` : "…"}</dd>
+          </div>
+          <div className="min-w-0 text-right">
+            <dt className="label">Size</dt>
+            <dd className="font-bold">${fmtUsdc(m * BigInt(leverage), 0)}</dd>
+          </div>
+        </dl>
       </div>
 
       <TriggerFields side={side} entry={price} margin={m} leverage={leverage} liq={liq} tp={t.tp} setTp={t.setTp} sl={t.sl} setSl={t.setSl} />
@@ -854,11 +866,11 @@ function Positions({ positions, orders, focused, pick }: { positions: Position[]
           <thead>
             <tr className="label text-left">
               <th className="pb-2 font-normal">Market</th>
-              <th className="pb-2 font-normal">Size</th>
-              <th className="pb-2 font-normal">Entry</th>
-              <th className="pb-2 font-normal">Mark</th>
-              <th className="pb-2 font-normal">Liq.</th>
-              <th className="pb-2 font-normal">TP / SL</th>
+              <th className="pb-2 pr-4 text-right font-normal">Size</th>
+              <th className="pb-2 pr-4 text-right font-normal">Entry</th>
+              <th className="pb-2 pr-4 text-right font-normal">Mark</th>
+              <th className="pb-2 pr-4 text-right font-normal">Liq.</th>
+              <th className="pb-2 pl-2 font-normal">TP / SL</th>
               <th className="pb-2 text-right font-normal">PnL</th>
               <th />
             </tr>
@@ -874,22 +886,21 @@ function Positions({ positions, orders, focused, pick }: { positions: Position[]
                 <td className="py-2.5 pl-1">
                   <ChartPick p={p} on={p.id === focused} pick={pick} />
                 </td>
-                <td>${fmtUsdc(BigInt(p.margin) * BigInt(p.leverage), 0)}</td>
-                <td>{fmtPrice(BigInt(p.entry_price))}</td>
-                <td>{mark ? fmtPrice(mark) : "…"}</td>
-                <td>
+                <td className="pr-4 text-right">${fmtUsdc(BigInt(p.margin) * BigInt(p.leverage), 0)}</td>
+                <td className="pr-4 text-right">{fmtPrice(BigInt(p.entry_price))}</td>
+                <td className="pr-4 text-right">{mark ? fmtPrice(mark) : "…"}</td>
+                <td className="py-2 pr-4 text-right">
                   {fmtPrice(liquidationPrice(p.side, BigInt(p.entry_price), p.leverage))}
                   {mark && <span className="label block">{away(mark, liquidationPrice(p.side, BigInt(p.entry_price), p.leverage))} away</span>}
                 </td>
-                <td>
+                <td className="pl-2">
                   <span className="flex items-center gap-1">
                     <TriggerSummary p={p} />
                     <EditTriggers key={JSON.stringify(p.triggers)} p={p} />
                   </span>
                 </td>
-                <td className="text-right" style={{ color: v >= 0n ? "var(--long)" : "var(--short)" }}>
-                  {v >= 0n ? "+" : ""}
-                  {fmtUsdc(v)}
+                <td className="text-right font-bold" style={{ color: v >= 0n ? "var(--long)" : "var(--short)" }}>
+                  {v >= 0n ? "+" : "−"}${fmtUsdc(v >= 0n ? v : -v)}
                 </td>
                 <td className="pl-3 text-right">
                   <span className="inline-flex gap-2">

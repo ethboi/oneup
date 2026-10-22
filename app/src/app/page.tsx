@@ -129,7 +129,7 @@ export default function Home() {
 
 /** What OneUp is and where to read more, under every tab. */
 function Footer({ go }: { go: (t: Tab) => void }) {
-  const link = "font-bold text-[var(--text)] underline decoration-dotted underline-offset-2";
+  const link = "font-semibold text-[var(--muted)] underline-offset-2 transition-colors hover:text-[var(--text)] hover:underline";
   return (
     <footer className="mt-10 border-t border-[var(--line)] pt-6 text-sm">
       <div className="grid gap-6 sm:grid-cols-[1.4fr_1fr_1fr]">
@@ -143,7 +143,7 @@ function Footer({ go }: { go: (t: Tab) => void }) {
           </div>
         </div>
         <div>
-          <b className="block">Read more</b>
+          <b className="block text-[var(--text)]">Read more</b>
           <ul className="label mt-1.5 flex flex-col gap-1">
             <li>
               <button type="button" className={link} onClick={() => go("About")}>

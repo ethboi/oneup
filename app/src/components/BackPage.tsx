@@ -49,38 +49,49 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
   return (
     <div className="flex flex-col gap-5">
       <section className="case relative overflow-hidden p-5 sm:p-8">
-        <p className="label">The bootstrap round</p>
-        <h1 className="display mt-2 text-3xl leading-tight sm:text-4xl">Back the house</h1>
-        <p className="mt-3 max-w-2xl text-[var(--muted)]">
-          The house can only take trades it could pay in full, so it needs a deep pool. Back it with USDC and you get a Backer Life
-          that pays you back from house profit, more the earlier you come in, plus $1UP locked for two years that earns the
-          house&apos;s buybacks.
-        </p>
-        <div className="mt-5 max-w-2xl">
-          <div className="num flex items-baseline justify-between text-sm">
-            <span>
-              <b>${fmtUsdc(backed, 0)}</b> <span className="label">of ${fmtUsdc(target, 0)} raised</span>
-            </span>
-            <span className="label">{pct.toFixed(1)}%</span>
+        <div className="flex items-center gap-8">
+          <div className="min-w-0 flex-1">
+          <p className="label">The bootstrap round</p>
+          <h1 className="display mt-2 text-3xl leading-tight sm:text-4xl">Back the house</h1>
+          <p className="mt-3 max-w-2xl text-[var(--muted)]">
+            The house can only take trades it could pay in full, so it needs a deep pool. Back it with USDC and you get a Backer Life
+            that pays you back from house profit, more the earlier you come in, plus $1UP locked for two years that earns the
+            house&apos;s buybacks.
+          </p>
+          <div className="mt-5 max-w-2xl">
+            <div className="num flex items-baseline justify-between text-sm">
+              <span>
+                <b>${fmtUsdc(backed, 0)}</b> <span className="label">of ${fmtUsdc(target, 0)} raised</span>
+              </span>
+              <span className="label">{pct.toFixed(1)}%</span>
+            </div>
+            <div className="mt-1.5">
+              <HealthBar value={pct / 100} segments={20} color="var(--primary)" label={`${pct.toFixed(1)}% of the round raised`} />
+            </div>
           </div>
-          <div className="mt-1.5">
-            <HealthBar value={pct / 100} segments={20} color="var(--primary)" label={`${pct.toFixed(1)}% of the round raised`} />
+          <dl className="num mt-5 grid max-w-2xl grid-cols-3 gap-4">
+            <div>
+              <dt className="label">Owed per $1 now</dt>
+              <dd className="text-xl font-extrabold">{capNow === null ? "…" : `${capNow.toFixed(2)}×`}</dd>
+            </div>
+            <div>
+              <dt className="label">$1UP per $1</dt>
+              <dd className="text-xl font-extrabold">{round ? fmtOneup(perDollar.toString()) : "…"}</dd>
+            </div>
+            <div>
+              <dt className="label">$1UP left for backers</dt>
+              <dd className="text-xl font-extrabold">{round ? fmtOneup(round.oneup_left) : "…"}</dd>
+            </div>
+          </dl>
+          </div>
+          {/* the console's screen, as on About */}
+          <div className="bezel hidden shrink-0 p-4 md:block" aria-hidden>
+            <div className="lcd flex h-36 w-52 flex-col items-center justify-center gap-2">
+              <PixelHeart size={64} />
+              <span className="display text-lg text-[var(--lcd-ink)]">BACKER LIFE</span>
+            </div>
           </div>
         </div>
-        <dl className="num mt-5 grid max-w-2xl grid-cols-3 gap-4">
-          <div>
-            <dt className="label">Owed per $1 now</dt>
-            <dd className="text-xl font-extrabold">{capNow === null ? "…" : `${capNow.toFixed(2)}×`}</dd>
-          </div>
-          <div>
-            <dt className="label">$1UP per $1</dt>
-            <dd className="text-xl font-extrabold">{round ? fmtOneup(perDollar.toString()) : "…"}</dd>
-          </div>
-          <div>
-            <dt className="label">$1UP left for backers</dt>
-            <dd className="text-xl font-extrabold">{round ? fmtOneup(round.oneup_left) : "…"}</dd>
-          </div>
-        </dl>
       </section>
 
       <div className="grid gap-4 md:grid-cols-3">

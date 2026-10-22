@@ -531,6 +531,22 @@ body {
     height: 18px;
     background: var(--line);
   }
+  /* the header's strip and tool buttons share one height */
+  .hdr-strip,
+  .hdr-tools > * > .btn {
+    height: 40px;
+    min-height: 40px;
+    padding-block: 0;
+  }
+  .hdr-strip {
+    border-color: var(--input-edge);
+  }
+  /* phones: tighter tool buttons, so the round clock keeps its room */
+  @media (max-width: 639px) {
+    .hdr-tools > * > .btn {
+      padding-inline: 10px;
+    }
+  }
   .bar-strip {
     overflow-x: auto;
     font-size: 13px;

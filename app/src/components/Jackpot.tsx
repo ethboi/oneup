@@ -34,30 +34,34 @@ export function Jackpot({ compact }: { compact?: boolean }) {
 
   return (
     <div className={`panel panel-jackpot ${compact ? "p-4" : "p-5"}`}>
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <PixelCoin size={22} />
-          <h2 className="font-extrabold">Jackpot</h2>
-        </div>
-        <span className="label num">
-          {left === null ? "…" : `draws in ${fmtDuration(left)}`}
-        </span>
+      <div className="flex items-center gap-2">
+        <PixelCoin size={22} />
+        <h2 className="font-extrabold">Jackpot</h2>
       </div>
-      <div className="mt-2 flex items-end justify-between gap-3">
+      <div className="mt-3 flex flex-wrap items-center gap-x-8 gap-y-4">
         <div className="bezel rounded-xl px-3 py-2">
           <div className="lcd rounded-lg px-3 py-2">
             <PixelAmount text={`$${fmtUsdc(pot, pot < 1_000n * USDC ? 2 : 0)}`} height={compact ? 30 : 40} />
           </div>
         </div>
-        <div className="num text-right text-sm">
+        <dl className="num grid flex-1 basis-full grid-cols-3 gap-4 sm:basis-auto sm:min-w-[320px]">
           <div>
-            <b>{fmtUsdc(myTickets, 0)}</b> <span className="label">tickets</span>
+            <dt className="label">Draws in</dt>
+            <dd className="text-xl font-extrabold">{left === null ? "…" : fmtDuration(left)}</dd>
           </div>
-          <div className="label">{myTickets > 0n ? `${odds.toFixed(odds < 1 ? 2 : 1)}% chance` : "lose a trade to get some"}</div>
-        </div>
+          <div>
+            <dt className="label">Your tickets</dt>
+            <dd className="text-xl font-extrabold">{fmtUsdc(myTickets, 0)}</dd>
+          </div>
+          <div>
+            <dt className="label">Your chance</dt>
+            <dd className="text-xl font-extrabold">{myTickets > 0n ? `${odds.toFixed(odds < 1 ? 2 : 1)}%` : "–"}</dd>
+          </div>
+        </dl>
       </div>
       <p className="label mt-3">
         The house&apos;s idle USDC earns interest; all of it goes here. Each $1 you lose is a ticket, and one ticket takes the lot.
+        {myTickets === 0n && " Lose a trade to get some."}
       </p>
     </div>
   );

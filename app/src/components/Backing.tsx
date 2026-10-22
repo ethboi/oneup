@@ -32,7 +32,7 @@ export function Backing() {
   return (
     <div className="panel p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-lg font-extrabold">Back the house</h2>
+        <h2 className="text-lg font-extrabold">Back with USDC</h2>
         <span className="label num">
           ${fmtUsdc(backed, 0)} of ${fmtUsdc(target, 0)} raised
         </span>

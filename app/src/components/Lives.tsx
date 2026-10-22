@@ -4,7 +4,7 @@
 // sorted by what they can still pay. Finished ones (fully healed or expired) fold away.
 
 import { useState } from "react";
-import { emissionsForEpoch, fmtUsdc, ppmToNumber, releasedEmissions, type LifeInfo, type Listing } from "@oneup/sdk";
+import { USDC, emissionsForEpoch, fmtUsdc, ppmToNumber, releasedEmissions, type LifeInfo, type Listing } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { lifeValue } from "@/lib/value";
 import { fmtClock, fmtOneup, useNow } from "./Header";
@@ -12,6 +12,9 @@ import { Icon } from "./Icon";
 import { HealthBar, PixelHeart } from "./Pixel";
 import { Sell, useListings } from "./Sell";
 import { Empty, Explainer, PanelHead, Stat, SummaryBar } from "./ui";
+
+/** Dollars, with cents below $1,000 so small amounts don't read as nothing. */
+const money = (x: bigint) => `$${fmtUsdc(x, x < 1_000n * USDC ? 2 : 0)}`;
 
 export function Lives() {
   const { o, d, me, tx, run } = useOneUp();
@@ -51,10 +54,10 @@ export function Lives() {
             </button>
           }
         >
-          <Stat label="Still to earn" value={`$${fmtUsdc(owedLeft, 0)}`} />
-          <Stat label="Paid so far" value={`$${fmtUsdc(paid)}`} />
-          <Stat label="Ready to claim" value={`$${fmtUsdc(claimable)}`} tone={claimable > 0n ? "good" : undefined} />
-          <Stat label="Last round, to all lives" value={last ? `$${fmtUsdc(BigInt(last.lives_pot), 0)}` : "–"} />
+          <Stat label="Still to earn" value={money(owedLeft)} />
+          <Stat label="Paid so far" value={money(paid)} />
+          <Stat label="Ready to claim" value={money(claimable)} tone={claimable > 0n ? "good" : undefined} />
+          <Stat label="Last round, to all lives" value={last ? money(BigInt(last.lives_pot)) : "–"} />
         </SummaryBar>
 
         <NextLife epochId={epoch?.id} left={epoch ? epoch.started_at + d.epochLengthS : 0} />

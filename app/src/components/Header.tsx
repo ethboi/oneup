@@ -64,7 +64,7 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
       </nav>
       {/* the round's clock and your result in it, one strip like the chart's market bar */}
       <div className="flex min-w-0 flex-1 justify-end lg:flex-none">
-        <div className="bar-strip num min-h-[38px] text-sm">
+        <div className="hdr-strip bar-strip num text-sm">
           {jackpot !== null && (
             <button
               type="button"
@@ -105,9 +105,12 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
           )}
         </div>
       </div>
-      <MuteButton />
-      <DemoMenu />
-      <AccountMenu />
+      {/* the tools: one height, close together */}
+      <div className="hdr-tools flex shrink-0 items-center gap-2">
+        <MuteButton />
+        <DemoMenu />
+        <AccountMenu />
+      </div>
     </header>
   );
 }
