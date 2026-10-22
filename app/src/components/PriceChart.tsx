@@ -450,7 +450,7 @@ export function PriceChart({
                   fill="var(--lcd-ink)"
                 />
                 {fresh && (
-                  <text key={`arrow-${last.t}`} className="tick-arrow" x={plotR + 8} y={placed[i] + 5} fontSize="11" fill="var(--lcd)">
+                  <text key={`arrow-${last.t}`} className="tick-arrow" x={plotR + 8} y={placed[i] + 3} fontSize="11" fill="var(--lcd)">
                     {tickUp ? "▲" : "▼"}
                   </text>
                 )}
