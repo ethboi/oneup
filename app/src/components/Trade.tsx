@@ -426,13 +426,23 @@ function RoundOver() {
     }
     seen.current = epoch.id;
     let live = true;
-    o.epochSummary(epoch.id - 1).then((x) => live && x && setShown(x));
-    const t = setTimeout(() => setShown(null), 7000);
+    (async () => {
+      // the new round can start a few seconds before the old one's summary is written: ask again until it is
+      for (let i = 0; i < 10 && live; i++) {
+        const x = await o.epochSummary(epoch.id - 1).catch(() => null);
+        if (x) return live && setShown(x);
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+    })();
     return () => {
       live = false;
-      clearTimeout(t);
     };
   }, [epoch?.id, o]);
+  useEffect(() => {
+    if (!shown) return;
+    const t = setTimeout(() => setShown(null), 7000);
+    return () => clearTimeout(t);
+  }, [shown]);
   if (!shown) return null;
   const lives = BigInt(shown.lives_pot);
   const buyback = BigInt(shown.buyback_pot);
