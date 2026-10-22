@@ -394,10 +394,12 @@ export function PriceChart({
 
   return (
     <div ref={ref} className="lcd relative">
-      {/* far behind the price: a pixel skyline and clouds, drifting slowly in the screen's own shade */}
+      {/* far behind the price: mountains, then forest, river, city and villages, and clouds, drifting slowly in the
+          screen's own shade */}
       <div className="lcd-scenery" aria-hidden style={{ left: PAD.l, right: PAD.r, top: PAD.t, bottom: PAD.b }}>
         <div className="lcd-clouds" />
-        <div className="lcd-skyline" />
+        <div className="lcd-far" />
+        <div className="lcd-near" />
       </div>
       <svg
         width={W}
