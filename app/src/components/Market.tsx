@@ -18,7 +18,14 @@ export function Market() {
   const px = useOneupPrice();
   const wallet = usePoll(() => o.usdcBalance(me), [me]);
   const sales = useActivity(100).filter((a) => a.kind === "sold");
-  const lives = listings.filter((l) => l.nft_contract === d.contracts.life);
+  // expired lives earn nothing more, so they aren't shown (an old listing can outlive its life's earning)
+  const listedLives = listings.filter((l) => l.nft_contract === d.contracts.life);
+  const lifeInfos = usePoll(
+    () => Promise.all(listedLives.map((l) => o.lifeInfo(l.token_id).catch(() => null))),
+    [listedLives.map((l) => l.token_id).join()],
+    10_000,
+  );
+  const lives = lifeInfos ? listedLives.filter((_, i) => lifeInfos[i] && !lifeInfos[i]!.expired) : [];
   const locks = listings.filter((l) => l.nft_contract === d.contracts.ve);
 
   return (

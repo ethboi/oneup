@@ -271,6 +271,11 @@ class Bot {
         await this.tx.delist(life, x.token_id).catch(() => {});
         return;
       }
+      // an expired life earns nothing more: take it down (its unclaimed USDC is claimed instead)
+      if (x.nft_contract === life && (await o.lifeInfo(x.token_id).catch(() => null))?.expired) {
+        await this.tx.delist(life, x.token_id).then(() => log(this.style.name, `delisted expired ${label(x)}`), () => {});
+        return;
+      }
       if (now - x.listed_at < 300) continue;
       const value = await valueOf(x, px);
       const next = (BigInt(x.price) * 95n) / 100n;
@@ -286,7 +291,7 @@ class Bot {
     const offers: { nft: string; token: string; price: bigint; what: string }[] = [];
     for (const l of await o.lives(this.id)) {
       const v = lifeValue(l);
-      if (v >= USDC && !l.backer && !up.has(`${life}:${l.token_id}`)) offers.push({ nft: life, token: l.token_id, price: share_(v, share.life), what: "Extra Life" });
+      if (v >= USDC && !l.backer && !l.expired && !up.has(`${life}:${l.token_id}`)) offers.push({ nft: life, token: l.token_id, price: share_(v, share.life), what: "Extra Life" });
     }
     for (const l of await o.locks(this.id)) {
       if (l.withdrawn || up.has(`${ve}:${l.token_id}`)) continue;
