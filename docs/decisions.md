@@ -354,6 +354,28 @@ round's house result (`fees` in the epoch summary), so it flows to Extra Lives a
 profit. Only the marketplace the owner set can pay it in, and a fee the house refuses is owed
 to it like a failed seller payout. Buyers pay the listed price as before.
 
+## D-29 · If OneUp winds down: lives first, then lockers · **Decided (22 Oct 2026), not built**
+
+What happens to the house's money if the protocol shuts down. A plan, written now so every promise made before
+then means something; the shutdown mode itself isn't in the contracts yet.
+
+1. **Traders' own money isn't the house's.** Free balances and open positions' margin belong to traders: every
+   position closes at the oracle price and everyone can withdraw.
+2. **Extra Lives and Backer Lives are paid first,** from the whole pool, with no reserve kept back, in proportion
+   to what each is still owed. They're the house's debts: losers were promised a payback, and backers put real
+   money in on that promise.
+3. **What's left goes to $1UP lockers,** by lock weight at a snapshot taken when the wind-down starts. Lockers are
+   the owners: they get the remainder, never before the debts. That gives $1UP a floor: a share of whatever is
+   left once everyone owed has been paid.
+
+**How:** a DAO proposal turns on a wind-down mode: no new orders; positions close over a set window (or at the
+deadline at the oracle price); the vault's deposit comes home (D-27); one final payout pays lives from the whole
+pool; the remainder is split among locks by the snapshot's weights, claimable from `ve`.
+
+**Considered and rejected:** everything to backers (ignores the losers' lives the product is built on);
+everything to lockers (would let $1UP holders profit from shutting down before the debts are paid); an equal split
+(doesn't follow what anyone is owed).
+
  · **Noted**
 
 - Rounding dust from sharing buybacks by weight stays in `ve` (no sweep).

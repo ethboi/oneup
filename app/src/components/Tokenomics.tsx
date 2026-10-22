@@ -109,6 +109,18 @@ export function Tokenomics() {
       </div>
 
       <section className="panel p-5">
+        <h2 className="text-lg font-extrabold">If OneUp winds down</h2>
+        <ol className="mt-2 flex list-decimal flex-col gap-1 pl-5 text-sm">
+          <li>Traders take back their own money: positions close at the oracle price and balances can be withdrawn.</li>
+          <li>Extra Lives and Backer Lives are paid from the whole pool, by what each is still owed. They&apos;re the house&apos;s debts.</li>
+          <li>
+            Whatever&apos;s left goes to $1UP lockers by lock weight. Lockers are the owners: last in line, but everything left is theirs.
+          </li>
+        </ol>
+        <p className="label mt-2">Only the DAO can start it. A plan for now (D-29); the shutdown mode isn&apos;t in the contracts yet.</p>
+      </section>
+
+      <section className="panel p-5">
         <h2 className="text-lg font-extrabold">Released, round by round</h2>
         <p className="label mt-1">Each bar is a round&apos;s schedule; the filled part is what house profit released to its losers.</p>
         {last.length === 0 ? (

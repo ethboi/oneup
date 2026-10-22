@@ -125,6 +125,10 @@ worst-case payout plus 10%) earns interest in a vault: a 5% mock here, USDC lend
 Intents and a Chain Signatures account on mainnet. All the interest builds a jackpot, drawn every four rounds
 among that period's losers, a ticket per $1 of net loss ([D-27](docs/decisions.md)).
 
+**If OneUp winds down.** The DAO can end it: positions close, the vault comes home, Extra Lives and Backer Lives
+are paid from the whole pool first, and what's left goes to $1UP lockers by weight. Lives are the house's debts;
+lockers are its owners ([D-29](docs/decisions.md), a plan, not yet built).
+
 **Market.** List an Extra Life or a lock for a USDC price; the buyer pays and the NFT moves in one step. Sellers
 pay 2%, which goes to the house pool as profit ([D-28](docs/decisions.md)). Each
 market can use up to half the pool, so no single market takes all the capacity. The owner lists markets.

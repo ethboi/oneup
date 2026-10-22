@@ -181,13 +181,19 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
         <h2 className="text-lg font-extrabold">The risks, plainly</h2>
         <ul className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
           <li>
-            <b>It&apos;s permanent.</b> <span className="text-[var(--muted)]">Backing can&apos;t be withdrawn; you get money back only as the house profits, or by selling.</span>
+            <b>Locked in, not lost.</b> <span className="text-[var(--muted)]">Backing can&apos;t be withdrawn: the USDC stays in the pool. You get it back as the house profits, or exit by selling the Backer Life.</span>
           </li>
           <li>
             <b>No date.</b> <span className="text-[var(--muted)]">If traders win more than they lose, the house makes nothing and Backer Lives aren&apos;t paid.</span>
           </li>
           <li>
             <b>Capped.</b> <span className="text-[var(--muted)]">A Backer Life never pays more than it&apos;s owed (2.0× at best); the $1UP lock is the only open-ended part.</span>
+          </li>
+          <li>
+            <b>If OneUp winds down.</b>{" "}
+            <span className="text-[var(--muted)]">
+              Backer Lives and losers&apos; lives are paid first, from the whole pool; $1UP lockers get only what&apos;s left (D-29, a plan, not yet built).
+            </span>
           </li>
           <li>
             <b>A proof of concept.</b> <span className="text-[var(--muted)]">These contracts haven&apos;t been audited. This demo runs on a local chain with test money.</span>
