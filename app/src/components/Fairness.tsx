@@ -5,7 +5,6 @@
 
 import { useEffect, useState } from "react";
 import { useWidth } from "@/lib/useWidth";
-import { PageTitle } from "./ui";
 
 interface Results {
   params: { seeds: number; lifeExpiryEpochs: number; window: number; measured: number };
@@ -31,84 +30,81 @@ export function Fairness() {
     fetch("/api/sim").then(async (x) => (x.ok ? setR(await x.json()) : setErr((await x.json()).error)));
   }, []);
   if (err) return <p className="label">{err}</p>;
-  if (!r) return <p className="label">Loading…</p>;
+  if (!r) return <p className="label">Loading the simulation…</p>;
   const [first, , , last] = r.quarters.oneup;
 
   return (
-    <div className="flex flex-col gap-4">
-      <div>
-        <PageTitle>Fairness</PageTitle>
-        <p className="label mt-1.5">Why a late loser gets back about what an early one does, from the simulator.</p>
-      </div>
-    <div className="panel p-5">
-        <p className="text-lg">
-          A dollar lost in year 3 gets back <span className="num font-bold">{cents(last)}</span> within a year, about what a
-          dollar lost early gets (<span className="num font-bold">{cents(first)}</span>). Year-1 losers take{" "}
-          <span className="num font-bold">{pct(r.y1ShareOfY3.oneup)}</span> of year-3 payouts, against{" "}
-          <span className="num font-bold">{pct(r.y1ShareOfY3.papertrade)}</span> under Papertrade-style rules.
-        </p>
-        <p className="label mt-1">
-          Extra Lives earn for {r.params.lifeExpiryEpochs} rounds after the one they&apos;re minted in, so old claims
-          can&apos;t crowd out new ones. Simulation: the same trader flows under each set of rules, {r.params.seeds} seeds,
-          each loss followed for {r.params.window} weeks.
-        </p>
-        <Chart r={r} />
+    // a section of the House tab (Solvency.tsx); the footer's "Fair to late players" opens it here
+    <div id="fairness" className="panel scroll-mt-4 p-5">
+      <h2 className="text-lg font-extrabold">Fair to late players</h2>
+      <p className="label mt-1 mb-3">Why a late loser gets back about what an early one does, from the simulator.</p>
+      <p className="text-lg">
+        A dollar lost in year 3 gets back <span className="num font-bold">{cents(last)}</span> within a year, about what a
+        dollar lost early gets (<span className="num font-bold">{cents(first)}</span>). Year-1 losers take{" "}
+        <span className="num font-bold">{pct(r.y1ShareOfY3.oneup)}</span> of year-3 payouts, against{" "}
+        <span className="num font-bold">{pct(r.y1ShareOfY3.papertrade)}</span> under Papertrade-style rules.
+      </p>
+      <p className="label mt-1">
+        Extra Lives earn for {r.params.lifeExpiryEpochs} rounds after the one they&apos;re minted in, so old claims
+        can&apos;t crowd out new ones. Simulation: the same trader flows under each set of rules, {r.params.seeds} seeds,
+        each loss followed for {r.params.window} weeks.
+      </p>
+      <Chart r={r} />
 
-        <h2 className="-mx-5 mt-5 border-t border-[var(--line)] px-5 pt-5 text-lg font-extrabold">USDC back within a year per $1 lost, by when the loss happened</h2>
-        {/* phones: periods down, rules across, so it fits without scrolling */}
-        <table className="num mt-3 w-full text-sm md:hidden">
-          <thead>
-            <tr className="label text-left">
-              <th className="pb-2 font-normal">Weeks</th>
-              {SERIES.map((s) => (
-                <th key={s.key} className="pb-2 text-right font-normal">
-                  <span className="mr-1 inline-block h-2 w-2 rounded-sm" style={{ background: s.color }} />
-                  {s.short}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {QUARTERS.map((q, i) => (
-              <tr key={q} className="border-t border-[var(--line)]">
-                <td className="py-2">{q}</td>
-                {SERIES.map((s) => (
-                  <td key={s.key} className="text-right">
-                    {cents(r.quarters[s.key][i])}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <table className="num mt-3 hidden w-full text-sm md:table">
-          <thead>
-            <tr className="label text-left">
-              <th className="pb-2 font-normal">Rules</th>
-              {["Weeks 1–39", "40–78", "79–117", "118–156"].map((h) => (
-                <th key={h} className="pb-2 text-right font-normal">
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
+      <h2 className="-mx-5 mt-5 border-t border-[var(--line)] px-5 pt-5 text-lg font-extrabold">USDC back within a year per $1 lost, by when the loss happened</h2>
+      {/* phones: periods down, rules across, so it fits without scrolling */}
+      <table className="num mt-3 w-full text-sm md:hidden">
+        <thead>
+          <tr className="label text-left">
+            <th className="pb-2 font-normal">Weeks</th>
             {SERIES.map((s) => (
-              <tr key={s.key} className="border-t border-[var(--line)]">
-                <td className="py-2">
-                  <span className="mr-2 inline-block h-2.5 w-2.5 rounded-sm" style={{ background: s.color }} />
-                  {s.label}
-                </td>
-                {r.quarters[s.key].map((v, i) => (
-                  <td key={i} className="text-right">
-                    {cents(v)}
-                  </td>
-                ))}
-              </tr>
+              <th key={s.key} className="pb-2 text-right font-normal">
+                <span className="mr-1 inline-block h-2 w-2 rounded-sm" style={{ background: s.color }} />
+                {s.short}
+              </th>
             ))}
-          </tbody>
-        </table>
-    </div>
+          </tr>
+        </thead>
+        <tbody>
+          {QUARTERS.map((q, i) => (
+            <tr key={q} className="border-t border-[var(--line)]">
+              <td className="py-2">{q}</td>
+              {SERIES.map((s) => (
+                <td key={s.key} className="text-right">
+                  {cents(r.quarters[s.key][i])}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <table className="num mt-3 hidden w-full text-sm md:table">
+        <thead>
+          <tr className="label text-left">
+            <th className="pb-2 font-normal">Rules</th>
+            {["Weeks 1–39", "40–78", "79–117", "118–156"].map((h) => (
+              <th key={h} className="pb-2 text-right font-normal">
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {SERIES.map((s) => (
+            <tr key={s.key} className="border-t border-[var(--line)]">
+              <td className="py-2">
+                <span className="mr-2 inline-block h-2.5 w-2.5 rounded-sm" style={{ background: s.color }} />
+                {s.label}
+              </td>
+              {r.quarters[s.key].map((v, i) => (
+                <td key={i} className="text-right">
+                  {cents(v)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

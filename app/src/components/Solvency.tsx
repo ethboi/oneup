@@ -4,6 +4,7 @@
 // sides, decision D-1), per-market liability against its cap (half the pool, D-14), and the epoch history.
 
 import { fmtUsdc, ppmToNumber, type EpochSummary } from "@oneup/sdk";
+import { Fairness } from "./Fairness";
 import { fmtUsd } from "./Header";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { Icon } from "./Icon";
@@ -34,8 +35,8 @@ export function Solvency() {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <PageTitle>Solvency</PageTitle>
-        <p className="label mt-1.5">Why the house can&apos;t go bust, live from the chain.</p>
+        <PageTitle>The house</PageTitle>
+        <p className="label mt-1.5">Why it can&apos;t go bust, live from the chain, and why it&apos;s fair to late players, from the simulator.</p>
       </div>
       <div className="panel p-5">
         <p className="text-lg">
@@ -188,6 +189,7 @@ export function Solvency() {
         <b>Where the pool comes from:</b> the house&apos;s seed and the bootstrap round. Backing has its own tab: the round, the
         curve, when it pays back, and the $1UP backers get.
       </div>
+      <Fairness />
       <Governance />
     </div>
   );

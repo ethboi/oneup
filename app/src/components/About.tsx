@@ -105,7 +105,7 @@ const NEAR: { title: string; status: Status; body: string; points: string[] }[] 
     body: "A DAO owns the house: the same Sputnik DAO v2 code mainnet DAOs run.",
     points: [
       "Listing and pausing markets, params, the keeper, the yield vault: all council votes",
-      "Proposals and votes are in the app, on the Solvency tab",
+      "Proposals and votes are in the app, on the House tab",
     ],
   },
   {

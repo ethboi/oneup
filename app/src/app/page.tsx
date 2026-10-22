@@ -8,7 +8,6 @@ import { Lives } from "@/components/Lives";
 import { Locks } from "@/components/Locks";
 import { Market } from "@/components/Market";
 import { Solvency } from "@/components/Solvency";
-import { Fairness } from "@/components/Fairness";
 import { About } from "@/components/About";
 import { BackPage } from "@/components/BackPage";
 import { Leaderboard } from "@/components/Leaderboard";
@@ -23,7 +22,7 @@ import { Onboarding } from "@/components/Onboarding";
 import { Icon, type IconName } from "@/components/Icon";
 import { Logo } from "@/components/Pixel";
 
-const TABS = ["Trade", "Extra Lives", "Locks", "Market", "Leaders", "Backing", "$1UP", "Solvency", "Fairness", "About"] as const;
+const TABS = ["Trade", "Extra Lives", "Locks", "Market", "Leaders", "Backing", "$1UP", "House", "About"] as const;
 type Tab = (typeof TABS)[number];
 const TAB_ICONS: Record<Tab, IconName> = {
   Trade: "chart",
@@ -33,14 +32,13 @@ const TAB_ICONS: Record<Tab, IconName> = {
   Leaders: "trophy",
   Backing: "deposit",
   $1UP: "claim",
-  Solvency: "shield",
-  Fairness: "scale",
+  House: "shield",
   About: "info",
 };
 /** Phones: the four you use; the ones you read sit behind More. */
 const PHONE_TABS: Tab[] = ["Trade", "Extra Lives", "Locks", "Market"];
 /** Desktop: the reading tabs sit under More. */
-const MORE_TABS: Tab[] = ["Solvency", "Fairness", "About"];
+const MORE_TABS: Tab[] = ["House", "About"];
 /** Below 1280px these join them, so the bar fits beside the round strip. */
 const NARROW_MORE_TABS: Tab[] = ["Leaders", "Backing", "$1UP"];
 const PHONE_LABEL: Partial<Record<Tab, string>> = { "Extra Lives": "Lives" };
@@ -48,10 +46,12 @@ const PHONE_LABEL: Partial<Record<Tab, string>> = { "Extra Lives": "Lives" };
 export default function Home() {
   const [tab, setTab] = useState<Tab>("Trade");
   const [more, setMore] = useState(false);
-  const go = (t: Tab) => {
+  /** Opens a tab at its top, or at the section with id `at`. */
+  const go = (t: Tab, at?: string) => {
     setTab(t);
     setMore(false);
-    window.scrollTo({ top: 0 });
+    if (at) setTimeout(() => document.getElementById(at)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    else window.scrollTo({ top: 0 });
   };
   return (
     <OneUpProvider>
@@ -89,8 +89,7 @@ export default function Home() {
           {tab === "Leaders" && <Leaderboard />}
           {tab === "Backing" && <BackPage go={(t) => go(t as Tab)} />}
           {tab === "$1UP" && <Tokenomics />}
-          {tab === "Solvency" && <Solvency />}
-          {tab === "Fairness" && <Fairness />}
+          {tab === "House" && <Solvency />}
           {tab === "About" && <About />}
           <Footer go={go} />
         </div>
@@ -100,7 +99,7 @@ export default function Home() {
       <nav className="bottom-nav lg:hidden" aria-label="Sections">
         {more && (
           <div className="absolute inset-x-3 bottom-[68px] flex flex-col gap-1 rounded-xl border border-[var(--panel-edge)] bg-[var(--panel)] p-2 shadow-[var(--panel-shadow)]">
-            {(["Leaders", "Backing", "$1UP", "Solvency", "Fairness", "About"] as const).map((t) => (
+            {(["Leaders", "Backing", "$1UP", "House", "About"] as const).map((t) => (
               <button key={t} className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-left font-bold hover:bg-[var(--panel-2)]" onClick={() => go(t)}>
                 <Icon name={TAB_ICONS[t]} />
                 {t}
@@ -114,7 +113,7 @@ export default function Home() {
             {PHONE_LABEL[t] ?? t}
           </button>
         ))}
-        <button aria-current={tab === "Solvency" || tab === "Fairness" || tab === "About" ? "page" : undefined} aria-expanded={more} onClick={() => setMore(!more)}>
+        <button aria-current={tab === "House" || tab === "About" ? "page" : undefined} aria-expanded={more} onClick={() => setMore(!more)}>
           <Icon name="more" size={20} />
           More
         </button>
@@ -131,7 +130,7 @@ export default function Home() {
 }
 
 /** What OneUp is and where to read more, under every tab. */
-function Footer({ go }: { go: (t: Tab) => void }) {
+function Footer({ go }: { go: (t: Tab, at?: string) => void }) {
   const link = "font-semibold text-[var(--muted)] underline-offset-2 transition-colors hover:text-[var(--text)] hover:underline";
   return (
     <footer className="mt-10 border-t border-[var(--line)] pt-6 text-sm">
@@ -154,12 +153,12 @@ function Footer({ go }: { go: (t: Tab) => void }) {
               </button>
             </li>
             <li>
-              <button type="button" className={link} onClick={() => go("Solvency")}>
+              <button type="button" className={link} onClick={() => go("House")}>
                 Why the house can&apos;t go bust
               </button>
             </li>
             <li>
-              <button type="button" className={link} onClick={() => go("Fairness")}>
+              <button type="button" className={link} onClick={() => go("House", "fairness")}>
                 Fair to late players
               </button>
             </li>
