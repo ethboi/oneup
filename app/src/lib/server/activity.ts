@@ -382,6 +382,42 @@ export interface Board {
 }
 
 /** A leaderboard of trades closed in [from, to] (ms), across every account. */
+/** One trader's results over a period, for the leaderboard: profit after the winner's cut. */
+export interface Standing {
+  account: string;
+  pnl: string;
+  trades: number;
+  wins: number;
+  /** Σ margin × leverage, USDC. */
+  volume: string;
+  liquidations: number;
+}
+
+/** Every trader's results between `from` and `to` (ms), best first. */
+export function standings(from: number, to: number): { rows: Standing[]; synced: boolean } {
+  const rows: Standing[] = [];
+  for (const [account, items] of state.history) {
+    let pnl = 0n;
+    let volume = 0n;
+    let trades = 0;
+    let wins = 0;
+    let liquidations = 0;
+    for (const i of items) {
+      if (i.kind !== "trade" || i.t < from || i.t > to) continue;
+      const t = i.trade;
+      pnl += BigInt(t.pnl) - BigInt(t.cut ?? 0);
+      volume += BigInt(t.margin) * BigInt(t.leverage);
+      trades++;
+      if (BigInt(t.pnl) > 0n) wins++;
+      if (t.reason === "Liquidation") liquidations++;
+    }
+    if (trades) rows.push({ account, pnl: pnl.toString(), trades, wins, volume: volume.toString(), liquidations });
+  }
+  rows.sort((a, b) => (BigInt(b.pnl) > BigInt(a.pnl) ? 1 : BigInt(b.pnl) < BigInt(a.pnl) ? -1 : 0));
+  const done = (state.next ?? 1) - 1;
+  return { rows, synced: state.head > 0 && done >= state.head - 10 };
+}
+
 export function boardBetween(from: number, to: number): Board {
   const sums = new Map<string, { pnl: bigint; trades: number }>();
   let best: Board["best"] = null;

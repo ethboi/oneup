@@ -17,6 +17,8 @@ import { intentsBalances, payFromChain } from "@/lib/intents";
 export interface NavTab {
   name: string;
   badge?: "lives";
+  /** Shown under "More" rather than in the bar. */
+  more?: boolean;
 }
 
 /** One bar: brand, the section tabs (desktop), your result this round and the epoch clock as plain text, Demo, and
@@ -38,19 +40,23 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
       </div>
       <nav className="hidden min-w-0 flex-1 lg:block" aria-label="Sections">
         <div className="tabs" role="tablist">
-          {tabs.map((t) => (
-            <button key={t.name} role="tab" aria-selected={tab === t.name} onClick={() => go(t.name)} className="tab">
-              {t.name}
-              {t.badge === "lives" && alive > 0 && <span className="tab-badge num">{alive}</span>}
-            </button>
-          ))}
+          {tabs
+            .filter((t) => !t.more)
+            .map((t) => (
+              <button key={t.name} role="tab" aria-selected={tab === t.name} onClick={() => go(t.name)} className="tab">
+                {t.name}
+                {t.badge === "lives" && alive > 0 && <span className="tab-badge num">{alive}</span>}
+              </button>
+            ))}
+          <MoreTabs tabs={tabs.filter((t) => t.more)} tab={tab} go={go} />
         </div>
       </nav>
       {/* the round's clock and your result in it, one strip like the chart's market bar */}
       <div className="flex min-w-0 flex-1 justify-end lg:flex-none">
         <div className="bar-strip num min-h-[38px] text-sm">
           <span className="bar-cell" title={`Round ${epoch?.id ?? ""} ends in ${fmtClock(left)}, with Extra Lives and $1UP locks for its losers`}>
-            <span className="label hidden sm:inline">Round {epoch?.id ?? "…"}</span>
+            {/* the label goes on narrow desktops too, where the tabs need the room */}
+            <span className="label hidden sm:inline lg:hidden xl:inline">Round {epoch?.id ?? "…"}</span>
             <b>{fmtClock(left)}</b>
           </span>
           {round && (
@@ -376,4 +382,44 @@ function useMyRound(me: string, startedAt?: number) {
   if (closes.length === 0) return null;
   const net = closes.reduce((s, i) => (i.kind === "trade" ? s + BigInt(i.trade.pnl) - BigInt(i.trade.cut ?? 0) : s), 0n);
   return net > 0n ? { net } : null;
+}
+
+/** The reading tabs, under one "More" in the bar (the phone's bottom bar has its own). */
+function MoreTabs({ tabs, tab, go }: { tabs: NavTab[]; tab: string; go: (t: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const current = tabs.find((t) => t.name === tab);
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    const t = setTimeout(() => document.addEventListener("click", close), 0);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener("click", close);
+    };
+  }, [open]);
+  if (tabs.length === 0) return null;
+  return (
+    <div className="relative">
+      <button type="button" role="tab" aria-selected={!!current} aria-haspopup="menu" aria-expanded={open} className="tab" onClick={() => setOpen(!open)}>
+        {current ? current.name : "More"}
+        <Icon name="chevron" size={14} />
+      </button>
+      {open && (
+        <div role="menu" className="panel absolute left-0 top-full z-40 mt-1 flex min-w-40 flex-col p-1.5">
+          {tabs.map((t) => (
+            <button
+              key={t.name}
+              role="menuitem"
+              type="button"
+              className="rounded-lg px-3 py-2 text-left text-sm font-bold hover:bg-[var(--panel-2)]"
+              style={t.name === tab ? { color: "var(--primary)" } : undefined}
+              onClick={() => go(t.name)}
+            >
+              {t.name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }

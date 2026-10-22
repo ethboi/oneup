@@ -11,6 +11,7 @@ import { Solvency } from "@/components/Solvency";
 import { Fairness } from "@/components/Fairness";
 import { About } from "@/components/About";
 import { BackPage } from "@/components/BackPage";
+import { Leaderboard } from "@/components/Leaderboard";
 import { Tokenomics } from "@/components/Tokenomics";
 import { Toasts } from "@/components/Toasts";
 import { SoundEvents } from "@/components/Sounds";
@@ -21,13 +22,14 @@ import { Onboarding } from "@/components/Onboarding";
 import { Icon, type IconName } from "@/components/Icon";
 import { Logo } from "@/components/Pixel";
 
-const TABS = ["Trade", "Extra Lives", "Locks", "Market", "Backing", "$1UP", "Solvency", "Fairness", "About"] as const;
+const TABS = ["Trade", "Extra Lives", "Locks", "Market", "Leaders", "Backing", "$1UP", "Solvency", "Fairness", "About"] as const;
 type Tab = (typeof TABS)[number];
 const TAB_ICONS: Record<Tab, IconName> = {
   Trade: "chart",
   "Extra Lives": "heart",
   Locks: "lock",
   Market: "store",
+  Leaders: "trophy",
   Backing: "deposit",
   $1UP: "claim",
   Solvency: "shield",
@@ -36,6 +38,8 @@ const TAB_ICONS: Record<Tab, IconName> = {
 };
 /** Phones: the four you use; the ones you read sit behind More. */
 const PHONE_TABS: Tab[] = ["Trade", "Extra Lives", "Locks", "Market"];
+/** Desktop: the reading tabs sit under More. */
+const MORE_TABS: Tab[] = ["Solvency", "Fairness", "About"];
 const PHONE_LABEL: Partial<Record<Tab, string>> = { "Extra Lives": "Lives" };
 
 export default function Home() {
@@ -61,12 +65,17 @@ export default function Home() {
         </div>
       </div>
       <div className="mx-auto max-w-[1280px] px-4 pb-24 lg:pb-16">
-        <Header tabs={TABS.map((t) => ({ name: t, badge: t === "Extra Lives" ? ("lives" as const) : undefined }))} tab={tab} go={(t) => go(t as Tab)} />
+        <Header
+          tabs={TABS.map((t) => ({ name: t, badge: t === "Extra Lives" ? ("lives" as const) : undefined, more: MORE_TABS.includes(t) }))}
+          tab={tab}
+          go={(t) => go(t as Tab)}
+        />
         <Onboarding />
         {tab === "Trade" && <Trade />}
         {tab === "Extra Lives" && <Lives />}
         {tab === "Locks" && <Locks />}
         {tab === "Market" && <Market />}
+        {tab === "Leaders" && <Leaderboard />}
         {tab === "Backing" && <BackPage go={(t) => go(t as Tab)} />}
         {tab === "$1UP" && <Tokenomics />}
         {tab === "Solvency" && <Solvency />}
@@ -79,7 +88,7 @@ export default function Home() {
       <nav className="bottom-nav lg:hidden" aria-label="Sections">
         {more && (
           <div className="absolute inset-x-3 bottom-[68px] flex flex-col gap-1 rounded-xl border border-[var(--panel-edge)] bg-[var(--panel)] p-2 shadow-[var(--panel-shadow)]">
-            {(["Backing", "$1UP", "Solvency", "Fairness", "About"] as const).map((t) => (
+            {(["Leaders", "Backing", "$1UP", "Solvency", "Fairness", "About"] as const).map((t) => (
               <button key={t} className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-left font-bold hover:bg-[var(--panel-2)]" onClick={() => go(t)}>
                 <Icon name={TAB_ICONS[t]} />
                 {t}
