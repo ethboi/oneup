@@ -34,7 +34,7 @@ export function onMuted(f: (m: boolean) => void) {
   return () => void listeners.delete(f);
 }
 
-function audio(): AudioContext | null {
+export function audio(): AudioContext | null {
   if (typeof window === "undefined") return null;
   ctx ??= new AudioContext();
   if (ctx.state === "suspended") void ctx.resume();
@@ -43,7 +43,7 @@ function audio(): AudioContext | null {
 
 const NOTE: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
 /** "E6" → Hz. */
-const hz = (n: string) => 440 * 2 ** ((NOTE[n[0]] + (n[1] === "#" ? 1 : 0) + 12 * (Number(n.slice(-1)) + 1) - 69) / 12);
+export const hz = (n: string) => 440 * 2 ** ((NOTE[n[0]] + (n[1] === "#" ? 1 : 0) + 12 * (Number(n.slice(-1)) + 1) - 69) / 12);
 
 interface Tone {
   note?: string;

@@ -9,6 +9,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { fmtUsdc, liquidationPrice, type Position } from "@oneup/sdk";
 import { heartbeat, lowHpBeep, shimmer } from "@/lib/sound";
 import { useFx, type FxEvent } from "@/lib/fx";
+import { setMusicTension } from "@/lib/music";
 import { nearMisses } from "@/lib/achievements";
 import { PixelCoin, PixelHeart } from "./Pixel";
 
@@ -59,6 +60,9 @@ export function useTensionSound(mood: Mood) {
   const ref = useRef(mood);
   ref.current = mood;
   const active = mood.state === "danger" || mood.state === "critical" || mood.state === "hot";
+  const tense = mood.state === "danger" || mood.state === "critical";
+  // the music sinks so the heartbeat comes through
+  useEffect(() => setMusicTension(tense), [tense]);
   useEffect(() => {
     if (!active) return;
     let timer: ReturnType<typeof setTimeout>;

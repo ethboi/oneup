@@ -2,16 +2,18 @@
 
 // Plays the moments that happen on chain rather than on a click: your order filling, a trade closing (win,
 // loss, liquidation, take-profit, stop), a new Extra Life and a Full Heal. Losses feed the TILT meter and a
-// win after a near miss earns Clutch. Also the header's mute button.
+// win after a near miss earns Clutch. Also the header's sound menu (effects and music).
 
 import { useEffect, useRef, useState } from "react";
 import { PPM, isLiquidatable, pnl } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { isMuted, onMuted, setMuted, sfx } from "@/lib/sound";
+import { isMusicOn, onMusic, setMusic, sync as syncMusic } from "@/lib/music";
 import { emitFx, winTier } from "@/lib/fx";
 import { addFlag, nearMisses } from "@/lib/achievements";
 import { REVENGE_MS, lastLossAt, recordLoss } from "@/lib/tilt";
 import { Icon } from "./Icon";
+import { Popover } from "./Popover";
 
 export function SoundEvents() {
   const { o, me, prices } = useOneUp();
@@ -84,24 +86,56 @@ export function SoundEvents() {
   return null;
 }
 
+/** The header's sound menu: sound effects on or off, and the music (which needs sound on). */
 export function MuteButton() {
-  const [muted, set] = useState(false);
+  const [muted, setM] = useState(false);
+  const [music, setMu] = useState(false);
   useEffect(() => {
-    set(isMuted());
-    return onMuted(set);
+    setM(isMuted());
+    setMu(isMusicOn());
+    const offs = [onMuted(setM), onMusic(setMu)];
+    // browsers start audio only after a click: pick the music back up on the first one
+    const first = () => syncMusic();
+    window.addEventListener("pointerdown", first, { once: true });
+    return () => {
+      offs.forEach((f) => f());
+      window.removeEventListener("pointerdown", first);
+    };
   }, []);
   return (
+    <Popover label={muted ? "Sound off" : "Sound on"} button={<Icon name={muted ? "soundOff" : music ? "music" : "sound"} />}>
+      {() => (
+        <div className="flex w-56 flex-col gap-1">
+          <Toggle
+            label="Sound effects"
+            on={!muted}
+            set={(v) => {
+              setMuted(!v);
+              if (v) sfx("fill"); // a sample, so you hear what you turned on
+            }}
+          />
+          <Toggle label="Music" hint={muted ? "Needs sound on" : undefined} on={music && !muted} disabled={muted} set={setMusic} />
+        </div>
+      )}
+    </Popover>
+  );
+}
+
+function Toggle({ label, hint, on, disabled, set }: { label: string; hint?: string; on: boolean; disabled?: boolean; set: (v: boolean) => void }) {
+  return (
     <button
-      className="btn btn-ghost px-2.5"
-      onClick={() => {
-        setMuted(!muted);
-        if (muted) sfx("fill"); // a sample, so you hear what you turned on
-      }}
-      aria-pressed={!muted}
-      aria-label={muted ? "Sound off, turn on" : "Sound on, turn off"}
-      title={muted ? "Sound off" : "Sound on"}
+      type="button"
+      role="switch"
+      aria-checked={on}
+      disabled={disabled}
+      onClick={() => set(!on)}
+      className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 text-left text-sm font-bold hover:bg-[var(--panel-2)] disabled:opacity-50"
     >
-      <Icon name={muted ? "soundOff" : "sound"} />
+      <span>
+        {label}
+        {hint && <span className="label block font-normal">{hint}</span>}
+      </span>
+      <span className={`switch ${on ? "switch-on" : ""}`} aria-hidden />
     </button>
   );
 }
