@@ -20,6 +20,8 @@ export interface ActivityItem {
   /** On a sale: what changed hands and its price; `value` is what it was worth then (USDC 1e6), when the sale
    *  was seen live (an old sale found by a rescan can't be valued after the fact). */
   sale?: { nft: "life" | "lock"; token_id: string; price: string; value?: string };
+  /** On a jackpot win: what it paid. */
+  amount?: string;
 }
 
 /** One closed trade: its open and close events joined by position id. */
@@ -205,7 +207,7 @@ export function toItems(ev: Event, executor: string, t: number, c: Record<string
     } else if (ev.standard === "oneup" && ev.event === "jackpot_won") {
       const who = short(String(d.account_id));
       mine(String(d.account_id), { t, kind: "jackpot", amount: String(d.amount), tickets: String(d.tickets) });
-      out.feed.push({ t, kind: "jackpot", who, text: `${who} won the ${usd(String(d.amount))} jackpot` });
+      out.feed.push({ t, kind: "jackpot", who, text: `${who} won the ${usd(String(d.amount))} jackpot`, amount: String(d.amount) });
     } else if (ev.standard === "oneup" && ev.event === "epoch_closed") {
       const s = d.summary as Record<string, string | number>;
       const lives = Number(s.lives_minted);

@@ -6,9 +6,18 @@
 import { USDC, fmtUsdc } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { PixelAmount, PixelCoin } from "./Pixel";
+import { useNow } from "./Header";
+
+/** 3d 4h, 2h 05m, 31:20. */
+export function fmtDuration(s: number) {
+  if (s >= 86_400) return `${Math.floor(s / 86_400)}d ${Math.floor((s % 86_400) / 3600)}h`;
+  if (s >= 3600) return `${Math.floor(s / 3600)}h ${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}m`;
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
 
 export function Jackpot({ compact }: { compact?: boolean }) {
-  const { o, me } = useOneUp();
+  const { o, d, me } = useOneUp();
+  const now = useNow();
   const t = usePoll(() => o.treasury(), [], 5000);
   const epoch = usePoll(() => o.epoch(), [], 10_000);
   const mine = usePoll(() => o.tickets(me), [me], 5000);
@@ -19,7 +28,8 @@ export function Jackpot({ compact }: { compact?: boolean }) {
   const total = BigInt(t.tickets);
   // this round's net loss turns into tickets when the round closes
   const myTickets = BigInt(mine ?? "0") + BigInt(pending ?? "0");
-  const rounds = epoch ? Math.max(0, t.draw_epoch - epoch.id) : null;
+  // the draw happens when round `draw_epoch` closes
+  const left = epoch ? Math.max(0, (t.draw_epoch - epoch.id) * d.epochLengthS + epoch.started_at + d.epochLengthS - now) : null;
   const odds = total + BigInt(pending ?? "0") > 0n ? (Number(myTickets) / Number(total + BigInt(pending ?? "0"))) * 100 : 0;
 
   return (
@@ -30,7 +40,7 @@ export function Jackpot({ compact }: { compact?: boolean }) {
           <h2 className="font-extrabold">Jackpot</h2>
         </div>
         <span className="label num">
-          {rounds === null ? "…" : rounds === 0 ? "drawn when this round ends" : `drawn in ${rounds + 1} rounds`}
+          {left === null ? "…" : `draws in ${fmtDuration(left)}`}
         </span>
       </div>
       <div className="mt-2 flex items-end justify-between gap-3">

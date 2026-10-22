@@ -21,6 +21,7 @@
   --text: #1c1b29;
   --muted: #5e6178;
   --accent: #f2b705; /* coin */
+  --jackpot: #b07a00; /* coin gold dark enough for text */
   --heart: #e2257a;
   --long: #137a43;
   --short: #d23a3a;
@@ -67,6 +68,7 @@
     --text: #eceef6;
     --muted: #9ba0b9;
     --accent: #ffc83d;
+    --jackpot: #ffc83d;
     --heart: #ff4fa3;
     --long: #2fb466;
     --short: #ec5050;

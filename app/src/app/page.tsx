@@ -17,6 +17,7 @@ import { Toasts } from "@/components/Toasts";
 import { SoundEvents } from "@/components/Sounds";
 import { AchievementWatcher, BadgesDialog } from "@/components/Achievements";
 import { FullHeal } from "@/components/FullHeal";
+import { JackpotWin } from "@/components/JackpotWin";
 import { EpochResults } from "@/components/EpochResults";
 import { Onboarding } from "@/components/Onboarding";
 import { Icon, type IconName } from "@/components/Icon";
@@ -112,6 +113,7 @@ export default function Home() {
       <AchievementWatcher />
       <BadgesDialog />
       <FullHeal />
+      <JackpotWin />
       <EpochResults />
     </OneUpProvider>
   );

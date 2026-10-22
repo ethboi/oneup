@@ -31,6 +31,8 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
   const left = epoch ? Math.max(0, epoch.started_at + d.epochLengthS - now) : 0;
   const alive = lives?.filter((l) => !l.expired && !l.full_heal).length ?? 0;
   const round = useMyRound(me, epoch?.started_at);
+  const treasury = usePoll(() => o.treasury(), [], 5000);
+  const jackpot = treasury?.vault ? BigInt(treasury.jackpot) : null;
 
   return (
     <header className="mb-4 flex items-center gap-2 border-b border-[var(--line)] py-3 sm:gap-4 lg:mb-5">
@@ -54,6 +56,19 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
       {/* the round's clock and your result in it, one strip like the chart's market bar */}
       <div className="flex min-w-0 flex-1 justify-end lg:flex-none">
         <div className="bar-strip num min-h-[38px] text-sm">
+          {jackpot !== null && (
+            <button
+              type="button"
+              className="bar-cell font-extrabold"
+              style={{ color: "var(--jackpot)" }}
+              onClick={() => go("Leaders")}
+              title="The jackpot: the house's idle USDC earns interest, and one loser's ticket takes it all. Tap for your tickets."
+              aria-label={`Jackpot $${fmtUsdc(jackpot, 2)}`}
+            >
+              <PixelCoin size={16} />
+              ${fmtUsdc(jackpot, jackpot < 1_000n * USDC ? 2 : 0)}
+            </button>
+          )}
           <span className="bar-cell" title={`Round ${epoch?.id ?? ""} ends in ${fmtClock(left)}, with Extra Lives and $1UP locks for its losers`}>
             {/* the label goes on narrow desktops too, where the tabs need the room */}
             <span className="label hidden sm:inline lg:hidden xl:inline">Round {epoch?.id ?? "…"}</span>
