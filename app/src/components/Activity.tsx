@@ -15,6 +15,8 @@ export interface ActivityItem {
   /** On a sale: what sold, its price and (when seen live) its value then (lib/server/activity.ts). */
   sale?: { nft: "life" | "lock"; token_id: string; price: string; value?: string };
   amount?: string;
+  /** On an open or a close: the trade, for the trades tape (lib/server/activity.ts). */
+  trade?: { market: string; side: "Long" | "Short"; size: string; price: string; open: boolean };
 }
 
 const LOOK: Record<ActivityItem["kind"], { icon: IconName; color: string }> = {

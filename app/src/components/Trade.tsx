@@ -172,23 +172,21 @@ function MarketBar(props: {
         </div>
       </dl>
       <div className="bar-strip num order-2 lg:order-3 lg:ml-auto" role="group" aria-label="Chart">
-        <label className="bar-cell">
-          <span className="sr-only">Chart style</span>
-          <select className="bar-select" value={style} onChange={(e) => setStyle(e.target.value as "line" | "candles")}>
-            <option value="line">Line</option>
-            <option value="candles">Candles</option>
-          </select>
-        </label>
-        <label className="bar-cell">
-          <span className="sr-only">Chart window</span>
-          <select className="bar-select num" value={range} onChange={(e) => setRange(Number(e.target.value))}>
-            {RANGES.map(([name, ms]) => (
-              <option key={name} value={ms}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </label>
+        {/* laid out, not folded into menus: one tap to switch, as on a trading screen */}
+        <span className="bar-cell !px-1" role="group" aria-label="Chart style">
+          {(["line", "candles"] as const).map((k) => (
+            <button key={k} type="button" className="bar-opt" aria-pressed={style === k} onClick={() => setStyle(k)}>
+              {k === "line" ? "Line" : "Candles"}
+            </button>
+          ))}
+        </span>
+        <span className="bar-cell !px-1" role="group" aria-label="Chart window">
+          {RANGES.map(([name, ms]) => (
+            <button key={name} type="button" className="bar-opt num" aria-pressed={range === ms} onClick={() => setRange(ms)}>
+              {name}
+            </button>
+          ))}
+        </span>
         <span className="bar-cell" title={live ? "Prices are updating" : "No new price for a few seconds"}>
           <span className={`h-1.5 w-1.5 rounded-full ${live ? "live-dot" : ""}`} style={{ background: live ? "var(--long)" : "var(--muted)" }} />
           <b className="hidden text-xs sm:inline" style={{ color: live ? "var(--long)" : "var(--muted)" }}>
@@ -339,20 +337,25 @@ export function Trade() {
         <div className="order-1 empty:hidden">
           <LossBanner />
         </div>
-        <Console
-          market={market}
-          setMarket={setMarket}
-          markets={markets.filter((m) => m.live)}
-          marks={marks}
-          mine={focused ? [focused] : []}
-          held={new Set(positions.map((p) => p.market_id))}
-        />
+        {/* very wide screens: the market's trades run beside the chart, where an exchange keeps its book */}
+        <div className="contents 2xl:grid 2xl:grid-cols-[minmax(0,1fr)_250px] 2xl:gap-4">
+          <Console
+            market={market}
+            setMarket={setMarket}
+            markets={markets.filter((m) => m.live)}
+            marks={marks}
+            mine={focused ? [focused] : []}
+            held={new Set(positions.map((p) => p.market_id))}
+          />
+          <TradesTape market={market} info={markets.find((m) => m.id === market)} />
+        </div>
         <div className="order-4 min-w-0">
-          <Below positions={positions} orders={orders} focused={focused?.id} pick={pick} />
+          <Below positions={positions} orders={orders} focused={focused?.id} pick={pick} market={market} />
         </div>
       </div>
       <div ref={formRef} id="order-form" className="order-3 flex flex-col gap-4">
         <OrderForm t={ticket} />
+        <Account t={ticket} positions={positions} />
         {/* under the form on every screen: on a desktop it fills the column beside the tall chart */}
         <Jackpot compact />
       </div>
@@ -361,17 +364,116 @@ export function Trade() {
   );
 }
 
+/** What you hold, as an exchange's account box sums it: your wallet, your balance in OneUp, the margin your
+ *  positions lock up and what they'd pay if closed now. */
+function Account({ t, positions }: { t: Ticket; positions: Position[] }) {
+  const { prices } = useOneUp();
+  const margin = positions.reduce((a, p) => a + BigInt(p.margin), 0n);
+  const open = positions.reduce((a, p) => {
+    const mark = prices[p.market_id];
+    return mark ? a + afterCut(pnl(p.side, BigInt(p.margin), p.leverage, BigInt(p.entry_price), mark), p.cut_ppm) : a;
+  }, 0n);
+  const equity = t.wallet + t.free + margin + open;
+  const usd = (x: bigint) => `${x < 0n ? "−" : ""}$${fmtUsdc(x < 0n ? -x : x, (x < 0n ? -x : x) < 1_000n * USDC ? 2 : 0)}`;
+  return (
+    <section className="panel p-4" aria-label="Account">
+      <div className="ticket-row">
+        <h3 className="font-extrabold">Account</h3>
+        <span className="num text-lg font-extrabold" title="Wallet, plus your balance in OneUp, plus your positions at the current mark">
+          {usd(equity)}
+        </span>
+      </div>
+      <dl className="num mt-2 flex flex-col gap-1.5 text-sm">
+        <div className="ticket-row">
+          <dt className="label">Wallet</dt>
+          <dd className="font-bold">{usd(t.wallet)}</dd>
+        </div>
+        <div className="ticket-row">
+          <dt className="label">In OneUp</dt>
+          <dd className="font-bold">{usd(t.free)}</dd>
+        </div>
+        <div className="ticket-row">
+          <dt className="label">Margin in use</dt>
+          <dd className="font-bold">{usd(margin)}</dd>
+        </div>
+        <div className="ticket-row">
+          <dt className="label">Open PnL</dt>
+          <dd className="font-bold" style={{ color: open > 0n ? "var(--long)" : open < 0n ? "var(--short)" : undefined }}>
+            {open > 0n ? "+" : ""}
+            {usd(open)}
+          </dd>
+        </div>
+      </dl>
+    </section>
+  );
+}
+
+/** How long ago, in the tape's few characters. */
+const agoShort = (ms: number) => {
+  const s = Math.max(0, Math.round(ms / 1000));
+  return s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s / 60)}m` : `${Math.floor(s / 3600)}h`;
+};
+
+/** The market's trades as they happen, newest first, under how its open max wins split between longs and shorts. */
+function TradesTape({ market, info }: { market: string; info?: Market }) {
+  const feed = useActivity(300);
+  const now = useNow();
+  const rows = feed.filter((a) => a.trade?.market === market).slice(0, 40);
+  const long = info ? BigInt(info.long_liability) : 0n;
+  const short = info ? BigInt(info.short_liability) : 0n;
+  const longPct = long + short > 0n ? Number((long * 1000n) / (long + short)) / 10 : 50;
+  return (
+    <section className="panel tape order-2 hidden min-h-0 flex-col 2xl:flex" aria-label={`${market} trades`}>
+      <div className="flex items-baseline justify-between px-3.5 pt-3">
+        <h3 className="font-extrabold">Trades</h3>
+        <span className="label">{market}</span>
+      </div>
+      {/* the house's book on this market: whose max wins it holds more of */}
+      <div className="px-3.5 pt-2.5" title="How the market's open max wins split between longs and shorts">
+        <div className="tape-split num">
+          <span style={{ width: `${longPct}%` }}>L {longPct.toFixed(0)}%</span>
+          <span style={{ width: `${100 - longPct}%` }}>{(100 - longPct).toFixed(0)}% S</span>
+        </div>
+      </div>
+      <div className="tape-row label mt-3 px-3.5 pb-1">
+        <span>Price</span>
+        <span className="text-right">Size</span>
+        <span className="text-right">Time</span>
+      </div>
+      <ol className="num min-h-0 flex-1 overflow-y-auto px-3.5 pb-3 text-[13px]">
+        {rows.length === 0 && <li className="label py-2">No trades on {market} yet.</li>}
+        {rows.map((a) => {
+          const tr = a.trade!;
+          return (
+            <li key={a.seq} className="tape-row py-[3px]" title={a.text}>
+              <span className="font-bold" style={{ color: tr.side === "Long" ? "var(--long)" : "var(--short)", opacity: tr.open ? 1 : 0.6 }}>
+                {tr.open ? "" : "× "}
+                {fmtPrice(BigInt(tr.price))}
+              </span>
+              <span className="text-right">${fmtCompact(BigInt(tr.size))}</span>
+              <span className="label text-right">{agoShort(now * 1000 - a.t)}</span>
+            </li>
+          );
+        })}
+      </ol>
+      <p className="label border-t border-[var(--line)] px-3.5 py-2">Colour is the side; × is a close.</p>
+    </section>
+  );
+}
+
 /** Positions and the live feed share one panel, switched by tabs. */
-function Below({ positions, orders, focused, pick }: { positions: Position[]; orders: Order[]; focused?: number; pick: (p: Position) => void }) {
+function Below({ positions: all, orders, focused, pick, market }: { positions: Position[]; orders: Order[]; focused?: number; pick: (p: Position) => void; market: string }) {
   const [view, setView] = useState<"positions" | "history" | "activity">("positions");
   const feed = useActivity().filter((a) => a.kind !== "opened");
+  const [onlyHere, setOnlyHere] = useState(false);
+  const positions = onlyHere ? all.filter((p) => p.market_id === market) : all;
   return (
     <div className="panel p-4 pt-2">
       <div className="tabs-inline mb-2 flex items-center justify-between border-b border-[var(--line)]" role="tablist">
         <div className="flex gap-1">
           {(
             [
-              ["positions", `Positions${positions.length ? ` (${positions.length})` : ""}`],
+              ["positions", `Positions${all.length ? ` (${all.length})` : ""}`],
               ["history", "History"],
               ["activity", "Activity"],
             ] as const
@@ -385,6 +487,15 @@ function Below({ positions, orders, focused, pick }: { positions: Position[]; or
           <span className="flex items-center gap-1.5 text-xs font-bold text-[var(--long)]">
             <span className="h-2 w-2 rounded-full bg-[var(--long)]" aria-hidden /> on chain
           </span>
+        )}
+        {view === "positions" && all.length > 0 && (
+          <div className="flex items-center gap-3">
+            <label className="hidden cursor-pointer items-center gap-1.5 text-xs font-bold text-[var(--muted)] sm:flex">
+              <input type="checkbox" className="check" checked={onlyHere} onChange={(e) => setOnlyHere(e.target.checked)} />
+              {market} only
+            </label>
+            <CloseAll positions={positions} />
+          </div>
         )}
       </div>
       {view === "positions" && <Positions positions={positions} orders={orders} focused={focused} pick={pick} />}
@@ -999,6 +1110,49 @@ function ChartPick({ p, on, pick }: { p: Position; on: boolean; pick: (p: Positi
       <span className={on ? "text-[var(--primary)]" : "text-[var(--muted)] opacity-0"} aria-hidden>
         <Icon name="chart" size={14} />
       </span>
+    </button>
+  );
+}
+
+/** Close every position shown that's past its minimum hold, after a second tap to confirm. */
+function CloseAll({ positions }: { positions: Position[] }) {
+  const { tx, run } = useOneUp();
+  const now = useNow();
+  const [asking, setAsking] = useState(false);
+  const ready = positions.filter((p) => p.close_order === null && p.opened_at + MIN_HOLD_S <= now);
+  useEffect(() => {
+    if (!asking) return;
+    // a confirm left alone goes away
+    const t = setTimeout(() => setAsking(false), 5000);
+    return () => clearTimeout(t);
+  }, [asking]);
+  if (ready.length === 0) return null;
+  const label = ready.length === 1 ? "Close 1" : `Close all ${ready.length}`;
+  return asking ? (
+    <span className="flex items-center gap-1.5 whitespace-nowrap text-xs font-bold" role="group" aria-label="Confirm close all">
+      <span className="text-[var(--short)]">{label}?</span>
+      <button
+        type="button"
+        className="chip !py-0.5"
+        style={{ background: "var(--short-fill)", borderColor: "var(--short-fill)", color: "var(--on-fill)" }}
+        onClick={() => {
+          setAsking(false);
+          run(`Close ${ready.length} position${ready.length === 1 ? "" : "s"}`, async () => {
+            for (const p of ready) await tx.placeClose(p.id);
+          });
+        }}
+      >
+        Yes
+      </button>
+      <button type="button" className="chip !py-0.5" onClick={() => setAsking(false)}>
+        No
+      </button>
+    </span>
+  ) : (
+    <button type="button" className="chip !py-0.5 whitespace-nowrap text-xs" onClick={() => setAsking(true)}>
+      {ready.length === 1 ? "Close 1" : "Close all"}
+      {/* the count where there's room for it */}
+      {ready.length > 1 && <span className="hidden sm:inline"> {ready.length}</span>}
     </button>
   );
 }

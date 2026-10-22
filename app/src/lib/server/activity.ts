@@ -22,6 +22,9 @@ export interface ActivityItem {
   sale?: { nft: "life" | "lock"; token_id: string; price: string; value?: string };
   /** On a jackpot win: what it paid. */
   amount?: string;
+  /** On an open or a close: the trade, for the trades tape (size and price in USDC 1e6 and price 1e8 units). A
+   *  close only carries it when its open was seen. */
+  trade?: { market: string; side: "Long" | "Short"; size: string; price: string; open: boolean };
 }
 
 /** One closed trade: its open and close events joined by position id. */
@@ -166,6 +169,8 @@ export function toItems(ev: Event, executor: string, t: number, c: Record<string
       const id = Number(d.position_id);
       const o = state.opened.get(id);
       state.opened.delete(id);
+      const last = out.feed[out.feed.length - 1];
+      if (o) last.trade = { market: o.market_id, side: o.side, size: String(BigInt(o.margin) * BigInt(o.leverage)), price: String(d.price), open: false };
       if (o) {
         mine(account, {
           t,
@@ -197,7 +202,13 @@ export function toItems(ev: Event, executor: string, t: number, c: Record<string
         entry_price: String(d.entry_price),
         t,
       });
-      out.feed.push({ t, kind: "opened", who, text: `${who} opened a ${d.leverage}× ${side.toLowerCase()} on ${d.market_id}` });
+      out.feed.push({
+        t,
+        kind: "opened",
+        who,
+        text: `${who} opened a ${d.leverage}× ${side.toLowerCase()} on ${d.market_id}`,
+        trade: { market: String(d.market_id), side, size: String(BigInt(String(d.margin)) * BigInt(Number(d.leverage))), price: String(d.entry_price), open: true },
+      });
     } else if (ev.standard === "oneup" && (ev.event === "deposit" || ev.event === "withdraw")) {
       mine(String(d.account_id), { t, kind: ev.event, amount: String(d.amount) });
     } else if (ev.standard === "oneup" && ev.event === "backed") {
