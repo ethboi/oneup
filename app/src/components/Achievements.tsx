@@ -10,6 +10,7 @@ import { ACHIEVEMENTS, GROUPS, SKINS, badgeStates, readFlags, skinUnlocked, type
 import { sfx } from "@/lib/sound";
 import { useHistory } from "./History";
 import { Icon } from "./Icon";
+import { PixelBadge } from "./Pixel";
 
 /** Each badge's state for this account (earned, when, progress), once its history has loaded. */
 export function useBadgeStates(): Map<string, BadgeState> | null {
@@ -85,8 +86,8 @@ export function AchievementWatcher() {
       onClick={() => (setShown(null), openBadges())}
       role="status"
     >
-      <span className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--on-color)]" style={{ background: RARITY[a.rarity].color }}>
-        <Icon name="trophy" size={20} />
+      <span className="flex h-12 w-12 items-center justify-center rounded-xl border-2 bg-[var(--panel-2)]" style={{ borderColor: RARITY[a.rarity].color }}>
+        <PixelBadge id={a.id} size={30} />
       </span>
       <span>
         <span className="label block">Achievement unlocked · {RARITY[a.rarity].name}</span>
@@ -213,10 +214,10 @@ function Badge({ a, b }: { a: (typeof ACHIEVEMENTS)[number]; b?: BadgeState }) {
       style={{ borderColor: got ? r.color : "var(--line)", background: got ? `color-mix(in srgb, ${r.color} 7%, transparent)` : undefined }}
     >
       <span
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
-        style={{ background: got ? r.color : "var(--panel-2)", color: got ? "var(--on-color)" : "var(--muted)" }}
+        className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border-2"
+        style={{ borderColor: got ? r.color : "var(--line)", background: "var(--panel-2)" }}
       >
-        <Icon name={got ? "trophy" : "lock"} size={18} />
+        <PixelBadge id={a.id} size={34} locked={!got} />
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex items-baseline justify-between gap-2">

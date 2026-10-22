@@ -1,26 +1,6 @@
 // Pixel sprites drawn from character grids, outlined in ink automatically so they read on any surface.
 
-const HEART = [
-  ".##...##.",
-  "####.####",
-  "#########",
-  "#########",
-  ".#######.",
-  "..#####..",
-  "...###...",
-  "....#....",
-];
-
-const COIN = [
-  "..####..",
-  ".######.",
-  "###||###",
-  "###||###",
-  "###||###",
-  "###||###",
-  ".######.",
-  "..####..",
-];
+import { COIN_ROWS as COIN, HEART_ROWS as HEART, SPRITES } from "@/lib/sprites";
 
 interface SpriteProps {
   rows: string[];
@@ -122,4 +102,13 @@ export function HealthBar({ value, segments = 10, color = "var(--heart)", label 
       ))}
     </div>
   );
+}
+
+/** An achievement's sprite. Locked, it's a grey silhouette. */
+export function PixelBadge({ id, size = 32, locked }: { id: string; size?: number; locked?: boolean }) {
+  const def = SPRITES[id];
+  if (!def) return null;
+  const grey = "color-mix(in srgb, var(--muted) 40%, var(--panel))";
+  const colors = locked ? Object.fromEntries(Object.keys(def.colors).map((k) => [k, grey])) : def.colors;
+  return <Sprite rows={def.rows} colors={colors} size={size} fill={locked ? 1 : (def.fill ?? 1)} edge={locked ? "var(--muted)" : undefined} />;
 }

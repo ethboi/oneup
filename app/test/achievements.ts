@@ -47,3 +47,17 @@ test("counts show progress until they're earned", () => {
   assert.deepEqual(s.get("centurion"), { got: false, progress: { n: 30, of: 100 } });
   assert.deepEqual(s.get("globetrotter"), { got: false, progress: { n: 2, of: 3 } });
 });
+
+test("every badge has a sprite, every sprite row is the same width and uses its palette", async () => {
+  const { ACHIEVEMENTS } = await import("../src/lib/achievements.ts");
+  const { SPRITES } = await import("../src/lib/sprites.ts");
+  for (const a of ACHIEVEMENTS) {
+    const s = SPRITES[a.id];
+    assert.ok(s, `${a.id} has no sprite`);
+    const w = s.rows[0].length;
+    for (const r of s.rows) {
+      assert.equal(r.length, w, `${a.id}: "${r}" is not ${w} wide`);
+      for (const c of r) if (c !== ".") assert.ok(c in s.colors, `${a.id}: no colour for "${c}"`);
+    }
+  }
+});
