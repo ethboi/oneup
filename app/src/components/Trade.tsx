@@ -42,6 +42,25 @@ const RANGES = [
 
 const MIN_HOLD_S = 60;
 
+/** A market's last few minutes as a small line, for its tile. */
+function Sparkline({ points, color }: { points: { t: number; p: number }[]; color: string }) {
+  const W = 56;
+  const H = 22;
+  if (points.length < 2) return <svg width={W} height={H} aria-hidden />;
+  const lo = Math.min(...points.map((x) => x.p));
+  const hi = Math.max(...points.map((x) => x.p));
+  const t0 = points[0].t;
+  const t1 = points[points.length - 1].t;
+  const d = points
+    .map((x, i) => `${i ? "L" : "M"}${(((x.t - t0) / Math.max(1, t1 - t0)) * W).toFixed(1)} ${(H - 2 - ((x.p - lo) / (hi - lo || 1)) * (H - 4)).toFixed(1)}`)
+    .join(" ");
+  return (
+    <svg width={W} height={H} aria-hidden className="shrink-0">
+      <path d={d} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 /** Line or candles, remembered in this browser. */
 function useChartStyle(): ["line" | "candles", (s: "line" | "candles") => void] {
   const [style, set] = useState<"line" | "candles">("line");
@@ -119,6 +138,7 @@ export function Trade() {
         pnl: net === null ? undefined : { usd: Number(net) / 1e6, pct: (Number(net) / Number(margin)) * 100 },
         // the price of the 9× profit cap: a move of 9 ÷ leverage
         cap: priceToNumber(entry) * (1 + ((p.side === "Long" ? 1 : -1) * 9) / p.leverage),
+        since: p.opened_at * 1000,
       },
       { price: priceToNumber(liquidationPrice(p.side, entry, p.leverage)), label: `#${p.id} liq`, kind: "liq", pos: p.id },
       ...(p.triggers.take_profit ? [{ price: priceToNumber(BigInt(p.triggers.take_profit)), label: `#${p.id} TP`, kind: "tp" as const, pos: p.id }] : []),
@@ -141,6 +161,7 @@ export function Trade() {
           markets={markets.filter((m) => m.live).map((m) => m.id)}
           marks={marks}
           mine={focused ? [focused] : []}
+          held={new Set(positions.map((p) => p.market_id))}
         />
         <div className="order-4 min-w-0">
           <Below positions={positions} orders={orders} focused={focused?.id} pick={pick} />
@@ -250,12 +271,15 @@ function Console({
   markets,
   marks,
   mine,
+  held: positionsHere,
 }: {
   market: string;
   setMarket: (m: string) => void;
   markets: string[];
   marks: Mark[];
   mine: Position[];
+  /** Markets you have a position in. */
+  held: Set<string>;
 }) {
   const { prices, history, me } = useOneUp();
   const mood = useMood(mine, prices[market]);
@@ -276,20 +300,35 @@ function Console({
   return (
     <div key={fx?.kind === "liquidated" || (fx?.kind === "win" && fx.tier === 3) ? fx.id : "case"} id="chart" className={`case order-2 min-w-0 scroll-mt-4 p-3 sm:p-5 ${fx?.kind === "liquidated" || (fx?.kind === "win" && fx.tier === 3) ? "shake" : ""}`}>
       <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
-      <div className="-mx-1 flex min-w-0 flex-1 gap-1.5 overflow-x-auto px-1 pb-1 pt-0.5" role="group" aria-label="Market">
+      <div className="-mx-1 flex min-w-0 flex-1 gap-1.5 overflow-x-auto px-1 pb-1.5 pt-0.5 sm:gap-2" role="group" aria-label="Market">
         {markets.map((m) => {
-          const h = history[m] ?? [];
+          const h = (history[m] ?? []).filter((x) => x.t >= now * 1000 - 300_000);
           const ch = h.length > 1 ? (h[h.length - 1].p / h[0].p - 1) * 100 : null;
           const [base, quote] = m.split("-");
+          const color = ch === null ? "var(--muted)" : ch >= 0 ? "var(--long)" : "var(--short)";
+          const open = positionsHere.has(m);
           return (
             <button key={m} aria-pressed={m === market} onClick={() => setMarket(m)} className="market-tile num shrink-0">
-              <span className="text-sm">
-                <b>{base}</b>
-                <span className="text-[var(--muted)]">-{quote}</span>
+              <span className="flex w-full items-center justify-between gap-2 text-sm">
+                <span>
+                  <b>{base}</b>
+                  <span className="text-[var(--muted)]">-{quote}</span>
+                </span>
+                {open && <span className="h-2 w-2 rounded-full bg-[var(--primary)]" title="You have a position here" aria-label="You have a position here" />}
               </span>
-              <span className="text-base font-extrabold">{prices[m] ? fmtPrice(prices[m]) : "…"}</span>
-              <span className="text-xs font-bold" style={{ color: ch === null ? "var(--muted)" : ch >= 0 ? "var(--long)" : "var(--short)" }}>
-                {ch === null ? "–" : `${ch >= 0 ? "▲" : "▼"} ${Math.abs(ch).toFixed(2)}%`}
+              <span className="flex w-full items-end justify-between gap-3">
+                <span>
+                  {/* keyed by the price so each new one flashes, green up or red down */}
+                  <span key={prices[m]?.toString()} className={`tick-flash block text-[15px] font-extrabold sm:text-base ${h.length > 1 && h[h.length - 1].p < h[h.length - 2].p ? "tick-down" : "tick-up"}`}>
+                    {prices[m] ? fmtPrice(prices[m]) : "…"}
+                  </span>
+                  <span className="text-xs font-bold" style={{ color }}>
+                    {ch === null ? "–" : `${ch >= 0 ? "▲" : "▼"} ${Math.abs(ch).toFixed(2)}%`}
+                  </span>
+                </span>
+                <span className="hidden sm:block">
+                  <Sparkline points={h} color={color} />
+                </span>
               </span>
             </button>
           );

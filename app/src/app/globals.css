@@ -439,30 +439,65 @@ body {
     background: linear-gradient(var(--stripe-1) 0 2px, transparent 2px 5px, var(--stripe-2) 5px 7px);
   }
   /* market picker above the screen: plain text, the selected one underlined */
+  /* market tiles: small cards, the picked one raised in the accent like a pressed key */
   .market-tile {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 1px;
-    min-width: 116px;
-    padding: 4px 4px 8px;
-    border-bottom: 2px solid transparent;
+    gap: 2px;
+    /* phones: three across, no sparkline */
+    flex: 1 0 0;
+    min-width: 104px;
+    padding: 7px 9px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--field);
     text-align: left;
-    opacity: 0.7;
     transition:
-      opacity 0.15s,
-      border-color 0.15s;
+      border-color 0.15s,
+      box-shadow 0.15s,
+      transform 0.06s;
+  }
+  @media (min-width: 640px) {
+    .market-tile {
+      flex: 0 0 auto;
+      min-width: 150px;
+      padding: 8px 10px;
+    }
   }
   .market-tile:hover {
-    opacity: 1;
+    border-color: color-mix(in srgb, var(--primary) 45%, var(--line));
   }
   .market-tile[aria-pressed="true"] {
-    opacity: 1;
     border-color: var(--primary);
+    background: color-mix(in srgb, var(--primary) 6%, var(--field));
+    box-shadow: 0 2px 0 var(--primary);
+  }
+  .market-tile:active {
+    transform: translateY(1px);
   }
   .market-tile:focus-visible {
     outline: 3px solid var(--info);
     outline-offset: 2px;
+  }
+  /* a new price flashes its direction for a moment */
+  .tick-flash {
+    animation: tick-flash 0.8s ease-out;
+    border-radius: 4px;
+  }
+  .tick-up {
+    --tick: var(--long);
+  }
+  .tick-down {
+    --tick: var(--short);
+  }
+  @keyframes tick-flash {
+    0% {
+      background: color-mix(in srgb, var(--tick) 22%, transparent);
+    }
+    100% {
+      background: transparent;
+    }
   }
 
   /* desktop tabs: plain text in the header bar, the current one underlined in the heart colour */
@@ -971,6 +1006,7 @@ body {
   .coin-fly,
   .coin-rain,
   .win-flash,
+  .tick-flash,
   .win-amount,
   .heart-crack,
   .heart-plus,

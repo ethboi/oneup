@@ -22,6 +22,8 @@ export interface Mark {
   /** On an entry: the price where the position hits its 9× profit cap (its green zone deepens toward this
    *  when there's no take-profit). */
   cap?: number;
+  /** On an entry: when the position opened (ms), where its shading starts. */
+  since?: number;
 }
 
 /** Candle widths: the first that puts at most 48 across the window. */
@@ -245,20 +247,20 @@ export function PriceChart({
   for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) ticks.push(v);
   const busy = [y(headP), ...shown.filter((s) => !s.edge).map((s) => y(s.m.price))];
 
-  // each position's zone runs from entry to the price now: green in profit, deepening toward the take-profit (or
-  // the 9× cap), red in loss, deepening toward the stop-loss (or liquidation). It grows and shrinks with the price
-  const clampY = (p: number) => Math.min(plotB, Math.max(PAD.t, y(p)));
-  const zones = marks
-    .filter((m) => m.kind === "entry" && m.pos !== undefined && m.pnl)
-    .flatMap((e) => {
-      const mine = marks.filter((m) => m.pos === e.pos);
-      const loss = e.pnl!.usd < 0;
-      const toward = loss
-        ? (mine.find((m) => m.kind === "sl") ?? mine.find((m) => m.kind === "liq"))?.price
-        : (mine.find((m) => m.kind === "tp")?.price ?? e.cap);
-      if (toward === undefined) return [];
-      return [{ key: `${e.pos}`, a: clampY(e.price), b: clampY(headP), from: y(e.price), to: y(toward), loss }];
-    });
+  // the focused position's shading fills between the price line and its entry, from when it opened: green on
+  // the profit side, deepening toward the take-profit (or the 9× cap), red on the loss side, deepening toward the
+  // stop-loss (or liquidation)
+  const entry = marks.find((m) => m.kind === "entry" && m.pos !== undefined && m.cap !== undefined);
+  const zone = (() => {
+    if (!entry) return null;
+    const mine = marks.filter((m) => m.pos === entry.pos);
+    const long = entry.cap! > entry.price;
+    const target = mine.find((m) => m.kind === "tp")?.price ?? entry.cap!;
+    const stop = (mine.find((m) => m.kind === "sl") ?? mine.find((m) => m.kind === "liq"))?.price;
+    const yE = y(entry.price);
+    const x0 = Math.max(PAD.l, x(entry.since ?? t0));
+    return { yE, x0, upIsProfit: long, profitTo: y(target), lossTo: stop === undefined ? (long ? plotB : PAD.t) : y(stop) };
+  })();
   // live profit on each visible entry line
   const pills = shown
     .filter(({ m, edge }) => !edge && m.kind === "entry" && m.pnl)
@@ -335,18 +337,29 @@ export function PriceChart({
         <text x={x(t1)} y={H - 5} fontSize="10" fill="var(--lcd-3)" textAnchor="end">
           now
         </text>
-        {/* each zone deepens away from entry, so the colour grows with the profit or loss */}
-        {zones.map((z) => (
-          <g key={z.key}>
+        {zone && (
+          <g clipPath="url(#lcd-plot)">
             <defs>
-              <linearGradient id={`zone-${z.key}`} gradientUnits="userSpaceOnUse" x1="0" x2="0" y1={z.from} y2={z.to}>
-                <stop offset="0" stopColor={z.loss ? "var(--short)" : "var(--long)"} stopOpacity="0.12" />
-                <stop offset="1" stopColor={z.loss ? "var(--short)" : "var(--long)"} stopOpacity="0.6" />
+              <linearGradient id="zone-profit" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1={zone.yE} y2={zone.profitTo}>
+                <stop offset="0" stopColor="var(--long)" stopOpacity="0.2" />
+                <stop offset="1" stopColor="var(--long)" stopOpacity="0.6" />
               </linearGradient>
+              <linearGradient id="zone-loss" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1={zone.yE} y2={zone.lossTo}>
+                <stop offset="0" stopColor="var(--short)" stopOpacity="0.24" />
+                <stop offset="1" stopColor="var(--short)" stopOpacity="0.6" />
+              </linearGradient>
+              <clipPath id="zone-above">
+                <rect x={zone.x0} y={0} width={W} height={Math.max(0, zone.yE)} />
+              </clipPath>
+              <clipPath id="zone-below">
+                <rect x={zone.x0} y={zone.yE} width={W} height={Math.max(0, H - zone.yE)} />
+              </clipPath>
             </defs>
-            <rect x={PAD.l} width={plotR - PAD.l} y={Math.min(z.a, z.b)} height={Math.abs(z.b - z.a)} fill={`url(#zone-${z.key})`} />
+            {/* between the line and the entry: above it in one colour, below it in the other */}
+            <path d={`${line} L${x(t1)} ${zone.yE} L${x(points[0].t)} ${zone.yE} Z`} fill={`url(#zone-${zone.upIsProfit ? "profit" : "loss"})`} clipPath="url(#zone-above)" />
+            <path d={`${line} L${x(t1)} ${zone.yE} L${x(points[0].t)} ${zone.yE} Z`} fill={`url(#zone-${zone.upIsProfit ? "loss" : "profit"})`} clipPath="url(#zone-below)" />
           </g>
-        ))}
+        )}
         <g clipPath="url(#lcd-plot)">
           {bars ? (
             bars.map((c) => {
@@ -372,7 +385,7 @@ export function PriceChart({
           ) : (
             <>
               {/* the fill would muddy a position's zone, so it only shows on its own */}
-              {zones.length === 0 && <path d={`${line} L${x(t1)} ${plotB} L${x(points[0].t)} ${plotB} Z`} fill="url(#lcd-fill)" />}
+              {!zone && <path d={`${line} L${x(t1)} ${plotB} L${x(points[0].t)} ${plotB} Z`} fill="url(#lcd-fill)" />}
               <path d={line} fill="none" stroke="var(--lcd-ink)" strokeWidth="2.5" strokeLinejoin="round" />
             </>
           )}
