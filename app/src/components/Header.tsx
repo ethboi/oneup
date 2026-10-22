@@ -16,15 +16,18 @@ export interface NavTab {
   badge?: "lives";
 }
 
-/** One bar: brand, the section tabs (desktop), the pool and the epoch clock as plain text, Demo, and your account. */
+/** One bar: brand, the section tabs (desktop), the house's result this round and the epoch clock as plain text, Demo,
+ *  and your account. */
 export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string; go: (t: string) => void }) {
   const { o, d, me } = useOneUp();
-  const pool = usePoll(() => o.pool(), []);
   const epoch = usePoll(() => o.epoch(), []);
   const lives = usePoll(() => o.lives(me), [me]);
   const now = useNow();
   const left = epoch ? Math.max(0, epoch.started_at + d.epochLengthS - now) : 0;
   const alive = lives?.filter((l) => !l.expired && !l.full_heal).length ?? 0;
+  // the house's result this round: what traders lost to it less what it paid winners. Positive at the
+  // round's end is what pays the Extra Lives
+  const house = epoch ? BigInt(epoch.losses) - BigInt(epoch.payouts) : null;
 
   return (
     <header className="mb-4 flex items-center gap-2 border-b border-[var(--line)] py-3 sm:gap-4 lg:mb-5">
@@ -43,9 +46,13 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
         </div>
       </nav>
       <dl className="num flex min-w-0 flex-1 justify-end gap-4 text-right lg:flex-none">
-        <div>
-          <dt className="label leading-tight">Pool</dt>
-          <dd className="font-extrabold leading-tight">{pool ? `$${fmtUsdc(BigInt(pool), 0)}` : "…"}</dd>
+        <div title="What traders lost to the house this round, less what it paid winners. A profit at the end of the round pays the Extra Lives.">
+          <dt className="label leading-tight">
+            House<span className="hidden sm:inline"> this round</span>
+          </dt>
+          <dd className="font-extrabold leading-tight" style={house === null || house === 0n ? undefined : { color: house > 0n ? "var(--long)" : "var(--short)" }}>
+            {house === null ? "…" : `${house > 0n ? "+" : house < 0n ? "−" : ""}$${fmtUsdc(house < 0n ? -house : house, 0)}`}
+          </dd>
         </div>
         <div>
           <dt className="label leading-tight">Epoch {epoch?.id ?? "…"}</dt>
