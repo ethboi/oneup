@@ -187,7 +187,8 @@ export function PriceChart({
   for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) ticks.push(v);
   const busy = [y(headP), ...shown.filter((s) => !s.edge).map((s) => y(s.m.price))];
 
-  // each position's zones: entry to take-profit in green, entry to stop-loss (or liquidation) in red
+  // each position's zones, in the screen's own shades: entry to take-profit lit up, entry to stop-loss (or
+  // liquidation) hatched
   const clampY = (p: number) => Math.min(plotB, Math.max(PAD.t, y(p)));
   const zones = marks
     .filter((m) => m.kind === "entry" && m.pos !== undefined)
@@ -196,8 +197,8 @@ export function PriceChart({
       const tp = mine.find((m) => m.kind === "tp");
       const loss = mine.find((m) => m.kind === "sl") ?? mine.find((m) => m.kind === "liq");
       return [
-        ...(tp ? [{ key: `${e.pos}p`, a: clampY(e.price), b: clampY(tp.price), color: "var(--long)" }] : []),
-        ...(loss ? [{ key: `${e.pos}l`, a: clampY(e.price), b: clampY(loss.price), color: "var(--short)" }] : []),
+        ...(tp ? [{ key: `${e.pos}p`, a: clampY(e.price), b: clampY(tp.price), loss: false }] : []),
+        ...(loss ? [{ key: `${e.pos}l`, a: clampY(e.price), b: clampY(loss.price), loss: true }] : []),
       ];
     });
   // live profit on each visible entry line
@@ -208,7 +209,7 @@ export function PriceChart({
       const sign = usd >= 0 ? "+" : "−";
       const amount = `${sign}$${Math.abs(usd).toLocaleString("en-US", { maximumFractionDigits: Math.abs(usd) >= 1000 ? 0 : 2, minimumFractionDigits: Math.abs(usd) >= 1000 ? 0 : 2 })}`;
       const text = narrow ? amount : `${amount} (${sign}${Math.abs(pct).toFixed(1)}%)`;
-      return { key: m.label, y: y(m.price), text, up: usd >= 0, w: text.length * 7 + 12 };
+      return { key: m.label, y: y(m.price), text, up: usd >= 0, w: (text.length + 2) * 7.4 + 12 };
     });
   const tickDigits = Math.max(decimalsOf(step), 0);
 
@@ -242,6 +243,9 @@ export function PriceChart({
           <clipPath id="lcd-plot">
             <rect x={PAD.l} y={0} width={plotR - PAD.l + 4} height={plotB} />
           </clipPath>
+          <pattern id="lcd-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <line x1="0" y1="0" x2="0" y2="6" stroke="var(--lcd-ink)" strokeWidth="1.2" opacity="0.16" />
+          </pattern>
           <linearGradient id="lcd-fill" x1="0" x2="0" y1="0" y2="1">
             <stop offset="0" stopColor="var(--lcd-2)" stopOpacity="0.7" />
             <stop offset="1" stopColor="var(--lcd-2)" stopOpacity="0.1" />
@@ -272,7 +276,15 @@ export function PriceChart({
           now
         </text>
         {zones.map((z) => (
-          <rect key={z.key} x={PAD.l} width={plotR - PAD.l} y={Math.min(z.a, z.b)} height={Math.abs(z.b - z.a)} fill={z.color} opacity="0.13" />
+          <rect
+            key={z.key}
+            x={PAD.l}
+            width={plotR - PAD.l}
+            y={Math.min(z.a, z.b)}
+            height={Math.abs(z.b - z.a)}
+            fill={z.loss ? "url(#lcd-hatch)" : "#fff"}
+            opacity={z.loss ? 1 : 0.18}
+          />
         ))}
         <g clipPath="url(#lcd-plot)">
           <path d={`${line} L${x(t1)} ${plotB} L${x(points[0].t)} ${plotB} Z`} fill="url(#lcd-fill)" />
@@ -293,10 +305,12 @@ export function PriceChart({
             />
           ),
         )}
+        {/* printed in the screen's own ink, like the price tag: the sign carries profit or loss, not a colour */}
         {pills.map((p) => (
           <g key={p.key}>
-            <rect x={plotR - p.w - 6} y={p.y - 18} width={p.w} height="15" rx="3" fill={p.up ? "var(--long-fill)" : "var(--short-fill)"} />
-            <text x={plotR - 12} y={p.y - 7} fontSize="11" fontWeight="700" textAnchor="end" fill="var(--on-fill)" className="num">
+            <rect x={plotR - p.w - 6} y={p.y - 19} width={p.w} height="16" rx="2" fill="var(--lcd-ink)" />
+            <text x={plotR - 12} y={p.y - 7} fontSize="12" fontWeight="700" textAnchor="end" fill="var(--lcd)" className="num">
+              {p.up ? "▲ " : "▼ "}
               {p.text}
             </text>
           </g>
