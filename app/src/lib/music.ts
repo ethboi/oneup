@@ -69,8 +69,10 @@ export function sync() {
 /** Muffle the music (a position near liquidation) or bring it back. */
 export function setMusicTension(t: boolean) {
   tense = t;
+  // only while playing: creating the audio context here, before any click, would leave it locked
+  if (!filter || !master) return;
   const a = audio();
-  if (!a || !filter || !master) return;
+  if (!a) return;
   filter.frequency.setTargetAtTime(tense ? 700 : 12000, a.currentTime, 0.3);
   master.gain.setTargetAtTime(tense ? VOLUME * 0.6 : VOLUME, a.currentTime, 0.3);
 }

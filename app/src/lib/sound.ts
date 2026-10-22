@@ -34,8 +34,15 @@ export function onMuted(f: (m: boolean) => void) {
   return () => void listeners.delete(f);
 }
 
+/** Set by the first tap, click or key. A context made before that starts locked, and iOS may keep it so. */
+let touched = false;
+if (typeof window !== "undefined") {
+  const mark = () => (touched = true);
+  for (const e of ["pointerdown", "keydown", "touchend"]) window.addEventListener(e, mark, { once: true, capture: true });
+}
+
 export function audio(): AudioContext | null {
-  if (typeof window === "undefined") return null;
+  if (typeof window === "undefined" || (!ctx && !touched)) return null;
   ctx ??= new AudioContext();
   if (ctx.state === "suspended") void ctx.resume();
   return ctx;
