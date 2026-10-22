@@ -51,10 +51,10 @@ export function Locks() {
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_340px] lg:items-start">
       <div className="flex min-w-0 flex-col gap-5">
-        <Explainer line="Locked $1UP earns the house's buybacks, shared by weight: the amount × the epochs left ÷ 104.">
+        <Explainer line="Locked $1UP earns the house's buybacks, shared by weight: the amount × the rounds left ÷ 104.">
           Each epoch, 30% of the house&apos;s payout buys back $1UP for everyone locked. A lock&apos;s weight counts from the
-          epoch after it&apos;s made and shrinks as it runs down. Leaving early costs up to half, less as the lock runs down,
-          and the penalty goes to everyone still locked. Losers&apos; $1UP arrives already locked for {MAX} epochs. A lock is an
+          round after it&apos;s made and shrinks as it runs down. Leaving early costs up to half, less as the lock runs down,
+          and the penalty goes to everyone still locked. Losers&apos; $1UP arrives already locked for {MAX} rounds. A lock is an
           NFT: sell it on the market instead of leaving early.
         </Explainer>
 
@@ -84,7 +84,7 @@ export function Locks() {
             }
           >
             <Stat label="Locked" value={`${fmtOneup(locked.toString())} $1UP`} />
-            <Stat label="Your weight next epoch" value={fmtOneup(mine.toString())} />
+            <Stat label="Your weight next round" value={fmtOneup(mine.toString())} />
             <Stat label="Your share" value={`${share.toFixed(2)}%`} />
             <Stat label="Recent buybacks" value={`${fmtOneup((recent ?? 0n).toString())} $1UP`} />
           </SummaryBar>
@@ -127,7 +127,7 @@ function LockRow({ l, epoch, px, claimable, listings }: { l: LockInfo; epoch: nu
   const left = Math.max(0, l.end - epoch - 1);
   const ended = epoch >= l.end;
   const penalty = BigInt(l.exit_penalty);
-  const origin = l.merged > 0 ? `Merged from ${l.merged} locks` : l.from_loss ? `From a loss in epoch ${l.created - 1}` : `Locked in epoch ${l.created}`;
+  const origin = l.merged > 0 ? `Merged from ${l.merged} locks` : l.from_loss ? `From a loss in round ${l.created - 1}` : `Locked in round ${l.created}`;
   return (
     <div className="p-3 sm:p-4">
       <div className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-2 sm:grid-cols-[1.1fr_1.2fr_auto_auto]">
@@ -142,9 +142,9 @@ function LockRow({ l, epoch, px, claimable, listings }: { l: LockInfo; epoch: nu
           <div className="label num mt-1">
             {l.withdrawn
               ? l.exited !== null
-                ? `Closed in epoch ${l.exited}`
+                ? `Closed in round ${l.exited}`
                 : "Unlocked"
-              : `Unlocks at epoch ${l.end} (${left} to go) · weight ${fmtOneup(l.power)}${px > 0n ? ` · worth $${fmtUsdc(lockValue(l, px), 0)} if left today` : ""}`}
+              : `Unlocks in round ${l.end} (${left} to go) · weight ${fmtOneup(l.power)}${px > 0n ? ` · worth $${fmtUsdc(lockValue(l, px), lockValue(l, px) < 100n * USDC ? 2 : 0)} if left today` : ""}`}
           </div>
         </div>
         <div className="text-right sm:col-start-3">
@@ -160,7 +160,7 @@ function LockRow({ l, epoch, px, claimable, listings }: { l: LockInfo; epoch: nu
               </button>
             ) : (
               <>
-                <div className="flex-1 sm:w-40">
+                <div className="min-w-0 flex-1 sm:w-52">
                   <Sell nft={d.contracts.ve} tokenId={l.token_id} suggested={px > 0n ? (lockValue(l, px) * 8n) / 10n : USDC} listings={listings} compact />
                 </div>
                 <button className="btn btn-ghost px-2.5" onClick={() => setLeaving(!leaving)} aria-expanded={leaving} aria-label="Leave early" title="Leave early">
@@ -208,7 +208,7 @@ function LockForm() {
         <span className="label flex justify-between">
           <span>Lock for</span>
           <span className="num font-bold text-[var(--text)]">
-            {epochs} epochs{epochs >= 13 ? ` (about ${years >= 1 ? `${years.toFixed(1)} years` : `${Math.round(epochs / 4.33)} months`})` : ""}
+            {epochs} rounds{epochs >= 13 ? ` (about ${years >= 1 ? `${years.toFixed(1)} years` : `${Math.round(epochs / 4.33)} months`})` : ""}
           </span>
         </span>
         <input

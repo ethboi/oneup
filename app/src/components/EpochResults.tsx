@@ -74,7 +74,7 @@ export function EpochResults() {
 
   return (
     <div className="fixed inset-0 z-[62] flex items-center justify-center bg-black/55 p-4" onMouseDown={(e) => e.target === e.currentTarget && setRound(null)}>
-      <div role="dialog" aria-label={`Epoch ${s.epoch} results`} className="case round-in relative flex max-h-[92vh] w-full max-w-[560px] flex-col gap-4 overflow-y-auto p-5 sm:p-6">
+      <div role="dialog" aria-label={`Round ${s.epoch} results`} className="case round-in relative flex max-h-[92vh] w-full max-w-[560px] flex-col gap-4 overflow-y-auto p-5 sm:p-6">
         <div className="bezel p-4">
           <div className="lcd px-4 py-3 text-[var(--lcd-ink)]">
             <div className="display text-sm">EPOCH {s.epoch}</div>
@@ -88,7 +88,7 @@ export function EpochResults() {
         <section className="flex items-center gap-3">
           {lost ? <PixelHeart size={36} /> : <Icon name={mine.length ? "up" : "chart"} size={28} />}
           <div className="min-w-0 flex-1">
-            <div className="label">You this epoch</div>
+            <div className="label">You this round</div>
             <div className="num text-xl font-extrabold" style={{ color: mine.length ? (lost ? "var(--short)" : "var(--long)") : undefined }}>
               {mine.length ? `${signed(myPnl)} on ${mine.length} trade${mine.length === 1 ? "" : "s"}` : "Sat this one out"}
             </div>

@@ -171,7 +171,7 @@ up faster than they were paid, so later losers recovered less. Making lives expi
 | [`app`](app) | Next.js app: trade, Extra Lives, locks, market, solvency, fairness |
 | [`docs`](docs) | [Maths](docs/maths.md), [interfaces](docs/interfaces.md), [decisions](docs/decisions.md), [security](docs/SECURITY.md), [plan](PLAN.md) |
 
-Tests: 151 contract unit and property tests, 7 end-to-end sandbox tests, 17 tests of the API routes,
+Tests: 170 contract unit and property tests, 7 end-to-end sandbox tests, 23 tests of the API routes,
 relayer, solver and keeper, plus SDK and simulation tests. A security review on 21 Oct found 21 issues, from
 a stop-loss that could close at a stale price to one key shared by every account; each fix has a test that
 failed before it ([docs/SECURITY.md](docs/SECURITY.md)).

@@ -74,7 +74,18 @@ export function Leaderboard() {
         <div className="panel num flex flex-wrap items-center gap-x-6 gap-y-1 p-4 text-sm">
           <b>You</b>
           <span>
-            Rank <b>{myRank + 1}</b> <span className="label">of {rows.length}</span>
+            {BigInt(mine.pnl) > 0n ? (
+              <>
+                <b>#{winners.findIndex((r) => r.account === me) + 1}</b> in Top profit
+              </>
+            ) : BigInt(mine.pnl) < 0n ? (
+              <>
+                <b>#{losers.findIndex((r) => r.account === me) + 1}</b> in Most lost
+              </>
+            ) : (
+              "Even"
+            )}{" "}
+            <span className="label">of {rows.length} traders</span>
           </span>
           <span style={{ color: BigInt(mine.pnl) >= 0n ? "var(--long)" : "var(--short)" }}>
             <b>{usd(BigInt(mine.pnl))}</b>

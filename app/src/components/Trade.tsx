@@ -1178,8 +1178,8 @@ function LossBanner() {
       <div className="flex-1">
         <div className="text-lg font-extrabold leading-tight">Extra Life incoming</div>
         <div className="label num mt-1">
-          You lost ${fmtUsdc(loss.amount)} (${fmtUsdc(loss.total)} this epoch). Your Extra Life and $1UP lock mint
-          when the epoch ends in {fmtClock(left)}, sized from what the house made.
+          You lost ${fmtUsdc(loss.amount)} (${fmtUsdc(loss.total)} this round). Your Extra Life and $1UP lock mint
+          when the round ends in {fmtClock(left)}, sized from what the house made.
         </div>
       </div>
       <button className="btn btn-ghost px-2.5" onClick={() => setLoss(null)} aria-label="Dismiss">

@@ -165,7 +165,12 @@ function YourItems({ px, listings }: { px: bigint; listings: Listing[] }) {
   const { o, d, me } = useOneUp();
   const lives = (usePoll(() => o.lives(me), [me]) ?? []).filter((l) => lifeValue(l) > 0n && !l.expired);
   const locks = (usePoll(() => o.locks(me), [me]) ?? []).filter((l) => !l.withdrawn);
-  if (lives.length + locks.length === 0) {
+  // the first three, so Recent sales stays in view; the rest on request
+  const [all, setAll] = useState(false);
+  const total = lives.length + locks.length;
+  const shownLives = all ? lives : lives.slice(0, 3);
+  const shownLocks = all ? locks : locks.slice(0, Math.max(0, 3 - shownLives.length));
+  if (total === 0) {
     return <p className="label px-4 pb-4">Nothing to sell yet. Extra Lives and $1UP locks arrive when you lose a trade.</p>;
   }
   return (
@@ -174,30 +179,35 @@ function YourItems({ px, listings }: { px: bigint; listings: Listing[] }) {
         Suggested prices are 70% of what a life can still pay and 80% of a lock&apos;s value if left today. You get the price less a 2% fee
         that goes to the house pool.
       </p>
-      {lives.map((l) => (
+      {shownLives.map((l) => (
         <div key={l.token_id} className="flex flex-col gap-2 p-3">
           <span className="flex min-w-0 items-center gap-3">
             <PixelHeart size={24} />
             <span className="min-w-0">
-              <b className="block">{l.backer ? "Backer Life" : `Extra Life from epoch ${l.epoch}`}</b>
+              <b className="block">{l.backer ? "Backer Life" : `Extra Life from round ${l.epoch}`}</b>
               <span className="label num">{usd(lifeValue(l))} still to pay</span>
             </span>
           </span>
           <Sell nft={d.contracts.life} tokenId={l.token_id} suggested={(lifeValue(l) * 7n) / 10n} listings={listings} compact />
         </div>
       ))}
-      {locks.map((l) => (
+      {shownLocks.map((l) => (
         <div key={l.token_id} className="flex flex-col gap-2 p-3">
           <span className="flex min-w-0 items-center gap-3">
             <PixelLock size={22} />
             <span className="min-w-0">
               <b className="block num">{fmtOneup(l.amount)} $1UP lock</b>
-              <span className="label num">{px > 0n ? `${usd(lockValue(l, px))} if left today` : `unlocks at epoch ${l.end}`}</span>
+              <span className="label num">{px > 0n ? `${usd(lockValue(l, px))} if left today` : `unlocks in round ${l.end}`}</span>
             </span>
           </span>
           <Sell nft={d.contracts.ve} tokenId={l.token_id} suggested={px > 0n ? (lockValue(l, px) * 8n) / 10n : USDC} listings={listings} compact />
         </div>
       ))}
+      {total > 3 && (
+        <button type="button" className="label w-full p-3 text-center font-bold underline decoration-dotted underline-offset-2" onClick={() => setAll(!all)}>
+          {all ? "Show fewer" : `Show all ${total}`}
+        </button>
+      )}
     </div>
   );
 }

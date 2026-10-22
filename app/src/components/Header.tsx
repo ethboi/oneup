@@ -374,7 +374,7 @@ function RoundsToggle() {
           } catch {}
         }}
       />
-      Show results after each epoch
+      Show results after each round
     </label>
   );
 }
@@ -411,7 +411,8 @@ function useMyRound(me: string, startedAt?: number) {
 /** The reading tabs, under one "More" in the bar (the phone's bottom bar has its own). */
 function MoreTabs({ tabs, tab, go }: { tabs: NavTab[]; tab: string; go: (t: string) => void }) {
   const [open, setOpen] = useState(false);
-  const current = tabs.find((t) => t.name === tab);
+  // the label shows the current tab only for the ones that live under More at every width
+  const current = tabs.find((t) => t.name === tab && t.more);
   useEffect(() => {
     if (!open) return;
     const close = () => setOpen(false);

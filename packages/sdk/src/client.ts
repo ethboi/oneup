@@ -79,6 +79,8 @@ export interface EpochSummary {
   losses: U128;
   payouts: U128;
   cuts: U128;
+  /** D-28: the marketplace's cut, part of `house_net`. */
+  fees?: U128;
   house_net: U128;
   cap_ppm: U128;
   lives_minted: number;

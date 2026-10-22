@@ -78,7 +78,8 @@ export default function Home() {
           tab={tab}
           go={(t) => go(t as Tab)}
         />
-        <Onboarding />
+        {/* the three-step intro belongs on the trading screen, not every page */}
+        {tab === "Trade" && <Onboarding />}
         {tab === "Trade" && <Trade />}
         {tab === "Extra Lives" && <Lives />}
         {tab === "Locks" && <Locks />}

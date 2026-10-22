@@ -15,7 +15,7 @@ const STEPS: { icon: React.ReactNode; title: string; body: string }[] = [
   {
     icon: <PixelHeart size={22} />,
     title: "Lose, get an Extra Life",
-    body: "When an epoch ends with the house in profit, its losers get Extra Lives: NFTs that earn USDC back from the house's later profit, up to a cap, for 13 epochs.",
+    body: "When a round ends with the house in profit, its losers get Extra Lives: NFTs that earn USDC back from the house's later profit, up to a cap, for 14 rounds.",
   },
   {
     icon: <PixelCoin size={22} />,
@@ -52,9 +52,9 @@ const LINEAGE: { from: string; idea: string; rows: { topic: string; them: string
 ];
 
 const BUILT: { icon: IconName; title: string; body: string }[] = [
-  { icon: "shield", title: "8 Rust contracts", body: "House, Extra Life (NEP-171), $1UP (NEP-141), locks, market (NEP-178 approvals), and mock USDC, oracle and swap. Events follow NEP-297." },
-  { icon: "check", title: "158 contract tests", body: "Unit and property tests, end-to-end tests on a sandbox chain, and a security review whose 21 fixes each have a test." },
-  { icon: "demo", title: "Keeper and bots", body: "Anyone can run the keeper: it pushes prices, fills orders, liquidates, fires take-profits and stop-losses, and closes epochs. Twelve bots with different styles trade, lock and shop, and an MCP server lets AI agents trade too." },
+  { icon: "shield", title: "9 Rust contracts", body: "House, Extra Life (NEP-171), $1UP (NEP-141), locks, market (NEP-178 approvals), and mock USDC, oracle, swap and yield vault. Events follow NEP-297." },
+  { icon: "check", title: "177 contract tests", body: "Unit and property tests, end-to-end tests on a sandbox chain, and a security review whose 21 fixes each have a test." },
+  { icon: "demo", title: "Keeper and bots", body: "Anyone can run the keeper: it pushes prices, fills orders, liquidates, fires take-profits and stop-losses, and closes rounds. Twelve bots with different styles trade, lock and shop, and an MCP server lets AI agents trade too." },
   { icon: "scale", title: "Simulations", body: "Fairness to late players and the cost of farming $1UP, tested before the rules were fixed." },
 ];
 
@@ -308,7 +308,7 @@ export function About() {
           <p className="mt-2 max-w-3xl text-sm text-[var(--muted)]">
             Everything runs on a local NEAR chain started with one command. Prices are real (Binance, with Coinbase as a
             fallback), pushed to a Pyth-compatible oracle; USDC and the buyback swap are local stand-ins. On mainnet the
-            house reads Outlayer&apos;s Pyth oracle and buys back on Rhea, with the same calls. Epochs are 10 minutes so you
+            house reads Outlayer&apos;s Pyth oracle and buys back on Rhea, with the same calls. Rounds are 10 minutes so you
             can watch Extra Lives arrive.
           </p>
         </section>

@@ -105,7 +105,7 @@ off-chain code (API routes, keeper, deploy). Every finding below has a test that
 ## Running the checks
 
 ```bash
-pnpm test           # contract unit + property tests (151), SDK and simulation tests
+pnpm test           # contract unit + property tests (170), SDK and simulation tests
 pnpm test:sandbox   # builds the wasm, 7 end-to-end tests on a sandbox chain
 pnpm test:ts        # API route, keeper and indexer tests (17)
 ```

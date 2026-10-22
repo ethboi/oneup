@@ -215,8 +215,8 @@ export function toItems(ev: Event, executor: string, t: number, c: Record<string
         t,
         kind: "epoch",
         text: lives
-          ? `Epoch ${s.epoch} closed: ${lives} Extra Lives, ${usd(s.lives_pot)} paid to lives`
-          : `Epoch ${s.epoch} closed: the house didn't profit, no Extra Lives`,
+          ? `Round ${s.epoch} closed: ${lives} Extra Lives, ${usd(s.lives_pot)} paid to lives`
+          : `Round ${s.epoch} closed: the house didn't profit, no Extra Lives`,
       });
     } else if (ev.standard === "nep171" && ev.event === "nft_mint" && executor === c.life) {
       const owner = String(d.owner_id);

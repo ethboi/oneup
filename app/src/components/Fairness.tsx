@@ -42,7 +42,7 @@ export function Fairness() {
           <span className="num font-bold">{pct(r.y1ShareOfY3.papertrade)}</span> under Papertrade-style rules.
         </p>
         <p className="label mt-1">
-          Extra Lives earn for {r.params.lifeExpiryEpochs} epochs after the one they&apos;re minted in, so old claims
+          Extra Lives earn for {r.params.lifeExpiryEpochs} rounds after the one they&apos;re minted in, so old claims
           can&apos;t crowd out new ones. Simulation: the same trader flows under each set of rules, {r.params.seeds} seeds,
           each loss followed for {r.params.window} weeks.
         </p>

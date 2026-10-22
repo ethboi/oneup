@@ -43,7 +43,7 @@ export function Solvency() {
         </p>
         {epoch && (
           <p className="mt-3 text-sm">
-            This epoch so far, traders lost <b className="num">${fmtUsdc(big(epoch.losses), 0)}</b> to the house and it paid winners{" "}
+            This round so far, traders lost <b className="num">${fmtUsdc(big(epoch.losses), 0)}</b> to the house and it paid winners{" "}
             <b className="num">${fmtUsdc(big(epoch.payouts), 0)}</b>: the house is{" "}
             <b className="num" style={{ color: houseNet >= 0n ? "var(--long)" : "var(--short)" }}>
               {houseNet >= 0n ? "up" : "down"} ${fmtUsdc(houseNet < 0n ? -houseNet : houseNet, 0)}
@@ -56,7 +56,7 @@ export function Solvency() {
             <Icon name="info" />
             <span>
               No payouts until the pool is back above its <b className="num">${fmtUsdc(big(s.seed), 0)}</b> seed. It&apos;s{" "}
-              <b className="num">${fmtUsdc(big(s.seed) - pool, 0)}</b> short, so this epoch&apos;s Extra Lives and buyback wait for profit.
+              <b className="num">${fmtUsdc(big(s.seed) - pool, 0)}</b> short, so this round&apos;s Extra Lives and buyback wait for profit.
             </span>
           </p>
         )}
@@ -136,22 +136,24 @@ export function Solvency() {
         </div>
 
         <div className="-mx-5 mt-5 overflow-x-auto border-t border-[var(--line)] px-5 pt-5">
-          <div className="text-lg font-extrabold">Epochs</div>
+          <div className="text-lg font-extrabold">Rounds</div>
           {(history ?? []).length === 0 ? (
-            <p className="label mt-2">No closed epochs yet.</p>
+            <p className="label mt-2">No closed rounds yet.</p>
           ) : (
-            <table className="num mt-3 w-full min-w-[720px] text-sm">
+            // phones: the round, what traders lost, the house's result, what lives got and the pool; the rest from 640px
+            <table className="num mt-3 w-full text-sm">
               <thead>
                 <tr className="label text-left">
-                  <th className="pb-2 font-normal">Epoch</th>
+                  <th className="pb-2 font-normal">Round</th>
                   <th className="pb-2 text-right font-normal">Traders lost</th>
-                  <th className="pb-2 text-right font-normal">Winners took</th>
+                  <th className="hidden pb-2 text-right font-normal sm:table-cell">Winners took</th>
+                  <th className="hidden pb-2 text-right font-normal md:table-cell">Market fees</th>
                   <th className="pb-2 text-right font-normal">House net</th>
-                  <th className="pb-2 text-right font-normal">Extra Lives</th>
-                  <th className="pb-2 text-right font-normal">Life cap</th>
+                  <th className="hidden pb-2 text-right font-normal md:table-cell">Extra Lives</th>
+                  <th className="hidden pb-2 text-right font-normal lg:table-cell">Life cap</th>
                   <th className="pb-2 text-right font-normal">Paid to lives</th>
-                  <th className="pb-2 text-right font-normal">Buyback</th>
-                  <th className="pb-2 text-right font-normal">Pool after</th>
+                  <th className="hidden pb-2 text-right font-normal sm:table-cell">Buyback</th>
+                  <th className="hidden pb-2 text-right font-normal sm:table-cell">Pool after</th>
                 </tr>
               </thead>
               <tbody>
@@ -159,13 +161,14 @@ export function Solvency() {
                   <tr key={e.epoch} className="border-t border-[var(--line)]">
                     <td className="py-2">{e.epoch}</td>
                     <td className="text-right">${fmtUsdc(big(e.losses), 0)}</td>
-                    <td className="text-right">${fmtUsdc(big(e.payouts), 0)}</td>
+                    <td className="hidden text-right sm:table-cell">${fmtUsdc(big(e.payouts), 0)}</td>
+                    <td className="hidden text-right md:table-cell">${fmtUsdc(big(e.fees), 2)}</td>
                     <td className="text-right">${fmtUsdc(big(e.house_net), 0)}</td>
-                    <td className="text-right">{e.lives_minted}</td>
-                    <td className="text-right">{ppmToNumber(big(e.cap_ppm)).toFixed(2)}×</td>
+                    <td className="hidden text-right md:table-cell">{e.lives_minted}</td>
+                    <td className="hidden text-right lg:table-cell">{ppmToNumber(big(e.cap_ppm)).toFixed(2)}×</td>
                     <td className="text-right">${fmtUsdc(big(e.lives_pot), 0)}</td>
-                    <td className="text-right">${fmtUsdc(big(e.buyback_pot), 0)}</td>
-                    <td className="text-right">${fmtUsdc(big(e.pool), 0)}</td>
+                    <td className="hidden text-right sm:table-cell">${fmtUsdc(big(e.buyback_pot), 0)}</td>
+                    <td className="hidden text-right sm:table-cell">${fmtUsdc(big(e.pool), 0)}</td>
                   </tr>
                 ))}
               </tbody>

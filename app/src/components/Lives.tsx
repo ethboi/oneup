@@ -30,11 +30,11 @@ export function Lives() {
 
   return (
     <div className="flex flex-col gap-5">
-      <Explainer line="Every loss in an epoch the house ends in profit becomes an Extra Life that pays you back in USDC.">
-        When an epoch ends, the house&apos;s profit is shared across that epoch&apos;s losers by how much they lost: that
+      <Explainer line="Every loss in a round the house ends in profit becomes an Extra Life that pays you back in USDC.">
+        When a round ends, the house&apos;s profit is shared across that round&apos;s losers by how much they lost: that
         share is the life&apos;s face value. It can earn up to face × its cap (2.0× when the pool is small, down to 1.2× at
         $1M). Each epoch, 60% of half the surplus above the reserve is shared across all earning lives by what they
-        were owed, so every life pays back at the same steady rate. A life earns for {expiry ?? 13} epochs after the one it&apos;s minted in, then keeps what it earned.
+        were owed, so every life pays back at the same steady rate. A life earns for {expiry ?? 13} rounds after the one it&apos;s minted in, then keeps what it earned.
         Sell one on the market and its unclaimed USDC goes with it.
       </Explainer>
 
@@ -54,7 +54,7 @@ export function Lives() {
           <Stat label="Still to earn" value={`$${fmtUsdc(owedLeft, 0)}`} />
           <Stat label="Paid so far" value={`$${fmtUsdc(paid)}`} />
           <Stat label="Ready to claim" value={`$${fmtUsdc(claimable)}`} tone={claimable > 0n ? "good" : undefined} />
-          <Stat label="Last epoch, to all lives" value={last ? `$${fmtUsdc(BigInt(last.lives_pot), 0)}` : "–"} />
+          <Stat label="Last round, to all lives" value={last ? `$${fmtUsdc(BigInt(last.lives_pot), 0)}` : "–"} />
         </SummaryBar>
 
         <NextLife epochId={epoch?.id} left={epoch ? epoch.started_at + d.epochLengthS : 0} />
@@ -62,7 +62,7 @@ export function Lives() {
         <div className="divide-y divide-[var(--line)]">
           <PanelHead title={`Earning (${earning.length})`} />
           {earning.length === 0 ? (
-            <Empty icon="heart">No Extra Lives earning. Lose a trade in an epoch the house ends in profit and one arrives when it closes.</Empty>
+            <Empty icon="heart">No Extra Lives earning. Lose a trade in a round the house ends in profit and one arrives when it closes.</Empty>
           ) : (
             earning.map((l) => <LifeRow key={l.token_id} l={l} expiry={expiry} listings={listings} />)
           )}
@@ -104,11 +104,11 @@ function NextLife({ epochId, left }: { epochId?: number; left: number }) {
     <div className="flex items-center gap-3 bg-[var(--panel-2)] px-4 py-3">
       <PixelHeart size={28} fill={lost > 0n ? 0.5 : 0} />
       <div className="min-w-0 flex-1 text-sm">
-        <b>Next Extra Life, epoch {epochId ?? "…"}</b>
+        <b>Next Extra Life, round {epochId ?? "…"}</b>
         <div className="label num">
           {lost > 0n
             ? `$${fmtUsdc(lost)} lost so far${oneup > 0n ? `, plus about ${fmtOneup(oneup.toString())} $1UP` : ""}. Mints in ${fmtClock(Math.max(0, left - now))}.`
-            : `Nothing lost this epoch. It closes in ${fmtClock(Math.max(0, left - now))}.`}
+            : `Nothing lost this round. It closes in ${fmtClock(Math.max(0, left - now))}.`}
         </div>
       </div>
     </div>
@@ -127,14 +127,14 @@ function LifeRow({ l, expiry, listings }: { l: LifeInfo; expiry?: number; listin
       ? "Expired"
       : l.backer
         ? "Earning until paid in full"
-        : `Earning through epoch ${l.epoch + (expiry ?? 13)}`;
+        : `Earning through round ${l.epoch + (expiry ?? 13)}`;
   const value = lifeValue(l);
   return (
     <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-2 p-3 sm:grid-cols-[auto_1.2fr_1fr_auto_auto] sm:p-4" style={earning ? undefined : { opacity: 0.75 }}>
       {/* while earning the heart stays pink, filling as it pays out; finished ones go grey */}
       <PixelHeart size={34} fill={l.full_heal ? 1 : earning ? progress : 0} live={earning} label={`${state}, ${(progress * 100).toFixed(0)}% paid`} />
       <div className="min-w-0">
-        <div className="font-extrabold">{l.backer ? `Backer Life #${l.token_id.slice(1)}` : `From epoch ${l.epoch}`}</div>
+        <div className="font-extrabold">{l.backer ? `Backer Life #${l.token_id.slice(1)}` : `From round ${l.epoch}`}</div>
         <div className="label truncate">{state}</div>
       </div>
       <div className="col-span-3 row-start-2 sm:col-span-1 sm:row-start-1 sm:col-start-3">

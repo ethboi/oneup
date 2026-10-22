@@ -44,7 +44,7 @@ export function FullHeal() {
         </span>
         <h2 className="display text-5xl">FULL HEAL</h2>
         <p className="text-lg">
-          <b>Revenge!</b> Your Extra Life from epoch {heal.epoch} paid you back <b className="num">${fmtUsdc(heal.paid)}</b> in full, out of
+          <b>Revenge!</b> Your Extra Life from round {heal.epoch} paid you back <b className="num">${fmtUsdc(heal.paid)}</b> in full, out of
           the house&apos;s profit.
         </p>
         <div className="mt-2 flex flex-wrap justify-center gap-2">

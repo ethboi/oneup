@@ -23,13 +23,14 @@ export function Sell({ nft, tokenId, suggested, listings, compact }: { nft: stri
 
   if (listing && !open) {
     return (
-      <div className={`${mt} flex items-center justify-between gap-2 rounded-lg border border-dashed border-[var(--line)] px-3 py-2 text-sm`}>
-        <span className="num">For sale at ${fmtUsdc(BigInt(listing.price))}</span>
-        <span className="flex gap-1.5">
-          <button className="btn btn-ghost px-3 py-1" onClick={() => setOpen(true)}>
+      // wraps rather than overflows in narrow columns (a lock's row)
+      <div className={`${mt} flex flex-wrap items-center justify-between gap-x-2 gap-y-1 rounded-lg border border-dashed border-[var(--line)] px-2.5 py-1.5 text-sm`}>
+        <span className="num whitespace-nowrap">For sale at ${fmtUsdc(BigInt(listing.price))}</span>
+        <span className="flex gap-1">
+          <button className="btn btn-ghost whitespace-nowrap px-2 py-0.5 text-xs" onClick={() => setOpen(true)}>
             Re-price
           </button>
-          <button className="btn btn-ghost px-3 py-1" onClick={() => run("Take down listing", () => tx.delist(nft, tokenId))}>
+          <button className="btn btn-ghost whitespace-nowrap px-2 py-0.5 text-xs" onClick={() => run("Take down listing", () => tx.delist(nft, tokenId))}>
             Take down
           </button>
         </span>
@@ -38,7 +39,8 @@ export function Sell({ nft, tokenId, suggested, listings, compact }: { nft: stri
   }
   if (!open) {
     return (
-      <button className={`btn btn-ghost ${mt} w-full`} onClick={() => setOpen(true)}>
+      // compact (in a row): a smaller button, so the life or lock it sells stays the focus
+      <button className={`btn btn-ghost ${mt} w-full ${compact ? "py-1.5 text-sm" : ""}`} onClick={() => setOpen(true)}>
         <Icon name="tag" />
         Sell
       </button>
