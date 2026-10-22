@@ -631,19 +631,77 @@ function TriggerFields(props: {
   return (
     <div className="flex flex-col gap-2">
       <div className="grid grid-cols-2 gap-2">
-        <TriggerInput label="Take profit" value={tp} set={setTp} hint={hint(side, entry, margin, leverage, tp, "tp", liq)} />
-        <TriggerInput label="Stop loss" value={sl} set={setSl} hint={hint(side, entry, margin, leverage, sl, "sl", liq)} />
+        <TriggerInput label="Take profit" value={tp} set={setTp} hint={hint(side, entry, margin, leverage, tp, "tp", liq)} slider={{ side, entry, leverage, kind: "tp" }} />
+        <TriggerInput label="Stop loss" value={sl} set={setSl} hint={hint(side, entry, margin, leverage, sl, "sl", liq)} slider={{ side, entry, leverage, kind: "sl" }} />
       </div>
-      <p className="label">Closes at the first oracle price past it, after the 60 s minimum hold.</p>
+      <p className="label">Slide to a gain or loss on your margin, or type a price. Closes at the first oracle price past it, after the 60 s minimum hold.</p>
     </div>
   );
 }
 
-function TriggerInput({ label, value, set, hint }: { label: string; value: string; set: (x: string) => void; hint: { text: string; bad?: boolean } | null }) {
+type TriggerSlider = { side: Side; entry?: bigint; leverage: number; kind: "tp" | "sl" };
+
+/** Slider ends, as % of margin: a win is capped at 9× margin, a loss is liquidated at 90%. */
+const MAX_TP_PCT = 900;
+const MAX_SL_PCT = 89;
+
+/** The largest gain or loss (as % of margin) a trigger can be slid to, short of the price reaching zero. */
+function sliderMax({ side, leverage, kind }: TriggerSlider) {
+  const max = kind === "tp" ? MAX_TP_PCT : MAX_SL_PCT;
+  const toZero = (side === "Long") === (kind === "sl") ? leverage * 100 - 1 : Infinity;
+  return Math.min(max, toZero);
+}
+
+/** Take profit runs 0–900%, so it moves on a squared scale: the small targets most people set get most of the track. */
+const toPct = (pos: number, s: TriggerSlider) => (s.kind === "tp" ? (pos / 100) ** 2 : pos / 100) * sliderMax(s);
+const toPos = (pct: number, s: TriggerSlider) => {
+  const f = Math.min(1, Math.max(0, pct / sliderMax(s)));
+  return (s.kind === "tp" ? Math.sqrt(f) : f) * 100;
+};
+
+/** The price at which a position makes (tp) or loses (sl) `pct`% of its margin. */
+function priceAtPct(pct: number, { side, entry, leverage, kind }: TriggerSlider) {
+  const e = priceToNumber(entry!);
+  const up = (side === "Long") === (kind === "tp");
+  const v = e * (1 + ((up ? 1 : -1) * pct) / 100 / leverage);
+  return v.toFixed(v < 10 ? 4 : v < 1000 ? 2 : 0);
+}
+
+/** How far `x` is from the entry, as % of margin in the trigger's direction (0 when blank or the wrong side). */
+function pctAtPrice(x: string, { side, entry, leverage, kind }: TriggerSlider) {
+  const at = Number(x);
+  if (!(at > 0) || !entry) return 0;
+  const up = (side === "Long") === (kind === "tp");
+  const move = (at / priceToNumber(entry) - 1) * (up ? 1 : -1);
+  return Math.max(0, move * leverage * 100);
+}
+
+function TriggerInput(props: { label: string; value: string; set: (x: string) => void; hint: { text: string; bad?: boolean } | null; slider?: TriggerSlider }) {
+  const { label, value, set, hint, slider } = props;
+  const pos = slider ? toPos(pctAtPrice(value, slider), slider) : 0;
+  const color = slider?.kind === "tp" ? "var(--long)" : "var(--short)";
   return (
     <label className="flex min-w-0 flex-col gap-1">
       <span className="label">{label}</span>
       <input className="input num" value={value} onChange={(e) => set(e.target.value)} inputMode="decimal" placeholder="Price" aria-label={`${label} price`} />
+      {slider && (
+        <input
+          type="range"
+          className="slider"
+          min={0}
+          max={100}
+          step={0.5}
+          value={pos}
+          disabled={!slider.entry}
+          aria-label={`${label} as % of margin`}
+          aria-valuetext={value ? `${pctAtPrice(value, slider).toFixed(0)}% of margin` : "Off"}
+          onChange={(e) => {
+            const pct = Math.round(toPct(Number(e.target.value), slider));
+            set(pct > 0 && slider.entry ? priceAtPct(pct, slider) : "");
+          }}
+          style={{ "--fill": `${pos}%`, "--primary": color } as React.CSSProperties}
+        />
+      )}
       <span className="label num truncate" style={hint?.bad ? { color: "var(--short)" } : undefined}>
         {hint?.text ?? " "}
       </span>
@@ -696,8 +754,8 @@ function EditTriggers({ p }: { p: Position }) {
             TP / SL · {p.side} {p.market_id} {p.leverage}×
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <TriggerInput label="Take profit" value={tp} set={setTp} hint={hint(p.side, mark, margin, p.leverage, tp, "tp", liq)} />
-            <TriggerInput label="Stop loss" value={sl} set={setSl} hint={hint(p.side, mark, margin, p.leverage, sl, "sl", liq)} />
+            <TriggerInput label="Take profit" value={tp} set={setTp} hint={hint(p.side, mark, margin, p.leverage, tp, "tp", liq)} slider={{ side: p.side, entry: mark, leverage: p.leverage, kind: "tp" }} />
+            <TriggerInput label="Stop loss" value={sl} set={setSl} hint={hint(p.side, mark, margin, p.leverage, sl, "sl", liq)} slider={{ side: p.side, entry: mark, leverage: p.leverage, kind: "sl" }} />
           </div>
           <p className="label">Gains and losses shown from the current price. Fires on the next oracle price past it; blank clears.</p>
           <button
