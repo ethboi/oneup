@@ -152,7 +152,7 @@ export function PriceChart({
   const H = narrow ? 300 : 420;
   // room at the top for the readout, at the bottom for the time axis
   // the right edge holds the price tag, plus the mark labels when a position is shown
-  const PAD = { l: 10, r: narrow ? 78 : marks.length ? 160 : 90, t: narrow && gauge ? 58 : 36, b: 22 };
+  const PAD = { l: 10, r: narrow ? 92 : marks.length ? 160 : 104, t: narrow && gauge ? 58 : 36, b: 22 };
   const [hover, setHover] = useState<number | null>(null);
   const now = useClock();
 
@@ -235,7 +235,7 @@ export function PriceChart({
 
   // right-edge labels: the price first, then each mark, nudged apart so none overlap
   const labels = [
-    { key: "head", y: y(headP), text: `${fresh ? (tickUp ? "▲ " : "▼ ") : ""}${last.p.toFixed(digits)}`, head: true, kind: undefined as Mark["kind"] | undefined },
+    { key: "head", y: y(headP), text: last.p.toFixed(digits), head: true, kind: undefined as Mark["kind"] | undefined },
     ...shown.map(({ m, edge }) => ({
       key: m.label,
       y: edge === "up" ? PAD.t : edge === "down" ? plotB : y(m.price),
@@ -428,7 +428,7 @@ export function PriceChart({
         {/* the present price, ruled across so it reads against the marks */}
         <line x1={x(t1)} x2={plotR + 2} y1={y(headP)} y2={y(headP)} stroke="var(--lcd-ink)" strokeWidth="1" />
         {/* keyed by the tick, so each new price pops the marker */}
-        <rect key={last.t} className="tick-pulse" x={x(t1) - 4} y={y(headP) - 4} width="8" height="8" fill="var(--lcd-ink)" />
+        <rect key={`pulse-${last.t}`} className="tick-pulse" x={x(t1) - 4} y={y(headP) - 4} width="8" height="8" fill="var(--lcd-ink)" />
         {labels.map((l, i) => (
           <g key={l.key} className={alarm && l.kind === "liq" ? "blink" : undefined}>
             {/* a leader when the label had to move off its line */}
@@ -437,18 +437,24 @@ export function PriceChart({
             )}
             {l.head ? (
               <>
-                {/* sized to the price, about 7.6px a character at 13px */}
+                {/* sized to the price, about 7.6px a character at 13px, plus a fixed slot for the tick's arrow so
+                    the price never moves when it appears */}
                 <rect
-                  key={fresh ? last.t : "still"}
+                  key={fresh ? `tag-${last.t}` : "tag"}
                   className={fresh ? "tick-tag" : undefined}
                   x={plotR + 4}
                   y={placed[i] - 9}
-                  width={Math.min(PAD.r - 2, l.text.length * 7.6 + 10)}
+                  width={Math.min(PAD.r - 2, l.text.length * 7.6 + 24)}
                   height="18"
                   rx="2"
                   fill="var(--lcd-ink)"
                 />
-                <text x={plotR + 8} y={placed[i] + 5} fontSize="13" fontWeight="700" fill="var(--lcd)" className="num">
+                {fresh && (
+                  <text key={`arrow-${last.t}`} className="tick-arrow" x={plotR + 8} y={placed[i] + 5} fontSize="11" fill="var(--lcd)">
+                    {tickUp ? "▲" : "▼"}
+                  </text>
+                )}
+                <text key="price" x={plotR + 22} y={placed[i] + 5} fontSize="13" fontWeight="700" fill="var(--lcd)" className="num">
                   {l.text}
                 </text>
               </>

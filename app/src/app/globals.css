@@ -1088,7 +1088,20 @@ body {
     fill: var(--lcd-3);
   }
 }
+/* the tick's arrow fades out in place */
+.tick-arrow {
+  animation: tick-arrow 1.2s ease-out forwards;
+}
+@keyframes tick-arrow {
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
+  .tick-arrow,
   .tick-pulse,
   .tick-tag {
     animation: none;
