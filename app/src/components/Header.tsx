@@ -19,6 +19,8 @@ export interface NavTab {
   badge?: "lives";
   /** Shown under "More" rather than in the bar. */
   more?: boolean;
+  /** In the bar on wide desktops (1280px+), under "More" below that. */
+  moreWhenNarrow?: boolean;
 }
 
 /** One bar: brand, the section tabs (desktop), your result this round and the epoch clock as plain text, Demo, and
@@ -38,19 +40,26 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
     <header className="mb-4 flex items-center gap-2 border-b border-[var(--line)] py-3 sm:gap-4 lg:mb-5">
       <div className="flex shrink-0 items-center gap-2">
         <Logo size={34} />
-        <span className="display hidden text-[22px] leading-none sm:inline">OneUp</span>
+        {/* the wordmark makes way for the tabs on small desktops */}
+        <span className="display hidden text-[22px] leading-none sm:inline lg:hidden xl:inline">OneUp</span>
       </div>
       <nav className="hidden min-w-0 flex-1 lg:block" aria-label="Sections">
         <div className="tabs" role="tablist">
           {tabs
             .filter((t) => !t.more)
             .map((t) => (
-              <button key={t.name} role="tab" aria-selected={tab === t.name} onClick={() => go(t.name)} className="tab">
+              <button
+                key={t.name}
+                role="tab"
+                aria-selected={tab === t.name}
+                onClick={() => go(t.name)}
+                className={`tab ${t.moreWhenNarrow ? "hidden xl:inline-flex" : ""}`}
+              >
                 {t.name}
                 {t.badge === "lives" && alive > 0 && <span className="tab-badge num">{alive}</span>}
               </button>
             ))}
-          <MoreTabs tabs={tabs.filter((t) => t.more)} tab={tab} go={go} />
+          <MoreTabs tabs={tabs.filter((t) => t.more || t.moreWhenNarrow)} tab={tab} go={go} />
         </div>
       </nav>
       {/* the round's clock and your result in it, one strip like the chart's market bar */}
@@ -71,7 +80,7 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
           )}
           <span className="bar-cell" title={`Round ${epoch?.id ?? ""} ends in ${fmtClock(left)}, with Extra Lives and $1UP locks for its losers`}>
             {/* the label goes on narrow desktops too, where the tabs need the room */}
-            <span className="label hidden sm:inline lg:hidden xl:inline">Round {epoch?.id ?? "…"}</span>
+            <span className="label hidden sm:inline lg:hidden 2xl:inline">Round {epoch?.id ?? "…"}</span>
             <b>{fmtClock(left)}</b>
           </span>
           {round && (
@@ -426,7 +435,8 @@ function MoreTabs({ tabs, tab, go }: { tabs: NavTab[]; tab: string; go: (t: stri
               key={t.name}
               role="menuitem"
               type="button"
-              className="rounded-lg px-3 py-2 text-left text-sm font-bold hover:bg-[var(--panel-2)]"
+              // tabs in the bar on wide screens only appear here below 1280px
+              className={`rounded-lg px-3 py-2 text-left text-sm font-bold hover:bg-[var(--panel-2)] ${t.moreWhenNarrow ? "xl:hidden" : ""}`}
               style={t.name === tab ? { color: "var(--primary)" } : undefined}
               onClick={() => go(t.name)}
             >

@@ -41,6 +41,8 @@ const TAB_ICONS: Record<Tab, IconName> = {
 const PHONE_TABS: Tab[] = ["Trade", "Extra Lives", "Locks", "Market"];
 /** Desktop: the reading tabs sit under More. */
 const MORE_TABS: Tab[] = ["Solvency", "Fairness", "About"];
+/** Below 1280px these join them, so the bar fits beside the round strip. */
+const NARROW_MORE_TABS: Tab[] = ["Leaders", "Backing", "$1UP"];
 const PHONE_LABEL: Partial<Record<Tab, string>> = { "Extra Lives": "Lives" };
 
 export default function Home() {
@@ -67,7 +69,12 @@ export default function Home() {
       </div>
       <div className="mx-auto max-w-[1280px] px-4 pb-24 lg:pb-16">
         <Header
-          tabs={TABS.map((t) => ({ name: t, badge: t === "Extra Lives" ? ("lives" as const) : undefined, more: MORE_TABS.includes(t) }))}
+          tabs={TABS.map((t) => ({
+            name: t,
+            badge: t === "Extra Lives" ? ("lives" as const) : undefined,
+            more: MORE_TABS.includes(t),
+            moreWhenNarrow: NARROW_MORE_TABS.includes(t),
+          }))}
           tab={tab}
           go={(t) => go(t as Tab)}
         />

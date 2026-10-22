@@ -538,6 +538,13 @@ body {
     white-space: nowrap;
     transition: color 0.15s;
   }
+  /* desktops short of very wide: tighter tabs, so the bar fits beside the jackpot, round and your result */
+  @media (max-width: 1535px) {
+    .tab {
+      padding: 8px 7px;
+      font-size: 13.5px;
+    }
+  }
   .tab:hover {
     color: var(--text);
   }
