@@ -28,6 +28,9 @@ enum DepositMsg {
         take_profit: Option<U128>,
         #[serde(default)]
         stop_loss: Option<U128>,
+        /// D-30: a limit order rather than one for the next price.
+        #[serde(default)]
+        limit_price: Option<U128>,
         #[serde(default)]
         account_id: Option<AccountId>,
     },
@@ -77,7 +80,8 @@ impl House {
                     self.back(sender_id.clone(), amount.0, cap);
                     self.lock_for_backer(sender_id, amount.0);
                 }
-                DepositMsg::Open { market_id, side, margin, leverage, take_profit, stop_loss, account_id } => {
+                DepositMsg::Open { market_id, side, margin, leverage, take_profit, stop_loss, limit_price, account_id } => {
+                    require!(limit_price.is_none_or(|x| x.0 > 0), "Limit price must be above zero");
                     let triggers = Triggers { take_profit, stop_loss };
                     if self.from_intents(&sender_id) {
                         // the Verifier doesn't return tokens a receiver rejects, so never refuse: a
@@ -94,7 +98,7 @@ impl House {
                                 env::log_str("Order not placed: margin above the deposit; the deposit stays in the free balance")
                             }
                             None if self.balance_of(&who) >= margin.0 => {
-                                self.internal_place_open(who, market_id, side, margin, leverage, triggers);
+                                self.internal_place_open(who, market_id, side, margin, leverage, triggers, limit_price);
                             }
                             None => env::log_str("Order not placed: margin above the free balance; the deposit stays there"),
                             Some(why) => env::log_str(&format!("Order not placed: {why}; the deposit stays in the free balance")),
@@ -105,7 +109,7 @@ impl House {
                         self.require_new_balance_min(&sender_id, amount.0);
                         self.credit(&sender_id, amount.0);
                         Event::Deposit { account_id: sender_id.clone(), amount }.emit();
-                        self.internal_place_open(sender_id, market_id, side, margin, leverage, triggers);
+                        self.internal_place_open(sender_id, market_id, side, margin, leverage, triggers, limit_price);
                     }
                 }
                 DepositMsg::MarketFee {} => {
@@ -162,7 +166,41 @@ impl House {
         stop_loss: Option<U128>,
     ) -> u64 {
         let triggers = Triggers { take_profit, stop_loss };
-        self.internal_place_open(env::predecessor_account_id(), market_id, side, margin, leverage, triggers)
+        self.internal_place_open(env::predecessor_account_id(), market_id, side, margin, leverage, triggers, None)
+    }
+
+    /// D-30: an open that rests until the price reaches `limit_price` (at or below it for a long, at or above
+    /// for a short) on a price newer than the order, then fills at that price. Its margin and the house's room
+    /// are held from now, as for any open, until it fills, is cancelled, or expires after `limit_expiry_s`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn place_limit_open(
+        &mut self,
+        market_id: String,
+        side: Side,
+        margin: U128,
+        leverage: u32,
+        limit_price: U128,
+        take_profit: Option<U128>,
+        stop_loss: Option<U128>,
+    ) -> u64 {
+        require!(limit_price.0 > 0, "Limit price must be above zero");
+        let triggers = Triggers { take_profit, stop_loss };
+        self.internal_place_open(env::predecessor_account_id(), market_id, side, margin, leverage, triggers, Some(limit_price))
+    }
+
+    /// D-30: the trader takes a resting limit order down; its margin and the house's room come back. A market
+    /// order can't be cancelled: it fills at the next price, and taking it back after seeing that price
+    /// coming would be a free option on the house.
+    pub fn cancel_order(&mut self, order_id: u64) {
+        let order = self.orders.get(&order_id).unwrap_or_else(|| env::panic_str("No such order")).clone();
+        require!(order.owner == env::predecessor_account_id(), "Not your order");
+        let OrderKind::Open { side, margin, limit: Some(_), .. } = order.kind else {
+            env::panic_str("Only a limit order can be cancelled")
+        };
+        self.orders.remove(&order_id);
+        self.change_liability(&order.market_id, side, math::max_liability(margin.0), false);
+        self.credit(&order.owner, margin.0);
+        Event::OrderCancelled { order_id, account_id: order.owner }.emit();
     }
 
     /// Sets or clears a position's take-profit and stop-loss. They fire only on prices published after
@@ -203,7 +241,7 @@ impl House {
     /// Anyone, once the fill window has passed without a fill. Returns the margin or reopens the position.
     pub fn expire(&mut self, order_id: u64) {
         let order = self.orders.get(&order_id).unwrap_or_else(|| env::panic_str("No such order")).clone();
-        require!(now_s() > order.placed_at + self.params.fill_window_s, "Fill window still open");
+        require!(now_s() > order.placed_at + self.window(&order), "Fill window still open");
         self.orders.remove(&order_id);
         match order.kind {
             OrderKind::Open { side, margin, .. } => {
@@ -293,12 +331,22 @@ impl House {
         if p.publish_time <= order.placed_at {
             return Err("Price is not newer than the order");
         }
-        if p.publish_time > order.placed_at + self.params.fill_window_s {
+        if p.publish_time > order.placed_at + self.window(&order) {
             return Err("Price is past the fill window; expire the order");
+        }
+        if let OrderKind::Open { side, limit: Some(limit), .. } = order.kind {
+            // D-30: a long fills at the limit or lower, a short at the limit or higher
+            let reached = match side {
+                Side::Long => p.price <= limit.0,
+                Side::Short => p.price >= limit.0,
+            };
+            if !reached {
+                return Err("Limit price not reached");
+            }
         }
         self.orders.remove(&order_id);
         match order.kind {
-            OrderKind::Open { side, margin, leverage, cut_ppm, triggers } => {
+            OrderKind::Open { side, margin, leverage, cut_ppm, triggers, .. } => {
                 let id = self.take_id();
                 self.positions.insert(
                     id,
@@ -458,6 +506,15 @@ impl House {
 }
 
 impl House {
+    /// How long an order may wait for its fill: the next price for a market order, longer for a limit (D-30).
+    fn window(&self, order: &Order) -> u64 {
+        match order.kind {
+            OrderKind::Open { limit: Some(_), .. } => self.params.limit_expiry_s,
+            _ => self.params.fill_window_s,
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn internal_place_open(
         &mut self,
         account: AccountId,
@@ -466,6 +523,7 @@ impl House {
         margin: U128,
         leverage: u32,
         triggers: Triggers,
+        limit: Option<U128>,
     ) -> u64 {
         let m = self.market(&market_id);
         require!(m.live, "Market is not live");
@@ -482,7 +540,7 @@ impl House {
                 id,
                 owner: account.clone(),
                 market_id: market_id.clone(),
-                kind: OrderKind::Open { side, margin, leverage, cut_ppm, triggers },
+                kind: OrderKind::Open { side, margin, leverage, cut_ppm, triggers, limit },
                 placed_at: now_s(),
             },
         );

@@ -10,7 +10,7 @@ const STEPS: { icon: React.ReactNode; title: string; body: string }[] = [
   {
     icon: <Icon name="chart" size={22} />,
     title: "Trade against the house",
-    body: "Long or short up to 100× at the oracle price, against one USDC pool. No fees, no funding, no slippage. Every trade the pool couldn't pay in the worst case is refused, so the house can't go bust.",
+    body: "Long or short up to 1000× at the oracle price, against one USDC pool. No fees, no funding, no slippage. Every trade the pool couldn't pay in the worst case is refused, so the house can't go bust.",
   },
   {
     icon: <PixelHeart size={22} />,
@@ -53,7 +53,7 @@ const LINEAGE: { from: string; idea: string; rows: { topic: string; them: string
 
 const BUILT: { icon: IconName; title: string; body: string }[] = [
   { icon: "shield", title: "9 Rust contracts", body: "House, Extra Life (NEP-171), $1UP (NEP-141), locks, market (NEP-178 approvals), and mock USDC, oracle, swap and yield vault. Events follow NEP-297." },
-  { icon: "check", title: "177 contract tests", body: "Unit and property tests, end-to-end tests on a sandbox chain, and a security review whose 21 fixes each have a test." },
+  { icon: "check", title: "190 contract tests", body: "Unit and property tests, end-to-end tests on a sandbox chain, and a security review whose 21 fixes each have a test." },
   { icon: "demo", title: "Keeper and bots", body: "Anyone can run the keeper: it pushes prices, fills orders, liquidates, fires take-profits and stop-losses, and closes rounds. Twelve bots with different styles trade, lock and shop, and an MCP server lets AI agents trade too." },
   { icon: "scale", title: "Simulations", body: "Fairness to late players and the cost of farming $1UP, tested before the rules were fixed." },
 ];

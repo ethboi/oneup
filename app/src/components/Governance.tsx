@@ -38,10 +38,14 @@ export function Governance() {
     const h = d.contracts.house;
     if (preset === "list") {
       const m = NEW_MARKETS.find((x) => x.id === target);
-      return m ? { description: `List ${m.id} at up to 100×`, kind: houseProposal(h, "add_market", { market_id: m.id, feed_id: m.feedId, max_leverage: 100 }) } : null;
+      return m ? { description: `List ${m.id} at up to 1000×`, kind: houseProposal(h, "add_market", { market_id: m.id, feed_id: m.feedId, max_leverage: 1000 }) } : null;
     }
     const m = markets.find((x) => x.id === target);
     if (!m) return null;
+    if (preset === "leverage") {
+      const lev = Math.max(1, Math.min(1000, Math.round(Number(capacity) || 0)));
+      return { description: `Set ${m.id}'s max leverage to ${lev}×`, kind: houseProposal(h, "set_max_leverage", { market_id: m.id, max_leverage: lev }) };
+    }
     if (preset === "pause") {
       return { description: `${m.live ? "Pause" : "Resume"} ${m.id}`, kind: houseProposal(h, "set_market_live", { market_id: m.id, live: !m.live }) };
     }
@@ -80,10 +84,11 @@ export function Governance() {
         <div className="mt-4 flex flex-wrap items-end gap-2">
           <label className="flex flex-col gap-1">
             <span className="label">Propose</span>
-            <select className="input" value={preset} onChange={(e) => (setPreset(e.target.value), setMarket(""))}>
+            <select className="input" value={preset} onChange={(e) => (setPreset(e.target.value), setMarket(""), setCapacity(e.target.value === "leverage" ? "1000" : "40"))}>
               <option value="list">List a market</option>
               <option value="pause">Pause or resume a market</option>
               <option value="capacity">Change a market&apos;s share of the pool</option>
+              <option value="leverage">Change a market&apos;s max leverage</option>
             </select>
           </label>
           <label className="flex flex-col gap-1">
@@ -94,6 +99,15 @@ export function Governance() {
               ))}
             </select>
           </label>
+          {preset === "leverage" && (
+            <label className="flex flex-col gap-1">
+              <span className="label">Max leverage</span>
+              <span className="field w-24">
+                <input className="input num" value={capacity} onChange={(e) => setCapacity(e.target.value)} inputMode="numeric" />
+                <span className="field-unit">×</span>
+              </span>
+            </label>
+          )}
           {preset === "capacity" && (
             <label className="flex flex-col gap-1">
               <span className="label">Share</span>

@@ -85,9 +85,10 @@ about 42 (`pnpm --filter @oneup/sim backers`).
 
 ## The rules
 
-**Trading.** USDC collateral, oracle price, leverage up to 100×. An order fills at the first oracle price
+**Trading.** USDC collateral, oracle price, leverage up to 1000×. An order fills at the first oracle price
 published *after* it was placed, within a 30-second window, never at a price already known, so nobody can
-front-run the oracle. Minimum hold 60 s. A position can win at most 9× its margin. Winners pay a cut of
+front-run the oracle. A limit order instead rests until a newer price reaches its limit (for up to 24 hours,
+or until cancelled) and fills at that price. Minimum hold 60 s. A position can win at most 9× its margin. Winners pay a cut of
 their profit: 10%, plus more for positions that use a big share of the pool (up to 25%). At a 90% loss a
 keeper (anyone can run one) liquidates and the full margin goes to the pool.
 

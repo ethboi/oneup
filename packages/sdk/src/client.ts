@@ -42,7 +42,8 @@ export interface Triggers {
 }
 
 export type OrderKind =
-  | { Open: { side: Side; margin: U128; leverage: number; cut_ppm: U128; triggers: Triggers } }
+  /** `limit`: a resting limit order (D-30); null fills at the next price. */
+  | { Open: { side: Side; margin: U128; leverage: number; cut_ppm: U128; triggers: Triggers; limit: U128 | null } }
   | { Close: { position_id: number; reason: "Close" | "Target" | "Stop" } };
 
 export interface Order {
@@ -263,7 +264,8 @@ export class OneUp {
   buyback = (epoch: number) => this.house<{ status: string; usdc: U128; oneup: U128 } | null>("get_buyback", { epoch });
   emissions = (epoch: number) => this.house<EpochEmissions | null>("get_emissions", { epoch });
   emissionCarry = () => this.house<U128>("get_emission_carry");
-  params = () => this.house<{ life_expiry_epochs: number; market_capacity_ppm: U128; oneup_per_usdc: number; min_hold_s: number }>("get_params");
+  params = () =>
+    this.house<{ life_expiry_epochs: number; market_capacity_ppm: U128; oneup_per_usdc: number; min_hold_s: number; fill_window_s: number; limit_expiry_s: number; leverage_hard_limit: number }>("get_params");
   quoteOpen = (market_id: string, side: Side, margin: bigint, leverage: number, price?: bigint) =>
     this.house<Quote>("quote_open", {
       market_id,
@@ -326,12 +328,23 @@ export class OneUp {
       faucet: (amount: bigint) => send<void>({ contractId: c.usdc, methodName: "faucet", args: { amount: amount.toString() } }),
       deposit: (amount: bigint) => ftCall(c.usdc, c.house, amount, ""),
       /** Deposits `amount` from the wallet and places an open for `margin` in one transaction. */
-      depositAndOpen: (amount: bigint, market_id: string, side: Side, margin: bigint, leverage: number, t: TriggerArgs = {}) =>
-        ftCall(c.usdc, c.house, amount, JSON.stringify({ open: { market_id, side, margin: margin.toString(), leverage, ...triggerArgs(t) } })),
+      /** `limit`: rest as a limit order at that price (1e8 units, D-30) instead of filling at the next price. */
+      depositAndOpen: (amount: bigint, market_id: string, side: Side, margin: bigint, leverage: number, t: TriggerArgs = {}, limit?: bigint) =>
+        ftCall(
+          c.usdc,
+          c.house,
+          amount,
+          JSON.stringify({ open: { market_id, side, margin: margin.toString(), leverage, ...triggerArgs(t), ...(limit ? { limit_price: limit.toString() } : {}) } }),
+        ),
       withdraw: (amount: bigint) =>
         send<boolean>({ contractId: c.house, methodName: "withdraw", args: { amount: amount.toString() }, deposit: ONE_YOCTO }),
       placeOpen: (market_id: string, side: Side, margin: bigint, leverage: number, t: TriggerArgs = {}) =>
         house<number>("place_open", { market_id, side, margin: margin.toString(), leverage, ...triggerArgs(t) }),
+      /** D-30: rests until the price reaches `limit` (1e8 units), then fills there. */
+      placeLimitOpen: (market_id: string, side: Side, margin: bigint, leverage: number, limit: bigint, t: TriggerArgs = {}) =>
+        house<number>("place_limit_open", { market_id, side, margin: margin.toString(), leverage, limit_price: limit.toString(), ...triggerArgs(t) }),
+      /** D-30: takes a resting limit order down; its margin comes back. */
+      cancelOrder: (order_id: number) => house<void>("cancel_order", { order_id }),
       /** Sets or clears a position's take-profit and stop-loss (1e8 price units; null clears). */
       setTriggers: (position_id: number, t: TriggerArgs) => house<void>("set_triggers", { position_id, ...triggerArgs(t) }),
       placeClose: (position_id: number) => house<number>("place_close", { position_id }),

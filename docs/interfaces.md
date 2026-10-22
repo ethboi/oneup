@@ -36,14 +36,16 @@ buyer  ──ft_transfer_call──▶ usdc ──▶ market ──▶ life|ve.n
 
 | Method | Caller | Does |
 |---|---|---|
-| `ft_on_transfer(sender_id, amount, msg)` | USDC contract | `msg = ""` credits the sender's free balance; `{"open":{market_id, side, margin, leverage, take_profit?, stop_loss?}}` credits it and places an open in the same step (a refused open refunds the whole transfer); `{"seed":{}}` (owner) adds to the pool and mints a 1.0× Backer Life; `{"back":{}}` (anyone, ≥ 10 USDC, until the total seeded reaches `backing_target`) adds to the pool, mints a Backer Life owed `backer_cap_ppm(pool, amount)` (D-22) and locks
+| `ft_on_transfer(sender_id, amount, msg)` | USDC contract | `msg = ""` credits the sender's free balance; `{"open":{market_id, side, margin, leverage, take_profit?, stop_loss?, limit_price?}}` credits it and places an open in the same step (a refused open refunds the whole transfer); `{"seed":{}}` (owner) adds to the pool and mints a 1.0× Backer Life; `{"back":{}}` (anyone, ≥ 10 USDC, until the total seeded reaches `backing_target`) adds to the pool, mints a Backer Life owed `backer_cap_ppm(pool, amount)` (D-22) and locks
 `backer_oneup_per_usdc` (10) $1UP per USDC for two years from the backers' allocation (D-26); from the Intents Verifier only, `{"for":{account_id}}` and `open` with `account_id` credit that account, and an open may not exceed the deposit (D-21). A new balance needs at least `min_margin` |
 | `withdraw(amount)` | trader | sends free balance; refunds on failed transfer |
 | `place_open(market_id, side, margin, leverage, take_profit?, stop_loss?) → order_id` | trader | moves margin from free balance into the order; pre-checks solvency and capacity with the order counted; optional trigger prices go with the position (D-19) |
+| `place_limit_open(market_id, side, margin, leverage, limit_price, take_profit?, stop_loss?) → order_id` | trader | as `place_open`, but rests until a newer price is at or past `limit_price` (≤ for a long, ≥ for a short) and fills at that price; expires after `limit_expiry_s` (D-30) |
+| `cancel_order(order_id)` | owner of the order | a resting limit only; returns its margin and room (D-30) |
 | `set_triggers(position_id, take_profit?, stop_loss?)` | owner of the position | sets or clears them; they fire only on prices published after this call |
 | `place_close(position_id) → order_id` | owner | only after the 60 s minimum hold |
 | `fill(order_id)` | keeper, owner or operator once `set_keeper` is called (D-23) | reads oracle; applies the fill rules in maths §2; opens or closes the position |
-| `expire(order_id)` | anyone | after `FILL_WINDOW` with no valid price; refunds margin |
+| `expire(order_id)` | anyone | after `FILL_WINDOW` (a limit: `limit_expiry_s`) with no valid price; refunds margin |
 | `liquidate(position_id)` | anyone | latest price; pnl ≤ −0.9M → margin to pool |
 | `take_profit(position_id)` | anyone | latest price; pnl at cap → close |
 | `hit_target(position_id)` / `hit_stop(position_id)` | anyone | latest price past the trader's trigger, after the minimum hold and newer than the trigger → places a close (reason `Target` / `Stop`) that fills at the next price (D-19) |
@@ -52,6 +54,7 @@ buyer  ──ft_transfer_call──▶ usdc ──▶ market ──▶ life|ve.n
 | `buyback(epoch, min_out)` | owner or operator (D-10) | swaps the epoch's buyback USDC; the $1UP goes to `ve` for that epoch's lockers |
 | `add_market(market_id, feed_id, max_leverage)` | owner | new markets get `market_capacity_ppm` of the pool (D-14) |
 | `set_capacity(market_id, ppm)` | owner | |
+| `set_max_leverage(market_id, max_leverage)` | owner | up to `leverage_hard_limit` (1000×); new opens only (D-31) |
 
 `market_id` is a short symbol (`"NEAR-USD"`); `side` is `"Long" | "Short"`.
 

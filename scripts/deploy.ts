@@ -118,7 +118,7 @@ export async function deploy(opts: { home: string; rpcUrl: string; epochLengthS:
   await call(root, id("house"), "set_swap", { swap: id("swap") });
   await call(root, id("house"), "set_vault", { vault: id("vault") });
   await call(root, id("house"), "set_marketplace", { marketplace: id("market") });
-  for (const m of MARKETS) await call(root, id("house"), "add_market", { market_id: m.id, feed_id: m.feedId, max_leverage: 100 });
+  for (const m of MARKETS) await call(root, id("house"), "add_market", { market_id: m.id, feed_id: m.feedId, max_leverage: 1000 });
 
   step("token registrations");
   for (const a of [id("house"), id("life"), id("ve"), id("swap"), id("market"), id("vault")]) {

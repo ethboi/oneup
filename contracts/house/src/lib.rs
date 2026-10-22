@@ -72,6 +72,13 @@ pub struct Params {
     /// D-27: the jackpot is drawn at the close of every this-many rounds.
     #[serde(default = "default_jackpot_epochs")]
     pub jackpot_epochs: u64,
+    /// D-30: how long a limit order may rest, holding its margin and the house's room, before anyone can expire it.
+    #[serde(default = "default_limit_expiry")]
+    pub limit_expiry_s: u64,
+}
+
+fn default_limit_expiry() -> u64 {
+    24 * 3600
 }
 
 fn default_float() -> U128 {
@@ -93,7 +100,9 @@ fn default_backer_oneup() -> u32 {
 impl Default for Params {
     fn default() -> Self {
         Self {
-            leverage_hard_limit: 250,
+            // D-31: a position's max win is 9× its margin at any leverage, so the cap only sets how small a move
+            // liquidates (0.09% at 1000×)
+            leverage_hard_limit: 1000,
             min_margin: U128(math::USDC),
             min_hold_s: 60,
             fill_window_s: 30,
@@ -108,6 +117,7 @@ impl Default for Params {
             backer_oneup_per_usdc: default_backer_oneup(),
             float_ppm: default_float(),
             jackpot_epochs: default_jackpot_epochs(),
+            limit_expiry_s: default_limit_expiry(),
         }
     }
 }
@@ -130,7 +140,9 @@ pub struct Market {
 #[near(serializers = [json, borsh])]
 #[derive(Clone, Debug)]
 pub enum OrderKind {
-    Open { side: Side, margin: U128, leverage: u32, cut_ppm: U128, triggers: Triggers },
+    /// `limit`: a limit order (D-30). It rests until a price at or better than the limit, newer than the order,
+    /// or until `limit_expiry_s`; without one it fills at the next price within `fill_window_s`.
+    Open { side: Side, margin: U128, leverage: u32, cut_ppm: U128, triggers: Triggers, limit: Option<U128> },
     /// `reason` is Close for the trader's own close, Target or Stop when a trigger placed it (D-19).
     Close { position_id: u64, reason: CloseReason },
 }
@@ -382,6 +394,14 @@ impl House {
     pub fn set_market_live(&mut self, market_id: String, live: bool) {
         self.assert_owner();
         self.market_mut(&market_id).live = live;
+    }
+
+    /// D-31: the owner (the DAO) changes a market's leverage cap, up to the hard limit. Open positions keep
+    /// theirs; only new opens are checked against it.
+    pub fn set_max_leverage(&mut self, market_id: String, max_leverage: u32) {
+        self.assert_owner();
+        require!((1..=self.params.leverage_hard_limit).contains(&max_leverage), "Leverage above hard limit");
+        self.market_mut(&market_id).max_leverage = max_leverage;
     }
 
     pub fn set_capacity(&mut self, market_id: String, capacity_ppm: U128) {

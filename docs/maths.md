@@ -45,6 +45,9 @@ p.conf / p.price ≤ MAX_CONF                   # MAX_CONF = 1% (10_000 ppm)
 ```
 
 The window stops a keeper-trader from waiting for a good price; see decisions D-2.
+A limit open (D-30) waits longer, `FILL_WINDOW` becoming `LIMIT_EXPIRY` (24 h), and also needs
+`p.price ≤ limit` for a long or `p.price ≥ limit` for a short; it fills at `p.price`. The trader chose that
+price in advance, so waiting for it is the point, not an edge.
 Liquidations and take-profits use the latest valid price, not a delayed one.
 
 ## 3. Solvency

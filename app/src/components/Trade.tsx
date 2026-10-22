@@ -537,6 +537,9 @@ function useTicket(market: string, maxLeverage: number) {
   const [intentStep, setIntentStep] = useState<string | null>(null);
   const viaAsset = d.intents?.assets.find((a) => a.token === payWith);
   const [side, setSide] = useState<Side>("Long");
+  // D-30: a market order fills at the next price; a limit rests until the price reaches it
+  const [orderType, setOrderType] = useState<"market" | "limit">("market");
+  const [limitPrice, setLimitPrice] = useState("");
   const [margin, setMargin] = useState("500");
   const [leverage, setLeverage] = useState(50);
   const [tp, setTp] = useState("");
@@ -548,7 +551,10 @@ function useTicket(market: string, maxLeverage: number) {
   }, [market, side]);
   const m = BigInt(Math.floor(Number(margin) || 0)) * USDC;
   const price = prices[market];
-  const quote = usePoll(() => o.quoteOpen(market, side, m, leverage, price), [market, side, margin, leverage, price?.toString()]);
+  const limitAt = orderType === "limit" ? toPrice(limitPrice) : null;
+  // a limit's liquidation and the like are quoted from its limit price, where it would fill
+  const at = limitAt ?? price;
+  const quote = usePoll(() => o.quoteOpen(market, side, m, leverage, at), [market, side, margin, leverage, at?.toString()]);
   const free = BigInt(usePoll(() => o.balance(me), [me]) ?? "0");
   const wallet = BigInt(usePoll(() => o.usdcBalance(me), [me]) ?? "0");
   const pool = BigInt(usePoll(() => o.pool(), []) ?? "0");
@@ -558,10 +564,13 @@ function useTicket(market: string, maxLeverage: number) {
   const slAt = toPrice(sl);
   // a trigger already past the price would fire on the first price after the hold: refuse it here
   const badTrigger = !!price && ((!!tpAt && targetHit(side, price, tpAt)) || (!!slAt && stopHit(side, price, slAt)));
-  const blocked = !quote?.allowed || m === 0n || (!viaAsset && topUp > wallet) || badTrigger || intentStep !== null;
+  const blocked =
+    !quote?.allowed || m === 0n || (!viaAsset && topUp > wallet) || badTrigger || intentStep !== null || (orderType === "limit" && (!limitAt || !!viaAsset));
   const label = viaAsset
     ? `${side} ${market} with ${viaAsset.symbol} on ${viaAsset.chain}`
-    : `${topUp > 0n ? "Deposit & " : ""}${side} ${market.split("-")[0]}`;
+    : orderType === "limit"
+      ? `${topUp > 0n ? "Deposit & " : ""}Limit ${side.toLowerCase()} at ${limitAt ? fmtPrice(limitAt) : "…"}`
+      : `${topUp > 0n ? "Deposit & " : ""}${side} ${market.split("-")[0]}`;
   const triggers = { takeProfit: tpAt, stopLoss: slAt };
   const submit = () =>
     viaAsset
@@ -577,10 +586,14 @@ function useTicket(market: string, maxLeverage: number) {
             onStep: setIntentStep,
           }).finally(() => setIntentStep(null)),
         )
-      : run(`${side} ${market} ${leverage}× · $${margin}`, () =>
-          topUp > 0n ? tx.depositAndOpen(topUp, market, side, m, leverage, triggers) : tx.placeOpen(market, side, m, leverage, triggers),
-        );
-  return { market, maxLeverage, side, setSide, margin, setMargin, leverage, setLeverage, tp, setTp, sl, setSl, price, m, quote, free, wallet, pool, topUp, blocked, label, submit, payWith, setPayWith, viaAsset, intentStep };
+      : limitAt
+        ? run(`Limit ${side.toLowerCase()} ${market} ${leverage}× · $${margin} at ${fmtPrice(limitAt)}`, () =>
+            topUp > 0n ? tx.depositAndOpen(topUp, market, side, m, leverage, triggers, limitAt) : tx.placeLimitOpen(market, side, m, leverage, limitAt, triggers),
+          )
+        : run(`${side} ${market} ${leverage}× · $${margin}`, () =>
+            topUp > 0n ? tx.depositAndOpen(topUp, market, side, m, leverage, triggers) : tx.placeOpen(market, side, m, leverage, triggers),
+          );
+  return { market, maxLeverage, side, setSide, orderType, setOrderType, limitPrice, setLimitPrice, limitAt, margin, setMargin, leverage, setLeverage, tp, setTp, sl, setSl, price, m, quote, free, wallet, pool, topUp, blocked, label, submit, payWith, setPayWith, viaAsset, intentStep };
 }
 
 /** The handheld: plastic case, slate surround with stripes, the LCD with its readout, and the market buttons. */
@@ -745,7 +758,7 @@ function Console({
 }
 
 /** Leverage stops under the slider: the common picks, and where the track's log scale puts most of its length. */
-const LEVERAGE_STOPS = [2, 5, 10, 25, 50, 100];
+const LEVERAGE_STOPS = [2, 10, 25, 50, 100, 500, 1000];
 /** The leverage slider runs 1× to the market's cap on a log scale, so 2×–10× aren't squeezed into the first tenth. */
 const levToPos = (lev: number, max: number) => (Math.log(Math.max(1, lev)) / Math.log(max)) * 100;
 const posToLev = (pos: number, max: number) => Math.max(1, Math.min(max, Math.round(Math.exp((pos / 100) * Math.log(max)))));
@@ -810,10 +823,58 @@ function OrderForm({ t }: { t: Ticket }) {
         ))}
       </div>
 
+      {/* D-30: fill at the next price, or rest until the price reaches yours */}
+      <div className="flex border-b border-[var(--line)]" role="tablist" aria-label="Order type">
+        {(["market", "limit"] as const).map((k) => (
+          <button
+            key={k}
+            type="button"
+            role="tab"
+            aria-selected={t.orderType === k}
+            className="ticket-tab"
+            onClick={() => {
+              t.setOrderType(k);
+              // a new limit starts at the price, to nudge from
+              if (k === "limit" && !t.limitPrice && price) t.setLimitPrice(String(priceToNumber(price)));
+            }}
+          >
+            {k === "market" ? "Market" : "Limit"}
+          </button>
+        ))}
+      </div>
+
       <div className="ticket-row">
         <span className="label">Available</span>
         <span className="num font-bold">${fmtUsdc(spendable, spendable < 1_000n * USDC ? 2 : 0)} USDC</span>
       </div>
+
+      {t.orderType === "limit" && (
+        <div className="flex flex-col gap-1">
+          <span className="field">
+            <span className="field-lead label">Price</span>
+            <input
+              className="input num text-right"
+              value={t.limitPrice}
+              onChange={(e) => t.setLimitPrice(e.target.value)}
+              inputMode="decimal"
+              aria-label="Limit price"
+            />
+            <span className="field-unit">USD</span>
+          </span>
+          <span className="label flex justify-between">
+            <span>
+              {side === "Long" ? "Fills at this price or lower" : "Fills at this price or higher"}
+              {t.limitAt && price ? ` · ${away(price, t.limitAt)} from the price` : ""}
+            </span>
+            {price && (
+              <button type="button" className="underline decoration-dotted underline-offset-2 hover:text-[var(--text)]" onClick={() => t.setLimitPrice(String(priceToNumber(price)))}>
+                Use price
+              </button>
+            )}
+          </span>
+          {t.viaAsset && <span className="text-sm text-[var(--short)]">A limit is paid from your USDC on NEAR, not another chain.</span>}
+        </div>
+      )}
 
       <div className="flex flex-col gap-1.5">
         <span className="field">
@@ -996,7 +1057,13 @@ function OrderForm({ t }: { t: Ticket }) {
       )}
 
       <div className="label flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <span>{t.viaAsset ? `Via NEAR Intents: a solver swaps your ${t.viaAsset.symbol} for USDC. Simulated on this local chain.` : "Fills at the next oracle price."}</span>
+        <span>
+          {t.viaAsset
+            ? `Via NEAR Intents: a solver swaps your ${t.viaAsset.symbol} for USDC. Simulated on this local chain.`
+            : t.orderType === "limit"
+              ? "Rests until the price reaches it, for up to 24 hours. Cancel any time."
+              : "Fills at the next oracle price."}
+        </span>
         {/* the keys, where a keyboard is */}
         <span className="hidden w-full lg:block" aria-hidden>
           Keys: <kbd>L</kbd> <kbd>S</kbd> side · <kbd>[</kbd> <kbd>]</kbd> leverage · <kbd>M</kbd> margin, then <kbd>Enter</kbd>
@@ -1163,11 +1230,36 @@ function Positions({ positions, orders, focused, pick }: { positions: Position[]
         </table>
       )}
       {pending.map((x) => (
-        <p key={x.id} className="mt-2 flex items-center gap-2 text-sm text-[var(--muted)]">
-          <Icon name="spinner" />
-          {"Open" in x.kind && `${x.kind.Open.side} ${x.market_id} ${x.kind.Open.leverage}×`}: filling at the next oracle price
-        </p>
+        <PendingOpen key={x.id} x={x} />
       ))}
+    </div>
+  );
+}
+
+/** An open waiting for its fill: a market order for the next price, or a resting limit you can take down. */
+function PendingOpen({ x }: { x: Order }) {
+  const { tx, run, prices } = useOneUp();
+  if (!("Open" in x.kind)) return null;
+  const { side, leverage, margin, limit } = x.kind.Open;
+  const what = `${side} ${x.market_id} ${leverage}× · $${fmtUsdc(BigInt(margin), 0)}`;
+  if (!limit)
+    return (
+      <p className="mt-2 flex items-center gap-2 text-sm text-[var(--muted)]">
+        <Icon name="spinner" />
+        {what}: filling at the next oracle price
+      </p>
+    );
+  const mark = prices[x.market_id];
+  return (
+    <div className="num mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-dashed border-[var(--line)] px-3 py-2 text-sm">
+      <span className="font-bold">Limit {what}</span>
+      <span className="label">
+        at {fmtPrice(BigInt(limit))}
+        {mark ? ` · ${away(mark, BigInt(limit))} away` : ""} · resting
+      </span>
+      <button type="button" className="chip ml-auto !py-0.5 text-xs" onClick={() => run(`Cancel limit #${x.id}`, () => tx.cancelOrder(x.id))}>
+        Cancel
+      </button>
     </div>
   );
 }

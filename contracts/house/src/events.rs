@@ -16,6 +16,9 @@ pub enum Event {
     OrderPlaced { order_id: u64, account_id: AccountId, market_id: String, position_id: Option<u64> },
     #[event_version("1.0.0")]
     OrderExpired { order_id: u64, account_id: AccountId },
+    /// D-30: the trader took a resting limit order down.
+    #[event_version("1.0.0")]
+    OrderCancelled { order_id: u64, account_id: AccountId },
     #[event_version("1.0.0")]
     PositionOpened {
         position_id: u64,

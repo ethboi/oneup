@@ -1290,3 +1290,154 @@ fn only_the_marketplace_pays_fees() {
     ctx("usdc", T0);
     let _ = h.ft_on_transfer(acc("mallory"), U128(usd(20)), r#"{"market_fee":{}}"#.into());
 }
+
+// D-30: limit orders
+
+/// Places a limit open at `t`. Returns the order id.
+fn limit(h: &mut House, who: &str, side: Side, margin: u128, lev: u32, limit_cents: i64, t: u64) -> u64 {
+    ctx(who, t);
+    h.place_limit_open(MARKET.into(), side, U128(margin), lev, U128(limit_cents as u128 * 1_000_000), None, None)
+}
+
+#[test]
+fn limit_long_rests_until_the_price_reaches_it_then_fills_there() {
+    let mut h = setup(usd(100_000));
+    deposit(&mut h, "alice", usd(1_000));
+    let order = limit(&mut h, "alice", Side::Long, usd(1_000), 10, 490, T0);
+    // the margin and the house's room are held while it rests
+    assert_eq!(h.get_balance(acc("alice")).0, 0);
+    assert!(h.get_solvency().liability.0 > 0);
+    ctx("keeper", T0 + 5);
+    assert_eq!(h.internal_fill(order, px(495, T0 + 5), T0 + 5), Err("Limit price not reached"));
+    // past a market order's 30 s window it still rests
+    ctx("keeper", T0 + 300);
+    h.internal_fill(order, px(488, T0 + 300), T0 + 300).unwrap();
+    let pos = h.get_position(h.next_id - 1).unwrap();
+    assert_eq!(pos.entry_price.0, 488 * 1_000_000);
+    assert_eq!(pos.leverage, 10);
+}
+
+#[test]
+fn limit_short_fills_at_or_above_its_price() {
+    let mut h = setup(usd(100_000));
+    deposit(&mut h, "alice", usd(1_000));
+    let order = limit(&mut h, "alice", Side::Short, usd(1_000), 10, 510, T0);
+    ctx("keeper", T0 + 5);
+    assert_eq!(h.internal_fill(order, px(509, T0 + 5), T0 + 5), Err("Limit price not reached"));
+    h.internal_fill(order, px(510, T0 + 6), T0 + 6).unwrap();
+    assert_eq!(h.get_position(h.next_id - 1).unwrap().entry_price.0, 510 * 1_000_000);
+}
+
+#[test]
+fn limit_needs_a_price_newer_than_the_order() {
+    let mut h = setup(usd(100_000));
+    deposit(&mut h, "alice", usd(1_000));
+    let order = limit(&mut h, "alice", Side::Long, usd(1_000), 10, 500, T0);
+    ctx("keeper", T0 + 1);
+    assert_eq!(h.internal_fill(order, px(480, T0), T0 + 1), Err("Price is not newer than the order"));
+}
+
+#[test]
+fn cancelled_limit_returns_margin_and_room() {
+    let mut h = setup(usd(100_000));
+    deposit(&mut h, "alice", usd(1_000));
+    let order = limit(&mut h, "alice", Side::Long, usd(1_000), 10, 490, T0);
+    ctx("alice", T0 + 10);
+    h.cancel_order(order);
+    assert_eq!(h.get_balance(acc("alice")).0, usd(1_000));
+    assert_eq!(h.get_solvency().liability.0, 0);
+    assert!(h.orders.get(&order).is_none());
+}
+
+#[test]
+#[should_panic(expected = "Only a limit order can be cancelled")]
+fn market_order_cannot_be_cancelled() {
+    let mut h = setup(usd(100_000));
+    deposit(&mut h, "alice", usd(1_000));
+    ctx("alice", T0);
+    let order = h.place_open(MARKET.into(), Side::Long, U128(usd(1_000)), 10, None, None);
+    h.cancel_order(order);
+}
+
+#[test]
+#[should_panic(expected = "Not your order")]
+fn cannot_cancel_someone_elses_limit() {
+    let mut h = setup(usd(100_000));
+    deposit(&mut h, "alice", usd(1_000));
+    let order = limit(&mut h, "alice", Side::Long, usd(1_000), 10, 490, T0);
+    ctx("bob", T0 + 1);
+    h.cancel_order(order);
+}
+
+#[test]
+fn limit_expires_after_its_resting_time() {
+    let mut h = setup(usd(100_000));
+    deposit(&mut h, "alice", usd(1_000));
+    let order = limit(&mut h, "alice", Side::Long, usd(1_000), 10, 490, T0);
+    let rest = h.get_params().limit_expiry_s;
+    ctx("keeper", T0 + rest + 1);
+    assert_eq!(h.internal_fill(order, px(480, T0 + rest + 1), T0 + rest + 1), Err("Price is past the fill window; expire the order"));
+    ctx("anyone", T0 + rest + 1);
+    h.expire(order);
+    assert_eq!(h.get_balance(acc("alice")).0, usd(1_000));
+    assert_eq!(h.get_solvency().liability.0, 0);
+}
+
+#[test]
+#[should_panic(expected = "Fill window still open")]
+fn limit_cannot_be_expired_while_resting() {
+    let mut h = setup(usd(100_000));
+    deposit(&mut h, "alice", usd(1_000));
+    let order = limit(&mut h, "alice", Side::Long, usd(1_000), 10, 490, T0);
+    ctx("anyone", T0 + 3600);
+    h.expire(order);
+}
+
+#[test]
+fn deposit_message_can_place_a_limit() {
+    let mut h = setup(usd(100_000));
+    ctx("usdc", T0);
+    let msg = r#"{"open":{"market_id":"NEAR-USD","side":"Short","margin":"1000000000","leverage":5,"limit_price":"520000000"}}"#;
+    let _ = h.ft_on_transfer(acc("alice"), U128(usd(1_000)), msg.into());
+    let orders = h.list_orders(None, None);
+    assert!(matches!(orders[0].kind, OrderKind::Open { limit: Some(l), .. } if l.0 == 520_000_000));
+}
+
+// D-31: leverage up to 1000×
+
+#[test]
+fn owner_raises_a_markets_leverage_to_1000() {
+    let mut h = setup(usd(100_000));
+    ctx("owner", T0);
+    h.set_max_leverage(MARKET.into(), 1000);
+    deposit(&mut h, "alice", usd(100));
+    let pos = open(&mut h, "alice", Side::Long, usd(100), 1000, 500, T0);
+    // the house's worst case is still 9× the margin: leverage only moves the liquidation price
+    assert_eq!(h.get_solvency().liability.0, usd(900));
+    assert_eq!(h.get_position(pos).unwrap().leverage, 1000);
+}
+
+#[test]
+#[should_panic(expected = "Leverage above hard limit")]
+fn max_leverage_stops_at_the_hard_limit() {
+    let mut h = setup(usd(100_000));
+    ctx("owner", T0);
+    h.set_max_leverage(MARKET.into(), 1001);
+}
+
+#[test]
+#[should_panic(expected = "Only the owner")]
+fn only_the_owner_changes_leverage() {
+    let mut h = setup(usd(100_000));
+    ctx("alice", T0);
+    h.set_max_leverage(MARKET.into(), 500);
+}
+
+#[test]
+#[should_panic(expected = "Leverage out of range")]
+fn leverage_above_the_markets_cap_is_refused() {
+    let mut h = setup(usd(100_000));
+    deposit(&mut h, "alice", usd(100));
+    ctx("alice", T0);
+    h.place_open(MARKET.into(), Side::Long, U128(usd(100)), 500, None, None);
+}

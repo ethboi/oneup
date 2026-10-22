@@ -1569,3 +1569,27 @@ kbd {
     animation: none;
   }
 }
+/* the order ticket's Market / Limit switch */
+.ticket-tab {
+  position: relative;
+  padding: 4px 12px 8px;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--muted);
+}
+.ticket-tab:hover {
+  color: var(--text);
+}
+.ticket-tab[aria-selected="true"] {
+  color: var(--text);
+}
+.ticket-tab[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--primary);
+}

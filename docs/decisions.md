@@ -376,6 +376,34 @@ pool; the remainder is split among locks by the snapshot's weights, claimable fr
 everything to lockers (would let $1UP holders profit from shutting down before the debts are paid); an equal split
 (doesn't follow what anyone is owed).
 
+## D-30 · Limit orders rest until the price reaches them · **Decided and built (22 Oct 2026)**
+
+An open can wait for a price: `place_limit_open` (or `limit_price` in a deposit's `open` message) places an
+order that fills at the first oracle price, newer than the order, that is at or below the limit for a long, or at
+or above it for a short, and fills *at that price*, so never worse than the limit.
+
+- **Held like any open.** Its margin leaves the free balance and its max win counts toward the solvency rule and
+  the market's capacity from the moment it's placed, with its winner's cut fixed then, so the fill can never be
+  refused for room.
+- **Bounded.** That reservation can't last forever: after `limit_expiry_s` (24 hours) anyone can expire it, which
+  returns the margin and the room, as for a market order past its 30-second window.
+- **Only limits can be cancelled** (`cancel_order`). A market order fills at the next price; taking it back once
+  that price could be seen coming would be a free option against the house.
+- **The keeper** calls `fill` only when its latest price has reached the limit, so a resting order costs nothing
+  until then; the house checks the limit again on the fill's own price.
+
+**Considered and rejected:** fill at the limit price rather than the oracle price (worse for traders when the price
+gaps through the limit, and a price the oracle never published); reserving room only at the fill (a fill could
+then be refused for capacity, and the order would have been a free option on room).
+
+## D-31 · Leverage up to 1000× · **Decided and built (22 Oct 2026)**
+
+The hard limit on any market's leverage rises from 250× to 1000×, the demo lists its markets at 1000×, and the
+owner (the DAO) can change a market's cap with `set_max_leverage`. The house's risk doesn't change: a position's
+max win is 9× its margin at any leverage, and that's what the solvency rule counts. Leverage only sets how small a
+move liquidates a position: 0.09% at 1000×, about nine cents on SOL. Open positions keep their leverage when a cap
+changes; only new opens are checked against it.
+
  · **Noted**
 
 - Rounding dust from sharing buybacks by weight stays in `ve` (no sweep).

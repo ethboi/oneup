@@ -101,7 +101,7 @@ server.registerTool(
   safe(async () => ({
     account: me,
     rules: [
-      "Perpetuals against one USDC house pool, at the oracle price, no fees or funding. Leverage up to 100x.",
+      "Perpetuals against one USDC house pool, at the oracle price, no fees or funding. Leverage up to 1000x.",
       "An order fills at the first oracle price after it's placed (a few seconds). A position must be held 60 s before it can close.",
       "A trade can win at most 9x its margin. Winners pay a cut of their profit (10%, up to 25% for big positions).",
       "At a 90% loss the position is liquidated: a move of 90/leverage % against you.",

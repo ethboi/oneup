@@ -32,7 +32,7 @@ export function Onboarding() {
     } catch {}
   };
   const steps = [
-    { icon: <Icon name="chart" size={20} />, title: "Trade against the house", line: "Long or short, up to 100×, at the oracle price. No fees." },
+    { icon: <Icon name="chart" size={20} />, title: "Trade against the house", line: "Long or short, up to 1000×, at the oracle price. No fees." },
     { icon: <PixelHeart size={20} />, title: "Lose? Get an Extra Life", line: "Your loss becomes an NFT that earns USDC from the house's profit." },
     { icon: <Icon name="lock" size={20} />, title: "Plus $1UP, locked", line: "Losers also get $1UP that earns the house's buybacks. Sell either one any time." },
   ];

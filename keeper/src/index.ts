@@ -43,8 +43,11 @@ const d: Deployment = JSON.parse(readFileSync(args.config!, "utf8"));
 const oneup = new OneUp(d);
 const keeper = oneup.calls(accountSender(new Account(d.keeper.id, oneup.provider, d.keeper.key as KeyPairString)));
 const owner = oneup.calls(accountSender(new Account(d.owner.id, oneup.provider, d.owner.key as KeyPairString)));
-const FILL_WINDOW_S = 30;
-const minHoldS = (await oneup.params()).min_hold_s;
+const params = await oneup.params();
+const FILL_WINDOW_S = params.fill_window_s ?? 30;
+// D-30: a limit order rests this long before it can be expired
+const LIMIT_EXPIRY_S = params.limit_expiry_s ?? 24 * 3600;
+const minHoldS = params.min_hold_s;
 
 const log = (...m: unknown[]) => console.log(new Date().toISOString().slice(11, 19), ...m);
 const nowS = () => Math.floor(Date.now() / 1000);
@@ -81,14 +84,20 @@ async function pushPrices(pusher: ReturnType<OneUp["calls"]>) {
 
 async function handleOrders() {
   for (const o of await oneup.listOrders(0, 200)) {
-    const label = "Open" in o.kind ? `open ${o.kind.Open.side} ${o.market_id}` : `${o.kind.Close.reason === "Close" ? "close" : o.kind.Close.reason.toLowerCase()} #${o.kind.Close.position_id}`;
-    if (nowS() > o.placed_at + FILL_WINDOW_S) {
+    const limit = "Open" in o.kind && o.kind.Open.limit ? BigInt(o.kind.Open.limit) : null;
+    const label =
+      "Open" in o.kind
+        ? `${limit ? "limit " : ""}open ${o.kind.Open.side} ${o.market_id}`
+        : `${o.kind.Close.reason === "Close" ? "close" : o.kind.Close.reason.toLowerCase()} #${o.kind.Close.position_id}`;
+    if (nowS() > o.placed_at + (limit ? LIMIT_EXPIRY_S : FILL_WINDOW_S)) {
       await keeper.expire(o.id);
       log(`expired order ${o.id} (${label})`);
       continue;
     }
     const px = latest.get(feeds.get(o.market_id) ?? "");
     if (!px || px.time <= o.placed_at) continue; // wait for a price published after the order
+    // a resting limit only fills once the price reaches it (the house checks again): no call, no gas, until then
+    if (limit && "Open" in o.kind && (o.kind.Open.side === "Long" ? px.price > limit : px.price < limit)) continue;
     const ok = await keeper.fill(o.id);
     log(`${ok ? "filled" : "could not fill"} order ${o.id} (${label})`);
   }
