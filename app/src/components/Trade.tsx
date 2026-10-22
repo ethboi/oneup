@@ -567,8 +567,6 @@ function OrderForm({ t }: { t: Ticket }) {
   const [payOpen, setPayWith] = useState(false);
   const showPayWith = payOpen || t.payWith !== "wallet" || topUp > wallet;
   const [why, setWhy] = useState(false);
-  // a loss of 90% of margin liquidates: the move against you that takes
-  const liqMove = 90 / leverage;
 
   return (
     <div className="panel flex flex-col gap-4 p-4">
@@ -616,13 +614,11 @@ function OrderForm({ t }: { t: Ticket }) {
             </button>
           )}
         </span>
-        <span className="label num">
-          {t.viaAsset
-            ? `Paid from ${t.viaAsset.symbol} on ${t.viaAsset.chain}: bridged, swapped and deposited in one intent`
-            : topUp > 0n
-              ? `$${fmtUsdc(free, 0)} free + $${fmtUsdc(topUp, 0)} from your wallet in the same step`
-              : `$${fmtUsdc(free, 0)} free to trade`}
-        </span>
+        {t.viaAsset && (
+          <span className="label">
+            Paid from {t.viaAsset.symbol} on {t.viaAsset.chain}: bridged, swapped and deposited in one intent
+          </span>
+        )}
       </label>
 
       {d.intents && showPayWith && (
@@ -646,15 +642,6 @@ function OrderForm({ t }: { t: Ticket }) {
             {leverage}×
           </span>
         </span>
-        <input
-          type="range"
-          className="slider"
-          min={1}
-          max={maxLeverage}
-          value={leverage}
-          onChange={(e) => setLeverage(Number(e.target.value))}
-          style={{ "--fill": `${((leverage - 1) / Math.max(1, maxLeverage - 1)) * 100}%` } as React.CSSProperties}
-        />
         <span className="chip-track mt-1" role="group" aria-label="Leverage presets">
           {[2, 5, 10, 25, 50, 100]
             .filter((x) => x <= maxLeverage)
@@ -663,9 +650,6 @@ function OrderForm({ t }: { t: Ticket }) {
                 {x}×
               </button>
             ))}
-        </span>
-        <span className="label num" style={leverage >= 50 ? { color: "var(--short)" } : undefined}>
-          A {liqMove < 1 ? liqMove.toFixed(2) : liqMove.toFixed(1)}% move against you liquidates
         </span>
       </label>
 
@@ -684,7 +668,12 @@ function OrderForm({ t }: { t: Ticket }) {
             <dt className="label">Liquidation</dt>
             <dd className="truncate font-bold">
               {liq ? fmtPrice(liq) : "…"}
-              {liq && price && <span className="label font-normal"> {away(price, liq)}</span>}
+              {liq && price && (
+                <span className="label font-normal" style={leverage >= 50 ? { color: "var(--short)" } : undefined}>
+                  {" "}
+                  {away(price, liq)}
+                </span>
+              )}
             </dd>
           </div>
           <div className="min-w-0">
@@ -696,30 +685,28 @@ function OrderForm({ t }: { t: Ticket }) {
             <dd className="font-bold">${fmtUsdc(m * BigInt(leverage), 0)}</dd>
           </div>
         </dl>
-      </div>
-
-      <TriggerFields side={side} entry={price} margin={m} leverage={leverage} liq={liq} tp={t.tp} setTp={t.setTp} sl={t.sl} setSl={t.setSl} />
-
-      {/* the promise, where the decision is made */}
-      {m > 0n && (
-        <div className="border-t border-[var(--line)] pt-3 text-sm">
-          <div className="flex items-center gap-2">
-            <PixelHeart size={18} className="shrink-0" />
-            <span className="num min-w-0 flex-1">
-              Lose it → Extra Life up to <b>${fmtUsdc(lifeUpTo, 0)}</b> + <b>{oneupUpTo.toLocaleString("en-US")} $1UP</b> + jackpot tickets
+        {/* the promise, where the decision is made */}
+        {m > 0n && (
+          <div className="mt-2 flex items-center gap-2 border-t border-[var(--line)] pt-2 text-sm">
+            <PixelHeart size={16} className="shrink-0" />
+            <span className="min-w-0 flex-1">
+              Lose it → Extra Life up to <b>${fmtUsdc(lifeUpTo, 0)}</b> + <b>{oneupUpTo.toLocaleString("en-US")} $1UP</b>
             </span>
             <button type="button" className="label shrink-0 underline decoration-dotted underline-offset-2" aria-expanded={why} onClick={() => setWhy(!why)}>
               {why ? "Hide" : "How"}
             </button>
           </div>
-          {why && (
-            <p className="label mt-1.5">
-              If this trade loses, you get an Extra Life that can pay back up to ${fmtUsdc(lifeUpTo, 0)} from house profit, plus up to{" "}
-              {oneupUpTo.toLocaleString("en-US")} $1UP locked for 2 years. Both are sized from what the house makes this round.
-            </p>
-          )}
-        </div>
-      )}
+        )}
+        {why && (
+          <p className="label mt-1.5">
+            If this trade loses, you get an Extra Life that can pay back up to ${fmtUsdc(lifeUpTo, 0)} from house profit, plus up to{" "}
+            {oneupUpTo.toLocaleString("en-US")} $1UP locked for 2 years, both sized from what the house makes this round, and a jackpot
+            ticket for each $1 lost.
+          </p>
+        )}
+      </div>
+
+      <TriggerFields side={side} entry={price} margin={m} leverage={leverage} liq={liq} tp={t.tp} setTp={t.setTp} sl={t.sl} setSl={t.setSl} />
 
       {quote && !quote.allowed && <p className="text-sm text-[var(--short)]">{quote.reason}</p>}
       {topUp > wallet && <p className="text-sm text-[var(--short)]">Not enough USDC in your wallet. Get some from the faucet in the Demo menu.</p>}
@@ -731,31 +718,24 @@ function OrderForm({ t }: { t: Ticket }) {
         onClick={t.submit}
       >
         {!blocked && <Icon name={side === "Long" ? "up" : "down"} size={20} />}
-        <span className="flex flex-col items-center leading-tight">
-          {t.label}
-          {m > 0n && (
-            <span className="num text-xs font-bold opacity-85">
-              ${fmtUsdc(m, 0)} at {leverage}×
-            </span>
-          )}
-        </span>
+        {t.label}
       </button>
-      {t.intentStep ? (
-        <p className="label -mt-1 flex items-center justify-center gap-2" role="status">
-          <Icon name="spinner" /> {t.intentStep}
-        </p>
-      ) : t.viaAsset ? (
-        <p className="label -mt-1 text-center">
-          Via NEAR Intents: a solver swaps your {t.viaAsset.symbol} for USDC on the Verifier. The bridge is simulated on this local chain.
-        </p>
-      ) : (
-        <p className="label -mt-1 text-center">Fills at the next oracle price. No fees, no funding.</p>
-      )}
-      {d.intents && !showPayWith && (
-        <button type="button" className="label -mt-1 self-center underline decoration-dotted underline-offset-2" onClick={() => setPayWith(true)}>
-          Pay from another chain
-        </button>
-      )}
+      <div className="label -mt-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        {t.intentStep ? (
+          <span className="flex items-center gap-2" role="status">
+            <Icon name="spinner" /> {t.intentStep}
+          </span>
+        ) : t.viaAsset ? (
+          <span>Via NEAR Intents: a solver swaps your {t.viaAsset.symbol} for USDC. The bridge is simulated on this local chain.</span>
+        ) : (
+          <span>Fills at the next oracle price. No fees.</span>
+        )}
+        {d.intents && !showPayWith && (
+          <button type="button" className="underline decoration-dotted underline-offset-2 hover:text-[var(--text)]" onClick={() => setPayWith(true)}>
+            Pay from another chain
+          </button>
+        )}
+      </div>
 
 
     </div>
