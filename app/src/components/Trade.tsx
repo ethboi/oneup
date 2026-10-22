@@ -60,32 +60,35 @@ export function Trade() {
     return () => io.disconnect();
   }, []);
 
+  // the chart details one position: the one picked below, or the newest in this market; the rest show faintly
+  const [focus, setFocus] = useState<number | null>(null);
+  const here = positions.filter((p) => p.market_id === market);
+  const focused = here.find((p) => p.id === focus) ?? here.reduce<Position | undefined>((a, p) => (!a || p.id > a.id ? p : a), undefined);
+  const pick = (p: Position) => {
+    setFocus(p.id);
+    setMarket(p.market_id);
+    document.getElementById("chart")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  };
   const mark = prices[market];
-  const marks: Mark[] = positions
-    .filter((p) => p.market_id === market)
-    .flatMap((p) => {
-      const entry = BigInt(p.entry_price);
-      const margin = BigInt(p.margin);
-      // what closing now would pay
-      const net = mark ? afterCut(pnl(p.side, margin, p.leverage, entry, mark), p.cut_ppm) : null;
-      return [
-        {
-          price: priceToNumber(entry),
-          label: `#${p.id} entry`,
-          kind: "entry" as const,
-          pos: p.id,
-          pnl: net === null ? undefined : { usd: Number(net) / 1e6, pct: (Number(net) / Number(margin)) * 100 },
-        },
-        {
-          price: priceToNumber(liquidationPrice(p.side, entry, p.leverage)),
-          label: `#${p.id} liq`,
-          kind: "liq" as const,
-          pos: p.id,
-        },
-        ...(p.triggers.take_profit ? [{ price: priceToNumber(BigInt(p.triggers.take_profit)), label: `#${p.id} TP`, kind: "tp" as const, pos: p.id }] : []),
-        ...(p.triggers.stop_loss ? [{ price: priceToNumber(BigInt(p.triggers.stop_loss)), label: `#${p.id} SL`, kind: "sl" as const, pos: p.id }] : []),
-      ];
-    });
+  const marks: Mark[] = here.flatMap((p): Mark[] => {
+    const entry = BigInt(p.entry_price);
+    if (p !== focused) return [{ price: priceToNumber(entry), label: `#${p.id} entry`, kind: "entry", pos: p.id, faint: true }];
+    const margin = BigInt(p.margin);
+    // what closing now would pay
+    const net = mark ? afterCut(pnl(p.side, margin, p.leverage, entry, mark), p.cut_ppm) : null;
+    return [
+      {
+        price: priceToNumber(entry),
+        label: `#${p.id} entry`,
+        kind: "entry",
+        pos: p.id,
+        pnl: net === null ? undefined : { usd: Number(net) / 1e6, pct: (Number(net) / Number(margin)) * 100 },
+      },
+      { price: priceToNumber(liquidationPrice(p.side, entry, p.leverage)), label: `#${p.id} liq`, kind: "liq", pos: p.id },
+      ...(p.triggers.take_profit ? [{ price: priceToNumber(BigInt(p.triggers.take_profit)), label: `#${p.id} TP`, kind: "tp" as const, pos: p.id }] : []),
+      ...(p.triggers.stop_loss ? [{ price: priceToNumber(BigInt(p.triggers.stop_loss)), label: `#${p.id} SL`, kind: "sl" as const, pos: p.id }] : []),
+    ];
+  });
 
   return (
     // Phones: one column in the order banner, chart, order form, then positions and activity (the left column
@@ -101,10 +104,10 @@ export function Trade() {
           setMarket={setMarket}
           markets={markets.filter((m) => m.live).map((m) => m.id)}
           marks={marks}
-          mine={positions.filter((p) => p.market_id === market)}
+          mine={focused ? [focused] : []}
         />
         <div className="order-4 min-w-0">
-          <Below positions={positions} orders={orders} />
+          <Below positions={positions} orders={orders} focused={focused?.id} pick={pick} />
         </div>
       </div>
       <div ref={formRef} id="order-form" className="order-3">
@@ -116,7 +119,7 @@ export function Trade() {
 }
 
 /** Positions and the live feed share one panel, switched by tabs. */
-function Below({ positions, orders }: { positions: Position[]; orders: Order[] }) {
+function Below({ positions, orders, focused, pick }: { positions: Position[]; orders: Order[]; focused?: number; pick: (p: Position) => void }) {
   const [view, setView] = useState<"positions" | "history" | "activity">("positions");
   const feed = useActivity().filter((a) => a.kind !== "opened");
   return (
@@ -141,7 +144,7 @@ function Below({ positions, orders }: { positions: Position[]; orders: Order[] }
           </span>
         )}
       </div>
-      {view === "positions" && <Positions positions={positions} orders={orders} />}
+      {view === "positions" && <Positions positions={positions} orders={orders} focused={focused} pick={pick} />}
       {view === "history" && <HistoryList />}
       {view === "activity" && <ActivityList items={feed} />}
     </div>
@@ -234,7 +237,7 @@ function Console({
   const pts = first === -1 ? all.slice(-1) : all.slice(Math.max(0, first - 1));
   const change = pts.length > 1 ? (pts[pts.length - 1].p / pts[0].p - 1) * 100 : 0;
   return (
-    <div key={fx?.kind === "liquidated" || (fx?.kind === "win" && fx.tier === 3) ? fx.id : "case"} className={`case order-2 min-w-0 p-3 sm:p-5 ${fx?.kind === "liquidated" || (fx?.kind === "win" && fx.tier === 3) ? "shake" : ""}`}>
+    <div key={fx?.kind === "liquidated" || (fx?.kind === "win" && fx.tier === 3) ? fx.id : "case"} id="chart" className={`case order-2 min-w-0 scroll-mt-4 p-3 sm:p-5 ${fx?.kind === "liquidated" || (fx?.kind === "win" && fx.tier === 3) ? "shake" : ""}`}>
       <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
       <div className="-mx-1 flex min-w-0 flex-1 gap-1.5 overflow-x-auto px-1 pb-1 pt-0.5" role="group" aria-label="Market">
         {markets.map((m) => {
@@ -495,7 +498,8 @@ const openCard = (p: Position, mark: bigint | undefined, v: bigint, me: string):
   account: me,
 });
 
-function Positions({ positions, orders }: { positions: Position[]; orders: Order[] }) {
+/** `focused`: the position the chart details; `pick` shows another there. */
+function Positions({ positions, orders, focused, pick }: { positions: Position[]; orders: Order[]; focused?: number; pick: (p: Position) => void }) {
   const { prices, me } = useOneUp();
   const now = useNow();
   const rows = useMemo(
@@ -515,12 +519,14 @@ function Positions({ positions, orders }: { positions: Position[]; orders: Order
       {rows.length === 0 && pending.length === 0 && <p className="label py-2">No open positions. Pick a side and a size to open one.</p>}
       <div className="flex flex-col md:hidden">
         {rows.map(({ p, mark, v, hold }) => (
-          <div key={p.id} className="num border-b border-[var(--line)] py-3 text-sm last:border-0">
+          <div
+            key={p.id}
+            className="num -mx-2 cursor-pointer rounded-lg border-b border-[var(--line)] px-2 py-3 text-sm last:border-0"
+            style={p.id === focused ? { background: "var(--panel-2)" } : undefined}
+            onClick={(e) => !(e.target as Element).closest("button, a, input") && pick(p)}
+          >
             <div className="flex items-baseline justify-between gap-2">
-              <div className="font-semibold">
-                <span style={{ color: p.side === "Long" ? "var(--long)" : "var(--short)" }}>{p.side}</span> {p.market_id}{" "}
-                {p.leverage}×
-              </div>
+              <ChartPick p={p} on={p.id === focused} pick={pick} />
               <div className="text-base font-semibold" style={{ color: v >= 0n ? "var(--long)" : "var(--short)" }}>
                 {v >= 0n ? "+" : ""}
                 {fmtUsdc(v)}
@@ -568,10 +574,14 @@ function Positions({ positions, orders }: { positions: Position[]; orders: Order
           </thead>
           <tbody>
             {rows.map(({ p, mark, v, hold }) => (
-              <tr key={p.id} className="border-t border-[var(--line)]">
-                <td className="py-2.5">
-                  <span style={{ color: p.side === "Long" ? "var(--long)" : "var(--short)" }}>{p.side}</span> {p.market_id}{" "}
-                  {p.leverage}×
+              <tr
+                key={p.id}
+                className="cursor-pointer border-t border-[var(--line)]"
+                style={p.id === focused ? { background: "var(--panel-2)" } : undefined}
+                onClick={(e) => !(e.target as Element).closest("button, a, input") && pick(p)}
+              >
+                <td className="py-2.5 pl-1">
+                  <ChartPick p={p} on={p.id === focused} pick={pick} />
                 </td>
                 <td>${fmtUsdc(BigInt(p.margin) * BigInt(p.leverage), 0)}</td>
                 <td>{fmtPrice(BigInt(p.entry_price))}</td>
@@ -608,6 +618,18 @@ function Positions({ positions, orders }: { positions: Position[]; orders: Order
         </p>
       ))}
     </div>
+  );
+}
+
+/** A position's name, which shows it on the chart; the one on the chart carries the chart icon. */
+function ChartPick({ p, on, pick }: { p: Position; on: boolean; pick: (p: Position) => void }) {
+  return (
+    <button type="button" className="flex items-center gap-1.5 text-left font-semibold" aria-pressed={on} title={on ? "On the chart" : "Show on the chart"} onClick={() => pick(p)}>
+      <span style={{ color: p.side === "Long" ? "var(--long)" : "var(--short)" }}>{p.side}</span> {p.market_id} {p.leverage}×
+      <span className={on ? "text-[var(--primary)]" : "text-[var(--muted)] opacity-0"} aria-hidden>
+        <Icon name="chart" size={14} />
+      </span>
+    </button>
   );
 }
 

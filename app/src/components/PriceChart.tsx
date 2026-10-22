@@ -17,6 +17,8 @@ export interface Mark {
   pos?: number;
   /** On an entry: the position's profit if closed now (USDC, after the winner's cut) and as % of margin. */
   pnl?: { usd: number; pct: number };
+  /** Another position's entry: a faint line only, with no label, zone or effect on the scale. */
+  faint?: boolean;
 }
 
 const DASH = { entry: "6 4", liq: "2 3", tp: "10 3 2 3", sl: "10 3 2 3" } as const;
@@ -83,7 +85,7 @@ function spread(ys: number[], gap: number, top: number, bottom: number) {
  */
 export function PriceChart({
   points,
-  marks = [],
+  marks: allMarks = [],
   alarm,
   readout,
   gauge,
@@ -98,6 +100,9 @@ export function PriceChart({
   gauge?: React.ReactNode;
 }) {
   const [ref, W] = useWidth();
+  // the chart details one position; the others only show where they came in
+  const marks = allMarks.filter((m) => !m.faint);
+  const faint = allMarks.filter((m) => m.faint);
   const narrow = W < 480;
   const H = narrow ? 300 : 420;
   // room at the top for the readout, at the bottom for the time axis
@@ -315,6 +320,11 @@ export function PriceChart({
             </text>
           </g>
         ))}
+        {faint
+          .filter((m) => m.price >= lo && m.price <= hi)
+          .map((m) => (
+            <line key={m.label} x1={PAD.l} x2={plotR} y1={y(m.price)} y2={y(m.price)} stroke="var(--lcd-3)" strokeWidth="1" strokeDasharray={DASH.entry} opacity="0.45" />
+          ))}
         {/* the present price, ruled across so it reads against the marks */}
         <line x1={x(t1)} x2={plotR + 2} y1={y(headP)} y2={y(headP)} stroke="var(--lcd-ink)" strokeWidth="1" />
         <rect x={x(t1) - 4} y={y(headP) - 4} width="8" height="8" fill="var(--lcd-ink)" />
