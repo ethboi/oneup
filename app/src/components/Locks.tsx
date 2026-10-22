@@ -5,10 +5,10 @@
 // closed ones fold away. Leave early for a penalty, or sell a lock on the market.
 
 import { useState } from "react";
-import { ONEUP, USDC, VE_MAX_EPOCHS, fmtUsdc, type LockInfo } from "@oneup/sdk";
+import { ONEUP, USDC, VE_MAX_EPOCHS, type LockInfo } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { lockValue, useOneupPrice } from "@/lib/value";
-import { fmtOneup } from "./Header";
+import { fmtOneup, fmtUsd } from "./Header";
 import { Icon } from "./Icon";
 import { Sell, useListings } from "./Sell";
 import { Empty, Explainer, PanelHead, Stat, SummaryBar } from "./ui";
@@ -52,7 +52,7 @@ export function Locks() {
     <div className="grid gap-5 lg:grid-cols-[1fr_340px] lg:items-start">
       <div className="flex min-w-0 flex-col gap-5">
         <Explainer title="Locks" line="Locked $1UP earns the house's buybacks, shared by weight: the amount × the rounds left ÷ 104.">
-          Each epoch, 30% of the house&apos;s payout buys back $1UP for everyone locked. A lock&apos;s weight counts from the
+          Each round, 30% of the house&apos;s payout buys back $1UP for everyone locked. A lock&apos;s weight counts from the
           round after it&apos;s made and shrinks as it runs down. Leaving early costs up to half, less as the lock runs down,
           and the penalty goes to everyone still locked. Losers&apos; $1UP arrives already locked for {MAX} rounds. A lock is an
           NFT: sell it on the market instead of leaving early.
@@ -61,26 +61,14 @@ export function Locks() {
         <div className="panel divide-y divide-[var(--line)]">
           <SummaryBar
             action={
-              <div className="flex flex-col gap-2 sm:items-end">
-                <button
-                  className="btn btn-accent w-full sm:w-auto"
-                  disabled={claimSum === 0n}
-                  onClick={() => run(`Claim ${fmtOneup(claimSum.toString(), 2)} $1UP`, () => tx.claimVeMany(toClaim.slice(0, 30).map(([k]) => k), past))}
-                >
-                  <Icon name="claim" />
-                  {claimSum > 0n ? `Claim all ${fmtOneup(claimSum.toString(), 2)}` : "Nothing to claim yet"}
-                </button>
-                {lossLocks.length >= 2 && (
-                  <button
-                    className="btn btn-ghost w-full sm:w-auto"
-                    onClick={() => run(`Merge ${lossLocks.length} loss-locks`, () => tx.mergeLocks(lossLocks.slice(0, 30).map((l) => l.token_id)))}
-                    title="One lock with the total amount, ending at the latest end. Claim first: it counts from next epoch."
-                  >
-                    <Icon name="merge" />
-                    Merge {lossLocks.length} loss-locks
-                  </button>
-                )}
-              </div>
+              <button
+                className="btn btn-accent w-full sm:w-auto"
+                disabled={claimSum === 0n}
+                onClick={() => run(`Claim ${fmtOneup(claimSum.toString(), 2)} $1UP`, () => tx.claimVeMany(toClaim.slice(0, 30).map(([k]) => k), past))}
+              >
+                <Icon name="claim" />
+                {claimSum > 0n ? `Claim all ${fmtOneup(claimSum.toString(), 2)}` : "Nothing to claim yet"}
+              </button>
             }
           >
             <Stat label="Locked" value={`${fmtOneup(locked.toString())} $1UP`} />
@@ -90,7 +78,21 @@ export function Locks() {
           </SummaryBar>
 
           <div className="divide-y divide-[var(--line)]">
-            <PanelHead title={`Running (${running.length})`} />
+            <PanelHead
+              title={`Running (${running.length})`}
+              action={
+                lossLocks.length >= 2 && (
+                  <button
+                    className="chip inline-flex items-center gap-1.5"
+                    onClick={() => run(`Merge ${lossLocks.length} loss-locks`, () => tx.mergeLocks(lossLocks.slice(0, 30).map((l) => l.token_id)))}
+                    title="One lock with the total amount, ending at the latest end. Claim first: it counts from next round."
+                  >
+                    <Icon name="merge" />
+                    Merge {lossLocks.length} loss-locks
+                  </button>
+                )
+              }
+            />
             {running.length === 0 ? (
               <Empty icon="lock">No locks yet. Lock $1UP here, or lose a trade: losers get their $1UP as a two-year lock.</Empty>
             ) : (
@@ -127,10 +129,12 @@ function LockRow({ l, epoch, px, claimable, listings }: { l: LockInfo; epoch: nu
   const left = Math.max(0, l.end - epoch - 1);
   const ended = epoch >= l.end;
   const penalty = BigInt(l.exit_penalty);
+  const worth = px > 0n && !l.withdrawn ? lockValue(l, px) : null;
   const origin = l.merged > 0 ? `Merged from ${l.merged} locks` : l.from_loss ? `From a loss in round ${l.created - 1}` : `Locked in round ${l.created}`;
   return (
     <div className="p-3 sm:p-4">
-      <div className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-2 sm:grid-cols-[1.1fr_1.2fr_auto_auto]">
+      {/* fixed widths on the right, as on Extra Lives, so the bars line up */}
+      <div className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_6.5rem_16rem] sm:gap-x-4">
         <div className="min-w-0">
           <div className="num font-extrabold">{fmtOneup(l.amount)} $1UP</div>
           <div className="label truncate">{origin}</div>
@@ -144,12 +148,21 @@ function LockRow({ l, epoch, px, claimable, listings }: { l: LockInfo; epoch: nu
               ? l.exited !== null
                 ? `Closed in round ${l.exited}`
                 : "Unlocked"
-              : `Unlocks in round ${l.end} (${left} to go) · weight ${fmtOneup(l.power)}${px > 0n ? ` · worth $${fmtUsdc(lockValue(l, px), lockValue(l, px) < 100n * USDC ? 2 : 0)} if left today` : ""}`}
+              : (
+                  <>
+                    <span className="block">
+                      Unlocks in round {l.end}, {left} to go
+                    </span>
+                    <span className="block">Weight {fmtOneup(l.power)}</span>
+                  </>
+                )}
           </div>
         </div>
         <div className="text-right sm:col-start-3">
-          <div className="num font-extrabold">{claimable > 0n ? fmtOneup(claimable.toString(), 2) : l.withdrawn ? "–" : "Earning"}</div>
-          <div className="label">{claimable > 0n ? "$1UP to claim" : ""}</div>
+          <div className="num font-extrabold" style={claimable > 0n ? { color: "var(--long)" } : undefined}>
+            {claimable > 0n ? fmtOneup(claimable.toString(), 2) : worth !== null ? fmtUsd(worth) : "–"}
+          </div>
+          <div className="label">{claimable > 0n ? "$1UP to claim" : worth !== null ? "if left today" : ""}</div>
         </div>
         {!l.withdrawn && (
           <div className="col-span-2 flex gap-2 sm:col-span-1 sm:col-start-4">
@@ -160,7 +173,7 @@ function LockRow({ l, epoch, px, claimable, listings }: { l: LockInfo; epoch: nu
               </button>
             ) : (
               <>
-                <div className="min-w-0 flex-1 sm:w-52">
+                <div className="min-w-0 flex-1">
                   <Sell nft={d.contracts.ve} tokenId={l.token_id} suggested={px > 0n ? (lockValue(l, px) * 8n) / 10n : USDC} listings={listings} compact />
                 </div>
                 <button className="btn btn-ghost px-2.5" onClick={() => setLeaving(!leaving)} aria-expanded={leaving} aria-label="Leave early" title="Leave early">
@@ -222,7 +235,7 @@ function LockForm() {
         />
       </label>
       <p className="label num">
-        Weight {((Number(amount) || 0) * epochs / MAX).toLocaleString("en-US", { maximumFractionDigits: 0 })}, shrinking each epoch.
+        Weight {((Number(amount) || 0) * epochs / MAX).toLocaleString("en-US", { maximumFractionDigits: 0 })}, shrinking each round.
         Leaving early costs up to half, less as the lock runs down.
       </p>
       <button className="btn btn-accent" disabled={raw === 0n} onClick={() => run(`Lock ${amount} $1UP`, () => tx.lock(raw, epochs))}>

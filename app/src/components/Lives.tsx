@@ -4,17 +4,15 @@
 // sorted by what they can still pay. Finished ones (fully healed or expired) fold away.
 
 import { useState } from "react";
-import { USDC, emissionsForEpoch, fmtUsdc, ppmToNumber, releasedEmissions, type LifeInfo, type Listing } from "@oneup/sdk";
+import { emissionsForEpoch, fmtUsdc, ppmToNumber, releasedEmissions, type LifeInfo, type Listing } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { lifeValue } from "@/lib/value";
-import { fmtClock, fmtOneup, useNow } from "./Header";
+import { fmtClock, fmtOneup, fmtUsd as money, useNow } from "./Header";
 import { Icon } from "./Icon";
 import { HealthBar, PixelHeart } from "./Pixel";
 import { Sell, useListings } from "./Sell";
 import { Empty, Explainer, PanelHead, Stat, SummaryBar } from "./ui";
 
-/** Dollars, with cents below $1,000 so small amounts don't read as nothing. */
-const money = (x: bigint) => `$${fmtUsdc(x, x < 1_000n * USDC ? 2 : 0)}`;
 
 export function Lives() {
   const { o, d, me, tx, run } = useOneUp();
@@ -36,7 +34,7 @@ export function Lives() {
       <Explainer title="Extra Lives" line="Every loss in a round the house ends in profit becomes an Extra Life that pays you back in USDC.">
         When a round ends, the house&apos;s profit is shared across that round&apos;s losers by how much they lost: that
         share is the life&apos;s face value. It can earn up to face × its cap (2.0× when the pool is small, down to 1.2× at
-        $1M). Each epoch, 60% of half the surplus above the reserve is shared across all earning lives by what they
+        $1M). Each round, 60% of half the surplus above the reserve is shared across all earning lives by what they
         were owed, so every life pays back at the same steady rate. A life earns for {expiry ?? 13} rounds after the one it&apos;s minted in, then keeps what it earned.
         Sell one on the market and its unclaimed USDC goes with it.
       </Explainer>
@@ -132,8 +130,10 @@ function LifeRow({ l, expiry, listings }: { l: LifeInfo; expiry?: number; listin
         ? "Earning until paid in full"
         : `Earning through round ${l.epoch + (expiry ?? 13)}`;
   const value = lifeValue(l);
+  const claimable = BigInt(l.claimable);
   return (
-    <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-2 p-3 sm:grid-cols-[auto_1.2fr_1fr_auto_auto] sm:p-4" style={earning ? undefined : { opacity: 0.75 }}>
+    // fixed widths on the right so every row's bar starts and ends in the same place
+    <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-2 p-3 sm:grid-cols-[auto_minmax(0,1fr)_minmax(0,1.3fr)_6.5rem_14rem] sm:gap-x-4 sm:p-4" style={earning ? undefined : { opacity: 0.75 }}>
       {/* while earning the heart stays pink, filling as it pays out; finished ones go grey */}
       <PixelHeart size={34} fill={l.full_heal ? 1 : earning ? progress : 0} live={earning} label={`${state}, ${(progress * 100).toFixed(0)}% paid`} />
       <div className="min-w-0">
@@ -143,14 +143,16 @@ function LifeRow({ l, expiry, listings }: { l: LifeInfo; expiry?: number; listin
       <div className="col-span-3 row-start-2 sm:col-span-1 sm:row-start-1 sm:col-start-3">
         <HealthBar value={progress} label="Paid toward Full Heal" />
         <div className="label num mt-1">
-          ${fmtUsdc(paid)} of ${fmtUsdc(owed)} · face ${fmtUsdc(BigInt(l.face), 0)} × {ppmToNumber(BigInt(l.cap_ppm)).toFixed(2)}
+          {money(paid)} of {money(owed)} paid · face {money(BigInt(l.face))} × {ppmToNumber(BigInt(l.cap_ppm)).toFixed(2)}
         </div>
       </div>
       <div className="text-right">
-        <div className="num font-extrabold">{BigInt(l.claimable) > 0n ? `$${fmtUsdc(BigInt(l.claimable))}` : earning ? "Earning" : "–"}</div>
-        <div className="label">{BigInt(l.claimable) > 0n ? "to claim" : earning ? `$${fmtUsdc(value, 0)} to go` : ""}</div>
+        <div className="num font-extrabold" style={claimable > 0n ? { color: "var(--long)" } : undefined}>
+          {claimable > 0n ? money(claimable) : earning ? money(value) : "–"}
+        </div>
+        <div className="label">{claimable > 0n ? "to claim" : earning ? "to go" : ""}</div>
       </div>
-      <div className="col-span-3 sm:col-span-1 sm:w-56">
+      <div className="col-span-3 sm:col-span-1">
         {value > 0n && <Sell nft={d.contracts.life} tokenId={l.token_id} suggested={(value * 7n) / 10n} listings={listings} compact />}
       </div>
     </div>

@@ -4,7 +4,8 @@
 // biggest losers get the biggest Extra Lives, so they have a board too.
 
 import { useEffect, useState } from "react";
-import { USDC, fmtUsdc } from "@oneup/sdk";
+import { fmtUsdc } from "@oneup/sdk";
+import { fmtUsd } from "./Header";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import type { Standing } from "@/lib/server/activity";
 import { PixelCoin, PixelHeart } from "./Pixel";
@@ -13,7 +14,7 @@ import { Jackpot } from "./Jackpot";
 type Period = "round" | "day" | "all";
 
 const short = (a: string) => a.replace(/\.test\.near$/, "");
-const usd = (x: bigint) => `${x < 0n ? "−" : x > 0n ? "+" : ""}$${fmtUsdc(x < 0n ? -x : x, (x < 0n ? -x : x) < 1_000n * USDC ? 2 : 0)}`;
+const usd = (x: bigint) => fmtUsd(x, true);
 
 export function Leaderboard() {
   const { o, me } = useOneUp();
@@ -132,7 +133,7 @@ function Board({ title, note, icon, rows, me, empty }: { title: string; note?: s
         <table className="num mt-3 w-full text-sm">
           <thead>
             <tr className="label text-left">
-              <th className="w-8 pb-1.5 font-normal">#</th>
+              <th className="w-8 pb-1.5 pl-1.5 font-normal">#</th>
               <th className="pb-1.5 font-normal">Trader</th>
               <th className="pb-1.5 text-right font-normal">PnL</th>
               <th className="hidden pb-1.5 text-right font-normal sm:table-cell">Trades</th>
@@ -145,11 +146,14 @@ function Board({ title, note, icon, rows, me, empty }: { title: string; note?: s
               const pnl = BigInt(r.pnl);
               const you = r.account === me;
               return (
-                <tr key={r.account} className="border-t border-[var(--line)]" style={you ? { background: "var(--panel-2)" } : undefined}>
-                  <td className="py-2 font-bold">{i + 1}</td>
+                <tr key={r.account} className="border-t border-[var(--line)]" style={you ? { background: "color-mix(in srgb, var(--primary) 9%, transparent)" } : undefined}>
+                  {/* your row: a tint and a bar in the heart colour, so it's found at a glance */}
+                  <td className="py-2 pl-1.5 font-bold" style={you ? { boxShadow: "inset 3px 0 0 var(--primary)" } : undefined}>
+                    {i + 1}
+                  </td>
                   <td className="py-2">
-                    {short(r.account)}
-                    {you && <span className="label"> (you)</span>}
+                    <span className={you ? "font-extrabold" : undefined}>{short(r.account)}</span>
+                    {you && <span className="you-tag">you</span>}
                     {r.liquidations > 0 && <span className="label" title={`${r.liquidations} liquidated`}> · {r.liquidations}× rekt</span>}
                   </td>
                   <td className="py-2 text-right font-bold" style={{ color: pnl >= 0n ? "var(--long)" : "var(--short)" }}>

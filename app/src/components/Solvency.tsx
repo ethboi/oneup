@@ -4,6 +4,7 @@
 // sides, decision D-1), per-market liability against its cap (half the pool, D-14), and the epoch history.
 
 import { fmtUsdc, ppmToNumber, type EpochSummary } from "@oneup/sdk";
+import { fmtUsd } from "./Header";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { Icon } from "./Icon";
 import { Governance } from "./Governance";
@@ -48,10 +49,10 @@ export function Solvency() {
         </p>
         {epoch && (
           <p className="mt-3 text-sm">
-            This round so far, traders lost <b className="num">${fmtUsdc(big(epoch.losses), 0)}</b> to the house and it paid winners{" "}
-            <b className="num">${fmtUsdc(big(epoch.payouts), 0)}</b>: the house is{" "}
+            This round so far, traders lost <b className="num">{fmtUsd(big(epoch.losses))}</b> to the house and it paid winners{" "}
+            <b className="num">{fmtUsd(big(epoch.payouts))}</b>: the house is{" "}
             <b className="num" style={{ color: houseNet >= 0n ? "var(--long)" : "var(--short)" }}>
-              {houseNet >= 0n ? "up" : "down"} ${fmtUsdc(houseNet < 0n ? -houseNet : houseNet, 0)}
+              {houseNet >= 0n ? "up" : "down"} {fmtUsd(houseNet < 0n ? -houseNet : houseNet)}
             </b>
             .
           </p>
@@ -165,15 +166,15 @@ export function Solvency() {
                 {history!.map((e) => (
                   <tr key={e.epoch} className="border-t border-[var(--line)]">
                     <td className="py-2">{e.epoch}</td>
-                    <td className="text-right">${fmtUsdc(big(e.losses), 0)}</td>
-                    <td className="hidden text-right sm:table-cell">${fmtUsdc(big(e.payouts), 0)}</td>
-                    <td className="hidden text-right md:table-cell">${fmtUsdc(big(e.fees), 2)}</td>
-                    <td className="text-right">${fmtUsdc(big(e.house_net), 0)}</td>
+                    <td className="text-right">{fmtUsd(big(e.losses))}</td>
+                    <td className="hidden text-right sm:table-cell">{fmtUsd(big(e.payouts))}</td>
+                    <td className="hidden text-right md:table-cell">{fmtUsd(big(e.fees))}</td>
+                    <td className="text-right">{fmtUsd(big(e.house_net))}</td>
                     <td className="hidden text-right md:table-cell">{e.lives_minted}</td>
                     <td className="hidden text-right lg:table-cell">{ppmToNumber(big(e.cap_ppm)).toFixed(2)}×</td>
-                    <td className="text-right">${fmtUsdc(big(e.lives_pot), 0)}</td>
-                    <td className="hidden text-right sm:table-cell">${fmtUsdc(big(e.buyback_pot), 0)}</td>
-                    <td className="hidden text-right sm:table-cell">${fmtUsdc(big(e.pool), 0)}</td>
+                    <td className="text-right">{fmtUsd(big(e.lives_pot))}</td>
+                    <td className="hidden text-right sm:table-cell">{fmtUsd(big(e.buyback_pot))}</td>
+                    <td className="hidden text-right sm:table-cell">{fmtUsd(big(e.pool))}</td>
                   </tr>
                 ))}
               </tbody>

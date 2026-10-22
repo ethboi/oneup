@@ -64,8 +64,17 @@ export function Governance() {
       </div>
       <p className="label mt-1 max-w-3xl">
         A Sputnik DAO (the same code as mainnet Sputnik v2 DAOs) owns the house: listing markets, pausing them and their share of the
-        pool all go through a council vote. Council: {council.map(short).join(", ")}. Routine buybacks run without a vote.
+        pool all go through a council vote. Routine buybacks run without a vote.
       </p>
+      <div className="mt-3 flex flex-wrap items-center gap-1.5 text-sm">
+        <span className="label mr-1">Council</span>
+        {council.map((c) => (
+          <span key={c} className="chip num" aria-current={c === me ? "true" : undefined}>
+            {short(c)}
+            {c === me && <span className="you-tag">you</span>}
+          </span>
+        ))}
+      </div>
 
       {isCouncil && (
         <div className="mt-4 flex flex-wrap items-end gap-2">
@@ -104,31 +113,50 @@ export function Governance() {
         </div>
       )}
 
-      <ul className="mt-4 flex flex-col">
-        {proposals.length === 0 && <li className="label">No proposals yet.</li>}
+      <h3 className="mt-5 font-extrabold">Proposals ({proposals.length})</h3>
+      <ul className="mt-1 flex flex-col">
+        {proposals.length === 0 && <li className="label py-2">No proposals yet.</li>}
         {[...proposals].reverse().map((p) => (
-          <ProposalRow key={p.id} p={p} canVote={isCouncil} />
+          <ProposalRow key={p.id} p={p} canVote={isCouncil} seats={council.length} />
         ))}
       </ul>
     </div>
   );
 }
 
-function ProposalRow({ p, canVote }: { p: DaoProposal; canVote: boolean }) {
+function ProposalRow({ p, canVote, seats }: { p: DaoProposal; canVote: boolean; seats: number }) {
   const { me, tx, run } = useOneUp();
   const counts = Object.values(p.vote_counts)[0] ?? ["0", "0", "0"];
   const voted = p.votes[me];
-  const colour = p.status === "Approved" ? "var(--long)" : p.status === "InProgress" ? "var(--info)" : "var(--muted)";
+  const colour = p.status === "Approved" ? "var(--long)" : p.status === "InProgress" ? "var(--info)" : p.status === "Rejected" ? "var(--short)" : "var(--muted)";
+  const yes = Number(counts[0]);
+  const no = Number(counts[1]);
   return (
     <li className="flex flex-wrap items-center gap-3 border-t border-[var(--line)] py-2.5 text-sm">
       <span className="label num w-8">#{p.id}</span>
       <span className="min-w-0 flex-1">
         <b className="block">{p.description}</b>
-        <span className="label">
-          by {short(p.proposer)} · {counts[0]} for, {counts[1]} against
+        <span className="label flex items-center gap-2">
+          by {short(p.proposer)}
+          {/* one square per council seat: for, against, not yet voted */}
+          <span className="inline-flex gap-0.5" aria-label={`${yes} for, ${no} against, of ${seats}`} title={`${yes} for, ${no} against`}>
+            {Array.from({ length: Math.max(seats, yes + no) }, (_, i) => (
+              <span
+                key={i}
+                className="inline-block h-2 w-2 rounded-[2px]"
+                style={{ background: i < yes ? "var(--long)" : i < yes + no ? "var(--short)" : "var(--line)" }}
+              />
+            ))}
+          </span>
+          <span className="num">
+            {yes} for, {no} against
+          </span>
         </span>
       </span>
-      <span className="text-xs font-extrabold" style={{ color: colour }}>
+      <span
+        className="rounded-md px-2 py-0.5 text-xs font-extrabold"
+        style={{ color: colour, background: `color-mix(in srgb, ${colour} 12%, transparent)` }}
+      >
         {p.status === "InProgress" ? "Voting" : p.status === "Approved" ? "Approved and executed" : p.status}
       </span>
       {canVote && p.status === "InProgress" && !voted && (

@@ -77,7 +77,7 @@ export function EpochResults() {
       <div role="dialog" aria-label={`Round ${s.epoch} results`} className="case round-in relative flex max-h-[92vh] w-full max-w-[560px] flex-col gap-4 overflow-y-auto p-5 sm:p-6">
         <div className="bezel p-4">
           <div className="lcd px-4 py-3 text-[var(--lcd-ink)]">
-            <div className="display text-sm">EPOCH {s.epoch}</div>
+            <div className="display text-sm">ROUND {s.epoch}</div>
             <div className="display text-4xl leading-tight">ROUND OVER</div>
             <div className="display num mt-1 text-base">
               {net > 0n ? `HOUSE +$${fmtUsdc(net, 0)} · ${s.lives_minted} EXTRA LIVES` : "HOUSE DIDN'T PROFIT · NO LIVES"}

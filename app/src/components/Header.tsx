@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { USDC, fmtUsdc, ONEUP } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { Logo, PixelCoin, PixelHeart } from "./Pixel";
@@ -35,6 +35,23 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
   const round = useMyRound(me, epoch?.started_at);
   const treasury = usePoll(() => o.treasury(), [], 5000);
   const jackpot = treasury?.vault ? BigInt(treasury.jackpot) : null;
+  // tabs that don't fit beside the strip fold into More from the end, one at a time until the bar fits
+  const nav = useRef<HTMLElement>(null);
+  const bar = tabs.filter((t) => !t.more);
+  const [fold, setFold] = useState(0);
+  const folded = new Set(bar.slice(bar.length - fold).map((t) => t.name));
+  useLayoutEffect(() => {
+    const n = nav.current;
+    if (n && n.scrollWidth > n.clientWidth + 1 && fold < bar.length - 1) setFold(fold + 1);
+  });
+  useEffect(() => {
+    const n = nav.current;
+    if (!n) return;
+    // the strip grows (your result this round arrives) or the window resizes: measure again from none folded
+    const ro = new ResizeObserver(() => setFold(0));
+    ro.observe(n);
+    return () => ro.disconnect();
+  }, []);
 
   return (
     <header className="mb-4 flex items-center gap-2 border-b border-[var(--line)] py-3 sm:gap-4 lg:mb-5">
@@ -43,10 +60,10 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
         {/* the wordmark makes way for the tabs on small desktops */}
         <span className="display hidden text-[22px] leading-none sm:inline lg:hidden xl:inline">OneUp</span>
       </div>
-      <nav className="hidden min-w-0 flex-1 lg:block" aria-label="Sections">
+      <nav ref={nav} className="hidden min-w-0 flex-1 lg:block" aria-label="Sections">
         <div className="tabs" role="tablist">
-          {tabs
-            .filter((t) => !t.more)
+          {bar
+            .filter((t) => !folded.has(t.name))
             .map((t) => (
               <button
                 key={t.name}
@@ -59,7 +76,11 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
                 {t.badge === "lives" && alive > 0 && <span className="tab-badge num">{alive}</span>}
               </button>
             ))}
-          <MoreTabs tabs={tabs.filter((t) => t.more || t.moreWhenNarrow)} tab={tab} go={go} />
+          <MoreTabs
+            tabs={tabs.filter((t) => t.more || t.moreWhenNarrow || folded.has(t.name)).map((t) => (folded.has(t.name) ? { ...t, more: true, moreWhenNarrow: false } : t))}
+            tab={tab}
+            go={go}
+          />
         </div>
       </nav>
       {/* the round's clock and your result in it, one strip like the chart's market bar */}
@@ -68,7 +89,8 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
           {jackpot !== null && (
             <button
               type="button"
-              className="bar-cell font-extrabold"
+              // phones have room for two cells: while you have a result this round, it takes the jackpot's place
+              className={`bar-cell font-extrabold ${round ? "hidden sm:flex" : ""}`}
               onClick={() => go("Leaders")}
               title="The jackpot: the house's idle USDC earns interest, and one loser's ticket takes it all. Tap for your tickets."
               aria-label={`Jackpot $${fmtUsdc(jackpot, 2)}`}
@@ -391,6 +413,11 @@ export function useNow(ms = 1000) {
   return now;
 }
 
+/** Dollars, with cents below $1,000 so small amounts don't read as nothing; `signed` adds + to gains. */
+export const fmtUsd = (x: bigint, signed = false) => {
+  const a = x < 0n ? -x : x;
+  return `${x < 0n ? "−" : signed && x > 0n ? "+" : ""}$${fmtUsdc(a, a < 1_000n * USDC ? 2 : 0)}`;
+};
 export const fmtClock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 export const fmtOneup = (x?: string, digits = 0) =>
   x === undefined ? "…" : (Number(BigInt(x) / (ONEUP / 1000n)) / 1000).toLocaleString("en-US", { maximumFractionDigits: digits });

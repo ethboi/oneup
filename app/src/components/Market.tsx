@@ -5,10 +5,10 @@
 // lists what you could sell and what you have up, and recent sales show what things went for against their value.
 
 import { useState } from "react";
-import { USDC, fmtUsdc, type LifeInfo, type Listing, type LockInfo } from "@oneup/sdk";
+import { USDC, type LifeInfo, type Listing, type LockInfo } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { lifeValue, lockValue, useOneupPrice } from "@/lib/value";
-import { fmtOneup } from "./Header";
+import { fmtOneup, fmtUsd } from "./Header";
 import { PixelHeart, PixelLock } from "./Pixel";
 import { Sell, useListings } from "./Sell";
 import { useActivity, type ActivityItem } from "./Activity";
@@ -26,7 +26,7 @@ type Filter = "all" | "life" | "lock";
 type Sort = "deal" | "cheap" | "value";
 
 /** Prices in cents under $100, whole dollars above. */
-const usd = (x: bigint) => `$${fmtUsdc(x, x < 100n * USDC ? 2 : 0)}`;
+const usd = (x: bigint) => fmtUsd(x);
 
 /** How far under value (positive) or over it (negative) a price is, in %; null when it has no value. */
 const discount = (price: bigint, value: bigint) => (value > 0n ? Math.round((1 - Number(price) / Number(value)) * 100) : null);
@@ -240,7 +240,7 @@ function Row({ x, wallet, epoch, totalPower }: { x: Item; wallet: bigint; epoch?
     // phones: price and button on their own line under the details
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3 sm:flex-nowrap sm:px-4">
       <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--panel-2)]">
-        {x.kind === "life" ? <PixelHeart size={28} fill={x.info.full_heal ? 1 : lifeProgress(x.info)} /> : <PixelLock size={24} />}
+        {x.kind === "life" ? <PixelHeart size={28} fill={x.info.full_heal ? 1 : lifeProgress(x.info)} live={!x.info.full_heal} /> : <PixelLock size={24} />}
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
@@ -289,19 +289,24 @@ function Sales({ items }: { items: ActivityItem[] }) {
         const s = a.sale;
         const off = s?.value ? discount(BigInt(s.price), BigInt(s.value)) : null;
         const ago = Math.max(0, Math.round((now - a.t) / 60_000));
+        // "bot2 bought bot4's Extra Life for $4.30": the price goes in its own column
+        const [, who, price] = a.text.match(/^(.*) for (\$[\d,.]+)$/) ?? [, a.text, null];
         return (
           <li key={a.seq} className="flex items-center gap-3 py-2.5 text-sm">
             {/* sales indexed before the sale field existed only have their text */}
             <span className="shrink-0">{(s?.nft ?? (a.text.includes("lock") ? "lock" : "life")) === "lock" ? <PixelLock size={18} /> : <PixelHeart size={20} />}</span>
             <span className="min-w-0 flex-1">
-              <span className="block">{a.text}</span>
+              <span className="block">{who}</span>
               {off !== null && (
                 <span className="label num" style={{ color: off > 0 ? "var(--long)" : undefined }}>
                   {off > 0 ? `${off}% under value` : off < 0 ? `${-off}% over value` : "at value"}
                 </span>
               )}
             </span>
-            <span className="label num shrink-0">{ago < 1 ? "now" : ago < 60 ? `${ago}m` : `${Math.round(ago / 60)}h`}</span>
+            <span className="shrink-0 text-right">
+              {price && <b className="num block">{price}</b>}
+              <span className="label num">{ago < 1 ? "now" : ago < 60 ? `${ago}m ago` : `${Math.round(ago / 60)}h ago`}</span>
+            </span>
           </li>
         );
       })}
