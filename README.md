@@ -29,7 +29,7 @@ pnpm demo
 ```
 
 `pnpm demo` builds the contracts if needed, starts a local NEAR node (near-sandbox, like `hardhat node`),
-deploys and wires all eight contracts, seeds the pool, then starts the keeper, six trading bots and the app
+deploys and wires all eight contracts, seeds the pool, then starts the keeper, twelve trading bots and the app
 at **http://127.0.0.1:3020**. Epochs are 10 minutes. The app signs as a funded demo trader (switch to any
 bot in the account menu). Chain state persists in `.localnet/`.
 
@@ -38,6 +38,8 @@ bot in the account menu). Chain state persists in `.localnet/`.
 | `pnpm demo` | Everything above, logs prefixed per process |
 | `pnpm demo --lan` | Same, and serves the app to your Wi-Fi so you can use it on a phone (it hands out the localnet's throwaway keys, so only on a network you trust) |
 | `pnpm stop` | Stops every OneUp process (and only those) |
+| `pnpm mcp` | OneUp as an MCP server, so an AI agent can trade (below) |
+| `pnpm bots:add` | Tops a running chain up to twelve bots without a reset |
 | `pnpm localnet:reset` | Wipes the local chain for a fresh deploy |
 | `pnpm test` | Contract unit + property tests, SDK and simulation tests |
 | `pnpm test:sandbox` | Builds the wasm and runs end-to-end tests on a sandbox chain |
@@ -45,6 +47,11 @@ bot in the account menu). Chain state persists in `.localnet/`.
 | `pnpm smoke` | Against a running demo: deposit → 50× long → fill → −2% → liquidation |
 | `pnpm sim` | Re-runs the early-vs-late simulation |
 | `pnpm farm` | Wash-trading break-even: the $1UP price at which trading against yourself would pay |
+
+**Let an AI agent trade.** `.mcp.json` registers OneUp's MCP server ([`mcp/`](mcp/src/index.ts)) for Claude
+Code: with `pnpm demo` running, open the repo in Claude Code and ask it to trade. Its tools read the markets
+and the house, quote a trade, open and close positions, set take-profit and stop-loss, and claim Extra Lives.
+It trades as the demo account, or a bot with `ONEUP_ACCOUNT=bot3`; localnet only.
 
 Move a price during the demo:
 `curl -XPOST localhost:8787/price -d '{"market":"NEAR-USD","movePct":-2}'`

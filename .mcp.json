@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "oneup": {
+      "command": "pnpm",
+      "args": ["--silent", "--filter", "@oneup/mcp", "start"],
+      "env": { "ONEUP_ACCOUNT": "demo" }
+    }
+  }
+}

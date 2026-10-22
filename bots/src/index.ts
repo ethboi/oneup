@@ -87,6 +87,44 @@ const STYLES: Style[] = [
     market: { sell: { life: [0.75, 0.95], lock: [0.55, 0.85] }, makeLocks: true },
   },
   { name: "collector", side: coin, margin: [100, 300], leverage: [5, 10], takeProfit: 0.3, stopLoss: 0.3, maxHoldS: [120, 300], collector: true, market: { buy: { upTo: 0.65, chance: 1 } } },
+  // bots 7–12 (pnpm bots:add on a running chain)
+  {
+    name: "momentum",
+    side: (h) => (h.length < 30 ? null : h.at(-1)! > sma(h, 30) * 1.0005 ? "Long" : h.at(-1)! < sma(h, 30) * 0.9995 ? "Short" : null),
+    margin: [300, 1_000],
+    leverage: [15, 40],
+    takeProfit: 0.6,
+    stopLoss: 0.35,
+    maxHoldS: [150, 420],
+    market: { sell: { life: [0.8, 1], lock: [0.6, 0.9] } },
+  },
+  {
+    name: "breakout",
+    side: (h) => {
+      if (h.length < 21) return null;
+      const before = h.slice(-21, -1);
+      return h.at(-1)! > Math.max(...before) ? "Long" : h.at(-1)! < Math.min(...before) ? "Short" : null;
+    },
+    margin: [400, 1_200],
+    leverage: [20, 50],
+    takeProfit: 0.8,
+    stopLoss: 0.3,
+    maxHoldS: [90, 300],
+    market: { sell: { life: [0.75, 0.95], lock: [0.6, 0.85] }, makeLocks: true },
+  },
+  { name: "gambler", side: coin, margin: [20, 80], leverage: [100, 100], takeProfit: 3, stopLoss: 0.9, maxHoldS: [60, 150], market: { sell: { life: [0.6, 0.85], lock: [0.5, 0.7] } } },
+  { name: "hodler", side: () => (Math.random() < 0.75 ? "Long" : "Short"), margin: [1_000, 3_000], leverage: [2, 4], takeProfit: 0.15, stopLoss: 0.15, maxHoldS: [600, 1_200], market: { buy: { upTo: 0.8, chance: 0.2 } } },
+  { name: "swing", side: coin, margin: [500, 2_000], leverage: [8, 20], takeProfit: 0.35, stopLoss: 0.3, maxHoldS: [200, 500], market: { sell: { life: [0.85, 1.05], lock: [0.7, 0.95] }, buy: { upTo: 0.88, chance: 0.1 } } },
+  {
+    name: "contrarian",
+    side: (h) => (h.length < 6 ? null : h.at(-1)! > h.at(-6)! * 1.001 ? "Short" : h.at(-1)! < h.at(-6)! * 0.999 ? "Long" : null),
+    margin: [300, 900],
+    leverage: [25, 60],
+    takeProfit: 0.5,
+    stopLoss: 0.6,
+    maxHoldS: [90, 240],
+    market: { sell: { life: [0.7, 0.9], lock: [0.55, 0.8] } },
+  },
 ];
 
 /** Shared price history per market, sampled every few seconds. */

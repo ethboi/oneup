@@ -26,7 +26,7 @@ A draft of the form, to check before sending. **One submission, not editable.** 
 
 ## Description
 
-The form allows 20 to 2,000 characters. This draft is 1,828.
+The form allows 20 to 2,000 characters. This draft is 1,869.
 
 ```text
 OneUp is a perpetuals exchange on NEAR where losing isn't the end of the story. Lose a trade, get a life.
@@ -41,5 +41,5 @@ Anyone can back the house in its bootstrap round for a Backer Life that never ex
 
 Built on NEAR: pay from Ethereum or Solana in one signed NEAR Intent, a Sputnik DAO owns the house, one-tap gasless trading with a trade-only key, and Extra Lives drawn on chain. Orders fill at the next oracle price, so nobody trades on a price they already know.
 
-What's in the repo: 8 Rust contracts with 158 tests and a security review (docs/SECURITY.md), a keeper, six trading bots, simulations of fairness and farming cost, and a Next.js app with live prices, history, shareable PnL cards and sound. One command (pnpm demo) starts a local NEAR chain with everything deployed. On mainnet the house reads Outlayer's Pyth oracle and buys back on Rhea.
+What's in the repo: 8 Rust contracts with 158 tests and a security review (docs/SECURITY.md), a keeper, twelve trading bots, an MCP server so AI agents can trade, simulations of fairness and farming cost, and a Next.js app with live prices, history, shareable PnL cards and sound. One command (pnpm demo) starts a local NEAR chain with everything deployed. On mainnet the house reads Outlayer's Pyth oracle and buys back on Rhea.
 ```

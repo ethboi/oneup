@@ -21,7 +21,8 @@ const BACKERS: [number, bigint][] = [
 const SWAP_USDC = 100_000n * USDC;
 const SWAP_ONEUP = 10_000_000n * ONEUP;
 const BOT_USDC = 50_000n * USDC;
-const BOTS = 6;
+/** One per trading style in bots/src (scripts/add-bots.ts tops a running chain up to this). */
+export const BOTS = 12;
 const SOLVER_USDC = 2_000_000n * USDC;
 /** Bridged assets for the simulated bridge: PoA tokens named like the real ones' chains. */
 const BRIDGED = [
