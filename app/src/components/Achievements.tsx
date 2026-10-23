@@ -48,7 +48,7 @@ const when = (t: number) => new Date(t).toLocaleString("en-US", { month: "short"
 
 const seenKey = (account: string) => `oneup.badges.${account}`;
 
-export function AchievementWatcher() {
+export function AchievementWatcher({ automatic }: { automatic: boolean }) {
   const { me } = useOneUp();
   const have = useBadges();
   const [shown, setShown] = useState<{ id: string; at: number } | null>(null);
@@ -63,13 +63,17 @@ export function AchievementWatcher() {
     try {
       localStorage.setItem(seenKey(me), JSON.stringify([...have]));
     } catch {}
-    if (seen === null) return; // first look at this account: what it already has isn't news
+    if (seen === null || !automatic) return; // quiet screens still record badges, without replaying them later
     const fresh = [...have].filter((id) => !seen!.includes(id));
     if (fresh.length === 0) return;
     sfx("badge");
     setShown({ id: fresh[0], at: Date.now() });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [list, me]);
+  }, [list, me, automatic]);
+
+  useEffect(() => {
+    if (!automatic) setShown(null);
+  }, [automatic]);
 
   useEffect(() => {
     if (!shown) return;
@@ -78,11 +82,11 @@ export function AchievementWatcher() {
   }, [shown]);
 
   const a = shown && ACHIEVEMENTS.find((x) => x.id === shown.id);
-  if (!a) return null;
+  if (!automatic || !a) return null;
   return (
     <button
       key={shown.at}
-      className="badge-toast panel fixed left-1/2 top-4 z-[70] flex -translate-x-1/2 items-center gap-3 px-4 py-3 text-left"
+      className="badge-toast panel fixed left-1/2 bottom-24 lg:bottom-4 z-[70] flex -translate-x-1/2 items-center gap-3 px-4 py-3 text-left"
       onClick={() => (setShown(null), openBadges())}
       role="status"
     >

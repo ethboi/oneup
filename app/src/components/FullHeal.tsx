@@ -12,15 +12,24 @@ import { PixelHeart } from "./Pixel";
 import { Icon } from "./Icon";
 import { ShareDialog } from "./PnlCard";
 
-export function FullHeal() {
+export function FullHeal({ automatic }: { automatic: boolean }) {
   const { me } = useOneUp();
-  const [heal, setHeal] = useState<{ epoch: number; paid: bigint } | null>(null);
+  const [heal, setHeal] = useState<{ epoch: number; paid: bigint; preview: boolean } | null>(null);
   const [sharing, setSharing] = useState(false);
   useFx((e) => {
     if (e.kind !== "heal") return;
+    // The Demo menu's existing preview event uses this non-NFT token ID.
+    const preview = e.tokenId === "preview";
+    if (!automatic && !preview) return;
     sfx("heal");
-    setHeal({ epoch: e.epoch, paid: BigInt(e.paid) });
+    setHeal({ epoch: e.epoch, paid: BigInt(e.paid), preview });
   });
+  useEffect(() => {
+    if (!automatic) {
+      setHeal(current => current?.preview ? current : null);
+      setSharing(false);
+    }
+  }, [automatic]);
   useEffect(() => {
     if (!heal) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setHeal(null);
@@ -29,7 +38,7 @@ export function FullHeal() {
   }, [heal]);
   // a fixed scatter of falling hearts
   const rain = useMemo(() => Array.from({ length: 18 }, (_, i) => ({ x: (i * 37) % 100, d: (i % 6) * 0.25, s: 18 + (i % 3) * 8 })), []);
-  if (!heal) return null;
+  if (!heal || (!automatic && !heal.preview)) return null;
 
   return (
     <div className="fixed inset-0 z-[65] flex items-center justify-center overflow-hidden bg-black/55 p-4" onMouseDown={(e) => e.target === e.currentTarget && setHeal(null)}>

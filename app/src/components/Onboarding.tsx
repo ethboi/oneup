@@ -21,8 +21,8 @@ export function Onboarding() {
     try { setExpanded(localStorage.getItem(KEY) !== "1"); } catch { setExpanded(true); }
   }, []);
   const status = next.phase === "loading" ? "Checking your recovery state…"
-    : next.phase === "claim" ? `$${fmtUsdc(next.claimable)} ready to claim from ${next.count} Life${next.count === 1 ? "" : "s"}`
-    : next.phase === "earning" ? `${next.count} Life${next.count === 1 ? " has" : "s have"} remaining earning rights; future payouts may be zero`
+    : next.phase === "claim" ? `$${fmtUsdc(next.claimable)} ready to claim from ${next.count} ${next.count === 1 ? "Life" : "Lives"}`
+    : next.phase === "earning" ? `${next.count} ${next.count === 1 ? "Life has" : "Lives have"} remaining earning rights; future payouts may be zero`
     : next.phase === "pending" ? `$${fmtUsdc(BigInt(pending!))} net loss this round; NFT eligibility is decided at settlement`
     : next.phase === "finished" ? "Your Lives have finished; no USDC remains unclaimed"
     : "No recovery NFT or unsettled loss in this wallet yet";

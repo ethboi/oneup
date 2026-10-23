@@ -159,11 +159,11 @@ export default function Home() {
       </nav>
       <Toasts />
       <SoundEvents />
-      <AchievementWatcher />
+      <AchievementWatcher automatic={tab === "Trade"} />
       <BadgesDialog />
-      <FullHeal />
-      <JackpotWin />
-      <EpochResults />
+      <FullHeal automatic={tab === "Trade"} />
+      <JackpotWin automatic={tab === "Trade"} />
+      <EpochResults automatic={tab === "Trade"} />
       <Boot />
     </OneUpProvider>
   );

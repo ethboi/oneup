@@ -17,13 +17,21 @@ const OFF = "oneup.rounds.off";
 const short = (a: string) => a.replace(/\.test\.near$/, "");
 const signed = (x: bigint) => `${x >= 0n ? "+" : "−"}$${fmtUsdc(x < 0n ? -x : x)}`;
 
-export function EpochResults() {
+export function EpochResults({ automatic }: { automatic: boolean }) {
   const { o, me } = useOneUp();
   const epoch = usePoll(() => o.epoch(), []);
   const last = useRef<number | null>(null);
-  const [round, setRound] = useState<{ s: EpochSummary; board: Board | null } | null>(null);
+  const [round, setRound] = useState<{ s: EpochSummary; board: Board | null; preview: boolean } | null>(null);
   const history = useHistory(me);
-  // the epoch poll re-runs the effect every 2 s, so loading a round is cancelled only on unmount
+  // Leaving Trade invalidates an in-flight automatic summary, even if the user returns before it loads.
+  const automaticSession = useRef(0);
+  useEffect(() => {
+    if (!automatic) {
+      automaticSession.current += 1;
+      setRound(current => current?.preview ? current : null);
+    }
+  }, [automatic]);
+  // Polls must not cancel summary loading; unmount and leaving Trade invalidate automatic work.
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -36,27 +44,30 @@ export function EpochResults() {
     if (!epoch) return;
     const prev = last.current;
     last.current = epoch.id;
-    if (prev === null || epoch.id <= prev) return;
+    if (prev === null || epoch.id <= prev || !automatic) return;
     try {
       if (localStorage.getItem(OFF) === "1") return;
     } catch {}
+    const session = automaticSession.current;
+    const cancelled = () => !mounted.current || session !== automaticSession.current;
     (async () => {
       // the summary lands with the close; give the indexer a few seconds to catch the last trades
       let s: EpochSummary | null = null;
-      for (let i = 0; i < 10 && !s; i++) {
+      for (let i = 0; i < 10 && !s && !cancelled(); i++) {
         s = await o.epochSummary(epoch.id - 1).catch(() => null);
         if (!s) await new Promise((r) => setTimeout(r, 1500));
       }
-      if (!s || !mounted.current) return;
+      if (!s || cancelled()) return;
       await new Promise((r) => setTimeout(r, 6000));
+      if (cancelled()) return;
       const board = await fetch(`/api/leaderboard?from=${s.started_at * 1000}&to=${s.ended_at * 1000}`)
         .then((r) => (r.ok ? (r.json() as Promise<Board>) : null))
         .catch(() => null);
-      if (!mounted.current) return;
+      if (cancelled()) return;
       sfx("round");
-      setRound({ s, board });
+      setRound({ s, board, preview: false });
     })();
-  }, [epoch, o]);
+  }, [epoch, o, automatic]);
 
   // the Demo menu's preview: the last finished round's screen, now
   useEffect(() => {
@@ -68,7 +79,7 @@ export function EpochResults() {
         .then((r) => (r.ok ? (r.json() as Promise<Board>) : null))
         .catch(() => null);
       sfx("round");
-      setRound({ s, board });
+      setRound({ s, board, preview: true });
     };
     window.addEventListener("oneup-preview-round", show);
     return () => window.removeEventListener("oneup-preview-round", show);
@@ -81,7 +92,7 @@ export function EpochResults() {
     return () => document.removeEventListener("keydown", onKey);
   }, [round]);
 
-  if (!round) return null;
+  if (!round || (!automatic && !round.preview)) return null;
   const { s, board } = round;
   const net = BigInt(s.house_net);
   const mine = (history?.items ?? []).filter((i) => i.kind === "trade" && i.t >= s.started_at * 1000 && i.t <= s.ended_at * 1000);
