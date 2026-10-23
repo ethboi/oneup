@@ -3,7 +3,8 @@
 // About: what OneUp is, how it works, what's built on NEAR and what's mocked, for judges and first-time
 // visitors. The app's entry for NEAR HACKATHON.
 
-import { PixelCoin, PixelHeart } from "./Pixel";
+import { PixelCoin, PixelHeart, PixelMark } from "./Pixel";
+import type { MarkName } from "@/lib/marks";
 import { Icon, type IconName } from "./Icon";
 
 const STEPS: { icon: React.ReactNode; title: string; body: string }[] = [
@@ -67,9 +68,10 @@ const STATUS: Record<Status, { label: string; bg: string; fg: string }> = {
 };
 
 /** Every NEAR tool OneUp uses, for the Built on NEAR section. */
-const NEAR: { title: string; status: Status; body: string; points: string[] }[] = [
+const NEAR: { title: string; status: Status; body: string; points: string[]; marks: { name: MarkName; label: string }[] }[] = [
   {
     title: "Rust smart contracts",
+    marks: [{ name: "rust", label: "Rust" }],
     status: "demo",
     body: "Nine contracts written with near-sdk 5, built with cargo-near.",
     points: [
@@ -80,6 +82,7 @@ const NEAR: { title: string; status: Status; body: string; points: string[] }[] 
   },
   {
     title: "NEAR standards",
+    marks: [{ name: "near", label: "NEAR" }],
     status: "demo",
     body: "Everything that moves follows a NEP, so wallets, explorers and indexers understand it.",
     points: [
@@ -91,6 +94,7 @@ const NEAR: { title: string; status: Status; body: string; points: string[] }[] 
   },
   {
     title: "NEAR Intents",
+    marks: [{ name: "intents", label: "NEAR Intents" }],
     status: "simulated",
     body: "Pay from Ethereum or Solana in one signature: bridge, swap to USDC and deposit, as one intent.",
     points: [
@@ -101,6 +105,7 @@ const NEAR: { title: string; status: Status; body: string; points: string[] }[] 
   },
   {
     title: "Sputnik DAO",
+    marks: [{ name: "dao", label: "Sputnik DAO" }],
     status: "demo",
     body: "A DAO owns the house: the same Sputnik DAO v2 code mainnet DAOs run.",
     points: [
@@ -110,18 +115,21 @@ const NEAR: { title: string; status: Status; body: string; points: string[] }[] 
   },
   {
     title: "Function-call keys (session keys)",
+    marks: [{ name: "near", label: "NEAR" }],
     status: "demo",
     body: "One-tap trading signs with a key that can only call the house's trade methods.",
     points: ["It can open, close and set triggers; it can't deposit, withdraw or move tokens", "Turn it off and the key is deleted"],
   },
   {
     title: "Meta transactions (NEP-366)",
+    marks: [{ name: "near", label: "NEAR" }],
     status: "demo",
     body: "Gasless trades: the app signs a delegate action and a relayer pays the gas.",
     points: ["The relayer only forwards trade calls to the house, with a gas cap and a rate limit"],
   },
   {
     title: "Chain Signatures",
+    marks: [{ name: "near", label: "NEAR" }],
     status: "mainnet",
     body: "How the house would hold its yield position on Ethereum from a NEAR contract (D-27).",
     points: [
@@ -132,6 +140,7 @@ const NEAR: { title: string; status: Status; body: string; points: string[] }[] 
   },
   {
     title: "Pyth prices via Outlayer",
+    marks: [{ name: "pyth", label: "Pyth" }, { name: "outlayer", label: "Outlayer" }],
     status: "simulated",
     body: "Every fill and settlement uses an oracle price published after the order.",
     points: [
@@ -142,18 +151,21 @@ const NEAR: { title: string; status: Status; body: string; points: string[] }[] 
   },
   {
     title: "Rhea",
+    marks: [{ name: "rhea", label: "Rhea" }],
     status: "mainnet",
     body: "NEAR's DEX for the buybacks: 30% of each round's payout buys $1UP for the lockers.",
     points: ["Locally a mock swap with the same interface", "Its 50M $1UP liquidity seed is minted at launch"],
   },
   {
     title: "NEAR randomness",
+    marks: [{ name: "near", label: "NEAR" }],
     status: "demo",
     body: "The jackpot is drawn from the block's random seed at a round's close.",
     points: ["Pyth Entropy only runs on EVM chains, so NEAR's own randomness is used (D-27)"],
   },
   {
     title: "Local chain and tests",
+    marks: [{ name: "near", label: "NEAR" }],
     status: "demo",
     body: "One command runs a real NEAR node and deploys everything; the same tooling runs the tests.",
     points: [
@@ -164,6 +176,7 @@ const NEAR: { title: string; status: Status; body: string; points: string[] }[] 
   },
   {
     title: "AI agents (MCP)",
+    marks: [{ name: "near", label: "NEAR" }],
     status: "demo",
     body: "An MCP server lets an AI agent trade on OneUp: read markets, quote, open and close, set triggers, claim lives.",
     points: ["Registered for Claude Code in .mcp.json; signs as the demo account or a bot"],
@@ -284,7 +297,14 @@ export function About() {
             {NEAR.map((n) => (
               <li key={n.title} className="rounded-xl border border-[var(--line)] p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <b>{n.title}</b>
+                  <span className="flex items-center gap-3">
+                    <span className="flex shrink-0 gap-1.5">
+                      {n.marks.map((m) => (
+                        <PixelMark key={m.name} name={m.name} label={m.label} size={34} />
+                      ))}
+                    </span>
+                    <b>{n.title}</b>
+                  </span>
                   <span className="shrink-0 rounded-md px-2 py-0.5 text-[11px] font-bold" style={{ background: STATUS[n.status].bg, color: STATUS[n.status].fg }}>
                     {STATUS[n.status].label}
                   </span>

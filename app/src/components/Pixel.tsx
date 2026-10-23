@@ -1,6 +1,7 @@
 // Pixel sprites drawn from character grids, outlined in ink automatically so they read on any surface.
 
 import { COIN_ROWS as COIN, HEART_ROWS as HEART, LOCK_ROWS, SPRITES, pixelText } from "@/lib/sprites";
+import { MARKS, type MarkName } from "@/lib/marks";
 
 interface SpriteProps {
   rows: string[];
@@ -140,5 +141,28 @@ export function PixelAmount({ text, height }: { text: string; height: number }) 
       label={text}
       style={{ maxWidth: "88vw", height: "auto", filter: "drop-shadow(3px 3px 0 var(--lcd-ink))" }}
     />
+  );
+}
+
+/** A brand mark from lib/marks.ts, drawn pixel for pixel; tiled marks get rounded corners like an app icon. */
+export function PixelMark({ name, size = 36, label }: { name: MarkName; size?: number; label?: string }) {
+  const m = MARKS[name] as { colors: Record<string, string>; rows: string[] };
+  const n = m.rows.length;
+  const tiled = !m.rows[0].includes(".");
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${n} ${n}`}
+      shapeRendering="crispEdges"
+      role={label ? "img" : undefined}
+      aria-label={label}
+      aria-hidden={label ? undefined : true}
+      style={tiled ? { borderRadius: size * 0.22, boxShadow: "0 2px 0 rgb(0 0 0 / 0.3)" } : undefined}
+    >
+      {m.rows.flatMap((r, y) =>
+        [...r].map((c, x) => (c === "." ? null : <rect key={`${x},${y}`} x={x} y={y} width="1.02" height="1.02" fill={m.colors[c]} />)),
+      )}
+    </svg>
   );
 }
