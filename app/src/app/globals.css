@@ -1601,17 +1601,51 @@ kbd {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 18px;
+  gap: 16px;
   padding: 16px;
+  overflow: hidden;
   background-color: var(--bg);
-  background-image: radial-gradient(var(--grille) 1.2px, transparent 1.6px);
-  background-size: 9px 9px;
+  background-image:
+    radial-gradient(ellipse at center, color-mix(in srgb, var(--primary) 16%, transparent), transparent 60%),
+    radial-gradient(var(--grille) 1.2px, transparent 1.6px);
+  background-size:
+    100% 100%,
+    9px 9px;
   cursor: pointer;
 }
 .boot-console {
-  width: min(440px, 100%);
-  padding: 22px 22px 26px;
-  animation: boot-rise 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.1) both;
+  position: relative;
+  width: min(600px, 100%, calc((100dvh - 80px) * 0.66));
+  padding: 18px 26px 30px;
+  border-radius: 24px 24px 96px 24px;
+  animation: boot-rise 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.1) both;
+}
+.boot-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 4px 12px;
+  font: 800 9px var(--font-body);
+  letter-spacing: 0.14em;
+  color: var(--muted);
+}
+.boot-led {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #3a1220;
+  animation: boot-led 0.3s steps(2) 0.2s both;
+}
+.boot-brand {
+  margin-left: auto;
+  font-size: 17px;
+  letter-spacing: 0;
+  color: color-mix(in srgb, var(--text) 30%, transparent);
+  text-shadow: 0 1px 0 rgb(255 255 255 / 0.06);
+}
+.boot-bezel {
+  padding: 16px 22px 26px;
+  border-radius: 14px 14px 52px 14px;
 }
 .boot-screen {
   position: relative;
@@ -1619,116 +1653,231 @@ kbd {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 14px;
-  height: 230px;
+  gap: 16px;
+  aspect-ratio: 10 / 8;
   overflow: hidden;
   /* the screen lighting up: dark, then a flicker, then on */
-  animation: boot-power 0.6s steps(3) 0.25s both;
+  animation: boot-power 0.7s steps(3) 0.35s both;
+}
+/* a price line drawing itself behind the logo, from the chain's own history */
+/* in the screen's lower half, under the logo, so it runs behind the words rather than through the heart */
+.boot-line {
+  position: absolute;
+  left: 0;
+  top: 52%;
+  width: 100%;
+  height: 30%;
+  overflow: visible;
+}
+.boot-line path {
+  fill: none;
+  stroke: var(--lcd-2);
+  opacity: 0.7;
+  stroke-width: 3px;
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: boot-draw 1.6s ease-out 2.8s forwards;
 }
 .boot-logo {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   /* drops from above the screen in pixel steps, like a handheld's logo */
-  animation: boot-drop 0.9s steps(9) 0.45s both;
+  animation: boot-drop 1s steps(10) 0.6s both;
 }
 .boot-word {
-  font-size: 40px;
+  font-size: clamp(38px, 9vw, 54px);
   line-height: 1;
   color: var(--lcd-ink);
 }
+.boot-tag,
+.boot-start {
+  position: relative;
+  color: var(--lcd-ink);
+  letter-spacing: 0.1em;
+}
 .boot-tag {
   min-height: 18px;
-  font-size: 13px;
-  letter-spacing: 0.08em;
-  color: var(--lcd-ink);
+  font-size: clamp(11px, 2.8vw, 14px);
 }
 .boot-caret {
   animation: blink 0.5s steps(1) infinite;
 }
 .boot-start {
-  font-size: 15px;
-  letter-spacing: 0.14em;
-  color: var(--lcd-ink);
+  font-size: clamp(14px, 3.4vw, 18px);
+  letter-spacing: 0.16em;
   opacity: 0;
 }
 .boot-start.on {
   opacity: 1;
   animation: blink 1s steps(1) infinite;
 }
+/* the markets scrolling along the bottom of the screen */
+.boot-ticker {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 6px 0;
+  overflow: hidden;
+  white-space: pre;
+  font-size: 11px;
+  color: var(--lcd);
+  background: var(--lcd-ink);
+  animation: boot-fade 0.4s ease-out 2.8s both;
+}
+/* two copies of the tape side by side: sliding by half loops without a seam */
+.boot-ticker > span {
+  display: inline-block;
+  animation: boot-tape 14s linear 2.8s infinite;
+}
 .boot-pad {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 22px 18px 0;
+  margin: 34px 10px 0;
 }
-/* a pixel D-pad: a plus of the bezel's colour */
+/* a D-pad: a plus in the bezel's colour, labelled for leverage */
 .boot-dpad {
   position: relative;
-  width: 60px;
-  height: 60px;
+  width: 84px;
+  height: 84px;
   background:
-    linear-gradient(var(--bezel), var(--bezel)) center / 20px 100% no-repeat,
-    linear-gradient(var(--bezel), var(--bezel)) center / 100% 20px no-repeat;
-  border-radius: 4px;
+    linear-gradient(var(--bezel), var(--bezel)) center / 28px 100% no-repeat,
+    linear-gradient(var(--bezel), var(--bezel)) center / 100% 28px no-repeat;
+  filter: drop-shadow(0 3px 0 rgb(0 0 0 / 0.35));
+}
+.boot-dpad-label {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  font: 800 8px var(--font-body);
+  letter-spacing: 0.1em;
+  color: var(--muted);
 }
 .boot-ab {
   display: flex;
-  gap: 12px;
+  align-items: flex-start;
+  gap: 16px;
   transform: rotate(-22deg);
 }
-.boot-ab > span {
-  display: grid;
-  place-content: center;
-  width: 38px;
-  height: 38px;
+.boot-key {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.boot-key::before {
+  content: "";
+  width: clamp(46px, 12vw, 60px);
+  height: clamp(46px, 12vw, 60px);
   border-radius: 999px;
-  background: var(--primary);
-  box-shadow: 0 3px 0 color-mix(in srgb, var(--primary) 60%, #000);
-  color: var(--on-fill);
-  font: 800 13px var(--font-display);
+  background: var(--k);
+  box-shadow:
+    inset 0 2px 0 rgb(255 255 255 / 0.25),
+    0 5px 0 color-mix(in srgb, var(--k) 55%, #000);
+  transition: transform 0.08s, box-shadow 0.08s;
+}
+.boot-key.long {
+  --k: var(--long-fill);
+  margin-top: -14px;
+}
+.boot-key.short {
+  --k: var(--short-fill);
+}
+.boot-key > span {
+  font: 800 10px var(--font-body);
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+.boot-key:hover::before,
+.boot-key.down::before {
+  transform: translateY(4px);
+  box-shadow:
+    inset 0 2px 0 rgb(255 255 255 / 0.25),
+    0 1px 0 color-mix(in srgb, var(--k) 55%, #000);
 }
 .boot-pills {
   display: flex;
   justify-content: center;
-  gap: 18px;
-  margin-top: 16px;
+  gap: 22px;
+  margin-top: 20px;
 }
-.boot-pills > span {
-  padding-top: 16px;
+.boot-pills > * {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
   font: 800 9px var(--font-body);
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   color: var(--muted);
-  background: linear-gradient(var(--bezel), var(--bezel)) top center / 44px 9px no-repeat;
-  border-radius: 6px;
 }
-.boot-pill-start {
-  animation: boot-nudge 1.6s ease-in-out 2.6s infinite;
+.boot-pills i {
+  width: 52px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--bezel);
+  transform: rotate(-22deg);
+  box-shadow: 0 2px 0 rgb(0 0 0 / 0.35);
+}
+.boot-pills button i {
+  animation: boot-nudge 1.6s ease-in-out 3.2s infinite;
+}
+.boot-pills button.down i {
+  transform: rotate(-22deg) translateY(2px);
+}
+/* the speaker: slanted slots in the corner */
+.boot-grille {
+  position: absolute;
+  right: 26px;
+  bottom: 16px;
+  display: flex;
+  gap: 6px;
+  transform: rotate(-28deg);
+}
+.boot-grille > span {
+  width: 4px;
+  height: 32px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.28);
+  box-shadow: inset 0 1px 1px rgb(0 0 0 / 0.4);
 }
 .boot-hint {
   font-size: 13px;
   color: var(--muted);
-  animation: boot-fade 0.4s ease-out 2.4s both;
+  text-align: center;
+  animation: boot-fade 0.4s ease-out 3s both;
 }
-/* pressing start: the screen flashes white, then the console drops away */
+/* pressing a key: the screen flashes, then the console drops away */
 .boot-leave .boot-screen {
   animation: boot-flash 0.35s steps(2) both;
 }
 .boot-leave {
-  animation: boot-out 0.65s steps(6) both;
+  animation: boot-out 0.75s steps(6) 0.12s both;
 }
 @keyframes boot-rise {
   from {
-    transform: translateY(24px);
+    transform: translateY(30px) scale(0.96);
     opacity: 0;
+  }
+}
+@keyframes boot-led {
+  to {
+    background: #ff3b5c;
+    box-shadow: 0 0 10px #ff3b5c;
   }
 }
 @keyframes boot-power {
   0% {
-    filter: brightness(0.25);
+    filter: brightness(0.2);
   }
   50% {
-    filter: brightness(1.15);
+    filter: brightness(1.2);
   }
   100% {
     filter: none;
@@ -1736,12 +1885,22 @@ kbd {
 }
 @keyframes boot-drop {
   from {
-    transform: translateY(-170px);
+    transform: translateY(-220px);
+  }
+}
+@keyframes boot-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes boot-tape {
+  to {
+    transform: translateX(-50%);
   }
 }
 @keyframes boot-nudge {
   50% {
-    transform: translateY(-3px);
+    transform: rotate(-22deg) translateY(-3px);
   }
 }
 @keyframes boot-fade {
@@ -1757,16 +1916,23 @@ kbd {
 @keyframes boot-out {
   to {
     opacity: 0;
-    transform: scale(1.04);
+    transform: scale(1.06);
   }
 }
 @media (prefers-reduced-motion: reduce) {
   .boot *,
-  .boot {
+  .boot,
+  .boot *::before {
     animation: none !important;
   }
   .boot-start.on {
     opacity: 1;
+  }
+  .boot-line path {
+    stroke-dashoffset: 0;
+  }
+  .boot-led {
+    background: #ff3b5c;
   }
 }
 /* already booted this session: hidden before the first paint (app/layout.tsx) */
