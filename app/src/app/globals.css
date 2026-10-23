@@ -1802,34 +1802,42 @@ kbd {
     inset 0 2px 0 rgb(255 255 255 / 0.25),
     0 1px 0 color-mix(in srgb, var(--k) 55%, #000);
 }
+/* MARKET and START: each pill and its label tilted together, as on a handheld */
 .boot-pills {
   display: flex;
   justify-content: center;
-  gap: 22px;
-  margin-top: 20px;
+  gap: 26px;
+  margin-top: 22px;
+  margin-right: 70px;
 }
 .boot-pills > * {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
+  transform: rotate(-25deg);
   font: 800 9px var(--font-body);
   letter-spacing: 0.14em;
   color: var(--muted);
 }
 .boot-pills i {
-  width: 52px;
-  height: 12px;
+  width: 46px;
+  height: 13px;
   border-radius: 999px;
-  background: var(--bezel);
-  transform: rotate(-22deg);
-  box-shadow: 0 2px 0 rgb(0 0 0 / 0.35);
+  background: linear-gradient(color-mix(in srgb, var(--bezel) 70%, #fff 8%), var(--bezel));
+  border: 1px solid rgb(0 0 0 / 0.45);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.08),
+    0 2px 0 rgb(0 0 0 / 0.4);
+  transition: transform 0.08s;
 }
 .boot-pills button i {
   animation: boot-nudge 1.6s ease-in-out 3.2s infinite;
 }
+.boot-pills button:hover i,
 .boot-pills button.down i {
-  transform: rotate(-22deg) translateY(2px);
+  transform: translateY(2px);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08);
 }
 /* the speaker: slanted slots in the corner */
 .boot-grille {
@@ -1900,7 +1908,7 @@ kbd {
 }
 @keyframes boot-nudge {
   50% {
-    transform: rotate(-22deg) translateY(-3px);
+    transform: translateY(-3px);
   }
 }
 @keyframes boot-fade {
