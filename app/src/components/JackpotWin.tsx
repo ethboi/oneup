@@ -33,6 +33,16 @@ export function JackpotWin() {
     setWin({ who: latest.who ?? "someone", amount: BigInt(latest.amount) });
   }, [items, me]);
 
+  // the Demo menu's preview: you take a pot of the jackpot's current size, or a round number
+  useEffect(() => {
+    const show = (e: Event) => {
+      sfx("jackpot");
+      setWin({ who: short(me), amount: BigInt((e as CustomEvent<string>).detail || "250000000") });
+    };
+    window.addEventListener("oneup-preview-jackpot", show);
+    return () => window.removeEventListener("oneup-preview-jackpot", show);
+  }, [me]);
+
   useEffect(() => {
     if (!win) return;
     const t = setTimeout(() => setWin(null), 9000);

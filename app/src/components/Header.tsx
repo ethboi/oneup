@@ -148,6 +148,8 @@ const PREVIEW_WINS = [20, 200, 1_200, 5_000];
 function DemoMenu() {
   const { o, me, setMe, accounts, tx, run } = useOneUp();
   const markets = usePoll(() => o.markets(), [], 30_000) ?? [];
+  const treasury = usePoll(() => o.treasury(), [], 30_000);
+  const jackpotNow = treasury?.jackpot && BigInt(treasury.jackpot) > 0n ? treasury.jackpot : undefined;
   const [amount, setAmount] = useState("10000");
   const amt = BigInt(Math.floor(Number(amount) || 0)) * USDC;
   return (
@@ -205,15 +207,26 @@ function DemoMenu() {
               ))}
             </div>
           </div>
+          {/* every on-screen moment, on demand: nothing is traded or changed */}
           <div className="flex flex-col gap-1">
-            <span className="label">Preview the screen&apos;s warnings</span>
-            <div className="flex gap-1.5">
-              <button type="button" className="chip flex-1 px-0" onClick={() => (close(), sfx("revenge"), emitFx({ kind: "revenge" }))}>
-                Revenge trade
-              </button>
-              <button type="button" className="chip flex-1 px-0" onClick={() => (close(), sfx("tilt"), previewTilt(me))}>
-                Tilt
-              </button>
+            <span className="label">Preview the screen&apos;s moments</span>
+            <div className="grid grid-cols-3 gap-1.5">
+              {(
+                [
+                  ["Loss +1", () => (sfx("lose"), markets.forEach((m, i) => emitFx({ kind: "lose", market: m.id, positionId: -10 - i })))],
+                  ["Liquidated", () => (sfx("liquidated"), markets.forEach((m, i) => emitFx({ kind: "liquidated", market: m.id, positionId: -20 - i })))],
+                  ["Revenge", () => (sfx("revenge"), emitFx({ kind: "revenge" }))],
+                  ["Tilt", () => (sfx("tilt"), previewTilt(me))],
+                  ["Full Heal", () => emitFx({ kind: "heal", tokenId: "preview", epoch: 1, paid: String(420n * USDC) })],
+                  ["Jackpot", () => window.dispatchEvent(new CustomEvent("oneup-preview-jackpot", { detail: jackpotNow }))],
+                  ["Round over", () => window.dispatchEvent(new Event("oneup-preview-round"))],
+                  ["Badges", () => openBadges()],
+                ] as [string, () => void][]
+              ).map(([name, go]) => (
+                <button key={name} type="button" className="chip px-0 text-xs" onClick={() => (close(), go())}>
+                  {name}
+                </button>
+              ))}
             </div>
           </div>
           {/* the power-on screen shows once a session; this brings it back */}

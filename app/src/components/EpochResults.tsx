@@ -58,6 +58,22 @@ export function EpochResults() {
     })();
   }, [epoch, o]);
 
+  // the Demo menu's preview: the last finished round's screen, now
+  useEffect(() => {
+    const show = async () => {
+      if (!epoch || epoch.id < 2) return;
+      const s = await o.epochSummary(epoch.id - 1).catch(() => null);
+      if (!s) return;
+      const board = await fetch(`/api/leaderboard?from=${s.started_at * 1000}&to=${s.ended_at * 1000}`)
+        .then((r) => (r.ok ? (r.json() as Promise<Board>) : null))
+        .catch(() => null);
+      sfx("round");
+      setRound({ s, board });
+    };
+    window.addEventListener("oneup-preview-round", show);
+    return () => window.removeEventListener("oneup-preview-round", show);
+  }, [epoch, o]);
+
   useEffect(() => {
     if (!round) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setRound(null);
