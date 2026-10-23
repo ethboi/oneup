@@ -4,7 +4,7 @@
 // Losers' $1UP arrives here already locked. A summary with Claim all and Merge, then your locks as rows;
 // closed ones fold away. Leave early for a penalty, or sell a lock on the market.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ONEUP, USDC, VE_MAX_EPOCHS, type LockInfo } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { lockValue, useOneupPrice } from "@/lib/value";
@@ -50,15 +50,18 @@ export function Locks() {
 
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_340px] lg:items-start">
-      <div className="flex min-w-0 flex-col gap-5">
-        <Explainer title="Locks" line="Locked $1UP earns the house's buybacks, shared by weight: the amount × the rounds left ÷ 104.">
-          Each round, 30% of the house&apos;s payout buys back $1UP for everyone locked. A lock&apos;s weight counts from the
-          round after it&apos;s made and shrinks as it runs down. Leaving early costs up to half, less as the lock runs down,
-          and the penalty goes to everyone still locked. Losers&apos; $1UP arrives already locked for {MAX} rounds. A lock is an
-          NFT: sell it on the market instead of leaving early.
-        </Explainer>
+      {/* phones: the left column dissolves so the title, then the price and form, then the locks run in order */}
+      <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-5">
+        <div className="order-1">
+          <Explainer title="Locks" line="Locked $1UP earns the house's buybacks, shared by weight: the amount × the rounds left ÷ 104.">
+            Each round, 30% of the house&apos;s payout buys back $1UP for everyone locked. A lock&apos;s weight counts from the
+            round after it&apos;s made and shrinks as it runs down. Leaving early costs up to half, less as the lock runs down,
+            and the penalty goes to everyone still locked. Losers&apos; $1UP arrives already locked for {MAX} rounds. A lock is an
+            NFT: sell it on the market instead of leaving early.
+          </Explainer>
 
-        <div className="panel divide-y divide-[var(--line)]">
+        </div>
+        <div className="panel order-3 min-w-0 divide-y divide-[var(--line)]">
           <SummaryBar
             action={
               <button
@@ -71,7 +74,7 @@ export function Locks() {
               </button>
             }
           >
-            <Stat label="Locked" value={`${fmtOneup(locked.toString())} $1UP`} />
+            <Stat label="Locked" value={`${fmtOneup(locked.toString())} $1UP`} sub={px > 0n ? `≈ ${fmtUsd((locked * px) / ONEUP)}` : undefined} />
             <Stat label="Your weight next round" value={fmtOneup(mine.toString())} />
             <Stat label="Your share" value={`${share.toFixed(2)}%`} />
             <Stat label="Recent buybacks" value={`${fmtOneup((recent ?? 0n).toString())} $1UP`} />
@@ -118,7 +121,11 @@ export function Locks() {
           )}
         </div>
       </div>
-      <LockForm />
+      {/* phones: the price and the form before a long list of locks */}
+      <div className="order-2 flex flex-col gap-4 lg:order-none">
+        <OneupPrice px={px} locked={locked} />
+        <LockForm px={px} />
+      </div>
     </div>
   );
 }
@@ -207,19 +214,107 @@ function LockRow({ l, epoch, px, claimable, listings }: { l: LockInfo; epoch: nu
   );
 }
 
-function LockForm() {
-  const { tx, run } = useOneUp();
-  const [amount, setAmount] = useState("1000");
+/** The $1UP price now, how it moved over the last day (sampled by the app's server), and what yours is worth. */
+function OneupPrice({ px, locked }: { px: bigint; locked: bigint }) {
+  const { o, me } = useOneUp();
+  const wallet = BigInt(usePoll(() => o.oneupBalance(me), [me]) ?? "0");
+  const [samples, setSamples] = useState<[number, number][]>([]);
+  useEffect(() => {
+    let live = true;
+    const tick = () =>
+      fetch("/api/oneup-price")
+        .then((x) => (x.ok ? x.json() : { samples: [] }))
+        .then((j) => live && setSamples(j.samples ?? []))
+        .catch(() => {});
+    tick();
+    const i = setInterval(tick, 60_000);
+    return () => {
+      live = false;
+      clearInterval(i);
+    };
+  }, []);
+  const now = Number(px);
+  const first = samples[0]?.[1];
+  const change = first && now ? (now / first - 1) * 100 : null;
+  const mins = samples.length ? Math.max(1, Math.round((Date.now() - samples[0][0]) / 60_000)) : 0;
+  const span = mins < 90 ? `${mins}m` : `${Math.round(mins / 60)}h`;
+  const pts = [...samples.map((x) => x[1]), ...(now ? [now] : [])];
+  const lo = Math.min(...pts);
+  const hi = Math.max(...pts);
+  const line = pts.length > 1 ? pts.map((v, i) => `${i ? "L" : "M"}${((i / (pts.length - 1)) * 100).toFixed(2)} ${(hi > lo ? 28 - ((v - lo) / (hi - lo)) * 24 : 15).toFixed(2)}`).join(" ") : null;
+  const tone = change === null || change === 0 ? "var(--muted)" : change > 0 ? "var(--long)" : "var(--short)";
+  return (
+    <div className="panel p-4">
+      <div className="ticket-row">
+        <h2 className="text-lg font-extrabold">$1UP price</h2>
+        <span className="num text-sm font-bold" style={{ color: tone }}>
+          {change === null ? "" : `${change >= 0 ? "▲" : "▼"} ${Math.abs(change).toFixed(2)}% · ${span}`}
+        </span>
+      </div>
+      <div className="num mt-1 text-3xl font-extrabold">{px > 0n ? `$${(now / 1e6).toFixed(now < 100_000 ? 4 : 2)}` : "…"}</div>
+      {line && (
+        <svg viewBox="0 0 100 30" preserveAspectRatio="none" className="mt-2 h-12 w-full" aria-label={`$1UP over the last ${span}`} role="img">
+          <path d={line} fill="none" stroke={tone} strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+        </svg>
+      )}
+      <p className="label mt-1">From the swap pool; buybacks push it up. Sampled every minute.</p>
+      <dl className="num mt-3 flex flex-col gap-1.5 border-t border-[var(--line)] pt-3 text-sm">
+        <div className="ticket-row">
+          <dt className="label">In your wallet</dt>
+          <dd className="font-bold">
+            {fmtOneup(wallet.toString())} <span className="label font-normal">{px > 0n ? `≈ ${fmtUsd((wallet * px) / ONEUP)}` : ""}</span>
+          </dd>
+        </div>
+        <div className="ticket-row">
+          <dt className="label">Locked</dt>
+          <dd className="font-bold">
+            {fmtOneup(locked.toString())} <span className="label font-normal">{px > 0n ? `≈ ${fmtUsd((locked * px) / ONEUP)}` : ""}</span>
+          </dd>
+        </div>
+      </dl>
+    </div>
+  );
+}
+
+function LockForm({ px }: { px: bigint }) {
+  const { o, me, tx, run } = useOneUp();
+  const wallet = BigInt(usePoll(() => o.oneupBalance(me), [me]) ?? "0");
+  const whole = wallet / ONEUP;
+  const [amount, setAmount] = useState("");
   const [epochs, setEpochs] = useState(MAX);
   const raw = BigInt(Math.floor(Number(amount) || 0)) * ONEUP;
+  const over = raw > wallet;
   const years = epochs / 52;
   return (
     <div className="panel flex flex-col gap-3 p-4">
       <h2 className="text-lg font-extrabold">Lock $1UP</h2>
+      <div className="ticket-row text-sm">
+        <span className="label">Available to lock</span>
+        <span className="num font-bold">{fmtOneup(wallet.toString())} $1UP</span>
+      </div>
       <span className="field">
-        <input className="input num" value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="$1UP amount" inputMode="decimal" />
+        <input className="input num" value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="$1UP amount" inputMode="decimal" placeholder="0" />
         <span className="field-unit">$1UP</span>
       </span>
+      {whole > 0n && (
+        <span className="chip-track" role="group" aria-label="Amount presets">
+          {([25, 50, 75, 100] as const).map((pc) => {
+            const v = String((whole * BigInt(pc)) / 100n);
+            return (
+              <button key={pc} type="button" className="chip num flex-1 px-0" aria-pressed={amount === v} onClick={() => setAmount(v)}>
+                {pc === 100 ? "Max" : `${pc}%`}
+              </button>
+            );
+          })}
+        </span>
+      )}
+      {raw > 0n && px > 0n && !over && <span className="label num -mt-1">≈ {fmtUsd((raw * px) / ONEUP)} at today&apos;s price</span>}
+      {over && <span className="text-sm text-[var(--short)]">That&apos;s more than your wallet holds.</span>}
+      {wallet === 0n && (
+        <p className="label">
+          Your wallet has no $1UP to lock. Losers&apos; $1UP arrives already locked, and locks can be bought on the Market.
+        </p>
+      )}
       <label className="flex flex-col gap-1">
         <span className="label flex justify-between">
           <span>Lock for</span>
@@ -241,9 +336,9 @@ function LockForm() {
         Weight {((Number(amount) || 0) * epochs / MAX).toLocaleString("en-US", { maximumFractionDigits: 0 })}, shrinking each round.
         Leaving early costs up to half, less as the lock runs down.
       </p>
-      <button className="btn btn-accent" disabled={raw === 0n} onClick={() => run(`Lock ${amount} $1UP`, () => tx.lock(raw, epochs))}>
+      <button className="btn btn-accent" disabled={raw === 0n || over} onClick={() => run(`Lock ${amount} $1UP`, () => tx.lock(raw, epochs)).then((ok) => ok && setAmount(""))}>
         <Icon name="lock" />
-        Lock
+        {raw > 0n ? `Lock ${Number(amount).toLocaleString("en-US")} $1UP` : "Lock"}
       </button>
     </div>
   );

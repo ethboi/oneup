@@ -43,13 +43,14 @@ export function Explainer({ title, line, children }: { title?: string; line: Rea
   );
 }
 
-export function Stat({ label, value, tone }: { label: string; value: React.ReactNode; tone?: "good" | "bad" }) {
+export function Stat({ label, value, tone, sub }: { label: string; value: React.ReactNode; tone?: "good" | "bad"; sub?: React.ReactNode }) {
   return (
     <div className="min-w-0">
       <div className="label truncate">{label}</div>
       <div className="num truncate text-xl font-extrabold" style={tone ? { color: tone === "good" ? "var(--long)" : "var(--short)" } : undefined}>
         {value}
       </div>
+      {sub && <div className="label num truncate">{sub}</div>}
     </div>
   );
 }
