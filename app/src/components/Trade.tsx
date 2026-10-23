@@ -746,10 +746,9 @@ function Console({
                   <span className="revenge-tag">DETECTED</span>
                 </span>
               ) : (
-                // a pinball machine's TILT, with how long the cool-down has left
+                // a pinball machine's TILT
                 <span className="tilt display">
                   <span className="tilt-word">TILT</span>
-                  <span className="tilt-cool num">COOL DOWN {fmtClock(tilt)}</span>
                 </span>
               )}
             </div>

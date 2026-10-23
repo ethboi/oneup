@@ -1084,8 +1084,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: 14px 30px 12px;
+  padding: 16px 30px 14px;
   border: 5px double var(--lcd-ink);
   border-radius: 6px;
   background: var(--lcd);
@@ -1104,11 +1103,6 @@ body {
     5px 5px 0 var(--lcd-ink),
     6px 6px 0 var(--lcd-ink);
   animation: blink 0.8s steps(1) infinite;
-}
-.tilt-cool {
-  font-size: clamp(12px, 2.2vw, 16px);
-  letter-spacing: 0.2em;
-  color: var(--lcd-ink);
 }
 @media (prefers-reduced-motion: reduce) {
   .revenge,
