@@ -17,6 +17,8 @@ export interface ActivityItem {
   amount?: string;
   /** On an open or a close: the trade, for the trades tape (lib/server/activity.ts). */
   trade?: { market: string; side: "Long" | "Short"; size: string; price: string; open: boolean };
+  /** On a jackpot draw: its round and the winner's tickets out of all of them (lib/server/activity.ts). */
+  draw?: { epoch: number; tickets?: string; total?: string };
 }
 
 const LOOK: Record<ActivityItem["kind"], { icon: IconName; color: string }> = {

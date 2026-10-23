@@ -22,6 +22,8 @@ export interface ActivityItem {
   sale?: { nft: "life" | "lock"; token_id: string; price: string; value?: string };
   /** On a jackpot win: what it paid. */
   amount?: string;
+  /** On a jackpot draw: its round and the winner's tickets out of all of them (none when it rolled over). */
+  draw?: { epoch: number; tickets?: string; total?: string };
   /** On an open or a close: the trade, for the trades tape (size and price in USDC 1e6 and price 1e8 units). A
    *  close only carries it when its open was seen. */
   trade?: { market: string; side: "Long" | "Short"; size: string; price: string; open: boolean };
@@ -218,7 +220,17 @@ export function toItems(ev: Event, executor: string, t: number, c: Record<string
     } else if (ev.standard === "oneup" && ev.event === "jackpot_won") {
       const who = short(String(d.account_id));
       mine(String(d.account_id), { t, kind: "jackpot", amount: String(d.amount), tickets: String(d.tickets) });
-      out.feed.push({ t, kind: "jackpot", who, text: `${who} won the ${usd(String(d.amount))} jackpot`, amount: String(d.amount) });
+      out.feed.push({
+        t,
+        kind: "jackpot",
+        who,
+        text: `${who} won the ${usd(String(d.amount))} jackpot`,
+        amount: String(d.amount),
+        draw: { epoch: Number(d.epoch), tickets: String(d.tickets), total: String(d.total_tickets) },
+      });
+    } else if (ev.standard === "oneup" && ev.event === "jackpot_rolled") {
+      // a draw with no tickets in it: the pot carries on to the next one
+      out.feed.push({ t, kind: "jackpot", text: `Round ${d.epoch}'s jackpot draw had no tickets; ${usd(String(d.jackpot))} rolls over`, amount: String(d.jackpot), draw: { epoch: Number(d.epoch) } });
     } else if (ev.standard === "oneup" && ev.event === "epoch_closed") {
       const s = d.summary as Record<string, string | number>;
       const lives = Number(s.lives_minted);
@@ -303,7 +315,11 @@ function record(block: { t: number; logs: [string, string][] }, c: Record<string
     if (list.length > KEEP_PER_ACCOUNT) list.splice(0, list.length - KEEP_PER_ACCOUNT);
     state.history.set(account, list);
   }
-  if (state.items.length > KEEP) state.items.splice(0, state.items.length - KEEP);
+  if (state.items.length > KEEP) {
+    // the feed keeps its newest KEEP items, but every jackpot draw stays for the winners' history
+    const cut = state.items.length - KEEP;
+    state.items = state.items.filter((i, k) => k >= cut || (i.kind === "jackpot" && i.draw));
+  }
 }
 
 const pendingSales: Omit<ActivityItem, "seq">[] = [];
@@ -371,6 +387,11 @@ export function startActivity() {
 
 export function activitySince(after: number): ActivityItem[] {
   return state.items.filter((i) => i.seq > after);
+}
+
+/** Every jackpot draw seen, newest first: winners, and the ones that rolled over. */
+export function jackpotDraws(): ActivityItem[] {
+  return state.items.filter((i) => i.kind === "jackpot" && i.draw).reverse();
 }
 
 /** An account's history, newest first, and how far the scan has got (it starts from block 1). */
