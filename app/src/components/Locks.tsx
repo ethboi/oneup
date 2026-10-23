@@ -1,6 +1,6 @@
 "use client";
 
-// Locks: stake $1UP for up to two years and earn the house's buybacks by weight (amount × time left).
+// Locks: stake $1UP for up to 104 rounds and earn the house's buybacks by weight (amount × time left).
 // Losers' $1UP arrives here already locked. A summary with Claim all and Merge, then your locks as rows;
 // closed ones fold away. Leave early for a penalty, or sell a lock on the market.
 
@@ -96,7 +96,7 @@ export function Locks() {
               }
             />
             {running.length === 0 ? (
-              <Empty icon="lock">No locks yet. Lock $1UP here, or lose a trade: losers get their $1UP as a two-year lock.</Empty>
+              <Empty icon="lock">No locks yet. Lock $1UP here, or lose a trade: losers get their $1UP as a 104-round lock.</Empty>
             ) : (
               running
                 .sort((a, b) => Number(BigInt(b.amount) - BigInt(a.amount)))

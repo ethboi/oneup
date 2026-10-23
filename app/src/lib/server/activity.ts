@@ -7,6 +7,7 @@
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { configPath, stateDir } from "./localnet";
 import { ONEUP, OneUp, netTradePnl } from "@oneup/sdk";
 export { netTradePnl } from "@oneup/sdk";
 
@@ -111,7 +112,7 @@ const state: State = (g.__oneupActivity2 ??= {
   opened: new Map(),
 });
 
-const SAVE = resolve(process.cwd(), "../.localnet/indexer.json");
+const SAVE = resolve(stateDir(), "indexer.json");
 
 function load(genesis: string) {
   state.genesis = genesis;
@@ -133,7 +134,7 @@ function save() {
 }
 
 function config() {
-  const d = JSON.parse(readFileSync(resolve(process.cwd(), "../localnet.json"), "utf8"));
+  const d = JSON.parse(readFileSync(configPath(), "utf8"));
   return { rpc: d.rpcUrl as string, c: d.contracts as Record<string, string> };
 }
 
@@ -347,7 +348,7 @@ const pendingSales: Omit<ActivityItem, "seq">[] = [];
  *  the swap price. The NFT has just moved, so its state is the state at the sale. */
 async function valueSales() {
   if (pendingSales.length === 0) return;
-  const o = new OneUp(JSON.parse(readFileSync(resolve(process.cwd(), "../localnet.json"), "utf8")));
+  const o = new OneUp(JSON.parse(readFileSync(configPath(), "utf8")));
   for (const item of pendingSales.splice(0)) {
     const sale = item.sale!;
     try {

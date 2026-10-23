@@ -155,7 +155,7 @@ function Footer({ go }: { go: (t: Tab, at?: string) => void }) {
           <div>
             <b className="display text-base">OneUp</b>
             <p className="label mt-0.5 max-w-sm">
-              Perps against a house that can&apos;t go bust. Lose a trade, get a life. Our entry for NEAR HACKATHON, November 2026.
+              Capped-payout perps with tradable recovery NFTs. Lose a trade, get a life. Our entry for NEAR HACKATHON, November 2026.
             </p>
           </div>
         </div>
@@ -169,12 +169,12 @@ function Footer({ go }: { go: (t: Tab, at?: string) => void }) {
             </li>
             <li>
               <button type="button" className={link} onClick={() => go("House")}>
-                Why the house can&apos;t go bust
+                How payout reserves work
               </button>
             </li>
             <li>
               <button type="button" className={link} onClick={() => go("House", "fairness")}>
-                Fair to late players
+                Recovery scenarios
               </button>
             </li>
             <li>

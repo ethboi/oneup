@@ -1,3 +1,5 @@
+> Historical staged plan. Some mechanics and checkboxes are superseded. See [current development plan](docs/HACKATHON_READINESS.md), README and executable code for current status.
+
 # OneUp POC — staged build plan
 
 Spec: The original OneUp spec (source of truth for mechanics and parameters).

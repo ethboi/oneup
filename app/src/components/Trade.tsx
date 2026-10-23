@@ -1061,7 +1061,7 @@ function OrderForm({ t }: { t: Ticket }) {
           <dd className="font-bold">{quote ? `${(Number(quote.cut_ppm) / 1e4).toFixed(1)}%` : "…"}</dd>
         </div>
         <div className="ticket-row">
-          <dt className="label">Fees</dt>
+          <dt className="label">Entry / funding fee</dt>
           <dd className="font-bold">None</dd>
         </div>
       </dl>
@@ -1072,7 +1072,7 @@ function OrderForm({ t }: { t: Ticket }) {
           <div className="flex items-center gap-2">
             <PixelHeart size={18} className="shrink-0" />
             <span className="min-w-0 flex-1">
-              Lose it and get an Extra Life up to <b className="num">${fmtUsdc(lifeUpTo, 0)}</b> plus <b className="num">{oneupUpTo.toLocaleString("en-US")} $1UP</b>
+              Potential recovery cap up to <b className="num">${fmtUsdc(lifeUpTo, 0)}</b> plus <b className="num">{oneupUpTo.toLocaleString("en-US")} $1UP</b>
             </span>
             <button type="button" className="label shrink-0 underline decoration-dotted underline-offset-2" aria-expanded={why} onClick={() => setWhy(!why)}>
               {why ? "Hide" : "How"}
@@ -1080,9 +1080,9 @@ function OrderForm({ t }: { t: Ticket }) {
           </div>
           {why && (
             <p className="label mt-1.5">
-              If this trade loses, you get an Extra Life that can pay back up to ${fmtUsdc(lifeUpTo, 0)} from house profit, plus up to{" "}
-              {oneupUpTo.toLocaleString("en-US")} $1UP locked for 2 years, both sized from what the house makes this round, and a jackpot
-              ticket for each $1 lost.
+              If the round is profitable, eligible net losses can create an Extra Life with a maximum payout of ${fmtUsdc(lifeUpTo, 0)} from house profit, plus up to{" "}
+              {oneupUpTo.toLocaleString("en-US")} $1UP locked for 104 rounds, both sized from what the house makes this round, and a jackpot
+              ticket for each $1 lost. These are conditional caps, not guaranteed proceeds; trader Lives expire after their mint round and 13 more.
             </p>
           )}
         </div>
@@ -1094,7 +1094,7 @@ function OrderForm({ t }: { t: Ticket }) {
             ? `Via NEAR Intents: a solver swaps your ${t.viaAsset.symbol} for USDC. Simulated on this local chain.`
             : t.orderType === "limit"
               ? "Rests until the price reaches it, for up to 24 hours. Cancel any time."
-              : "Fills at the next oracle price."}
+              : "Fills using a later oracle price within the execution window."}
         </span>
         {/* the keys, where a keyboard is */}
         <span className="hidden w-full lg:block" aria-hidden>
@@ -1102,7 +1102,7 @@ function OrderForm({ t }: { t: Ticket }) {
         </span>
         {d.intents && !showPayWith && (
           <button type="button" className="underline decoration-dotted underline-offset-2 hover:text-[var(--text)]" onClick={() => setPayWith(true)}>
-            Pay from another chain
+            Simulate a cross-chain deposit
           </button>
         )}
       </div>

@@ -1,224 +1,143 @@
 # OneUp
 
-**Perps against a house that can't go bust. Lose a trade, get a life.**
+**Lose a trade, get a life. Capped-payout perps with tradable recovery NFTs on NEAR.**
 
-OneUp is a perpetuals exchange on NEAR where every trade is against one USDC house pool, at the oracle
-price, with no fees, funding or slippage. When you lose, you get an **Extra Life**: a capped, tradeable NFT
-that earns USDC back from the house's real profit, plus **$1UP** locked for two years that earns the house's
-buybacks. Sell either one on the built-in market whenever you like.
+OneUp is a local-chain prototype for traders interested in partial recovery after losses. Trade against a
+USDC house pool → eligible net losses in a profitable round create an **Extra Life** → claim USDC allocated
+from future house profit → transfer the NFT and its unclaimed USDC to a buyer. Recovery can be zero.
+The maximum payout is a cap, not a valuation or promise. Trader Lives earn during their mint round and
+13 subsequent rounds; expiry ends future allocations, not already-earned claims.
 
-Think of it as Papertrade meets Aerodrome: from Papertrade, a loss buys a claim on the house; from
-Aerodrome, a vote-escrow lock that earns protocol revenue by size and time left. OneUp keeps both and drops
-what made them hard to live with: no payout queue (the house refuses trades it couldn't cover), claims that
-expire so late players aren't crowded out, and locks that earn buybacks without gauge votes or bribes.
+Built by ethboi for continued development toward [NEAR HACKATHON](https://nearhackathon.com/).
+Existing code is permitted per the team's clarification. The repository stays private while building;
+publication and submission are later human decisions. This is test money on local NEAR, not a production exchange.
 
-Built at NEAR HACKATHON by ethboi ([@ethboi_](https://x.com/ethboi_) on X). Rust contracts on NEAR (near-sdk), a TypeScript keeper, bots and simulation, and a
-Next.js app, all running on a local NEAR chain with one command.
+## Try the core loop
 
-## Run it
-
-Needs Node 24, pnpm 10, and Rust with the wasm target and cargo-near (only to build the contracts):
+Verified development toolchain: Node 24.13.0, pnpm 10.18.3, Rust 1.99.1 with
+`wasm32-unknown-unknown`, cargo-near 0.22.0. CI uses the same versions. Install dependencies with
+`pnpm install --frozen-lockfile`, then `pnpm build:contracts`.
 
 ```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
-rustup target add wasm32-unknown-unknown
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/near/cargo-near/releases/latest/download/cargo-near-installer.sh | sh
-
-pnpm install
-pnpm demo
+pnpm demo:judge
+# Open http://127.0.0.1:3021
+# In another terminal, use the absolute ONEUP_CONFIG printed by the launcher:
+ONEUP_CONFIG=/absolute/path/printed/by/launcher/localnet.json pnpm test:judge
 ```
 
-`pnpm demo` builds the contracts if needed, starts a local NEAR node (near-sandbox, like `hardhat node`),
-deploys and wires all eight contracts, seeds the pool, then starts the keeper, twelve trading bots and the app
-at **http://127.0.0.1:3020**. Epochs are 10 minutes. The app signs as a funded demo trader (switch to any
-bot in the account menu). Chain state persists in `.localnet/`.
+The judge launcher creates fresh state under `.judge/<timestamp>/`, binds RPC 3130, app 3021,
+control 8887 and peer port 25567, runs fixed controllable prices, and starts no bots. It refuses occupied
+ports and never resets the ordinary demo. If app port 3021 is occupied, use `ONEUP_JUDGE_APP_PORT=3022 pnpm demo:judge`. Setup/build time is separate from the three-minute walkthrough.
+The test deposits for two traders, fills and liquidates positions, waits for NFT settlement, claims test
+USDC, sells another NFT, verifies the former owner cannot claim, and verifies the buyer can claim.
+Its `e2e.json` records source identity, assertions and nine deployed WASM hashes beside the isolated config.
+All pre-existing bootstrap backing is prepared demo state, not external fundraising.
 
-| Command | What it does |
+For the animated live-price demo use `pnpm demo` at http://127.0.0.1:3020. It runs twelve bots and
+10-minute epochs; state persists in `.localnet/`. It deploys five product contracts and four mocks,
+plus unchanged third-party contracts. Rebuilding WASM does not redeploy an existing chain: startup
+warns about mismatched hashes or missing build provenance and preserves state. `pnpm verify:deployment` fails on a mismatch.
+
+| Command | Purpose |
 |---|---|
-| `pnpm demo` | Everything above, logs prefixed per process |
-| `pnpm demo --lan` | Same, and serves the app to your Wi-Fi so you can use it on a phone (it hands out the localnet's throwaway keys, so only on a network you trust) |
-| `pnpm stop` | Stops every OneUp process (and only those) |
-| `pnpm mcp` | OneUp as an MCP server, so an AI agent can trade (below) |
-| `pnpm bots:add` | Tops a running chain up to twelve bots without a reset |
-| `pnpm localnet:reset` | Wipes the local chain for a fresh deploy |
-| `pnpm test` | Contract unit + property tests, SDK and simulation tests |
-| `pnpm test:sandbox` | Builds the wasm and runs end-to-end tests on a sandbox chain |
-| `pnpm test:ts` | API route, relayer, solver, indexer and keeper price tests |
-| `pnpm smoke` | Against a running demo: deposit → 50× long → fill → −2% → liquidation |
-| `pnpm sim` | Re-runs the early-vs-late simulation |
-| `pnpm farm` | Wash-trading break-even: the $1UP price at which trading against yourself would pay |
+| `pnpm verify` | Full gate: all typechecks, Rust/property/SDK/model tests, app/keeper regressions, fresh sandbox tests, sensitivity and production app build |
+| `pnpm demo:judge` / `pnpm test:judge` | Isolated controlled demonstration / asserted core-loop check |
+| `pnpm verify:deployment` | Compare nine deployed contracts with local WASM; honors `ONEUP_CONFIG` |
+| `pnpm demo` | Persistent ordinary demo, live prices and twelve synthetic trading bots |
+| `pnpm test` | Rust unit/property, SDK and model tests; excludes sandbox and app/keeper Node tests |
+| `pnpm test:ts` / `pnpm test:sandbox` | App/keeper regressions / built-WASM integration tests |
+| `pnpm sim` / `pnpm sim:sensitivity` | Historical growth illustration / adverse economic scenarios |
+| `pnpm farm` | Historical and same-wallet token farming comparison |
+| `pnpm localnet:reset` | Destructively reset the ordinary chain; unnecessary for the isolated judge demo |
 
-**Let an AI agent trade.** `.mcp.json` registers OneUp's MCP server ([`mcp/`](mcp/src/index.ts)) for Claude
-Code: with `pnpm demo` running, open the repo in Claude Code and ask it to trade. Its tools read the markets
-and the house, quote a trade, open and close positions, set take-profit and stop-loss, and claim Extra Lives.
-It trades as the demo account, or a bot with `ONEUP_ACCOUNT=bot3`; localnet only.
+`pnpm verify` writes ignored `.verification/` logs and a manifest with the source commit, dirty-state
+fingerprint, commands, runtime and log hashes, and fails on source drift. A build manifest binds WASM hashes to Rust/build inputs. Next builds run in a source snapshot so their generated files cannot overwrite the ordinary demo. Use that manifest for current counts; historical reports
+retain their original dates and stages. CI artifacts become available only after a future authorized push.
 
-Move a price during the demo:
-`curl -XPOST localhost:8787/price -d '{"market":"NEAR-USD","movePct":-2}'`
-
-## How the money moves
-
-```mermaid
-flowchart LR
-  T[Traders] -- "losses, liquidations, winners' cut" --> P[(House pool<br/>USDC)]
-  K[Backers] -- "back the pool<br/>(bootstrap round)" --> P
-  P -- "winners' profit (≤ 9× margin)" --> T
-  P --> R{{"Reserve<br/>1.2× worst case,<br/>never below the seed"}}
-  P -- "half the surplus<br/>above the reserve" --> S((Epoch payout))
-  S -- 60% --> L[Extra Lives<br/>NFT holders]
-  S -- 30% --> B[Buy back $1UP] --> V[$1UP lockers<br/>by weight]
-  S -- 10% --> P
-  E[$1UP emissions] -- "20 per $1 of house profit<br/>to losers, as 2-year locks" --> V
-  L <-. "sell" .-> M[(Market)]
-  V <-. "sell" .-> M
-  K -. "Backer Lives" .-> L
+Ordinary demo price steering:
+```bash
+curl -XPOST localhost:8787/price -H 'content-type: application/json' -d '{"market":"NEAR-USD","movePct":-2}'
 ```
 
-**Where the pool comes from.** Anyone can back the house during its bootstrap round (up to $1M). The USDC
-joins the pool for good, and the backer gets a **Backer Life**: an Extra Life that never expires, paid from
-the same profit as the losers' lives. It's owed the average of the Extra Life curve over the backing, so the
-first dollar earns 2.0× and the last 1.2×, and comes with a two-year lock of 10 $1UP per $1 that earns
-buybacks ([D-26](docs/decisions.md)); to get out early, sell it on the market. Backers are losers by
-choice ([D-22](docs/decisions.md)). The Backing tab shows the round, the curve and when it pays back; the $1UP tab the token's split and releases. How long a full round
-takes to pay back depends on volume: with traders losing $1M a week, half in about 22 weeks and all of it in
-about 42 (`pnpm --filter @oneup/sim backers`).
+## Rules and limits
 
-## The rules
+- **Trading:** USDC margin, oracle execution, up to 1000× leverage; max profit 9× margin. No entry or
+  funding fee. Winners pay 10–25% of profit; marketplace sellers pay 2%. Liquidation at 90% loss takes
+  the full margin. Minimum voluntary hold is 60 seconds.
+- **Admission:** maximum wins of both longs and shorts count against pool capacity, including pending
+  opens. This reserve invariant prevents over-admission under its accounting assumptions; it does not
+  eliminate oracle, owner/operator, vault, implementation or availability risks.
+- **Oracle:** a fill needs a price published after placement and within the permitted window. The trusted
+  keeper is expected to fill promptly; the contract does not prove it chose the first later price or that
+  nobody had advance knowledge. Limit orders can rest up to 24 hours.
+- **Recovery:** profitable rounds allocate claim face value and emissions by positive wallet net loss.
+  The face is a share of house profit, not necessarily the trader's full loss. Maximum claim is 1.2–2×
+  face. Lives share 60% of half the surplus: two thirds to trader Lives and one third to Backer Lives,
+  with unused slices passed across. Future profits, caps and expiry limit recovery.
+- **Ownership:** Extra Lives and locks are NFTs. Listings require willing USDC buyers; neither immediate
+  liquidity nor a sale price is guaranteed. Unclaimed Life proceeds transfer with ownership.
+- **Backing:** contributions permanently join the pool. Backer Lives never expire but still depend on
+  house profit. The local deployment starts with $250K house seed and $100K synthetic bot backing,
+  creating $426K of aggregate Backer Life caps. These are not users or traction.
+- **$1UP:** 1B minted once: 900M emissions, 50M spot-liquidity allocation, 42.5M treasury and 7.5M
+  reserved for backing incentives. The token constructor initially assigns 50M to treasury; deployment
+  moves 7.5M to the house backing allocation. Emissions release with house profit and arrive as locks.
+- **Locks:** up to 104 epochs (two years at weekly cadence; accelerated in demos), rewards by amount × time left. Early exit costs up to half the tokens;
+  market prices and discounts are assumptions in models, not observed liquidity.
+- **Yield/jackpot:** local mock vault and accelerated interest. Cross-chain lending and Chain Signatures
+  remain plans. Wind-down distributions in D-29 are also planned, not implemented.
 
-**Trading.** USDC collateral, oracle price, leverage up to 1000×. An order fills at the first oracle price
-published *after* it was placed, within a 30-second window, never at a price already known, so nobody can
-front-run the oracle. A limit order instead rests until a newer price reaches its limit (for up to 24 hours,
-or until cancelled) and fills at that price. Minimum hold 60 s. A position can win at most 9× its margin. Winners pay a cut of
-their profit: 10%, plus more for positions that use a big share of the pool (up to 25%). At a 90% loss a
-keeper (anyone can run one) liquidates and the full margin goes to the pool.
+The mechanism combines ideas from Papertrade (loss-linked claims) and Aerodrome (revenue-linked NFT
+locks), with capped expiring recovery and reserve admission. These references acknowledge design
+lineage, not a claim to have invented every component.
 
-**Solvency: the pool can always pay.** Every open position's maximum win is counted, longs and shorts
-alike, and a trade that would push that total past the pool is refused. So there is never a payout queue.
-Counting *both* sides matters: positions close at different times, so a long can take its max win after a
-pump and a short opened at the top can take its own after a crash.
-[`d1_spec_rule_can_go_bust`](contracts/house/src/tests.rs) shows the pool failing under the
-"bigger side only" rule; a property test runs 200 random trading sequences and checks the pool always
-covers every open position and no USDC is created or lost.
+## NEAR and implementation status
 
-**Extra Lives.** At each epoch's end, the house's net result (losses taken − payouts made) is split among
-that epoch's losers in proportion to their losses: that's each Extra Life's face value, so fake losses from
-a long/short pair only create claims as big as the cut they paid. A life can earn up to *cap × face*; the
-cap is 2.0× at an empty pool, falling to 1.2× at $1M. Lives are paid from 60% of half the surplus: two thirds to
-losers' lives and one third to Backer Lives, each side passing on what it can't use
-([D-26](docs/decisions.md)). Within a side every earning life gets the same fraction of its cap each epoch, so it
-pays back in a straight line ([D-25](docs/decisions.md)). A life earns for the epoch it's
-minted in and 13 after, then stops and keeps what it earned. Lives are NEP-171 NFTs: sell one and its
-unclaimed USDC goes with it.
+Primary positioning: **Unstoppable DeFi**. Secondary: **NFTs That Do Something**. The NFT earns money,
+changes claim ownership when transferred and has on-chain dynamic art. DAO ownership and key restrictions
+support this story; they do not make this an autonomous business or a proven AI security product.
 
-**$1UP: only losers earn it.** 1B fixed supply, minted once: 900M for emissions over 208 epochs, 50M to seed a
-spot pool, 50M treasury. No team or VC allocation. Each epoch releases 20 $1UP per $1 of house profit (at most
-that epoch's schedule plus anything unreleased before), shared across the epoch's losers by loss and delivered as
-**two-year locks**. Winners are paid in USDC instead. Releasing by house profit, and locking it, is what stops
-farming: a long and a short on yourself costs only the 10% cut, and `pnpm farm` shows it only pays once $1UP is
-worth hundreds of millions in the corrected same-wallet model (about $337M at 1× honest volume in
-the first 13 epochs for seed 1, versus $3.3M under the historical first design). These are model outputs, not
-a price forecast; real Sybil behaviour and trade flows can differ.
-
-**Locks.** Lock $1UP for up to 104 epochs. Each epoch's buyback is shared by weight: amount × epochs left ÷ 104.
-Leaving early costs up to half, less as the lock runs down, and the penalty goes to the people still locked. Or
-sell the lock on the market: it's an NFT.
-
-**The pool at work, and the jackpot.** The part of the pool the house doesn't need on hand (it keeps 1.2× the
-worst-case payout plus 10%) earns interest in a vault: a 5% mock here, USDC lending on Ethereum through NEAR
-Intents and a Chain Signatures account on mainnet. All the interest builds a jackpot, drawn every four rounds
-among that period's losers, a ticket per $1 of net loss ([D-27](docs/decisions.md)).
-
-**If OneUp winds down.** The DAO can end it: positions close, the vault comes home, Extra Lives and Backer Lives
-are paid from the whole pool first, and what's left goes to $1UP lockers by weight. Lives are the house's debts;
-lockers are its owners ([D-29](docs/decisions.md), a plan, not yet built).
-
-**Market.** List an Extra Life or a lock for a USDC price; the buyer pays and the NFT moves in one step. Sellers
-pay 2%, which goes to the house pool as profit ([D-28](docs/decisions.md)). Each
-market can use up to half the pool, so no single market takes all the capacity. The owner lists markets.
-
-## Fair to late players
-
-![Late losers get back as much as early ones](docs/fairness.svg)
-
-The simulation ([`sim/`](sim/src/model.ts)) runs the same trader flows (three years of weekly epochs,
-growing volume, 20 seeds) under OneUp's rules and Papertrade-style rules, with Papertrade's parameters
-taken from its docs. Each loss is followed for a year.
-
-| USDC back within a year per $1 lost | Weeks 1–39 | 40–78 | 79–117 | 118–156 |
-|---|---|---|---|---|
-| **OneUp** | 13.5¢ | 10.5¢ | 9.5¢ | 10.4¢ |
-| OneUp without life expiry | 28.5¢ | 13.3¢ | 7.1¢ | 5.7¢ |
-| Papertrade-style | 13.0¢ | 17.3¢ | 10.7¢ | 7.8¢ |
-
-Year-1 losers take **0%** of year-3 payouts under OneUp, against **12%** under Papertrade-style rules,
-where loss tokens earn forever. The middle row is OneUp without expiry, as first specified: claims piled
-up faster than they were paid, so later losers recovered less. Making lives expire after 13 epochs fixed it
-([decision D-13](docs/decisions.md)).
-
-## What's in the repo
-
-| Path | What |
+| Component | Current state |
 |---|---|
-| [`contracts/house`](contracts/house) | Pool, orders, delayed fills, solvency, cut, liquidation, epoch close, emissions, buybacks |
-| [`contracts/extra-life`](contracts/extra-life) | Extra Life NFTs (NEP-171), payouts by group, expiry, claims |
-| [`contracts/oneup-token`](contracts/oneup-token) | $1UP (NEP-141), fixed supply |
-| [`contracts/ve`](contracts/ve) | $1UP locks (NFTs), decaying weight (O(1) tally), buyback rewards, early exit, losers' locks |
-| [`contracts/market`](contracts/market) | Marketplace for Extra Lives and locks, priced in USDC |
-| [`contracts/math`](contracts/math) | Every formula, with the worked vectors from [`docs/maths.md`](docs/maths.md) |
-| `contracts/mock-*` | Local-chain USDC with a faucet, a Pyth-compatible oracle, a constant-product swap |
-| [`contracts/tests`](contracts/tests) | End-to-end tests on a sandbox chain |
-| [`packages/sdk`](packages/sdk) | TypeScript port of the maths (same vectors) and typed contract calls |
-| [`keeper`](keeper) | Pushes prices, fills, liquidates, takes profit at cap, closes epochs, runs buybacks |
-| [`bots`](bots) | Six rule-based trading agents for demo volume; one sells its lives and locks, one buys bargains |
-| [`sim`](sim) | Early-vs-late simulation and the farming break-even |
-| [`app`](app) | Next.js app: trade, Extra Lives, locks, market, solvency, fairness |
-| [`docs`](docs) | [Maths](docs/maths.md), [interfaces](docs/interfaces.md), [decisions](docs/decisions.md), [security](docs/SECURITY.md), [plan](PLAN.md) |
+| House, Extra Life, token, locks, marketplace | Implemented locally; NEP-141/171/178 and NEP-297 events |
+| Intents verifier, PoA and solver | Official vendored contracts and signed local execution; bridge credits simulated |
+| Ethereum/Solana funding, 1Click | No real bridge deposit or 1Click integration demonstrated; first-use setup can require an additional signature |
+| Sputnik DAO | Local ownership and voting; disclosed demo council keys, not independent production governance |
+| Function-call keys / NEP-366 | Local sponsored trade calls; a trade-only key can still lose the trading balance |
+| MCP / bots | Full-key demo tooling and synthetic activity; no constrained autonomous-agent treasury |
+| Oracle | Mock oracle with live, simulated or fixed inputs; Outlayer-compatible call interface, real deployment unverified |
+| Buyback swap | Local constant-product mock with custom payload; real Rhea adapter remains to be implemented |
+| Vault / Chain Signatures | Mock vault; external lending and Chain Signatures are future work |
 
-Tests: 170 contract unit and property tests, 7 end-to-end sandbox tests, 23 tests of the API routes,
-relayer, solver and keeper, plus SDK and simulation tests. A security review on 21 Oct found 21 issues, from
-a stop-loss that could close at a stale price to one key shared by every account; each fix has a test that
-failed before it ([docs/SECURITY.md](docs/SECURITY.md)).
-The sandbox tests found two real bugs during the build (a u128 overflow in reward splits and a
-duplicate-registration panic), and running the demo found a third (the reserve floor; decision D-12).
+## Economic evidence
 
-## Tracks and NEAR features
+`pnpm sim` reproduces the historical growth illustration: weekly losses $20K→$2M, assumed mean 15%
+house edge, fixed 50% utilisation, $25K seed at a 1× backer claim, 20 random seeds. This is an aggregate-flow
+model, not an executable market/admission model. Some synthetic paths exceed available cash; even its
+historical headline must not be presented as a solvency or general fairness proof.
 
-Built for NEAR HACKATHON. The tracks it leans on, and the NEAR pieces it uses:
+`pnpm sim:sensitivity` writes `sim/out/sensitivity.json`: flat/declining activity, low/negative edge,
+high utilisation, actual deployment backing and a larger bootstrap. It reports recovery, expired/unpaid
+caps, backer repayment, early/late ratios and cash deficits with ranges across seeds. Negative cash flags
+infeasible exogenous flows, not a demonstrated contract exploit. High utilisation can leave recovery at
+zero; low activity can leave backing substantially unpaid.
 
-- **Unstoppable DeFi.** A perps exchange; deposits and trades from other chains through **NEAR Intents**:
-  the official Verifier and PoA factory (release 0.4.2) run locally, intents are signed with the official
-  `@defuse-protocol/intents-sdk`, and OneUp's solver fills them with `execute_intents`
-  ([D-21](docs/decisions.md)). "Long NEAR with USDC on Solana" is one signature.
-- **NFTs That Do Something.** Extra Lives (**NEP-171**) earn USDC from the house's profit, carry their
-  unclaimed USDC when sold on the built-in market (**NEP-178** approvals), and are **dynamic**: their image
-  is a pixel heart drawn on chain, filling as they pay back.
-- **Social Money.** A **Sputnik DAO** (the code mainnet DAOs run) owns the house; markets and their share
-  of the pool are council votes ([D-20](docs/decisions.md)).
-- **AI Security & Defense.** One-tap trading uses a **function-call key** that can only open, close and
-  set TP/SL, with a gas budget; it can't attach deposits, so it can't move funds. The keeper's price feed
-  uses the same kind of key, and contract accounts have no keys at all. The threat model, the review and
-  its 21 fixes are in [docs/SECURITY.md](docs/SECURITY.md).
-- **Real-World Money.** Gasless trading: session-key trades go as **meta transactions** (NEP-366) to a
-  relayer that pays the gas.
-- **Games With Real Economies.** Rounds, leaderboards, achievements and a player market for Extra Lives
-  and locks.
+The report also compares same-wallet and separate-wallet farming with different assumed lock discounts.
+Wallet netting is not Sybil resistance. Extra Life recovery, trade admission, capital timing and real
+liquidity can further change profitability. Read assumptions and adverse results before quoting FDVs.
 
-Also: **NEP-141** ($1UP, USDC), **NEP-245** (NEAR Intents balances), **NEP-297** events (the app's feed
-and history), named accounts. Not used: Chain Signatures, HOT, social login and the 1Click API need
-testnet or mainnet; Rhea's buyback swap is a local stand-in.
+## Repository and evidence
 
-## What's mocked locally
+- `contracts/`: five product contracts, four mocks, shared integer maths and fresh-WASM sandbox tests.
+- `packages/sdk/`: typed calls and formula vectors. `keeper/`: prices, execution, epoch and retry loops.
+- `app/`: Next.js interface. `bots/` and `mcp/`: synthetic demo activity and agent tools.
+- `sim/`: floating-point economic illustrations. `contracts/vendor/`: unchanged third-party binaries.
+- [Current demo and readiness plan](docs/HACKATHON_READINESS.md), [maths](docs/maths.md),
+  [interfaces](docs/interfaces.md), [security limits](docs/SECURITY.md), [historical decisions](docs/decisions.md).
 
-- **Prices** come from the keeper, which pushes real market prices (Binance's public API, Coinbase as a
-  fallback) to a Pyth-compatible oracle. A demo can still move a market: the push lands on top of the real
-  price, holds for 30 seconds and then drifts back. Offline, `--prices sim` is a steerable random walk;
-  `--prices hermes` reads Pyth directly but needs a `PYTH_API_KEY` (Hermes now refuses unauthenticated requests). Newly listed markets are priced automatically. On mainnet the house points at Outlayer's
-  `price-oracle-pyth.near` with the same calls. Outlayer's testnet feed was stale when checked.
-- **USDC** is a local token with a faucet. **Buybacks** swap on a local constant-product pool standing in
-  for Rhea.
-- **NEAR Intents** runs locally with the official contracts, but the bridge from other chains is simulated:
-  the root account mints the bridged token into the Verifier, as a real bridge would after a deposit.
-- Buybacks run through an operator role with a minimum price, so nobody can sandwich them (D-10, D-20).
-  Order fills go through a keeper role (D-23).
+## Licensing
 
-See [`docs/decisions.md`](docs/decisions.md) for every design decision and known limit.
+Original OneUp source code and accompanying documentation are **AGPL-3.0-only**; see [LICENSE](LICENSE)
+and [NOTICE](NOTICE). Commercial use is permitted under those terms. Covered modified network-served
+versions must offer corresponding source to their users. Third-party binaries, dependencies and marks
+retain their own terms; see [third-party notices](THIRD_PARTY_NOTICES.md) and [vendor provenance](contracts/vendor/README.md).

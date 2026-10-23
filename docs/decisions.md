@@ -1,3 +1,5 @@
+> Historical decision log. Current implementation/status: [README](../README.md) and [readiness plan](HACKATHON_READINESS.md). Historical counts and plans are not current test evidence.
+
 # Decisions
 
 Open = needs a call. Decided = frozen for the build.
@@ -257,7 +259,7 @@ Lives were sized by each wallet's gross losses in the epoch. A long and a short 
 and wins the other, minus the winner's cut, yet the losing leg counted in full: a cheap way to take most of
 an epoch's lives and $1UP. Now each wallet's epoch total is losses minus profit paid, and only wallets above
 zero share the epoch's face value and $1UP, by net loss. Splitting the legs across two wallets still works,
-but then the winning wallet's cut (10–25%) is the cost, which D-16's farming numbers already price in. The app warns about, and the order
+but then the winning wallet's cut (10–25%) is the cost. The corrected same-wallet D-16 model does not price separate-wallet allocations; see `pnpm sim:sensitivity` for a separate approximation and its limitations. The app warns about, and the order
 form refuses, a trigger already past the price; the contract allows it, since the newer-price rule makes
 it harmless.
 
@@ -412,11 +414,12 @@ changes; only new opens are checked against it.
   for years.
 - Loser locks are one NFT per loser per profitable epoch, with storage paid by `ve`; a minimum lock size
   would bound that.
-- A full close batch (10 lives + 10 locks) hasn't been gas-tested at the limit; the demo has ≤ 7 losers
-  per epoch.
+- Historical batch-limit concern: superseded by the 11-loser, multi-batch fresh-sandbox regression in contracts/tests/tests/epoch.rs. This does not establish arbitrary batch sizes are safe.
 - House storage is paid by the contract (min margin 1 USDC bounds spam); no per-user storage deposits.
 
 ## Research (20 Oct 2026)
+
+Current team clarification (23 Oct): existing code is permitted. Private development continues; publication and submission are deferred. The following entries retain the earlier research context.
 
 - **R-1 · Code before 1 Nov?** No explicit rule. The site says "Build your project during the hackathon".
   Submissions accepted 2026-11-01T00:00Z to 2026-11-14T23:59Z; judging 16–18 Nov. A submission needs a

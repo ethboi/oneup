@@ -55,7 +55,7 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
           <h1 className="display mt-2 text-3xl leading-tight sm:text-4xl">Back the house</h1>
           <p className="mt-3 max-w-2xl text-[var(--muted)]">
             The house can only take trades it could pay in full, so it needs a deep pool. Back it with USDC and you get a Backer Life
-            that pays you back from house profit, more the earlier you come in, plus $1UP locked for two years that earns the
+            that pays you back from house profit, more the earlier you come in, plus $1UP locked for 104 rounds that earns the
             house&apos;s buybacks.
           </p>
           <div className="mt-5 max-w-2xl">
@@ -100,7 +100,7 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
           from a third of every round&apos;s Extra Life payout until it&apos;s paid in full.
         </Card>
         <Card icon={<PixelLock size={24} />} title="$1UP, locked">
-          10 $1UP per $1, locked for two years like a loser&apos;s lock. It earns a share of every buyback, so you share in the
+          10 $1UP per $1, locked for 104 rounds like a loser&apos;s lock. It earns a share of every buyback, so you share in the
           house&apos;s upside, not just your capped claim.
         </Card>
         <Card icon={<Icon name="store" size={22} />} title="An exit">
@@ -192,7 +192,7 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
         <h2 className="text-lg font-extrabold">The risks, plainly</h2>
         <ul className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
           <li>
-            <b>Locked in, not lost.</b> <span className="text-[var(--muted)]">Backing can&apos;t be withdrawn: the USDC stays in the pool. You get it back as the house profits, or exit by selling the Backer Life.</span>
+            <b>Permanent contribution.</b> <span className="text-[var(--muted)]">Backing can&apos;t be withdrawn: the USDC stays in the pool. Repayment depends on future profit; an early sale needs a buyer and may recover less than the contribution.</span>
           </li>
           <li>
             <b>No date.</b> <span className="text-[var(--muted)]">If traders win more than they lose, the house makes nothing and Backer Lives aren&apos;t paid.</span>

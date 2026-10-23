@@ -20,7 +20,12 @@
     "demo": "tsx scripts/demo.ts",
     "test:sandbox": "contracts/build.sh && PATH=\"$HOME/.cargo/bin:$PATH\" cargo test --manifest-path contracts/Cargo.toml -p oneup-integration",
     "stop": "tsx scripts/stop.ts",
-    "farm": "pnpm --filter @oneup/sim exec tsx src/farm.ts"
+    "farm": "pnpm --filter @oneup/sim exec tsx src/farm.ts",
+    "sim:sensitivity": "pnpm --filter @oneup/sim exec tsx src/sensitivity.ts",
+    "demo:judge": "tsx scripts/judge-demo.ts",
+    "test:judge": "tsx scripts/judge-e2e.ts",
+    "verify:deployment": "tsx scripts/deployment-check.ts",
+    "verify": "tsx scripts/verify.ts"
   },
   "devDependencies": {
     "@types/node": "24.19.1",
@@ -32,5 +37,6 @@
   "dependencies": {
     "@oneup/sdk": "workspace:*",
     "near-api-js": "7.3.1"
-  }
+  },
+  "license": "AGPL-3.0-only"
 }

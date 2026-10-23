@@ -31,12 +31,12 @@ export function Lives() {
 
   return (
     <div className="flex flex-col gap-5">
-      <Explainer title="Extra Lives" line="Every loss in a round the house ends in profit becomes an Extra Life that pays you back in USDC.">
+      <Explainer title="Extra Lives" line="Eligible net losses in profitable rounds create NFTs that can earn a capped share of future house profit.">
         When a round ends, the house&apos;s profit is shared across that round&apos;s losers by how much they lost: that
         share is the life&apos;s face value. It can earn up to face × its cap (2.0× when the pool is small, down to 1.2× at
         $1M). Each round, 60% of half the surplus above the reserve is shared across all earning lives by what they
-        were owed, so every life pays back at the same steady rate. A life earns for {expiry ?? 13} rounds after the one it&apos;s minted in, then keeps what it earned.
-        Sell one on the market and its unclaimed USDC goes with it.
+        were owed, subject to its cap and available profit. Recovery can be zero. A life earns for {expiry ?? 13} rounds after the one it&apos;s minted in, then keeps what it earned.
+        List one on the market and its unclaimed USDC goes with it if purchased. A buyer is required.
       </Explainer>
 
       <div className="panel divide-y divide-[var(--line)]">
@@ -52,7 +52,7 @@ export function Lives() {
             </button>
           }
         >
-          <Stat label="Still to earn" value={money(owedLeft)} />
+          <Stat label="Unpaid payout cap" value={money(owedLeft)} />
           <Stat label="Paid so far" value={money(paid)} />
           <Stat label="Ready to claim" value={money(claimable)} tone={claimable > 0n ? "good" : undefined} />
           <Stat label="Last round, to all lives" value={last ? money(BigInt(last.lives_pot)) : "–"} />

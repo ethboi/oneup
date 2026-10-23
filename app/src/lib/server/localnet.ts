@@ -6,8 +6,11 @@ import { networkInterfaces } from "node:os";
 import { resolve } from "node:path";
 import type { Deployment } from "@oneup/sdk";
 
+export const configPath = () => resolve(/*turbopackIgnore: true*/ process.env.ONEUP_CONFIG ?? resolve(process.cwd(), "../localnet.json"));
+export const stateDir = () => resolve(/*turbopackIgnore: true*/ process.env.ONEUP_STATE_DIR ?? resolve(process.cwd(), "../.localnet"));
+
 export function deployment(): Deployment {
-  const d = JSON.parse(readFileSync(resolve(process.cwd(), "../localnet.json"), "utf8")) as Deployment;
+  const d = JSON.parse(readFileSync(configPath(), "utf8")) as Deployment;
   assertLocalnet(d);
   return d;
 }

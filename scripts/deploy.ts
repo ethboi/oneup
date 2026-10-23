@@ -1,6 +1,7 @@
 // Deploys and wires every OneUp contract on the local chain, seeds the pool and the swap, and funds the
 // keeper, the bots and a demo trader. Called by `pnpm localnet` on a fresh chain.
 
+import { CONTRACT_WASMS } from "./artifacts.ts";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { Account, JsonRpcProvider, KeyPair, nearToYocto, teraToGas, type KeyPairString } from "near-api-js";
@@ -67,17 +68,7 @@ export async function deploy(opts: { home: string; rpcUrl: string; epochLengthS:
   for (let i = 1; i <= BOTS; i++) bots.push(await create(`bot${i}`, "20"));
 
   step("code");
-  const code: Record<(typeof names)[number], string> = {
-    usdc: "mock_usdc",
-    oracle: "mock_oracle",
-    house: "oneup_house",
-    life: "oneup_extra_life",
-    oneup: "oneup_token",
-    ve: "oneup_ve",
-    swap: "mock_swap",
-    market: "oneup_market",
-    vault: "mock_vault",
-  };
+  const code = CONTRACT_WASMS;
   for (const n of names) await c[n].deployContract(WASM(code[n]));
 
   step("init");

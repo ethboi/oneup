@@ -3,6 +3,7 @@
 // Live activity: what's happening on the exchange, from the contracts' events (/api/activity).
 
 import { useEffect, useState } from "react";
+import { pollActivity } from "../lib/activity-feed";
 import { OnExplorer } from "./ui";
 import { useNow } from "./Header";
 import { Icon, type IconName } from "./Icon";
@@ -41,21 +42,12 @@ const LOOK: Record<ActivityItem["kind"], { icon: IconName; color: string }> = {
 export function useActivity(keep = 60): ActivityItem[] {
   const [items, setItems] = useState<ActivityItem[]>([]);
   useEffect(() => {
-    let after = 0;
-    let live = true;
-    const tick = async () => {
-      const r = await fetch(`/api/activity?after=${after}`).then((x) => (x.ok ? x.json() : { items: [] })).catch(() => ({ items: [] }));
-      const fresh: ActivityItem[] = r.items ?? [];
-      if (!live || fresh.length === 0) return;
-      after = fresh[fresh.length - 1].seq;
-      setItems((old) => [...fresh.reverse(), ...old].slice(0, keep));
-    };
-    tick();
-    const i = setInterval(tick, 2000);
-    return () => {
-      live = false;
-      clearInterval(i);
-    };
+    setItems([]);
+    return pollActivity<ActivityItem>(async after => {
+      const response = await fetch(`/api/activity?after=${after}`);
+      if (!response.ok) throw new Error("Activity unavailable");
+      return (await response.json()).items ?? [];
+    }, setItems, keep);
   }, [keep]);
   return items;
 }

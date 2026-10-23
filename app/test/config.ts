@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { assertLocalnet, guard, hostOk, publicConfig } from "../src/lib/server/localnet.ts";
+import { assertLocalnet, guard, hostOk, publicConfig, configPath, stateDir } from "../src/lib/server/localnet.ts";
 import type { Deployment } from "@oneup/sdk";
 
 const key = (n: number) => `ed25519:${String(n).repeat(40)}`;
@@ -48,4 +48,18 @@ test("guard: foreign Host, and non-JSON posts", () => {
   assert.equal(guard(r("127.0.0.1:3020", { method: "POST", body: "{}", headers: { "content-type": "text/plain" } }))?.status, 415);
   assert.equal(guard(r("127.0.0.1:3020", { method: "POST", body: "{}" }))?.status, 415);
   assert.equal(guard(r("127.0.0.1:3020", { method: "POST", body: "{}", headers: { "content-type": "application/json; charset=utf-8" } })), null);
+});
+
+
+test("isolated app configuration and persistence paths cannot fall back into the ordinary demo", () => {
+  const config = process.env.ONEUP_CONFIG, state = process.env.ONEUP_STATE_DIR;
+  try {
+    process.env.ONEUP_CONFIG = "/tmp/oneup-judge/localnet.json";
+    process.env.ONEUP_STATE_DIR = "/tmp/oneup-judge/chain";
+    assert.equal(configPath(), "/tmp/oneup-judge/localnet.json");
+    assert.equal(stateDir(), "/tmp/oneup-judge/chain");
+  } finally {
+    if (config === undefined) delete process.env.ONEUP_CONFIG; else process.env.ONEUP_CONFIG = config;
+    if (state === undefined) delete process.env.ONEUP_STATE_DIR; else process.env.ONEUP_STATE_DIR = state;
+  }
 });

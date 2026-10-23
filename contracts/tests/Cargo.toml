@@ -2,6 +2,7 @@
 path = "lib.rs"
 
 [package]
+license = "AGPL-3.0-only"
 name = "oneup-integration"
 version = "0.1.0"
 edition = "2021"

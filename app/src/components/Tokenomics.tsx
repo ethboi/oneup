@@ -15,10 +15,10 @@ const M = 1_000_000n * ONEUP;
 
 /** The fixed supply, minted once (contracts/oneup-token). Backers' 7.5M comes out of the treasury (D-26). */
 const SPLIT = [
-  { name: "Losers, by house profit", amount: 900n * M, color: "var(--heart)", note: "Released over 208 rounds as house profit allows, only to losing wallets, always locked for two years" },
+  { name: "Losers, by house profit", amount: 900n * M, color: "var(--heart)", note: "Released over 208 rounds as house profit allows, only to losing wallets, always locked for 104 rounds" },
   { name: "Liquidity seed", amount: 50n * M, color: "var(--info)", note: "Pairs with USDC for the buyback pool (Rhea on mainnet)" },
   { name: "Treasury", amount: 42_500_000n * ONEUP, color: "var(--muted)", note: "Run by the DAO that owns the house" },
-  { name: "Backers", amount: 7_500_000n * ONEUP, color: "var(--accent)", note: "10 per $1 backed in the bootstrap round, locked for two years" },
+  { name: "Backers", amount: 7_500_000n * ONEUP, color: "var(--accent)", note: "10 per $1 backed in the bootstrap round, locked for 104 rounds" },
 ];
 
 export function Tokenomics() {
@@ -47,7 +47,7 @@ export function Tokenomics() {
           <h1 className="display mt-2 text-3xl leading-tight sm:text-4xl">$1UP: earned by losing</h1>
           <p className="mt-3 max-w-2xl text-[var(--muted)]">
             A fixed billion, minted once. Nine in ten go to the people who lose trades, released only as fast as the house actually
-            makes money, and always locked for two years. Locks earn the house&apos;s buybacks. No team or investor allocation.
+            makes money, and always locked for 104 rounds. Locks earn the house&apos;s buybacks. No team or investor allocation.
           </p>
           <dl className="num mt-5 grid max-w-3xl grid-cols-2 gap-4 sm:grid-cols-4">
             <Stat label="Price" value={px > 0n ? `$${(Number(px) / 1e6).toFixed(4)}` : "…"} />
@@ -97,8 +97,8 @@ export function Tokenomics() {
           house actually made. What isn&apos;t released carries to later rounds{carry ? `: ${fmtOneup(carry)} now` : ""}.
         </Card>
         <Card icon={<PixelLock size={22} />} title="Only to losers, locked">
-          A round&apos;s $1UP is shared by its losers in proportion to their net loss, as two-year locks. Winners are paid in USDC
-          instead. Farming it with a long and a short on yourself costs the winner&apos;s cut and pays only at very high prices.
+          A round&apos;s $1UP is shared by its losers in proportion to their net loss, as 104-round locks. Winners are paid in USDC
+          instead. Farming costs and rewards depend on same/separate wallets, future recovery and lock discounts. The model is not a proof of Sybil resistance.
         </Card>
         <Card icon={<Icon name="claim" size={22} />} title="Value from buybacks">
           30% of every round&apos;s payout buys $1UP on the market and shares it across locks by weight (amount × time left). Leaving a lock

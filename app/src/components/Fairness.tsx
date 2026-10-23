@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { useWidth } from "@/lib/useWidth";
 
 interface Results {
-  params: { seeds: number; lifeExpiryEpochs: number; window: number; measured: number };
+  params: { seeds: number; lifeExpiryEpochs: number; window: number; measured: number; start: number; peak: number; edge: number; seed: number; utilisation: number };
   series: { week: number; oneup: number; oneupNoExpiry: number; papertrade: number }[];
   quarters: { oneup: number[]; oneupNoExpiry: number[]; papertrade: number[] };
   y1ShareOfY3: { oneup: number; papertrade: number; losses: number };
@@ -36,18 +36,18 @@ export function Fairness() {
   return (
     // a section of the House tab (Solvency.tsx); the footer's "Fair to late players" opens it here
     <div id="fairness" className="panel scroll-mt-4 p-5">
-      <h2 className="text-lg font-extrabold">Fair to late players</h2>
-      <p className="label mt-1 mb-3">Why a late loser gets back about what an early one does, from the simulator.</p>
+      <h2 className="text-lg font-extrabold">Recovery under one growth scenario</h2>
+      <p className="label mt-1 mb-3">An aggregate-flow illustration, not a forecast or fairness proof.</p>
       <p className="text-lg">
-        A dollar lost in year 3 gets back <span className="num font-bold">{cents(last)}</span> within a year, about what a
+        In this scenario, a dollar lost in year 3 gets back <span className="num font-bold">{cents(last)}</span> within a year, compared with what a
         dollar lost early gets (<span className="num font-bold">{cents(first)}</span>). Year-1 losers take{" "}
         <span className="num font-bold">{pct(r.y1ShareOfY3.oneup)}</span> of year-3 payouts, against{" "}
         <span className="num font-bold">{pct(r.y1ShareOfY3.papertrade)}</span> under Papertrade-style rules.
       </p>
       <p className="label mt-1">
         Extra Lives earn for {r.params.lifeExpiryEpochs} rounds after the one they&apos;re minted in, so old claims
-        can&apos;t crowd out new ones. Simulation: the same trader flows under each set of rules, {r.params.seeds} seeds,
-        each loss followed for {r.params.window} weeks.
+        stop receiving future allocations; this does not ensure equal recovery. Simulation: the same trader flows under each set of rules, {r.params.seeds} seeds,
+        each loss followed for {r.params.window} weeks. Assumed weekly losses grow from ${r.params.start?.toLocaleString()} to ${r.params.peak?.toLocaleString()}, average house edge {r.params.edge * 100}%, utilisation {r.params.utilisation * 100}%, seed ${r.params.seed?.toLocaleString()} at a 1× backer claim. The separate sensitivity report uses deployment bootstrap amounts and adverse scenarios; synthetic flows can exceed modeled cash because this is not an order-admission simulation.
       </p>
       <Chart r={r} />
 

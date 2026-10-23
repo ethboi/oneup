@@ -8,3 +8,13 @@ node_modules/
 localnet.json
 *.tsbuildinfo
 next-env.d.ts
+
+*.buybacks.json
+*.buybacks.json.tmp
+.judge/
+.verification/
+
+.next-judge/
+.next-verify/
+
+.oneup-tsconfig-*.json

@@ -100,30 +100,33 @@ function fill<T extends { face: number; remaining: number }>(lives: T[], amount:
  * each life was owed when minted, each capped at what it's still owed (any excess goes round again);
  * "remaining" (before D-25) shared it by what each is still owed, so a half-paid life earned half as fast.
  */
-export function oneup(fs: Flow[], seed = 25_000, utilisation = 0.5, expiry = Infinity, share: Share = "split"): { cohorts: Cohort[]; pool: number[] } {
+export function oneup(fs: Flow[], seed = 25_000, utilisation = 0.5, expiry = Infinity, share: Share = "split", backerOwed = seed) {
   let pool = seed;
   // Each life cohort: what it was owed and what it's still owed. The seed is cohort −1 at 1.0×.
-  const owed: { epoch: number; face: number; remaining: number }[] = [{ epoch: -1, face: seed, remaining: seed }];
+  const owed: { epoch: number; face: number; remaining: number }[] = [{ epoch: -1, face: backerOwed, remaining: backerOwed }];
   const cohorts: Cohort[] = fs.map((f, epoch) => cohort(epoch, f.losses, fs.length));
   const poolSeries: number[] = [];
+  let expiredUnpaid = 0, mintedCaps = 0, backerPaid = 0;
   fs.forEach((f, e) => {
     pool += f.losses - f.payouts;
     const houseNet = f.losses - f.payouts;
     if (houseNet > 0) {
-      const cap = 2.0 - 0.8 * Math.min(pool, 1_000_000) / 1_000_000;
+      const cap = 2.0 - 0.8 * Math.max(0, Math.min(pool, 1_000_000)) / 1_000_000;
       owed.push({ epoch: e, face: houseNet * cap, remaining: houseNet * cap });
+      mintedCaps += houseNet * cap;
     }
     const liability = utilisation * pool;
     const reserve = Math.max(1.2 * liability, seed);
     const payout = 0.5 * Math.max(0, pool - reserve);
     // lives older than `expiry` epochs stop earning (the seed never expires)
-    for (const o of owed) if (o.epoch >= 0 && e - o.epoch > expiry) o.remaining = 0;
+    for (const o of owed) if (o.epoch >= 0 && e - o.epoch > expiry) { expiredUnpaid += o.remaining; o.remaining = 0; }
     const totalOwed = owed.reduce((s, o) => s + o.remaining, 0);
     const pot = Math.min(0.6 * payout, totalOwed);
     const buyback = 0.3 * payout + (0.6 * payout - pot);
     const pay = (o: (typeof owed)[number], amount: number) => {
       o.remaining -= amount;
       if (o.epoch >= 0) credit(cohorts[o.epoch], e, amount);
+      else backerPaid += amount;
     };
     if (pot > 0 && share === "remaining") {
       for (const o of owed) pay(o, (pot * o.remaining) / totalOwed);
@@ -142,7 +145,7 @@ export function oneup(fs: Flow[], seed = 25_000, utilisation = 0.5, expiry = Inf
     pool -= pot + buyback;
     poolSeries.push(pool);
   });
-  return { cohorts, pool: poolSeries };
+  return { cohorts, pool: poolSeries, mintedCaps, expiredUnpaid, outstandingCaps: owed.filter(o => o.epoch >= 0).reduce((s, o) => s + o.remaining, 0), backerOwed, backerPaid };
 }
 
 // Papertrade-style

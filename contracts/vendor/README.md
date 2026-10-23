@@ -11,3 +11,7 @@ Third-party contracts deployed unchanged on the local chain. Each is the publish
 
 The Verifier 0.4.2 uses state-init and global-contract host functions, so it needs nearcore 2.10 or newer
 (the bundled near-sandbox is 2.13).
+
+## License notices
+
+Preserve [NEAR Intents MIT](LICENSE-near-intents) and [Sputnik DAO MIT](LICENSE-sputnik-dao) notices. These files are excluded from any original-OneUp license grant. See [third-party scope and provenance limits](../../THIRD_PARTY_NOTICES.md).

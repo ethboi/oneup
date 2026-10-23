@@ -11,7 +11,7 @@ const STEPS: { icon: React.ReactNode; title: string; body: string }[] = [
   {
     icon: <Icon name="chart" size={22} />,
     title: "Trade against the house",
-    body: "Long or short up to 1000× at the oracle price, against one USDC pool. No fees, no funding, no slippage. Every trade the pool couldn't pay in the worst case is refused, so the house can't go bust.",
+    body: "Long or short up to 1000× at the oracle price, against one USDC pool. No entry or funding fee; winners pay 10–25% of profit. Admission reserves capped maximum wins on both sides. This invariant assumes correct custody, oracle and contract execution.",
   },
   {
     icon: <PixelHeart size={22} />,
@@ -21,12 +21,12 @@ const STEPS: { icon: React.ReactNode; title: string; body: string }[] = [
   {
     icon: <PixelCoin size={22} />,
     title: "Plus $1UP, locked",
-    body: "Losers also get $1UP, released only by real house profit, locked for two years. Locks earn the house's buybacks, weighted by size and time left.",
+    body: "Losers also get $1UP, released only by real house profit, locked for 104 rounds. Locks earn the house's buybacks, weighted by size and time left.",
   },
   {
     icon: <Icon name="store" size={22} />,
-    title: "Sell any time",
-    body: "Extra Lives and locks are NFTs. List them on the built-in market for USDC instead of waiting them out.",
+    title: "Transfer claim rights",
+    body: "Extra Lives and locks are NFTs. List them on the built-in market for USDC if a buyer is willing. Future payouts and sale proceeds are not guaranteed.",
   },
 ];
 
@@ -37,15 +37,15 @@ const LINEAGE: { from: string; idea: string; rows: { topic: string; them: string
     idea: "A loss buys a claim on the house",
     rows: [
       { topic: "What a loss gets you", them: "PAPER tokens, 100 per $1 lost, staked for a share of profit", oneup: "An Extra Life paying USDC back, capped, plus $1UP locked" },
-      { topic: "When winners can't be paid", them: "Winners wait in a queue as debt", oneup: "Never happens: trades the pool couldn't cover are refused" },
-      { topic: "How long a claim lasts", them: "Forever, so early claims crowd out late ones", oneup: "14 rounds, so a late loss gets back about what an early one does" },
+      { topic: "When winners can't be paid", them: "Winners wait in a queue as debt", oneup: "Admission refuses trades beyond reserved capacity; custody/oracle/code risks remain" },
+      { topic: "How long a claim lasts", them: "Forever, so early claims crowd out late ones", oneup: "Mint round plus 13 subsequent rounds; recovery depends on future profit" },
     ],
   },
   {
     from: "Aerodrome",
     idea: "A lock that earns by size and time left",
     rows: [
-      { topic: "The lock", them: "AERO locked up to 4 years as a veAERO NFT", oneup: "$1UP locked up to 2 years as an NFT; weight is amount × time left" },
+      { topic: "The lock", them: "AERO locked up to 4 years as a veAERO NFT", oneup: "$1UP locked up to 104 rounds as an NFT; weight is amount × time left" },
       { topic: "What it earns", them: "Fees and bribes from the pools you vote for", oneup: "The house's buybacks: no voting, no bribes" },
       { topic: "Getting out early", them: "Sell the NFT on another marketplace", oneup: "Leave for a penalty paid to those who stay, or sell on the built-in market" },
     ],
@@ -54,9 +54,9 @@ const LINEAGE: { from: string; idea: string; rows: { topic: string; them: string
 
 const BUILT: { icon: IconName; title: string; body: string }[] = [
   { icon: "shield", title: "9 Rust contracts", body: "House, Extra Life (NEP-171), $1UP (NEP-141), locks, market (NEP-178 approvals), and mock USDC, oracle, swap and yield vault. Events follow NEP-297." },
-  { icon: "check", title: "190 contract tests", body: "Unit and property tests, end-to-end tests on a sandbox chain, and a security review whose 21 fixes each have a test." },
+  { icon: "check", title: "Failure-path regression tests", body: "Unit, property, SDK and fresh-sandbox integration tests. Run pnpm verify for current results; review findings and regression coverage are documented in docs/SECURITY.md." },
   { icon: "demo", title: "Keeper and bots", body: "Anyone can run the keeper: it pushes prices, fills orders, liquidates, fires take-profits and stop-losses, and closes rounds. Twelve bots with different styles trade, lock and shop, and an MCP server lets AI agents trade too." },
-  { icon: "scale", title: "Simulations", body: "Fairness to late players and the cost of farming $1UP, tested before the rules were fixed." },
+  { icon: "scale", title: "Simulations", body: "Aggregate recovery sensitivity and same/separate-wallet farming assumptions. These models do not prove demand, fairness or Sybil resistance." },
 ];
 
 type Status = "demo" | "simulated" | "mainnet";
@@ -100,7 +100,7 @@ const NEAR: { title: string; status: Status; body: string; points: string[]; mar
     points: [
       "The official Verifier and PoA token factory (release 0.4.2) run on the local chain",
       "Intents are signed with the official SDK; OneUp's solver fills them with execute_intents",
-      "Only the bridge step is simulated here; on mainnet it's the 1Click API",
+      "Local bridge credit is simulated; no real Ethereum/Solana deposit or 1Click integration is implemented",
     ],
   },
   {
@@ -118,7 +118,7 @@ const NEAR: { title: string; status: Status; body: string; points: string[]; mar
     marks: [{ name: "near", label: "NEAR" }],
     status: "demo",
     body: "One-tap trading signs with a key that can only call the house's trade methods.",
-    points: ["It can open, close and set triggers; it can't deposit, withdraw or move tokens", "Turn it off and the key is deleted"],
+    points: ["It can open, close and set triggers; trading can still lose the balance. It cannot directly withdraw tokens", "Turn it off and the key is deleted"],
   },
   {
     title: "Meta transactions (NEP-366)",
@@ -142,10 +142,10 @@ const NEAR: { title: string; status: Status; body: string; points: string[]; mar
     title: "Pyth prices via Outlayer",
     marks: [{ name: "pyth", label: "Pyth" }, { name: "outlayer", label: "Outlayer" }],
     status: "simulated",
-    body: "Every fill and settlement uses an oracle price published after the order.",
+    body: "Order fills require a later oracle price; liquidation uses the latest valid price. Prompt execution still trusts the keeper.",
     points: [
       "Locally the keeper pushes live Binance prices into a Pyth-compatible oracle",
-      "On mainnet the house reads Outlayer's Pyth oracle with the same calls",
+      "An Outlayer-compatible interface exists; real-network deployment and feed behavior remain unverified",
       "The house checks each price's age, confidence and that it isn't from the future",
     ],
   },
@@ -153,8 +153,8 @@ const NEAR: { title: string; status: Status; body: string; points: string[]; mar
     title: "Rhea",
     marks: [{ name: "rhea", label: "Rhea" }],
     status: "mainnet",
-    body: "NEAR's DEX for the buybacks: 30% of each round's payout buys $1UP for the lockers.",
-    points: ["Locally a mock swap with the same interface", "Its 50M $1UP liquidity seed is minted at launch"],
+    body: "Intended buyback venue; the working demo uses a custom mock swap. No real Rhea adapter is implemented.",
+    points: ["Local custom swap payload; a real Rhea adapter remains to be implemented", "Its 50M $1UP liquidity seed is minted at launch"],
   },
   {
     title: "NEAR randomness",
@@ -179,7 +179,7 @@ const NEAR: { title: string; status: Status; body: string; points: string[]; mar
     marks: [{ name: "near", label: "NEAR" }],
     status: "demo",
     body: "An MCP server lets an AI agent trade on OneUp: read markets, quote, open and close, set triggers, claim lives.",
-    points: ["Registered for Claude Code in .mcp.json; signs as the demo account or a bot"],
+    points: ["Registered in .mcp.json; uses the demo/bot full key, not a capital-limited agent wallet"],
   },
 ];
 
@@ -198,7 +198,7 @@ export function About() {
             <h1 className="display mt-2 text-4xl leading-tight sm:text-5xl">Lose a trade, get a life.</h1>
             <p className="mt-3 max-w-xl text-[var(--muted)]">
               OneUp is a perpetuals exchange on NEAR where losing isn&apos;t the end of the story. Trade against a house
-              that can&apos;t go bust; if you lose, you get an Extra Life that pays you back from the house&apos;s profit.
+              with reserved capped payouts. Eligible net losses can create a tradable Extra Life sharing future house profit; recovery can be zero.
             </p>
           </div>
           <div className="bezel shrink-0 self-start p-4 sm:self-auto">
@@ -261,16 +261,16 @@ export function About() {
           <h2 className="text-lg font-extrabold">Why it&apos;s different</h2>
           <ul className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
             <li>
-              <b className="block">Losses come back</b>
+              <b className="block">Conditional loss recovery</b>
               <span className="text-[var(--muted)]">On most exchanges a loss is gone. Here the house shares its profit with the people it came from.</span>
             </li>
             <li>
-              <b className="block">Fair to late players</b>
-              <span className="text-[var(--muted)]">Lives expire, so early claims can&apos;t crowd out new ones. A dollar lost in year three gets back about what one lost early does.</span>
+              <b className="block">Expiring recovery claims</b>
+              <span className="text-[var(--muted)]">Expiry bounds future claim lifetimes; recovery still depends on future profits and can be zero. Economic scenarios show both favorable and unfavorable results.</span>
             </li>
             <li>
-              <b className="block">Hard to farm</b>
-              <span className="text-[var(--muted)]">$1UP is released only by real house profit and arrives locked for two years, which makes wash-trading for it expensive.</span>
+              <b className="block">Farming assumptions</b>
+              <span className="text-[var(--muted)]">$1UP releases with house profit and arrives locked for 104 rounds. Separate-wallet strategies and sale discounts change farming economics; wallet netting is not Sybil resistance.</span>
             </li>
           </ul>
         </section>
@@ -327,9 +327,7 @@ export function About() {
           <h2 className="text-lg font-extrabold">This demo</h2>
           <p className="mt-2 max-w-3xl text-sm text-[var(--muted)]">
             Everything runs on a local NEAR chain started with one command. Prices are real (Binance, with Coinbase as a
-            fallback), pushed to a Pyth-compatible oracle; USDC and the buyback swap are local stand-ins. On mainnet the
-            house reads Outlayer&apos;s Pyth oracle and buys back on Rhea, with the same calls. Rounds are 10 minutes so you
-            can watch Extra Lives arrive.
+            fallback), pushed to a Pyth-compatible oracle; USDC and the buyback swap are local stand-ins. Planned integrations include Outlayer and Rhea, without real-network proof. The ordinary demo has live prices and 10-minute rounds; the separate judge profile has fixed controllable prices and 45-second rounds.
           </p>
         </section>
       </div>

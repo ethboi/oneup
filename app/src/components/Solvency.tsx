@@ -37,7 +37,7 @@ export function Solvency() {
     <div className="flex flex-col gap-4">
       <div>
         <PageTitle>The house</PageTitle>
-        <p className="label mt-1.5">Why it can&apos;t go bust, live from the chain, and why it&apos;s fair to late players, from the simulator.</p>
+        <p className="label mt-1.5">Payout reserves from the chain and recovery scenarios from a simplified model. Oracle, custody and implementation risks remain.</p>
       </div>
       <div className="panel p-5">
         <p className="text-lg">

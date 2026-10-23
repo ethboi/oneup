@@ -38,17 +38,17 @@ export const voting: Rules = {
 };
 
 /** New: losers only, release K $1UP per $1 of house profit (capped by schedule + carry), as a fresh lock. */
-export function profitRelease(K: number): Rules {
+export function profitRelease(K: number, wallets: "same" | "separate" = "same", liquidity = 1 - FRESH_LOCK_HAIRCUT): Rules {
   return {
     name: `Losers only, ${K} $1UP per $1 of house profit, locked`,
     farmerOneup: (L, N, x, state) => {
       const available = state.carry + SCHEDULE;
       const release = Math.min(available, K * Math.max(0, N + CUT * x));
       state.carry = available - release;
-      const netLoss = CUT * x;
+      const netLoss = wallets === "same" ? CUT * x : x;
       return L + netLoss > 0 ? release * (netLoss / (L + netLoss)) : 0;
     },
-    liquidity: 1 - FRESH_LOCK_HAIRCUT,
+    liquidity,
   };
 }
 

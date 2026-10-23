@@ -44,7 +44,7 @@ now − p.publish_time ≤ MAX_PRICE_AGE          # MAX_PRICE_AGE = 60 s
 p.conf / p.price ≤ MAX_CONF                   # MAX_CONF = 1% (10_000 ppm)
 ```
 
-The window stops a keeper-trader from waiting for a good price; see decisions D-2.
+The window bounds waiting but does not prove the first later price was chosen. The keeper remains trusted for prompt execution; see D-23.
 A limit open (D-30) waits longer, `FILL_WINDOW` becoming `LIMIT_EXPIRY` (24 h), and also needs
 `p.price ≤ limit` for a long or `p.price ≥ limit` for a short; it fills at `p.price`. The trader chose that
 price in advance, so waiting for it is the point, not an edge.
@@ -62,8 +62,8 @@ short_liab_m = Σ 9 × M   over shorts in m
 **Rule (see decisions D-1):**
 
 ```
-liab_m = long_liab_m + short_liab_m           # D-1 recommended (sound across time)
-liab_m = max(long_liab_m, short_liab_m)       # spec as written (sound only if both sides settle at once)
+liab_m = long_liab_m + short_liab_m           # current deployment: both sides, sound across time
+# Historical rejected alternative: max(long_liab_m, short_liab_m); unsafe across asynchronous closes
 
 E = Σ_m liab_m
 open allowed only if   E_after ≤ pool   and   liab_m_after ≤ capacity_m
@@ -88,7 +88,7 @@ payout   = M + pnl − cut                      # winner
 payout   = M + pnl                            # loser (pnl < 0), the |pnl| goes to the pool
 ```
 
-The size term (`u / 2`) is a proposal: a position using 10% of the pool's room pays 15%, one using 30% or
+The implemented size term (`u / 2`) means: a position using 10% of the pool's room pays 15%, one using 30% or
 more pays the 25% hard maximum.
 
 ## 5. Epoch result and Extra Life minting

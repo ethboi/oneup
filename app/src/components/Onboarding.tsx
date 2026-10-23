@@ -32,9 +32,9 @@ export function Onboarding() {
     } catch {}
   };
   const steps = [
-    { icon: <Icon name="chart" size={20} />, title: "Trade against the house", line: "Long or short, up to 1000×, at the oracle price. No fees." },
-    { icon: <PixelHeart size={20} />, title: "Lose? Get an Extra Life", line: "Your loss becomes an NFT that earns USDC from the house's profit." },
-    { icon: <Icon name="lock" size={20} />, title: "Plus $1UP, locked", line: "Losers also get $1UP that earns the house's buybacks. Sell either one any time." },
+    { icon: <Icon name="chart" size={20} />, title: "Trade against the house", line: "Trade at oracle prices. Winners pay a 10–25% cut; no entry or funding fee." },
+    { icon: <PixelHeart size={20} />, title: "Lose? Get an Extra Life", line: "In profitable rounds, eligible net losses create NFTs with capped, expiring rights to future house profit." },
+    { icon: <Icon name="lock" size={20} />, title: "Claim or transfer", line: "Claim earned USDC, or list your Life. A buyer inherits unclaimed USDC; a sale needs a buyer." },
   ];
   return (
     <div className="panel mb-4 flex items-start gap-3 p-4">

@@ -4,9 +4,9 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { ONEUP, OneUp, USDC } from "@oneup/sdk";
-import { deployment } from "./localnet";
+import { deployment, stateDir } from "./localnet";
 
-const SAVE = resolve(process.cwd(), "../.localnet/oneup-price.json");
+const SAVE = resolve(stateDir(), "oneup-price.json");
 const EVERY_MS = 60_000;
 const KEEP = 24 * 60;
 

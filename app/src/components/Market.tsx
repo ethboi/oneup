@@ -82,7 +82,7 @@ export function Market() {
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_360px] lg:items-start">
       <div className="flex min-w-0 flex-col gap-5">
-        <Explainer title="Market" line={<>Buy and sell Extra Lives and $1UP locks for USDC. You have <b className="num text-[var(--text)]">{usd(wallet)}</b> in your wallet.</>}>
+        <Explainer title="Market" line={<>List or buy Extra Lives and $1UP locks for USDC. Caps are conditional; listings need buyers. Reference gaps are not investment returns. You have <b className="num text-[var(--text)]">{usd(wallet)}</b> in your wallet.</>}>
           Buy someone&apos;s Extra Life and its USDC payouts are yours. Buy a lock and you get its $1UP when it ends, and its share
           of buybacks until then. You pay from your wallet&apos;s USDC and the NFT moves to you in the same step; if it was
           sold elsewhere first, your USDC comes straight back. Sellers pay 2% of the price, which goes into the house pool
@@ -107,9 +107,9 @@ export function Market() {
             <label className="flex items-center gap-2 text-sm">
               <span className="label">Sort</span>
               <select className="bar-select num" value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
-                <option value="deal">Best deal</option>
+                <option value="deal">Largest cap / exit-price gap</option>
                 <option value="cheap">Cheapest</option>
-                <option value="value">Most value</option>
+                <option value="value">Highest cap / exit estimate</option>
               </select>
             </label>
           </div>
@@ -245,12 +245,12 @@ function Row({ x, wallet, epoch, totalPower }: { x: Item; wallet: bigint; epoch?
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <b className="truncate">{title}</b>
-          {off !== null && off > 0 && <span className="deal num">{off}% off</span>}
-          {off !== null && off < 0 && <span className="label num">{-off}% over value</span>}
+          {off !== null && off > 0 && <span className="deal num">{off}% below reference</span>}
+          {off !== null && off < 0 && <span className="label num">{-off}% above reference</span>}
         </div>
         <div className="label">{detail}</div>
         <div className="label num">
-          Worth {usd(x.value)}
+          {x.kind === "life" ? "Maximum remaining payout" : "Exit estimate"} {usd(x.value)}
           {x.kind === "lock" ? " if left today" : ""}
         </div>
       </div>
@@ -299,7 +299,7 @@ function Sales({ items }: { items: ActivityItem[] }) {
               <span className="block">{who}</span>
               {off !== null && (
                 <span className="label num" style={{ color: off > 0 ? "var(--long)" : undefined }}>
-                  {off > 0 ? `${off}% under value` : off < 0 ? `${-off}% over value` : "at value"}
+                  {off > 0 ? `${off}% below reference` : off < 0 ? `${-off}% above reference` : "at reference"}
                 </span>
               )}
             </span>

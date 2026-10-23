@@ -41,7 +41,7 @@ export function Backing() {
       <p className="label mt-1 max-w-3xl">
         Your USDC joins the pool for good and gives traders room to trade. In return you get a Backer Life: an Extra Life that never
         expires, paid from a third of every round&apos;s Extra Life payout, and owed more the earlier you back. You also get $1UP,
-        locked for two years, earning the house&apos;s buybacks. To get out early, sell the Backer Life on the Market.
+        locked for 104 rounds, earning the house&apos;s buybacks. An early exit requires a willing buyer on the Market; sale proceeds are not guaranteed.
       </p>
 
       <div className="mt-4 grid gap-5 lg:grid-cols-[1.4fr_1fr]">
@@ -59,9 +59,9 @@ export function Backing() {
               <dl className="num grid grid-cols-2 gap-y-1 text-sm">
                 <dt className="label">Owed back</dt>
                 <dd className="text-right font-bold">{ppmToNumber(BigInt(round.cap_ppm)).toFixed(3)}×</dd>
-                <dt className="label">Backer Life worth</dt>
+                <dt className="label">Maximum Backer Life payout</dt>
                 <dd className="text-right font-bold">${fmtUsdc(BigInt(round.owed), 0)}</dd>
-                <dt className="label">Plus $1UP, locked 2 years</dt>
+                <dt className="label">Plus $1UP, locked 104 rounds</dt>
                 <dd className="text-right font-bold">{fmtOneup(round.oneup)}</dd>
                 <dt className="label">Room left in the round</dt>
                 <dd className="text-right">${fmtUsdc(left, 0)}</dd>

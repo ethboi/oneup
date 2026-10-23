@@ -10,6 +10,8 @@
 
 import { createServer } from "node:http";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { renameSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { Account, KeyPair, actions, type KeyPairString } from "near-api-js";
@@ -29,6 +31,7 @@ import {
 import { HermesSource, LiveSource, SimSource, sane, type PriceSource, type Steerable } from "./prices.ts";
 import { validSteer } from "./control.ts";
 import { processOrders } from "./orders.ts";
+import { reconcileBuybacks, restoreBuybacks } from "./buybacks.ts";
 
 const { values: args } = parseArgs({
   options: {
@@ -36,7 +39,7 @@ const { values: args } = parseArgs({
     tick: { type: "string", default: "3000" },
     "price-tick": { type: "string", default: "1000" },
     control: { type: "string", default: "8787" },
-    config: { type: "string", default: resolve(import.meta.dirname, "../../localnet.json") },
+    config: { type: "string", default: process.env.ONEUP_CONFIG ?? resolve(import.meta.dirname, "../../localnet.json") },
   },
 });
 
@@ -54,7 +57,7 @@ const log = (...m: unknown[]) => console.log(new Date().toISOString().slice(11, 
 const nowS = () => Math.floor(Date.now() / 1000);
 
 const source: PriceSource =
-  args.prices === "hermes" ? new HermesSource() : args.prices === "sim" ? new SimSource(d.markets) : new LiveSource(log);
+  args.prices === "hermes" ? new HermesSource() : (args.prices === "sim" || args.prices === "fixed") ? new SimSource(d.markets, args.prices === "fixed" ? 0 : undefined) : new LiveSource(log);
 /** Markets as listed on chain (refreshed every tick, so markets listed by vote get prices too). */
 let feeds = new Map<string, string>(d.markets.map((m) => [m.id, m.feedId]));
 /** Latest pushed price per feed, 1e8 units, and its publish time. */
@@ -132,7 +135,6 @@ async function handleEpoch() {
       const e = (await oneup.epoch()).id - 1;
       const s = await oneup.epochSummary(e);
       log(`epoch ${e} closed: house net ${fmt(s?.house_net)}, ${s?.lives_minted} Extra Lives, lives pot ${fmt(s?.lives_pot)}, buyback ${fmt(s?.buyback_pot)}`);
-      await runBuyback(e);
       return;
     }
     if (r === "waiting for mints" || r === "waiting for recall") return; // next tick
@@ -167,13 +169,23 @@ async function handleTreasury() {
   }
 }
 
-async function runBuyback(epoch: number) {
-  const b = await oneup.buyback(epoch);
-  if (!b || b.status !== "Pending") return;
-  const quote = BigInt(await oneup.view<string>(d.contracts.swap, "get_quote", { usdc_in: b.usdc }));
-  if (quote === 0n) return log(`buyback ${epoch}: swap has no liquidity`);
-  await owner.buyback(epoch, (quote * 98n) / 100n);
-  log(`buyback ${epoch}: ${fmt(b.usdc)} USDC → $1UP for lockers`);
+// Fingerprint changes on redeployment without writing keys to the checkpoint.
+const buybackIdentity = createHash("sha256").update(`${d.rpcUrl}:${d.contracts.house}:${d.keeper.key}`).digest("hex");
+const buybackFile = `${args.config!}.buybacks.json`;
+let savedBuybacks: unknown;
+try { savedBuybacks = JSON.parse(readFileSync(buybackFile, "utf8")); } catch { /* reconstruct */ }
+const buybackQueue = restoreBuybacks(savedBuybacks, buybackIdentity);
+async function handleBuybacks() {
+  const epoch = await oneup.epoch();
+  await reconcileBuybacks({
+    read: oneup.buyback,
+    quote: async usdc => BigInt(await oneup.view<string>(d.contracts.swap, "get_quote", { usdc_in: usdc })),
+    swap: owner.buyback,
+    deliver: owner.retryBuybackDelivery,
+  }, buybackQueue, epoch.id, queue => {
+    writeFileSync(`${buybackFile}.tmp`, JSON.stringify({ identity: buybackIdentity, ...queue }), { mode: 0o600 });
+    renameSync(`${buybackFile}.tmp`, buybackFile);
+  }, log);
 }
 
 const fmt = (x?: string) => (x === undefined ? "-" : (Number(x) / 1e6).toLocaleString("en-US", { maximumFractionDigits: 2 }));
@@ -228,7 +240,7 @@ async function riskSender() {
 async function keySender(file: string, receiver: string, methods: string[]) {
   // the key is kept beside the chain's state (.localnet/, wiped with it), so a restart reuses it rather than
   // adding another
-  const saved = resolve(dirname(args.config!), `.localnet/${file}`);
+  const saved = resolve(process.env.ONEUP_STATE_DIR ?? resolve(dirname(args.config!), ".localnet"), file);
   let kp: KeyPair | null = null;
   try {
     kp = KeyPair.fromString(readFileSync(saved, "utf8").trim() as KeyPairString);
@@ -283,6 +295,7 @@ async function tick() {
     ["orders", handleOrders],
     ["epoch", handleEpoch],
     ["treasury", handleTreasury],
+    ["buybacks", handleBuybacks],
   ];
   for (const [name, fn] of steps) {
     try {

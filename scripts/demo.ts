@@ -4,13 +4,14 @@
 // `pnpm demo --lan` also serves the app to your local network, to try it on a phone. That page hands out
 // the localnet's throwaway dev keys, so only use it on a network you trust.
 
+import { CONTRACT_WASMS } from "./artifacts.ts";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { networkInterfaces } from "node:os";
 import { resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dirname, "..");
-const WASMS = ["oneup_house", "oneup_extra_life", "oneup_token", "oneup_ve", "oneup_market", "mock_usdc", "mock_oracle", "mock_swap", "mock_vault"];
+const WASMS = Object.values(CONTRACT_WASMS);
 const APP_URL = "http://127.0.0.1:3020";
 const LAN = process.argv.includes("--lan");
 const LAN_URLS = Object.values(networkInterfaces())

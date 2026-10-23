@@ -1,45 +1,37 @@
-# NEAR HACKATHON submission (draft)
+# NEAR HACKATHON submission — working draft, not submitted
 
-A draft of the form, to check before sending. **One submission, not editable.** Submissions open
-2026-11-01T00:00Z and close 2026-11-14T23:59Z (research R-1 in [decisions.md](decisions.md)).
+Existing code is permitted per the team's clarification. We are still building and keeping the repository
+private. Publication, X posting and submission are deferred. Preserve the pre-event baseline and describe
+subsequent work accurately; do not retrospectively claim all existing work was built during the event.
 
-## Before submitting
+Primary track: Unstoppable DeFi (`defi`). Secondary: NFTs That Do Something (`nfts`).
+See the [official site](https://nearhackathon.com/) and [current instructions](https://nearhackathon.com/HACKATHON.md)
+again before submission. The current deadline is 14 November 2026, 23:59 UTC; one submission, not editable.
 
-- [ ] Check the rule on code written before 1 Nov (R-1: the site says "build your project during the
-      hackathon"; ask in the NEAR Discord if unsure).
-- [ ] Make the repo public.
-- [ ] Post on X with a video or screenshots, saying it was built at NEAR HACKATHON.
-- [ ] Fill the fields below that are left blank.
-
-## Fields
-
-| Field | Value |
-|---|---|
-| Project name | OneUp |
-| Lead | _(your name)_ |
-| Email | _(your email)_ |
-| Team size | _(fill in)_ |
-| Tracks | _(pick from the form's list)_ |
-| NEAR wallet | _(fill in)_ |
-| Repo | https://github.com/ethboi/oneup (public before submitting) |
-| X post | _(link)_ |
-
-## Description
-
-The form allows 20 to 2,000 characters. This draft is 1,869.
+## Description draft
 
 ```text
-OneUp is a perpetuals exchange on NEAR where losing isn't the end of the story. Lose a trade, get a life.
+OneUp is a perps prototype on NEAR where eligible trading losses become tradable recovery NFTs. Trade, receive an Extra Life after a profitable round, claim USDC from future house profit, or transfer the NFT and its unclaimed USDC to a buyer.
 
-Think Papertrade meets Aerodrome: a loss buys a claim on the house, and a locked token earns by size and time left, without the payout queue, the forever-claims or the bribes.
+Each trade reserves its capped maximum payout against a shared USDC house pool. There is no entry or funding fee; winners pay a 10–25% profit cut. Recovery is conditional, capped and time-limited: trader Lives earn in their mint round and 13 subsequent rounds. Listing an NFT requires a willing buyer. These are claims on future profits, not guaranteed refunds.
 
-Traders go long or short up to 1000x against one USDC house pool, at the oracle price, with no fees, funding or slippage. Any trade the pool couldn't pay in the worst case is refused, so the house can't go bust and there is never a payout queue.
+NEAR provides asynchronous contract composition, token and NFT standards, restricted trading keys and sponsored calls. The local prototype runs the official Intents verifier with a custom solver and simulated bridge credits, plus Sputnik DAO ownership and dynamic on-chain NFT art. USDC, oracle, swap and vault boundaries are mocks. Outlayer, Rhea and cross-chain lending are intended integrations, not demonstrated deployments.
 
-When an epoch ends with the house in profit, its losers get Extra Lives: NFTs that earn USDC back from the house's later profit, up to a cap, for 13 epochs. Lives expire, so early claims can't crowd out new players: in our simulation a dollar lost in year three gets back about what one lost early does. Losers also get $1UP, released only by real house profit and locked for two years; locks earn the house's buybacks by size and time left. Extra Lives and locks can be sold on the built-in market at any time.
-
-Anyone can back the house in its bootstrap round for a Backer Life that never expires; the first dollar is owed 2x, the last 1.2x.
-
-Built on NEAR: pay from Ethereum or Solana in one signed NEAR Intent, a Sputnik DAO owns the house, one-tap gasless trading with a trade-only key, and Extra Lives drawn on chain. Orders fill at the next oracle price, so nobody trades on a price they already know.
-
-What's in the repo: 9 Rust contracts with 190 tests and a security review (docs/SECURITY.md), a keeper, twelve trading bots, an MCP server so AI agents can trade, simulations of fairness and farming cost, and a Next.js app with live prices, history, shareable PnL cards and sound. One command (pnpm demo) starts a local NEAR chain with everything deployed. On mainnet the house reads Outlayer's Pyth oracle and buys back on Rhea.
+The repository includes contract/property/sandbox tests, failure-recovery regressions, a deterministic-price isolated demo and economic sensitivity reports, including unfavorable regimes. It runs on local NEAR with test money and has not been production-audited.
 ```
+
+## Deferred human inputs and publication checklist
+
+- [ ] Lead, email and exact team-size option.
+- [ ] Human-selected mainnet NEAR prize account; no address invented by tooling.
+- [x] AGPL-3.0-only selected for original code; upstream notices preserved. Dependency obligations still need review before external distribution.
+- [ ] Authorized publication of the final tested repository revision.
+- [ ] Human-recorded and published public X demo post, accurately describing event work.
+- [ ] Final description checked against the 20–2,000 character limit.
+- [ ] Contact-notice consent and explicit approval of the exact final submission.
+
+## Claims and proof
+
+Use `pnpm verify` for current test evidence and `pnpm test:judge` for source-bound local core-loop evidence.
+Public CI results do not exist until a future push executes the workflow. No bots, seed funds or synthetic
+marketplace activity should be described as external users, fundraising or demand.

@@ -53,10 +53,10 @@ const out = {
   ptPeakQueue: headline.ptPeakQueue,
 };
 
-const dir = resolve(import.meta.dirname, "../out");
+const dir = resolve(process.env.ONEUP_SIM_OUTPUT ?? resolve(import.meta.dirname, "../out"));
 mkdirSync(dir, { recursive: true });
 writeFileSync(resolve(dir, "results.json"), JSON.stringify(out, null, 2));
-writeFileSync(resolve(import.meta.dirname, "../../docs/fairness.svg"), fairnessSvg(out.series));
+if (!process.env.ONEUP_SIM_OUTPUT) writeFileSync(resolve(import.meta.dirname, "../../docs/fairness.svg"), fairnessSvg(out.series));
 
 const c = (x: number) => `${(x * 100).toFixed(1)}¢`;
 const p = (x: number) => `${(x * 100).toFixed(1)}%`;
