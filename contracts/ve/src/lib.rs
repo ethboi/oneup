@@ -105,6 +105,12 @@ trait FungibleToken {
     fn ft_transfer(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>);
 }
 
+#[near(serializers = [json])]
+pub struct LocksPage {
+    pub locks: Vec<LockInfo>,
+    pub next_index: Option<U128>,
+}
+
 #[near(contract_state)]
 #[derive(PanicOnDefault)]
 pub struct Ve {
@@ -333,6 +339,24 @@ impl Ve {
             .into_iter()
             .filter_map(|t| self.locks.get(&t.token_id).filter(|l| l.merged_into.is_none()).map(|l| self.info(t.token_id.clone(), t.owner_id, l)))
             .collect()
+    }
+
+    /// Cursor advances over all owned NFTs, including merged/withdrawn ones, before filtering.
+    pub fn locks_for_owner_page(&self, account_id: AccountId, from_index: Option<U128>, limit: Option<u64>) -> LocksPage {
+        let from = from_index.unwrap_or(U128(0));
+        let limit = limit.unwrap_or(100).clamp(1, 100);
+        let total = self.tokens.nft_supply_for_owner(account_id.clone()).0;
+        if from.0 >= total { return LocksPage { locks: vec![], next_index: None }; }
+        let tokens = self.tokens.nft_tokens_for_owner(account_id, Some(from), Some(limit));
+        let count = tokens.len() as u64;
+        let next_index = (from.0 + (count as u128) < total).then(|| U128(from.0 + count as u128));
+        let locks = tokens.into_iter().filter_map(|t| self.locks.get(&t.token_id).filter(|l| l.merged_into.is_none()).map(|l| self.info(t.token_id.clone(), t.owner_id, l))).collect();
+        LocksPage { locks, next_index }
+    }
+
+    pub fn get_claimable_many(&self, token_ids: Vec<TokenId>, epochs: Vec<u64>) -> Vec<(TokenId, U128)> {
+        require!(token_ids.len() <= MAX_LOCKS_PER_CALL, "At most 30 locks");
+        token_ids.into_iter().map(|id| { let due = self.get_claimable(id.clone(), epochs.clone()); (id, due) }).collect()
     }
 
     /// Total weight fixed for `epoch`.

@@ -98,21 +98,26 @@ Per epoch `e`, over positions **closed** in `e` (open positions don't count unti
 ```
 losses_e      = Σ |pnl|  over losing closes (liquidations count the full M)
 payouts_e     = Σ (pnl − cut) over winning closes
-house_net_e   = losses_e − payouts_e
+fees_e        = marketplace fees received during e
+house_net_e   = max(0, losses_e + fees_e − payouts_e)
+loss_i        = max(0, wallet_i losing closes − wallet_i net winning profits)
+net_losses_e  = Σ loss_i
 ```
 
-If `house_net_e > 0`, each wallet `i` that lost `loss_i` in `e` (summed over all its losing closes, all
-markets) gets one Extra Life:
+If `house_net_e > 0`, each wallet with positive net loss across all markets gets one Extra Life (D-24):
 
 ```
-face_i = floor(house_net_e × loss_i / losses_e)
+face_i = floor(house_net_e × loss_i / net_losses_e)
 cap    = 2.0 − 0.8 × min(pool, 1_000_000) / 1_000_000      # pool = pool at epoch close, before payouts
 owed_i = floor(face_i × cap)
 ```
 
 If `house_net_e ≤ 0`, no Extra Lives are minted for `e`.
 
-The seed provider's Extra Life: `face = 25_000`, `cap = 1.0`, minted at launch.
+The seed provider receives a Backer Life with face equal to the deposited seed and cap 1.0.
+Seed and public backing capital enter the spendable pool only after the Backer Life mint succeeds.
+Pending backing reserves its bootstrap allocation and cap position. New backing pauses while closing;
+a failed mint returns its USDC to the sender's free balance and restores its reserved $1UP allocation.
 
 Mid-epoch, the app shows a **pending Extra Life** (the wallet's losses so far); face value is only known at
 epoch close. (The demo script says one "drops into the wallet" on liquidation; it drops as pending.)
@@ -167,7 +172,7 @@ per_epoch     = floor(EMISSIONS / 208)          # = 4_326_923.076923076923076923
 available_e   = carry_{e−1} + per_epoch
 release_e     = min(available_e, RATE × house_net_e)      # RATE = 20 $1UP per USDC
 carry_e       = available_e − release_e (+ rounding and failed locks)
-loser i gets  release_e × loss_i / losses_e, as a 104-epoch lock (§9)
+loser i gets  release_e × loss_i / net_losses_e, as a 104-epoch lock (§9)
 ```
 
 Winners earn USDC, not $1UP. With `house_net ≤ 0` nothing is released and the whole schedule carries.
@@ -212,8 +217,8 @@ pool = 200_000, E = 50_000 → R = 60_000, S = 140_000, P = 70_000.
   (all paid in full, all three become Full Heals), bb_pot = 21_000 + 5_160 = **26_160**, 7_000 stays.
 - pool' = 200_000 − 36_840 − 26_160 = **137_000** ≥ 1.2 × 50_000 ✓
 - Same with pool = 120_000: R = 60_000, S = 60_000, P = 30_000, 0.6P = 18_000 = el_pot →
-  Alice **899**, Bob **4_885**, seed **12_214** (floors of 18_000 × owed / 36_840; 2 units of dust stay),
-  bb_pot = **9_000**.
+  Losers first receive 12,000 and backers 6,000. Alice and Bob fill at **1,840** and **10,000**;
+  the unused 160 spills to the seed Backer Life, which receives **6,160**. bb_pot = **9,000**.
 
 ### V6 — Emissions
 per_epoch = 4_326_923.0769…. house_net = 1_350 USDC → release = min(4_326_923.08, 20 × 1_350) =
@@ -227,3 +232,13 @@ Lock 1_000 for 104 epochs → weight **1_000**; after 52 epochs **500**. Lock 1_
 
 ### V9 — Release cap
 house_net = 10_000_000 USDC → 20 × that is 200M, capped at available = **per_epoch** (+ carry).
+
+## Asynchronous close and jackpot bounds
+
+A new close waits for earlier life-pot callbacks, pending backing mints and their token locks before
+checkpointing the next epoch. Partial pot refunds restore only their refunded debt. A jackpot draw freezes
+its random target, ticket total and payout amount, then visits/removes at most the requested close batch
+(maximum 15) ticket accounts per call. Later harvested interest remains for the next draw. A round returns
+`closed` only after the draw and payout complete. A zero jackpot or no tickets rolls over without discarding
+tickets. Existing local deployments must be recreated to use this contract state layout; there is no
+upgrade/migration path in this proof of concept.

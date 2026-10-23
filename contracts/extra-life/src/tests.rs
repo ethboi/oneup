@@ -41,7 +41,7 @@ fn pot(c: &mut ExtraLife, amount: u128) -> u128 {
 fn v1_v5_mint_and_pay() {
     let mut c = setup();
     ctx("house", 0);
-    c.mint_batch(0, vec![item("seed", 25_000, 1_000_000)]);
+    c.mint_backer(acc("seed"), U128(25_000 * USDC), U128(1_000_000));
     // V1: Alice 1_000 face at 1.84× → 1_840; Bob 10_000 owed at 1.0×
     c.mint_batch(1, vec![item("alice", 1_000, 1_840_000), item("bob", 10_000, 1_000_000)]);
     let a = c.life_info("1:alice".into()).unwrap();
@@ -52,7 +52,7 @@ fn v1_v5_mint_and_pay() {
     let dust = pot(&mut c, 18_000);
     assert!(dust <= 3);
     let paid = |c: &ExtraLife, id: &str| c.life_info(id.into()).unwrap().paid.0 / USDC;
-    assert_eq!((paid(&c, "1:alice"), paid(&c, "1:bob"), paid(&c, "0:seed")), (899, 4_885, 12_214));
+    assert_eq!((paid(&c, "1:alice"), paid(&c, "1:bob"), paid(&c, "b1")), (1_840, 10_000, 6_160));
 
     // a pot bigger than everything owed pays all in full and returns the rest
     assert_eq!(pot(&mut c, 50_000), 31_160 * USDC - dust);

@@ -70,15 +70,13 @@ impl House {
                 DepositMsg::Seed {} => {
                     require!(sender_id == self.owner, "Only the owner seeds the pool");
                     // The seed's Backer Life is capped at 1.0×, so the seed is only ever paid back
-                    self.back(sender_id, amount.0, math::PPM);
-                    Event::Seed { amount, pool: U128(self.pool) }.emit();
+                    self.back(sender_id, amount.0, math::PPM, false);
                 }
                 DepositMsg::Back {} => {
                     require!(amount.0 >= math::MIN_BACKING, "Back with at least 10 USDC");
-                    require!(self.seed + amount.0 <= self.params.backing_target.0, "Backing round is full");
-                    let cap = math::backer_cap_ppm(self.pool, amount.0);
-                    self.back(sender_id.clone(), amount.0, cap);
-                    self.lock_for_backer(sender_id, amount.0);
+                    require!(self.seed + self.pending_backing + amount.0 <= self.params.backing_target.0, "Backing round is full");
+                    let cap = math::backer_cap_ppm(self.pool + self.pending_backing, amount.0);
+                    self.back(sender_id, amount.0, cap, true);
                 }
                 DepositMsg::Open { market_id, side, margin, leverage, take_profit, stop_loss, limit_price, account_id } => {
                     require!(limit_price.is_none_or(|x| x.0 > 0), "Limit price must be above zero");
@@ -451,13 +449,12 @@ impl House {
 
     /// Adds `amount` to the pool and the seed (so it only comes back from profit, D-12) and mints its
     /// Backer Life owed `cap_ppm` × `amount` (D-22).
-    fn back(&mut self, account: AccountId, amount: u128, cap_ppm: u128) {
-        self.pool += amount;
-        self.seed += amount;
-        let owed = math::owed(amount, cap_ppm);
-        self.lives_owed += owed;
-        self.mint_backer(account.clone(), amount, cap_ppm).detach();
-        Event::Backed { account_id: account, amount: U128(amount), cap_ppm: U128(cap_ppm), owed: U128(owed), pool: U128(self.pool) }.emit();
+    fn back(&mut self, account: AccountId, amount: u128, cap_ppm: u128, reward: bool) {
+        require!(self.closing.is_none() && !self.closing_requested, "Backing paused during epoch close");
+        let oneup = if reward { self.backer_oneup_for(amount) } else { 0 };
+        self.backer_oneup -= oneup;
+        self.pending_backing += amount;
+        self.mint_backer(account, amount, cap_ppm, oneup).detach();
     }
 
     /// Settles a position at `price`: pays the trader's free balance, moves the pool, frees the liability

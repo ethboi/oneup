@@ -77,3 +77,30 @@ async fn lives_expire_after_their_window() -> anyhow::Result<()> {
     assert_eq!(view(&e.house, "get_lives_state", json!({})).await?["lives_owed"], owed);
     Ok(())
 }
+
+
+#[tokio::test]
+async fn full_epoch_batch_and_next_batch_complete_through_wasm_receipts() -> anyhow::Result<()> {
+    let e = setup(5).await?;
+    let mut losers = Vec::new();
+    for n in 0..11 {
+        let name = format!("loser{n}-with-a-long-account-name-for-storage");
+        let t = trader(&e, &name, 10).await?;
+        let (pos, placed_at) = open(&e, &t, "Long", 10, 50, 500).await?;
+        push(&e, 490, placed_at + 2).await?;
+        assert!(e.keeper.call(e.house.id(), "liquidate").args_json(json!({"position_id":pos})).max_gas().transact().await?.json::<bool>()?);
+        losers.push(t);
+    }
+    e.worker.fast_forward(10).await?;
+    let steps = close_epoch(&e).await?;
+    assert_eq!(steps.last().map(String::as_str), Some("closed"), "{steps:?}");
+    assert_eq!(view(&e.house, "get_epoch_summary", json!({"epoch":1})).await?["lives_minted"], json!(11));
+    for t in losers {
+        let life = view(&e.life, "life_info", json!({"token_id":format!("1:{}",t.id())})).await?;
+        assert_eq!(life["face"], json!(usd(10)));
+        let locks = view(&e.ve, "locks_for_owner", json!({"account_id":t.id()})).await?;
+        assert_eq!(locks.as_array().unwrap().len(), 1);
+        assert_eq!(locks[0]["amount"], json!((200u128 * 10u128.pow(18)).to_string()));
+    }
+    Ok(())
+}

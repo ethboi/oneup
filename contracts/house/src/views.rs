@@ -110,11 +110,11 @@ impl House {
     /// The bootstrap round (D-22): how much is backed, the target, and what backing `amount` now earns.
     pub fn get_backing(&self, amount: Option<U128>) -> Backing {
         let amount = amount.map_or(math::USDC, |a| a.0.max(1));
-        let cap_ppm = math::backer_cap_ppm(self.pool, amount);
+        let cap_ppm = math::backer_cap_ppm(self.pool + self.pending_backing, amount);
         Backing {
             backed: U128(self.seed),
             target: self.params.backing_target,
-            open: self.seed + math::MIN_BACKING <= self.params.backing_target.0,
+            open: self.closing.is_none() && !self.closing_requested && self.seed + self.pending_backing + math::MIN_BACKING <= self.params.backing_target.0,
             min: U128(math::MIN_BACKING),
             cap_ppm: U128(cap_ppm),
             owed: U128(math::owed(amount, cap_ppm)),

@@ -4,9 +4,11 @@
 // Losers' $1UP arrives here already locked. A summary with Claim all and Merge, then your locks as rows;
 // closed ones fold away. Leave early for a penalty, or sell a lock on the market.
 
+import { parseTokenAmount } from "@oneup/sdk";
 import { useEffect, useState } from "react";
 import { ONEUP, USDC, VE_MAX_EPOCHS, type LockInfo } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
+import { lockOrigin, lockCountdown } from "@/lib/locks";
 import { lockValue, useOneupPrice } from "@/lib/value";
 import { fmtOneup, fmtUsd } from "./Header";
 import { Icon } from "./Icon";
@@ -28,9 +30,7 @@ export function Locks() {
   // every lock's claimable in one poll
   const claimable =
     usePoll(async () => {
-      const out: Record<string, bigint> = {};
-      await Promise.all(locks.map(async (l) => (out[l.token_id] = BigInt(await o.veClaimable(l.token_id, past)))));
-      return out;
+      return o.veClaimables(locks.map(l => l.token_id), past);
     }, [locks.map((l) => l.token_id).join(), id]) ?? {};
   // buybacks land after their epoch ends; an epoch nobody is locked for passes its buyback to the next
   const recent = usePoll(
@@ -46,7 +46,7 @@ export function Locks() {
   const share = total > 0n ? Number((mine * 10_000n) / total) / 100 : 0;
   const toClaim = Object.entries(claimable).filter(([, v]) => v > 0n);
   const claimSum = toClaim.reduce((s, [, v]) => s + v, 0n);
-  const lossLocks = running.filter((l) => l.from_loss && id < l.end);
+  const rewardLocks = running.filter((l) => l.from_loss && id < l.end);
 
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_340px] lg:items-start">
@@ -83,14 +83,14 @@ export function Locks() {
             <PanelHead
               title={`Running (${running.length})`}
               action={
-                lossLocks.length >= 2 && (
+                rewardLocks.length >= 2 && (
                   <button
                     className="chip inline-flex items-center gap-1.5"
-                    onClick={() => run(`Merge ${lossLocks.length} loss-locks`, () => tx.mergeLocks(lossLocks.slice(0, 30).map((l) => l.token_id)))}
+                    onClick={() => run(`Merge ${rewardLocks.length} reward locks`, () => tx.mergeLocks(rewardLocks.slice(0, 30).map((l) => l.token_id)))}
                     title="One lock with the total amount, ending at the latest end. Claim first: it counts from next round."
                   >
                     <Icon name="merge" />
-                    Merge {lossLocks.length} loss-locks
+                    Merge {rewardLocks.length} reward locks
                   </button>
                 )
               }
@@ -136,7 +136,7 @@ function LockRow({ l, epoch, px, claimable, listings }: { l: LockInfo; epoch: nu
   const ended = epoch >= l.end;
   const penalty = BigInt(l.exit_penalty);
   const worth = px > 0n && !l.withdrawn ? lockValue(l, px) : null;
-  const origin = l.merged > 0 ? `Merged from ${l.merged} locks` : l.from_loss ? `From a loss in round ${l.created - 1}` : `Locked in round ${l.created}`;
+  const origin = lockOrigin(l);
   return (
     <div className="p-3 sm:p-4">
       {/* fixed widths on the right, as on Extra Lives, so the bars line up */}
@@ -160,7 +160,7 @@ function LockRow({ l, epoch, px, claimable, listings }: { l: LockInfo; epoch: nu
               : (
                   <>
                     <span className="block">
-                      Unlocks in round {l.end}, {left} to go
+                      {lockCountdown(l.end, epoch)}
                     </span>
                     <span className="block">Weight {fmtOneup(l.power)}</span>
                   </>
@@ -281,7 +281,7 @@ function LockForm({ px }: { px: bigint }) {
   const whole = wallet / ONEUP;
   const [amount, setAmount] = useState("");
   const [epochs, setEpochs] = useState(MAX);
-  const raw = BigInt(Math.floor(Number(amount) || 0)) * ONEUP;
+  const raw = parseTokenAmount(amount, 18);
   const over = raw > wallet;
   const years = epochs / 52;
   return (

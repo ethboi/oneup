@@ -85,7 +85,7 @@ export function EpochResults() {
   const { s, board } = round;
   const net = BigInt(s.house_net);
   const mine = (history?.items ?? []).filter((i) => i.kind === "trade" && i.t >= s.started_at * 1000 && i.t <= s.ended_at * 1000);
-  const myPnl = mine.reduce((a, i) => a + (i.kind === "trade" ? BigInt(i.trade.pnl) : 0n), 0n);
+  const myPnl = mine.reduce((a, i) => a + (i.kind === "trade" ? BigInt(i.trade.pnl) - BigInt(i.trade.cut ?? 0) : 0n), 0n);
   const lost = myPnl < 0n;
 
   return (
@@ -151,7 +151,7 @@ export function EpochResults() {
                   <div className="label">Best trade</div>
                   <b>{short(board.best.account)}</b>{" "}
                   <span className="num">
-                    {board.best.side} {board.best.market_id} {board.best.leverage}×, {Math.round((Number(board.best.pnl) / Number(board.best.margin)) * 100)}%
+                    {board.best.side} {board.best.market_id} {board.best.leverage}×, {Math.round((Number(BigInt(board.best.pnl) - BigInt(board.best.cut ?? 0)) / Number(board.best.margin)) * 100)}%
                   </span>
                 </div>
               )}

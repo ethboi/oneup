@@ -65,6 +65,8 @@ export interface Solvency {
 }
 
 export interface Epoch {
+  net_losses: U128;
+  fees: U128;
   id: number;
   started_at: number;
   losses: U128;
@@ -261,7 +263,7 @@ export class OneUp {
   listPositions = (from_index = 0, limit = 100) => this.house<Position[]>("list_positions", { from_index, limit });
   listOrders = (from_index = 0, limit = 100) => this.house<Order[]>("list_orders", { from_index, limit });
   pendingLife = (account_id: string) => this.house<U128>("get_pending_life", { account_id });
-  buyback = (epoch: number) => this.house<{ status: string; usdc: U128; oneup: U128 } | null>("get_buyback", { epoch });
+  buyback = (epoch: number) => this.house<{ status: "Pending" | "Swapping" | "Done" | { DeliveryPending: { remaining: U128 } } | { Delivering: { amount: U128 } }; usdc: U128; oneup: U128 } | null>("get_buyback", { epoch });
   emissions = (epoch: number) => this.house<EpochEmissions | null>("get_emissions", { epoch });
   emissionCarry = () => this.house<U128>("get_emission_carry");
   params = () =>
@@ -278,12 +280,29 @@ export class OneUp {
   // Other contracts
   price = (feedId: string) => this.view<OraclePrice | null>(this.d.contracts.oracle, "get_price_unsafe", { price_identifier: feedId });
   lives = (account_id: string) => this.view<LifeInfo[]>(this.d.contracts.life, "lives_for_owner", { account_id });
-  locks = (account_id: string) => this.view<LockInfo[]>(this.d.contracts.ve, "locks_for_owner", { account_id });
+  locks = async (account_id: string): Promise<LockInfo[]> => {
+    const locks: LockInfo[] = [];
+    let from_index: U128 | null = "0";
+    do {
+      const page: { locks: LockInfo[]; next_index: U128 | null } = await this.view(this.d.contracts.ve, "locks_for_owner_page", { account_id, from_index, limit: 100 });
+      locks.push(...page.locks);
+      from_index = page.next_index;
+    } while (from_index !== null);
+    return locks;
+  };
   lockInfo = (token_id: string) => this.view<LockInfo | null>(this.d.contracts.ve, "lock_info", { token_id });
   totalPower = (epoch: number) => this.view<U128>(this.d.contracts.ve, "get_total_power", { epoch });
   pendingPower = () => this.view<U128>(this.d.contracts.ve, "get_pending_power");
   lockRewards = (epoch: number) => this.view<U128>(this.d.contracts.ve, "get_rewards", { epoch });
   veClaimable = (token_id: string, epochs: number[]) => this.view<U128>(this.d.contracts.ve, "get_claimable", { token_id, epochs });
+  veClaimables = async (token_ids: string[], epochs: number[]): Promise<Record<string, bigint>> => {
+    const out: Record<string, bigint> = {};
+    for (let i = 0; i < token_ids.length; i += 20) {
+      const batch = await this.view<[string, U128][]>(this.d.contracts.ve, "get_claimable_many", { token_ids: token_ids.slice(i, i + 20), epochs });
+      for (const [id, amount] of batch) out[id] = BigInt(amount);
+    }
+    return out;
+  };
   lifeInfo = (token_id: string) => this.view<LifeInfo | null>(this.d.contracts.life, "life_info", { token_id });
   listings = () => this.view<Listing[]>(this.d.contracts.market, "get_listings", {});
   /** $1UP out for `usdc_in` on the swap (Rhea's stand-in). */
@@ -362,6 +381,7 @@ export class OneUp {
       hitStop: (position_id: number) => house<boolean>("hit_stop", { position_id }),
       closeEpoch: (limit = 10) => house<string>("close_epoch", { limit }, MAX_GAS),
       buyback: (epoch: number, min_out: bigint) => house<void>("buyback", { epoch, min_out: min_out.toString() }, MAX_GAS),
+      retryBuybackDelivery: (epoch: number) => house<void>("retry_buyback_delivery", { epoch }, MAX_GAS),
       /** At most 30 lives per call. */
       claimLives: (token_ids: string[]) =>
         send<void>({ contractId: c.life, methodName: "claim", args: { token_ids: token_ids.slice(0, 30) }, gas: MAX_GAS }),

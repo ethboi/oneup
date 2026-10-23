@@ -19,7 +19,8 @@ use near_sdk::{
 /** The most the house can take of a sale. */
 const MAX_FEE_PPM: u128 = 100_000;
 const GAS_NFT_TRANSFER: Gas = Gas::from_tgas(20);
-const GAS_ON_BOUGHT: Gas = Gas::from_tgas(25);
+const GAS_ON_BOUGHT: Gas = Gas::from_tgas(80);
+const GAS_BUY_OVERHEAD: Gas = Gas::from_tgas(20);
 const GAS_FT_TRANSFER: Gas = Gas::from_tgas(10);
 const GAS_ON_PAID: Gas = Gas::from_tgas(5);
 const MAX_LISTINGS_PAGE: u32 = 100;
@@ -123,13 +124,16 @@ impl Market {
         require!(price.0 == l.price.0, "Price changed");
         require!(amount.0 >= l.price.0, "Below the price");
         require!(sender_id != l.seller, "That's your own listing");
+        // Reserve settlement gas before the irreversible NFT receipt. Caller-selected gas must not
+        // make a later callback fail and refund a buyer who already owns the NFT.
+        require!(env::prepaid_gas().saturating_sub(env::used_gas()) >= GAS_NFT_TRANSFER.saturating_add(GAS_ON_BOUGHT).saturating_add(GAS_BUY_OVERHEAD), "Insufficient gas for purchase settlement");
         // taken down now so it can't be bought twice while the transfer is in flight
         self.listings.remove(&key);
         ext_nft::ext(nft_contract)
             .with_attached_deposit(NearToken::from_yoctonear(1))
             .with_static_gas(GAS_NFT_TRANSFER)
             .nft_transfer(sender_id.clone(), token_id, Some(l.approval_id), Some("OneUp market".into()))
-            .then(Self::ext(env::current_account_id()).with_static_gas(GAS_ON_BOUGHT).on_bought(l, sender_id, amount))
+            .then(Self::ext(env::current_account_id()).with_static_gas(GAS_ON_BOUGHT).with_unused_gas_weight(0).on_bought(l, sender_id, amount))
             .into()
     }
 

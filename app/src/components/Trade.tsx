@@ -1,5 +1,6 @@
 "use client";
 
+import { parseTokenAmount } from "@oneup/sdk";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ONEUP_PER_USDC,
@@ -27,6 +28,8 @@ import { AngryHeart, FallingCandles, PixelCoin, PixelHeart } from "./Pixel";
 import { Icon } from "./Icon";
 import { Popover } from "./Popover";
 import { useTilt } from "@/lib/tilt";
+import { reservedMargin } from "@/lib/account";
+import { priceInput as toPrice, triggerValues, editablePrice } from "@/lib/triggers";
 import { payFromChain } from "@/lib/intents";
 import { useRevengeFlash, useStreak } from "./Streaks";
 import { Burst, Gauge, MoodGlow, useCloseFx, useMood, useTensionSound } from "./Mood";
@@ -357,7 +360,7 @@ export function Trade() {
       </div>
       <div ref={formRef} id="order-form" className="order-3 flex flex-col gap-4">
         <OrderForm t={ticket} />
-        <Account t={ticket} positions={positions} />
+        <Account t={ticket} positions={positions} orders={orders} />
         {/* under the form on every screen: on a desktop it fills the column beside the tall chart */}
         <Jackpot compact />
       </div>
@@ -367,10 +370,10 @@ export function Trade() {
 }
 
 /** What you hold, as an exchange's account box sums it: your wallet, your balance in OneUp, the margin your
- *  positions lock up and what they'd pay if closed now. */
-function Account({ t, positions }: { t: Ticket; positions: Position[] }) {
+ *  positions and pending opens lock up and what positions would pay if closed now. */
+function Account({ t, positions, orders }: { t: Ticket; positions: Position[]; orders: Order[] }) {
   const { prices } = useOneUp();
-  const margin = positions.reduce((a, p) => a + BigInt(p.margin), 0n);
+  const margin = reservedMargin(positions, orders);
   const open = positions.reduce((a, p) => {
     const mark = prices[p.market_id];
     return mark ? a + afterCut(pnl(p.side, BigInt(p.margin), p.leverage, BigInt(p.entry_price), mark), p.cut_ppm) : a;
@@ -381,7 +384,7 @@ function Account({ t, positions }: { t: Ticket; positions: Position[] }) {
     <section className="panel p-4" aria-label="Account">
       <div className="ticket-row">
         <h3 className="font-extrabold">Account</h3>
-        <span className="num text-lg font-extrabold" title="Wallet, plus your balance in OneUp, plus your positions at the current mark">
+        <span className="num text-lg font-extrabold" title="Wallet, balance in OneUp, reserved order margin, and positions at the current mark">
           {usd(equity)}
         </span>
       </div>
@@ -549,7 +552,7 @@ function useTicket(market: string, maxLeverage: number) {
     setTp("");
     setSl("");
   }, [market, side]);
-  const m = BigInt(Math.floor(Number(margin) || 0)) * USDC;
+  const m = parseTokenAmount(margin, 6);
   const price = prices[market];
   const limitAt = orderType === "limit" ? toPrice(limitPrice) : null;
   // a limit's liquidation and the like are quoted from its limit price, where it would fill
@@ -565,7 +568,7 @@ function useTicket(market: string, maxLeverage: number) {
   // a trigger already past the price would fire on the first price after the hold: refuse it here
   const badTrigger = !!price && ((!!tpAt && targetHit(side, price, tpAt)) || (!!slAt && stopHit(side, price, slAt)));
   const blocked =
-    !quote?.allowed || m === 0n || (!viaAsset && topUp > wallet) || badTrigger || intentStep !== null || (orderType === "limit" && (!limitAt || !!viaAsset));
+    !triggerValues(tp, sl) || !quote?.allowed || m === 0n || (!viaAsset && topUp > wallet) || badTrigger || intentStep !== null || (orderType === "limit" && (!limitAt || !!viaAsset));
   const label = viaAsset
     ? `${side} ${market} with ${viaAsset.symbol} on ${viaAsset.chain}`
     : orderType === "limit"
@@ -1403,9 +1406,6 @@ const afterCut = (v: bigint, cutPpm: string) => (v > 0n ? v - (v * BigInt(cutPpm
 /** How far the mark is from a price, as a percentage of the mark. */
 const away = (mark: bigint, to: bigint) => `${((Math.abs(Number(to - mark)) / Number(mark)) * 100).toFixed(1)}%`;
 
-/** A typed price ("5.42") in 1e8 units, or null when blank or not a positive number. */
-const toPrice = (x: string) => (Number(x) > 0 ? numberToPrice(Number(x)) : null);
-
 /** Optional take-profit and stop-loss for a new order: prices, with what each would make or lose. */
 function TriggerFields(props: {
   side: Side;
@@ -1564,10 +1564,11 @@ function TriggerSummary({ p }: { p: Position }) {
 function EditTriggers({ p }: { p: Position }) {
   const { tx, run, prices } = useOneUp();
   const mark = prices[p.market_id];
-  const show = (x: string | null) => (x ? String(priceToNumber(BigInt(x))) : "");
+  const show = editablePrice;
   const [tp, setTp] = useState(show(p.triggers.take_profit));
   const [sl, setSl] = useState(show(p.triggers.stop_loss));
   const margin = BigInt(p.margin);
+  const edited = triggerValues(tp, sl);
   const liq = liquidationPrice(p.side, BigInt(p.entry_price), p.leverage);
   return (
     <Popover
@@ -1587,7 +1588,8 @@ function EditTriggers({ p }: { p: Position }) {
           <p className="label">Gains and losses shown from the current price. Fires on the next oracle price past it; blank clears.</p>
           <button
             className="btn btn-accent"
-            onClick={() => run(`Set TP / SL on #${p.id}`, () => tx.setTriggers(p.id, { takeProfit: toPrice(tp), stopLoss: toPrice(sl) })).then(close)}
+            disabled={!edited}
+            onClick={() => edited && run(`Set TP / SL on #${p.id}`, () => tx.setTriggers(p.id, edited)).then(close)}
           >
             Save
           </button>

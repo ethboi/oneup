@@ -115,7 +115,9 @@ spot pool, 50M treasury. No team or VC allocation. Each epoch releases 20 $1UP p
 that epoch's schedule plus anything unreleased before), shared across the epoch's losers by loss and delivered as
 **two-year locks**. Winners are paid in USDC instead. Releasing by house profit, and locking it, is what stops
 farming: a long and a short on yourself costs only the 10% cut, and `pnpm farm` shows it only pays once $1UP is
-worth tens of millions (it paid at $3M under the first design).
+worth hundreds of millions in the corrected same-wallet model (about $337M at 1× honest volume in
+the first 13 epochs for seed 1, versus $3.3M under the historical first design). These are model outputs, not
+a price forecast; real Sybil behaviour and trade flows can differ.
 
 **Locks.** Lock $1UP for up to 104 epochs. Each epoch's buyback is shared by weight: amount × epochs left ÷ 104.
 Leaving early costs up to half, less as the lock runs down, and the penalty goes to the people still locked. Or

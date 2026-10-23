@@ -23,6 +23,7 @@ pub struct Env {
     pub ve: Contract,
     pub swap: Contract,
     pub market: Contract,
+    pub vault: Contract,
     pub owner: Account,
     pub keeper: Account,
 }
@@ -36,6 +37,10 @@ pub async fn setup(epoch_length_s: u64) -> anyhow::Result<Env> {
 }
 
 pub async fn setup_with(epoch_length_s: u64, life_expiry_epochs: u64) -> anyhow::Result<Env> {
+    setup_with_fee(epoch_length_s, life_expiry_epochs, 0).await
+}
+
+pub async fn setup_with_fee(epoch_length_s: u64, life_expiry_epochs: u64, fee_ppm: u128) -> anyhow::Result<Env> {
     let worker = near_workspaces::sandbox().await?;
     let owner = worker.root_account()?;
     let keeper = worker.dev_create_account().await?;
@@ -47,6 +52,7 @@ pub async fn setup_with(epoch_length_s: u64, life_expiry_epochs: u64) -> anyhow:
     let ve = worker.dev_deploy(&wasm("oneup_ve")).await?;
     let swap = worker.dev_deploy(&wasm("mock_swap")).await?;
     let market = worker.dev_deploy(&wasm("oneup_market")).await?;
+    let vault = worker.dev_deploy(&wasm("mock_vault")).await?;
 
     usdc.call("new").args_json(json!({"owner": owner.id()})).transact().await?.into_result()?;
     oracle.call("new").args_json(json!({"owner": owner.id(), "pusher": keeper.id()})).transact().await?.into_result()?;
@@ -96,7 +102,7 @@ pub async fn setup_with(epoch_length_s: u64, life_expiry_epochs: u64) -> anyhow:
     owner.call(house.id(), "set_swap").args_json(json!({"swap": swap.id()})).transact().await?.into_result()?;
     market
         .call("new")
-        .args_json(json!({"usdc": usdc.id(), "nft_contracts": [life.id(), ve.id()]}))
+        .args_json(json!({"usdc": usdc.id(), "nft_contracts": [life.id(), ve.id()], "house": house.id(), "fee_ppm": fee_ppm.to_string()}))
         .transact()
         .await?
         .into_result()?;
@@ -107,8 +113,12 @@ pub async fn setup_with(epoch_length_s: u64, life_expiry_epochs: u64) -> anyhow:
         .await?
         .into_result()?;
 
+    vault.call("new").args_json(json!({"usdc": usdc.id(), "apr_ppm": "50000", "year_s": 52 * epoch_length_s})).transact().await?.into_result()?;
+    owner.call(house.id(), "set_vault").args_json(json!({"vault": vault.id()})).transact().await?.into_result()?;
+    owner.call(house.id(), "set_marketplace").args_json(json!({"marketplace": market.id()})).transact().await?.into_result()?;
+
     // register the contracts on USDC, then seed the pool with 100K
-    for id in [house.id(), life.id(), ve.id(), swap.id(), market.id()] {
+    for id in [house.id(), life.id(), ve.id(), swap.id(), market.id(), vault.id()] {
         owner.call(usdc.id(), "mint").args_json(json!({"receiver_id": id, "amount": "0"})).transact().await?.into_result()?;
     }
     owner.call(usdc.id(), "mint").args_json(json!({"receiver_id": owner.id(), "amount": usd(100_000)})).transact().await?.into_result()?;
@@ -121,7 +131,7 @@ pub async fn setup_with(epoch_length_s: u64, life_expiry_epochs: u64) -> anyhow:
         .await?
         .into_result()?;
 
-    Ok(Env { worker, usdc, oracle, life, house, oneup, ve, swap, market, owner, keeper })
+    Ok(Env { worker, usdc, oracle, life, house, oneup, ve, swap, market, vault, owner, keeper })
 }
 
 pub async fn push(e: &Env, cents: i64, publish_time: u64) -> anyhow::Result<()> {

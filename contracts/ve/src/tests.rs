@@ -453,3 +453,33 @@ fn late_buyback_through_a_merged_lock_pays_only_the_difference() {
     assert_eq!(sent(), 20 * ONEUP);
     assert_eq!(claimable(&v, &c, &[2]), 0);
 }
+
+
+#[test]
+fn pagination_reaches_locks_after_a_page_of_merged_nfts() {
+    let mut v = setup();
+    for _ in 0..102 { lock(&mut v, "alice", 1, 104); }
+    // Historical merged NFTs still occupy enumeration slots; a sparse page must retain its cursor.
+    for id in 1..=100 { v.locks.get_mut(&id.to_string()).unwrap().merged_into = Some("102".into()); }
+    let first = v.locks_for_owner_page(acc("alice"), None, Some(100));
+    assert!(first.locks.is_empty());
+    assert_eq!(first.next_index, Some(U128(100)));
+    let second = v.locks_for_owner_page(acc("alice"), first.next_index, Some(100));
+    assert_eq!(second.locks.len(), 2);
+    assert_eq!(second.next_index, None);
+    assert!(second.locks.iter().any(|l| l.token_id == "102"));
+    let batch = v.get_claimable_many(vec!["101".into(), "102".into()], vec![]);
+    assert_eq!(batch, vec![("101".into(), U128(0)), ("102".into(), U128(0))]);
+}
+
+#[test]
+fn pagination_finishes_at_exact_page_boundary_and_accepts_exhausted_cursor() {
+    let mut v = setup();
+    for _ in 0..100 { lock(&mut v, "alice", 1, 104); }
+    let page = v.locks_for_owner_page(acc("alice"), None, Some(100));
+    assert_eq!(page.locks.len(), 100);
+    assert_eq!(page.next_index, None);
+    let end = v.locks_for_owner_page(acc("alice"), Some(U128(100)), Some(100));
+    assert!(end.locks.is_empty());
+    assert_eq!(end.next_index, None);
+}

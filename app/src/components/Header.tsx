@@ -1,5 +1,6 @@
 "use client";
 
+import { parseTokenAmount } from "@oneup/sdk";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { previewTilt } from "@/lib/tilt";
 import { showBoot } from "./Boot";
@@ -151,7 +152,7 @@ function DemoMenu() {
   const treasury = usePoll(() => o.treasury(), [], 30_000);
   const jackpotNow = treasury?.jackpot && BigInt(treasury.jackpot) > 0n ? treasury.jackpot : undefined;
   const [amount, setAmount] = useState("10000");
-  const amt = BigInt(Math.floor(Number(amount) || 0)) * USDC;
+  const amt = parseTokenAmount(amount, 6);
   return (
     <Popover
       label="Demo tools"
@@ -247,7 +248,7 @@ function AccountMenu() {
   const wallet = usePoll(() => o.usdcBalance(me), [me]);
   const oneup = usePoll(() => o.oneupBalance(me), [me]);
   const [amount, setAmount] = useState("1000");
-  const amt = BigInt(Math.floor(Number(amount) || 0)) * USDC;
+  const amt = parseTokenAmount(amount, 6);
   return (
     <Popover
       label="Account and funds"
@@ -311,7 +312,7 @@ function ChainDeposit() {
   const held = usePoll(() => intentsBalances(o, d, me), [me], 5000);
   if (!d.intents) return null;
   const a = assets.find((x) => x.token === token)!;
-  const usdc = BigInt(Math.floor(Number(amount) || 0)) * USDC;
+  const usdc = parseTokenAmount(amount, 6);
   const leftovers = Object.entries(held ?? {}).filter(([, v]) => v > 0n);
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-[var(--line)] p-3">

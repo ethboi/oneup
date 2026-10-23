@@ -125,3 +125,40 @@ async fn a_listing_cannot_change_under_the_buyer() -> anyhow::Result<()> {
     assert_eq!(usdc(&e, &dave).await?, 1_000 * USDC);
     Ok(())
 }
+
+
+#[tokio::test]
+async fn buyer_gas_cannot_separate_nft_delivery_from_payment() -> anyhow::Result<()> {
+    let e = setup_with_fee(5, 13, 20_000).await?;
+    let seller = e.owner.create_subaccount("seller").initial_balance(NearToken::from_near(10)).transact().await?.into_result()?;
+    let buyer = e.owner.create_subaccount("buyer").initial_balance(NearToken::from_near(10)).transact().await?.into_result()?;
+    register(&e.owner, &e.oneup, seller.id().as_str()).await?;
+    seller.call(e.usdc.id(), "faucet").args_json(json!({"amount": usd(1)})).transact().await?.into_result()?;
+    buyer.call(e.usdc.id(), "faucet").args_json(json!({"amount": usd(1000)})).transact().await?.into_result()?;
+    transfer(&e.owner, &e.oneup, seller.id().as_str(), (1000u128 * 10u128.pow(18)).to_string()).await?;
+    for gas in [80, 100, 140, 155, 160, 180, 300] {
+        transfer_call(&seller, &e.oneup, e.ve.id().as_str(), (10u128.pow(18)).to_string(), r#"{"lock":{"epochs":52}}"#).await?;
+        let locks = view(&e.ve, "locks_for_owner", json!({"account_id": seller.id()})).await?;
+        let id = locks.as_array().unwrap().last().unwrap()["token_id"].as_str().unwrap().to_string();
+        list(&e, &seller, &e.ve, &id, 100).await?;
+        let before_buyer = usdc(&e, &buyer).await?;
+        let before_seller = usdc(&e, &seller).await?;
+        let before_pool: u128 = view(&e.house, "get_pool", json!({})).await?.as_str().unwrap().parse()?;
+        let msg = json!({"buy":{"nft_contract":e.ve.id(),"token_id":id,"price":usd(100)}}).to_string();
+        let _ = buyer.call(e.usdc.id(), "ft_transfer_call").args_json(json!({"receiver_id":e.market.id(),"amount":usd(120),"msg":msg})).deposit(NearToken::from_yoctonear(1)).gas(near_workspaces::types::Gas::from_tgas(gas)).transact().await?;
+        let owner = owner_of(&e.ve, &id).await?;
+        if owner == buyer.id().as_str() {
+            assert_eq!(before_buyer - usdc(&e, &buyer).await?, 100 * USDC, "gas {gas}: buyer pays");
+            assert_eq!(usdc(&e, &seller).await? - before_seller, 98 * USDC, "gas {gas}: seller paid");
+            let after_pool: u128 = view(&e.house, "get_pool", json!({})).await?.as_str().unwrap().parse()?;
+            assert_eq!(after_pool - before_pool, 2 * USDC, "gas {gas}: fee reaches house");
+        } else {
+            assert_eq!(owner, seller.id().as_str());
+            assert_eq!(usdc(&e, &buyer).await?, before_buyer, "gas {gas}: rejected buy refunded");
+            assert_eq!(usdc(&e, &seller).await?, before_seller);
+            assert_ne!(gas, 300, "ordinary max-gas purchase must succeed");
+        }
+        assert_eq!(view(&e.usdc, "ft_balance_of", json!({"account_id":e.market.id()})).await?, json!("0"));
+    }
+    Ok(())
+}

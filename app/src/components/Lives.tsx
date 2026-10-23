@@ -4,7 +4,7 @@
 // sorted by what they can still pay. Finished ones (fully healed or expired) fold away.
 
 import { useState } from "react";
-import { emissionsForEpoch, fmtUsdc, ppmToNumber, releasedEmissions, type LifeInfo, type Listing } from "@oneup/sdk";
+import { fmtUsdc, ppmToNumber, previewLossEmission, type LifeInfo, type Listing } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { lifeValue } from "@/lib/value";
 import { fmtClock, fmtOneup, fmtUsd as money, useNow } from "./Header";
@@ -93,13 +93,12 @@ function NextLife({ epochId, left }: { epochId?: number; left: number }) {
   const pending = usePoll(() => o.pendingLife(me), [me]);
   const carry = usePoll(() => o.emissionCarry(), []);
   const epoch = usePoll(() => o.epoch(), []);
+  const params = usePoll(() => o.params(), []);
   const now = useNow();
   const lost = pending ? BigInt(pending) : 0n;
   let oneup = 0n;
   if (epoch && carry !== undefined && lost > 0n) {
-    const losses = BigInt(epoch.losses);
-    const net = losses > BigInt(epoch.payouts) ? losses - BigInt(epoch.payouts) : 0n;
-    oneup = losses > 0n ? (releasedEmissions(BigInt(carry) + emissionsForEpoch(BigInt(epoch.id)), net) * lost) / losses : 0n;
+    oneup = previewLossEmission(epoch, BigInt(carry), lost, BigInt(params?.oneup_per_usdc ?? 20));
   }
   return (
     <div className="flex items-center gap-3 bg-[var(--panel-2)] px-4 py-3">

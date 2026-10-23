@@ -177,3 +177,17 @@ checks (maths §2), so the fill rules don't depend on the oracle's 60 s threshol
 - Testnet: `mock-oracle` (D-6). Outlayer `price-oracle-pyth.testnet` is stale. `mock-oracle` implements
   the calls above plus `push_prices([{feed_id, price, conf, expo, publish_time}])` (pusher only). It
   rejects a `publish_time` that isn't newer than the stored one.
+
+
+### Follow-up recovery and paging interfaces
+
+- House `retry_buyback_delivery(epoch)` is owner/operator-only and accepts only `DeliveryPending` state.
+  `Delivering` prevents overlapping retries; callback results are amounts used, and only refunded proceeds
+  remain pending. Existing `Pending`, `Swapping`, and `Done` enum encodings are preserved.
+- ve `locks_for_owner_page(account_id, from_index?, limit?)` returns `{ locks, next_index }`; the cursor
+  advances over raw owned NFTs before filtering merged NFTs. A page may have no locks and a non-null
+  cursor. SDK `locks()` exhausts cursors. `get_claimable_many(token_ids, epochs)` supports at most 30 locks;
+  SDK batches claimability requests in groups of 20.
+- `close_epoch` can return `waiting for backing`, `waiting for pot`, and `drawing jackpot` as well as
+  existing progress strings. Continue until `closed`. New backing is refused while a close is requested
+  or active. The bootstrap quote includes pending reservations when determining capacity and cap.

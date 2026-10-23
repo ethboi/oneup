@@ -51,6 +51,7 @@ impl House {
     /// After a backer's `lock_for` transfer: anything `ve` didn't take goes back to the backers' allocation.
     #[private]
     pub fn on_backer_lock(&mut self, amount: U128, #[callback_result] used: Result<U128, PromiseError>) -> U128 {
+        self.pending_backer_locks = self.pending_backer_locks.saturating_sub(1);
         let back = amount.0 - used.map_or(0, |u| u.0.min(amount.0));
         self.backer_oneup += back;
         if back > 0 {
@@ -148,12 +149,11 @@ impl House {
 
     /// Locks a backer's $1UP for two years, like a loser's (D-26). What `ve` doesn't take goes back to the
     /// allocation.
-    pub(crate) fn lock_for_backer(&mut self, account: AccountId, usdc: u128) {
-        let amount = self.backer_oneup_for(usdc);
+    pub(crate) fn lock_for_backer(&mut self, account: AccountId, amount: u128) {
         if amount == 0 {
             return;
         }
-        self.backer_oneup -= amount;
+        self.pending_backer_locks += 1;
         let msg = near_sdk::serde_json::json!({ "lock_for": { "items": [[account, U128(amount)]] } }).to_string();
         ext_ft::ext(self.oneup.clone().expect("oneup"))
             .with_attached_deposit(NearToken::from_yoctonear(1))

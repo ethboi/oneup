@@ -446,3 +446,14 @@ changes; only new opens are checked against it.
   `usdc.fakes.testnet`. → D-8. Source: [Circle USDC addresses](https://developers.circle.com/stablecoins/usdc-contract-addresses).
 - **R-5 · Rhea testnet.** `ref-finance-101.testnet` per Ref's UI config; repo last updated Nov 2024, no
   current Rhea doc. → D-9. Source: [ref-ui config](https://github.com/ref-finance/ref-ui/blob/main/src/services/config.ts).
+
+
+### Review correction, 23 October 2026: farming and current allocation
+
+The historical D-16 table is retained as a record of the earlier model. The corrected `pnpm farm` floors
+nonpositive house profit at zero and credits a same-wallet long/short farmer only its net loss (the cut),
+not its gross losing leg. For seed 1, 20 $1UP per USDC of house profit and farmer volume equal to honest
+loss volume, its break-even FDV is approximately $337M in the first 13 epochs and $546M in year 2.
+These are scenario-model outputs, not a forecast or a proof that all farming strategies are unprofitable.
+The canonical maths now uses positive wallet net losses, includes marketplace fees, and tests the
+actual loser/backer split rather than the pre-D-26 vector.

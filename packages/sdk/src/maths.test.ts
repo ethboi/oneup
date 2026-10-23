@@ -63,3 +63,27 @@ describe("maths vectors", () => {
     expect(m.fmtUsdc(-500_000n)).toBe("-0.50");
   });
 });
+
+
+it("loser previews use wallet net losses, market fees and the configured rate", () => {
+  const epoch = { id: 1, losses: usd(200).toString(), payouts: usd(90).toString(), net_losses: usd(110).toString(), fees: "0" };
+  expect(m.previewLossEmission(epoch, 0n, usd(10))).toBe(200n * m.ONEUP);
+  expect(m.previewLossEmission(epoch, 0n, usd(100))).toBe(2000n * m.ONEUP);
+  expect(m.previewLossEmission({ ...epoch, fees: usd(11).toString() }, 0n, usd(10), 10n)).toBe(110n * m.ONEUP);
+  expect(m.releasedEmissions(100n * m.ONEUP, -usd(1))).toBe(0n);
+});
+
+
+it("form amounts are exact, finite, nonnegative and bounded to u128", () => {
+  expect(m.parseTokenAmount("1.000001", 6)).toBe(1000001n);
+  expect(m.parseTokenAmount("0.000000000000000001", 18)).toBe(1n);
+  expect(m.parseTokenAmount(".5", 6)).toBe(500000n);
+  for (const text of ["Infinity", "1e999", "NaN", "-1", "0.0000001", "9".repeat(80)]) expect(m.parseTokenAmount(text, 6)).toBe(0n);
+  expect(m.numberToPrice(Infinity)).toBe(0n);
+});
+
+it("history, share cards and rankings use the profit actually retained after the winner cut", () => {
+  expect(m.netTradePnl({ pnl: "55000000", cut: "5544000" })).toBe(49456000n);
+  expect(m.netTradePnl({ pnl: "-500000000", cut: "0" })).toBe(-500000000n);
+  expect(m.netTradePnl({ pnl: "-100" })).toBe(-100n);
+});

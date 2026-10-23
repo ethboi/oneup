@@ -5,6 +5,7 @@
 
 import { Account, type KeyPairString } from "near-api-js";
 import { sfx } from "./sound";
+import { pollSerial } from "./poll";
 import { loadSession, sessionSender, type Session } from "./session";
 import { OneUp, accountSender, normalizePrice, type Deployment } from "@oneup/sdk";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -159,8 +160,7 @@ function Loaded({ d, children }: { d: Deployment; children: ReactNode }) {
         return out;
       });
     };
-    tick();
-    const i = setInterval(tick, 1000);
+    const stop = pollSerial(tick, () => {}, 1000);
     // the server has been watching too: start the chart from its last 30 minutes rather than empty
     fetch("/api/prices")
       .then((r) => (r.ok ? r.json() : {}))
@@ -179,7 +179,7 @@ function Loaded({ d, children }: { d: Deployment; children: ReactNode }) {
       .catch(() => {});
     return () => {
       live = false;
-      clearInterval(i);
+      stop();
     };
   }, [o]);
 
@@ -190,19 +190,12 @@ function Loaded({ d, children }: { d: Deployment; children: ReactNode }) {
 /** Polls `f` every `ms` and whenever `deps` or the transaction version change. */
 export function usePoll<T>(f: () => Promise<T>, deps: unknown[], ms = 2000): T | undefined {
   const { version } = useOneUp();
-  const [v, setV] = useState<T>();
-  useEffect(() => {
-    let live = true;
-    const tick = () => f().then((x) => live && setV(x)).catch(() => {});
-    tick();
-    const i = setInterval(tick, ms);
-    return () => {
-      live = false;
-      clearInterval(i);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [...deps, version, ms]);
-  return v;
+  // Identity changes invalidate the old value during render, before effects can run.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const identity = useMemo(() => ({}), deps);
+  const [snapshot, setSnapshot] = useState<{ identity: object; value: T }>();
+  useEffect(() => pollSerial(f, value => setSnapshot({ identity, value }), ms), [identity, version, ms]);
+  return snapshot?.identity === identity ? snapshot.value : undefined;
 }
 
 function cleanError(e: unknown): string {

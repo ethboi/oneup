@@ -42,6 +42,7 @@ fn setup(seed: u128) -> House {
     h.set_swap(acc("swap"));
     ctx("usdc", T0);
     let _ = h.ft_on_transfer(acc("owner"), U128(seed), r#"{"seed":{}}"#.into());
+    h.on_backer_minted(acc("owner"), U128(seed), U128(oneup_math::PPM), U128(0), Ok("b1".into()));
     h
 }
 
@@ -292,8 +293,17 @@ fn close_epoch_fully(h: &mut House) -> u32 {
     let mut steps = 0;
     loop {
         steps += 1;
+        let before = h.pool;
+        let reserve = oneup_math::reserve(h.liability, h.reserve_floor());
         match h.close_epoch(Some(2)).as_str() {
-            "closed" => return steps,
+            "closed" => {
+                if before >= reserve { assert!(h.pool >= reserve); } else { assert_eq!(h.pool, before); }
+                if h.pending_pots > 0 {
+                    let amount = h.get_epoch_summary(h.epoch.id - 1).unwrap().lives_pot;
+                    assert!(h.on_pot(amount, Ok(amount)));
+                }
+                return steps;
+            },
             "waiting for mints" => {
                 // lives and loser locks both land through a callback that counts one pending batch down
                 for _ in 0..h.get_closing().unwrap().pending_mints {
@@ -493,6 +503,8 @@ fn new_markets_get_half_the_pool() {
     h.set_life(acc("life"));
     ctx("usdc", T0);
     let _ = h.ft_on_transfer(acc("owner"), U128(usd(100_000)), r#"{"seed":{}}"#.into());
+    ctx("house", T0);
+    h.on_backer_minted(acc("owner"), U128(usd(100_000)), U128(oneup_math::PPM), U128(0), Ok("seed".into()));
     assert_eq!(h.get_markets()[0].capacity_ppm.0, 500_000);
     // 6_000 margin → 54K of max wins, past half of the 100K pool
     let q = h.quote_open(MARKET.into(), Side::Long, U128(usd(6_000)), 2, Some(U128(500_000_000)));
@@ -532,6 +544,8 @@ fn buyback_goes_to_lockers() {
     // proceeds arrive and are forwarded to ve
     ctx("oneup", T0 + 701);
     let _ = h.ft_on_transfer(acc("swap"), U128(1_000_000), r#"{"buyback_proceeds":{"epoch":1}}"#.into());
+    assert_eq!(h.get_buyback(1).unwrap().status, crate::BuybackStatus::Delivering { amount: U128(1_000_000) });
+    assert!(h.on_buyback_delivered(1, U128(1_000_000), Ok(U128(1_000_000))));
     let bb = h.get_buyback(1).unwrap();
     assert_eq!((bb.status, bb.oneup.0), (crate::BuybackStatus::Done, 1_000_000));
 }
@@ -604,7 +618,7 @@ mod invariants {
             })
             .sum();
         let positions: u128 = h.positions.values().map(|p| p.margin.0).sum();
-        h.pool + balances + orders + positions + h.buyback_usdc + h.lives_paid
+        h.pool + h.pending_backing + balances + orders + positions + h.buyback_usdc + h.lives_paid
     }
 
     proptest! {
@@ -683,7 +697,10 @@ mod invariants {
                     Op::Back { who, amount } => {
                         // backing is new money from outside: the wallet's deposit, straight to the pool
                         ctx("usdc", t);
+                        let cap = oneup_math::backer_cap_ppm(h.pool, amount);
                         let _ = h.ft_on_transfer(acc(WHO[who]), U128(amount), r#"{"back":{}}"#.into());
+                        ctx("house", t);
+                        h.on_backer_minted(acc(WHO[who]), U128(amount), U128(cap), U128(0), Ok("backer".into()));
                         total += amount;
                     }
                 }
@@ -691,7 +708,7 @@ mod invariants {
                 prop_assert_eq!(net, h.epoch.net_losses.0);
                 prop_assert_eq!(total_held(&h), total);
                 prop_assert!(h.liability <= h.pool, "liability {} > pool {}", h.liability, h.pool);
-                prop_assert!(h.pool >= oneup_math::reserve(h.liability, h.reserve_floor()).min(h.pool));
+                // Reserve preservation is checked at distribution in close_epoch_fully, not after trades.
                 let sum: u128 = h.markets.values().map(|m| h.market_liability(m)).sum();
                 prop_assert_eq!(sum, h.liability);
             }
@@ -1043,6 +1060,8 @@ fn anyone_can_back_the_pool() {
     ctx("usdc", T0);
     let _ = h.ft_on_transfer(acc("bob"), U128(usd(10_000)), r#"{"back":{}}"#.into());
     let cap = oneup_math::backer_cap_ppm(usd(25_000), usd(10_000));
+    ctx("house", T0);
+    h.on_backer_minted(acc("bob"), U128(usd(10_000)), U128(cap), U128(0), Ok("b2".into()));
     assert_eq!(cap, 1_976_000); // the average of 1.98× at 25K and 1.972× at 35K
     assert_eq!(h.get_pool().0, usd(35_000));
     assert_eq!(h.reserve_floor(), usd(35_000)); // only ever paid back from profit
@@ -1077,9 +1096,9 @@ fn a_failed_backer_mint_returns_the_backing() {
     ctx("usdc", T0);
     let _ = h.ft_on_transfer(acc("bob"), U128(usd(1_000)), r#"{"back":{}}"#.into());
     let owed = h.lives_owed;
-    let _ = h.on_backer_minted(acc("bob"), U128(usd(1_000)), U128(usd(1_970)), Err(near_sdk::PromiseError::Failed));
+    let _ = h.on_backer_minted(acc("bob"), U128(usd(1_000)), U128(1_970_000), U128(0), Err(near_sdk::PromiseError::Failed));
     assert_eq!((h.pool, h.seed), (usd(25_000), usd(25_000)));
-    assert_eq!(h.lives_owed, owed - usd(1_970));
+    assert_eq!(h.lives_owed, owed);
     assert_eq!(h.get_balance(acc("bob")).0, usd(1_000));
 }
 
@@ -1088,6 +1107,8 @@ fn the_owner_can_seed_twice() {
     let mut h = setup(usd(25_000));
     ctx("usdc", T0);
     let _ = h.ft_on_transfer(acc("owner"), U128(usd(5_000)), r#"{"seed":{}}"#.into());
+    ctx("house", T0);
+    h.on_backer_minted(acc("owner"), U128(usd(5_000)), U128(oneup_math::PPM), U128(0), Ok("seed".into()));
     // both seeds are owed back at 1.0×
     assert_eq!((h.seed, h.lives_owed), (usd(30_000), usd(30_000)));
 }
@@ -1109,6 +1130,10 @@ fn a_backing_locks_its_oneup_from_the_allocation() {
     assert_eq!(h.get_backing(None).oneup_left.0, 50_000 * ONEUP_UNIT);
     // the next backer gets what's left, not more
     assert_eq!(h.get_backing(Some(U128(usd(10_000)))).oneup.0, 50_000 * ONEUP_UNIT);
+    // A successful life mint activates backing and starts its reserved token lock.
+    ctx("house", T0);
+    assert!(h.on_backer_minted(acc("bob"), U128(usd(10_000)), U128(1_976_000), U128(100_000 * ONEUP_UNIT), Ok("b2".into())));
+    assert_eq!(h.pending_backer_locks, 1);
     // a lock ve refused comes back to the allocation
     ctx("house", T0);
     h.on_backer_lock(U128(100_000 * ONEUP_UNIT), Err(near_sdk::PromiseError::Failed));
@@ -1440,4 +1465,160 @@ fn leverage_above_the_markets_cap_is_refused() {
     deposit(&mut h, "alice", usd(100));
     ctx("alice", T0);
     h.place_open(MARKET.into(), Side::Long, U128(usd(100)), 500, None, None);
+}
+
+fn pending_delivery() -> House {
+    let mut h = setup(usd(25_000));
+    h.record_buyback(&crate::Epoch { id: 1, ..Default::default() }, usd(100));
+    h.buybacks.get_mut(&1).unwrap().status = crate::BuybackStatus::Swapping;
+    ctx("oneup", T0 + 1);
+    let _ = h.ft_on_transfer(acc("swap"), U128(1000), r#"{"buyback_proceeds":{"epoch":1}}"#.into());
+    h
+}
+
+#[test]
+fn failed_and_partial_buyback_delivery_can_retry_only_refunded_tokens() {
+    let mut h = pending_delivery();
+    assert!(!h.on_buyback_delivered(1, U128(1000), Err(near_sdk::PromiseError::Failed)));
+    assert_eq!(h.get_buyback(1).unwrap().status, crate::BuybackStatus::DeliveryPending { remaining: U128(1000) });
+    ctx("owner", T0 + 2);
+    h.retry_buyback_delivery(1);
+    assert!(!h.on_buyback_delivered(1, U128(1000), Ok(U128(600))));
+    assert_eq!(h.get_buyback(1).unwrap().status, crate::BuybackStatus::DeliveryPending { remaining: U128(400) });
+    ctx("owner", T0 + 3);
+    h.retry_buyback_delivery(1);
+    assert_eq!(h.get_buyback(1).unwrap().status, crate::BuybackStatus::Delivering { amount: U128(400) });
+    assert!(h.on_buyback_delivered(1, U128(400), Ok(U128(400))));
+    assert_eq!(h.get_buyback(1).unwrap().oneup, U128(1000));
+    assert_eq!(h.get_buyback(1).unwrap().status, crate::BuybackStatus::Done);
+}
+
+#[test]
+fn rejected_buyback_delivery_is_still_owed() {
+    let mut h = pending_delivery();
+    assert!(!h.on_buyback_delivered(1, U128(1000), Ok(U128(0))));
+    assert_eq!(h.get_buyback(1).unwrap().status, crate::BuybackStatus::DeliveryPending { remaining: U128(1000) });
+}
+
+#[test]
+#[should_panic(expected = "No delivery to retry")]
+fn buyback_cannot_retry_while_delivery_is_in_flight() {
+    let mut h = pending_delivery();
+    ctx("owner", T0 + 2);
+    h.retry_buyback_delivery(1);
+}
+
+#[test]
+#[should_panic(expected = "Only the owner or operator")]
+fn buyback_delivery_retry_requires_operator() {
+    let mut h = pending_delivery();
+    assert!(!h.on_buyback_delivered(1, U128(1000), Ok(U128(0))));
+    ctx("alice", T0 + 2);
+    h.retry_buyback_delivery(1);
+}
+
+#[test]
+fn old_buyback_status_encoding_is_preserved() {
+    assert_eq!(near_sdk::borsh::to_vec(&crate::BuybackStatus::Pending).unwrap(), vec![0]);
+    assert_eq!(near_sdk::borsh::to_vec(&crate::BuybackStatus::Swapping).unwrap(), vec![1]);
+    assert_eq!(near_sdk::borsh::to_vec(&crate::BuybackStatus::Done).unwrap(), vec![2]);
+}
+
+
+#[test]
+fn pending_backing_is_not_spendable_or_rewarded_and_failed_mint_restores_reservations() {
+    let mut h = setup(usd(25_000));
+    h.backer_oneup = 20_000 * ONEUP;
+    ctx("usdc", T0);
+    let _ = h.ft_on_transfer(acc("bob"), U128(usd(1000)), r#"{"back":{}}"#.into());
+    assert_eq!(h.pool, usd(25_000));
+    assert_eq!(h.pending_backing, usd(1000));
+    assert_eq!(h.lives_owed, usd(25_000));
+    assert_eq!(h.pending_backer_locks, 0);
+    assert_eq!(h.backer_oneup, 10_000 * ONEUP);
+    ctx("keeper", T0 + 600);
+    assert_eq!(h.close_epoch(None), "waiting for backing");
+    assert!(!h.get_backing(None).open);
+    assert!(!h.on_backer_minted(acc("bob"), U128(usd(1000)), U128(1_979_600), U128(10_000 * ONEUP), Err(near_sdk::PromiseError::Failed)));
+    assert_eq!(h.pool, usd(25_000));
+    assert_eq!(h.pending_backing, 0);
+    assert_eq!(h.backer_oneup, 20_000 * ONEUP);
+    assert_eq!(h.pending_backer_locks, 0);
+    assert_eq!(h.get_balance(acc("bob")).0, usd(1000));
+    close_epoch_fully(&mut h);
+}
+
+#[test]
+#[should_panic(expected = "Backing paused during epoch close")]
+fn backing_cannot_race_an_expiry_snapshot() {
+    let mut h = setup(usd(25_000));
+    ctx("keeper", T0 + 600);
+    h.close_epoch(None);
+    ctx("usdc", T0 + 601);
+    let _ = h.ft_on_transfer(acc("bob"), U128(usd(1000)), r#"{"back":{}}"#.into());
+}
+
+#[test]
+fn pending_target_and_caps_include_all_reserved_backing() {
+    let mut h = setup(usd(25_000));
+    ctx("usdc", T0);
+    let _ = h.ft_on_transfer(acc("bob"), U128(usd(1000)), r#"{"back":{}}"#.into());
+    let quote = h.get_backing(Some(U128(usd(1000))));
+    assert_eq!(quote.cap_ppm.0, oneup_math::backer_cap_ppm(usd(26_000), usd(1000)));
+    h.params.backing_target = U128(usd(26_000));
+    assert!(!h.get_backing(None).open);
+}
+
+#[test]
+fn partial_pot_refund_restores_only_refunded_debt_and_closing_waits_for_old_pots() {
+    let mut h = setup(usd(25_000));
+    h.lives_owed = 600;
+    h.lives_paid = 400;
+    h.pending_pots = 1;
+    ctx("keeper", T0 + 600);
+    assert_eq!(h.close_epoch(None), "waiting for pot");
+    assert!(!h.on_pot(U128(400), Ok(U128(399))));
+    assert_eq!(h.lives_owed, 601);
+    assert_eq!(h.lives_paid, 399);
+    assert_eq!(h.pending_pots, 0);
+    assert_eq!(h.close_epoch(None), "begun");
+}
+
+#[test]
+fn jackpot_draw_is_bounded_resumable_and_preserves_later_harvest() {
+    let mut h = setup(usd(25_000));
+    for i in 0..101 { h.add_tickets(&acc(&format!("trader{i}")), 100); }
+    h.jackpot = usd(500);
+    let mut draw = None;
+    assert!(!h.draw_jackpot(4, &mut draw, 10));
+    assert_eq!(h.tickets.len(), 91);
+    assert_eq!(h.jackpot, 0);
+    h.on_harvested(Ok(U128(usd(25))));
+    let target = draw.as_ref().unwrap().target;
+    for _ in 0..9 { assert!(!h.draw_jackpot(4, &mut draw, 10)); assert_eq!(draw.as_ref().unwrap().target, target); }
+    assert!(h.draw_jackpot(4, &mut draw, 10));
+    let total: u128 = (0..101).map(|i| h.get_balance(acc(&format!("trader{i}"))).0).sum();
+    assert_eq!(total, usd(500));
+    assert_eq!(h.jackpot, usd(25));
+    assert_eq!(h.tickets_total, 0);
+    assert!(h.tickets.is_empty());
+}
+
+
+#[test]
+fn a_frozen_jackpot_finishes_even_if_future_draws_are_disabled() {
+    let mut h = setup(usd(25_000));
+    h.params.jackpot_epochs = 1;
+    h.jackpot = usd(100);
+    for i in 0..21 { h.add_tickets(&acc(&format!("player{i}")), 1); }
+    ctx("keeper", T0 + 600);
+    assert_eq!(h.close_epoch(None), "begun");
+    assert_eq!(h.close_epoch(None), "expiring");
+    h.on_expired(Ok(U128(h.lives_owed)));
+    assert_eq!(h.close_epoch(Some(3)), "drawing jackpot");
+    assert_eq!(h.tickets.len(), 18);
+    h.params.jackpot_epochs = 0;
+    close_epoch_fully(&mut h);
+    assert!(h.tickets.is_empty());
+    assert_eq!((0..21).map(|i| h.get_balance(acc(&format!("player{i}"))).0).sum::<u128>(), usd(100));
 }

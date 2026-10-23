@@ -285,6 +285,11 @@ pub struct House {
     tickets_total: u128,
     /// D-28: the marketplace whose sales pay the house a cut.
     marketplace: Option<AccountId>,
+    /// Backing capital is unavailable for trading until its Backer Life mint succeeds.
+    pending_backing: u128,
+    pending_backer_locks: u32,
+    pending_pots: u32,
+    closing_requested: bool,
 }
 
 pub(crate) fn now_s() -> u64 {
@@ -332,6 +337,10 @@ impl House {
             tickets: IterableMap::new(StorageKey::Tickets),
             tickets_total: 0,
             marketplace: None,
+            pending_backing: 0,
+            pending_backer_locks: 0,
+            pending_pots: 0,
+            closing_requested: false,
         }
     }
 

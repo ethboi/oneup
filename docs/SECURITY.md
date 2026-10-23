@@ -13,7 +13,7 @@ sequences of opens, closes, fills, liquidations, triggers, backings, expiries an
 ([`conservation_and_solvency`](../contracts/house/src/tests.rs)):
 
 - **No USDC is created or lost.** The house holds exactly pool + free balances + pending and open margins
-  + buyback USDC + what it has sent to Extra Lives.
+  + buyback USDC + pending backing + what it has sent to Extra Lives.
 - **The pool covers every open position's max win** (D-1): liability ≤ pool, and the epoch payout never
   takes the pool below 1.2 × liability or below the total seeded.
 - **Liability is the sum of the markets'**, kept in step on every open, fill, expiry and close.
@@ -30,14 +30,13 @@ received and no life claims more than it was paid.
 | Role | Account on localnet | Can | Can't |
 |---|---|---|---|
 | Owner | Sputnik DAO (D-20) | List, pause and size markets; set the oracle, swap, params, keeper, operator, Intents Verifier; hand over ownership | Touch traders' balances or positions directly |
-| Operator | root | Run buybacks with a minimum price (D-10) | Anything else the owner does |
+| Operator | root | Run buybacks and retry delivery; fill, take profit at cap, and deploy pool capital through the shared keeper gate | Owner-only configuration |
 | Keeper | `keeper.test.near` | Fill orders, take profit at the 9× cap (D-23); push prices through a separate key that can only call the oracle; deploy pool USDC to the vault up to the contract's limit (D-27) | Pick a fill price older than the order or outside the window; move funds anywhere but the vault |
 | Anyone | – | Liquidate, place a close for a crossed trigger, expire a stale order, close an epoch, back the pool | Fill an order or take profit while a keeper is set |
 | NEAR Intents Verifier | `intents.test.near` | Deposit USDC naming the account it's for (D-21) | Open a trade larger than the deposit it brings |
 | Session key | browser | Open, close and set triggers on the house, with no deposit (gasless through the relayer) | Deposit, withdraw or move tokens |
 
-Contract accounts have no access keys after deploy (`scripts/deploy.ts` deletes them), so nobody can
-redeploy a contract. Each account the deploy creates has its own key. The browser gets only the demo
+Contract accounts have no access keys after deploy (`scripts/deploy.ts` deletes them), so no access-key holder can redeploy those accounts. Vendored contracts may have their own administrative methods, which are not established absent merely by deleting keys. Each account the deploy creates has its own key. The browser gets only the demo
 trader's and the bots' keys (`/api/config`); the root, keeper and solver keys stay on the server.
 
 ### Trust assumptions
@@ -83,7 +82,7 @@ off-chain code (API routes, keeper, deploy). Every finding below has a test that
 | 18 | Low | Extra Life claims could record more than they sent; a failed claim restored the wrong tokens | Record only what's sent; restore each token's own amount; 30 per call | `claim_never_records_more_than_it_sends`, `failed_claim_restores_exactly_its_amounts` |
 | 19 | Low | A second seed from the owner was silently not owed | Backer Lives have their own ids | `the_owner_can_seed_twice`, `one_owner_can_back_twice` |
 | 20 | Low | The solver's fill check allowed a free 1% and odd payloads; the relay had no gas cap or rate limit | Exact checks, one fill at a time; 100 Tgas cap, 10 per 10 s | `app/test/fill.ts`, `app/test/relay.ts` |
-| 21 | Low | The keeper stamped prices after fetching, and one missing market stopped every push | Stamp before the fetch; skip bad markets; drop NaN, zero and >20% jumps | `keeper/test/prices.ts` |
+| 21 | Low | The keeper stamped prices after fetching, and one missing market stopped every push | Stamp before the fetch; skip bad markets; drop NaN, zero and isolated >20% jumps (sustained jumps accepted after ten rejected ticks) | `keeper/test/prices.ts` |
 
 ## Known and accepted
 
@@ -91,8 +90,8 @@ off-chain code (API routes, keeper, deploy). Every finding below has a test that
   market's). Ten small positions pay ~10% instead of up to 25%. It's a fee question, not a solvency one.
 - **Failed Extra Life or lock mints aren't retried.** A loser whose mint fails loses that epoch's life
   (the house stops counting it as owed). Not seen in testing; a retry queue is the fix.
-- **Forwarding buyback $1UP to ve has no callback.** If ve refused it the tokens would sit in the house
-  unrecorded.
+- **Buyback delivery is tracked.** Rejected or failed deliveries retain the refunded amount for
+  `retry_buyback_delivery(epoch)` by the owner or operator; in-flight retries are refused.
 - **Ownership hands over in one step** (`set_owner`). A typo loses the house; propose-and-accept is the fix.
 - **ve and the house can drift by an epoch** if ve is deployed late or a checkpoint fails; locks made in
   that gap are weighted from the wrong epoch.
@@ -105,7 +104,31 @@ off-chain code (API routes, keeper, deploy). Every finding below has a test that
 ## Running the checks
 
 ```bash
-pnpm test           # contract unit + property tests (170), SDK and simulation tests
-pnpm test:sandbox   # builds the wasm, 7 end-to-end tests on a sandbox chain
-pnpm test:ts        # API route, keeper and indexer tests (17)
+pnpm test           # contract unit/property, SDK and simulation tests
+pnpm test:sandbox   # builds the wasm; 11 end-to-end tests on fresh sandbox chains
+pnpm test:ts        # API route, keeper, indexer and UI-helper regressions
 ```
+
+## Follow-up review and remediation, 23 October 2026
+
+The first-party repository was reviewed with Security Scan and the five Spec Reviewer dimensions.
+The scan is source-based; third-party WASM internals, installed dependency source and live advisory
+verification are excluded. It does not establish mainnet readiness.
+
+Confirmed issues addressed in source include insufficient marketplace settlement gas, keeper first-page
+order starvation, backing/expiry debt races, and unbounded jackpot draw/cleanup. Marketplace admission
+now reserves explicit downstream gas before NFT transfer. The keeper snapshots every order page before
+mutating orders. Backing stays pending until its mint succeeds; its reward allocation is reserved and
+only delivered on success. Closing waits for earlier debt-mutating transfer chains. Jackpot work is
+bounded across resumable close calls. Partial life-pot refunds restore debt rather than clearing it.
+
+Regressions cover insufficient/ordinary buyer gas with fees enabled, >200 resting limits, pending and
+failed backing, debt snapshot serialization, bounded jackpot work and later harvests, buyback refund/retry,
+RPC failure/retry, and net-profit ranking. UI/model regressions cover wallet net-loss previews, negative
+profit epochs, lock cursors through filtered and exact-boundary pages, post-schedule carry reporting,
+late buybacks, exact trigger prices, revocation recovery, and poll cancellation.
+Vault recall and full epoch batches are exercised on fresh sandbox chains.
+
+These source changes alter House/Closing state layouts and add NFT views. Existing localnet deployments
+are reused on restart and have no access keys for redeployment. Use a separately created fresh sandbox
+to validate new bytes; recreating an existing demo is an explicit operator action, not an automatic reset.

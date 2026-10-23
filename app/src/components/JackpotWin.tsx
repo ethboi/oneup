@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { USDC, fmtUsdc } from "@oneup/sdk";
 import { useOneUp } from "@/lib/oneup";
+import { latestJackpotWin } from "@/lib/jackpot";
 import { sfx } from "@/lib/sound";
 import { useActivity } from "./Activity";
 import { PixelAmount, PixelCoin } from "./Pixel";
@@ -20,7 +21,7 @@ export function JackpotWin() {
   const [win, setWin] = useState<{ who: string; amount: bigint } | null>(null);
 
   useEffect(() => {
-    const latest = items.filter((i) => i.kind === "jackpot").at(-1);
+    const latest = latestJackpotWin(items);
     // what's already in the feed when the page opens isn't news
     if (seen.current === null) {
       seen.current = latest?.seq ?? 0;
@@ -30,7 +31,7 @@ export function JackpotWin() {
     seen.current = latest.seq;
     const mine = latest.who === short(me);
     sfx(mine ? "jackpot" : "win");
-    setWin({ who: latest.who ?? "someone", amount: BigInt(latest.amount) });
+    setWin({ who: latest.who, amount: BigInt(latest.amount) });
   }, [items, me]);
 
   // the Demo menu's preview: you take a pot of the jackpot's current size, or a round number

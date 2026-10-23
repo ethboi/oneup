@@ -7,7 +7,8 @@
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { ONEUP, OneUp } from "@oneup/sdk";
+import { ONEUP, OneUp, netTradePnl } from "@oneup/sdk";
+export { netTradePnl } from "@oneup/sdk";
 
 export interface ActivityItem {
   seq: number;
@@ -136,10 +137,16 @@ function config() {
   return { rpc: d.rpcUrl as string, c: d.contracts as Record<string, string> };
 }
 
+class RpcError extends Error {
+  constructor(readonly detail: { cause?: { name?: string }; data?: { name?: string } }) {
+    super(JSON.stringify(detail).slice(0, 200));
+  }
+}
+
 async function rpc<T>(url: string, method: string, params: unknown): Promise<T> {
   const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) });
   const j = await r.json();
-  if (j.error) throw new Error(JSON.stringify(j.error).slice(0, 200));
+  if (j.error) throw new RpcError(j.error);
   return j.result as T;
 }
 
@@ -276,8 +283,13 @@ export function toItems(ev: Event, executor: string, t: number, c: Record<string
 }
 
 /** Reads one block's OneUp events, without recording them (blocks are read in parallel, recorded in order). */
-async function readBlock(url: string, height: number, c: Record<string, string>): Promise<{ t: number; logs: [string, string, string][] }> {
-  const block = await rpc<{ header: { timestamp_nanosec: string }; chunks: { chunk_hash: string; tx_root: string }[] }>(url, "block", { block_id: height });
+async function readBlock(url: string, height: number, c: Record<string, string>): Promise<{ t: number; logs: [string, string, string][] } | null> {
+  const block = await rpc<{ header: { timestamp_nanosec: string }; chunks: { chunk_hash: string; tx_root: string }[] }>(url, "block", { block_id: height }).catch((error: unknown) => {
+    // Only a definitive missing final block is a skipped height; transport and other RPC errors retry.
+    if (error instanceof RpcError && (error.detail.cause?.name === "UNKNOWN_BLOCK" || error.detail.data?.name === "UNKNOWN_BLOCK")) return null;
+    throw error;
+  });
+  if (!block) return null;
   const t = Math.floor(Number(block.header.timestamp_nanosec) / 1e6);
   const logs: [string, string, string][] = [];
   for (const ch of block.chunks) {
@@ -288,8 +300,8 @@ async function readBlock(url: string, height: number, c: Record<string, string>)
       const res = await rpc<{ receipts_outcome: { outcome: { logs: string[]; executor_id: string } }[] }>(url, "EXPERIMENTAL_tx_status", {
         tx_hash: tx.hash,
         sender_account_id: tx.signer_id,
-        wait_until: "NONE",
-      }).catch(() => null);
+        wait_until: "FINAL",
+      });
       for (const r of res?.receipts_outcome ?? []) {
         for (const log of r.outcome.logs) if (log.startsWith("EVENT_JSON:")) logs.push([r.outcome.executor_id, log.slice(11), tx.hash]);
       }
@@ -357,6 +369,16 @@ async function valueSales() {
   }
 }
 
+/** Read the entire batch successfully before committing any events or advancing the cursor. */
+export async function indexBatch(url: string, heights: number[], c: Record<string, string>) {
+  if (heights.length === 0) return;
+  const blocks = await Promise.all(heights.map((h) => readBlock(url, h, c)));
+  for (const b of blocks) if (b) record(b, c);
+  state.next = heights[heights.length - 1] + 1;
+  state.dirty = true;
+  await valueSales();
+}
+
 async function step() {
   const { rpc: url, c } = config();
   if (!state.genesis) load((await rpc<{ genesis_hash: string }>(url, "status", [])).genesis_hash);
@@ -367,11 +389,7 @@ async function step() {
   // catch up in parallel batches, recorded in block order; a missing height (skipped block) is passed over
   for (let n = 0; state.next <= target && n < 20; n++) {
     const heights = Array.from({ length: Math.min(BATCH, target - state.next + 1) }, (_, i) => state.next! + i);
-    const blocks = await Promise.all(heights.map((h) => readBlock(url, h, c).catch(() => null)));
-    for (const b of blocks) if (b) record(b, c);
-    await valueSales();
-    state.next += heights.length;
-    state.dirty = true;
+    await indexBatch(url, heights, c);
   }
 }
 
@@ -451,7 +469,7 @@ export function standings(from: number, to: number): { rows: Standing[]; synced:
     for (const i of items) {
       if (i.kind !== "trade" || i.t < from || i.t > to) continue;
       const t = i.trade;
-      pnl += BigInt(t.pnl) - BigInt(t.cut ?? 0);
+      pnl += netTradePnl(t);
       volume += BigInt(t.margin) * BigInt(t.leverage);
       trades++;
       if (BigInt(t.pnl) > 0n) wins++;
@@ -468,12 +486,12 @@ export function boardBetween(from: number, to: number): Board {
   const sums = new Map<string, { pnl: bigint; trades: number }>();
   let best: Board["best"] = null;
   let worst: Board["biggestLoss"] = null;
-  const roe = (t: TradeRecord) => Number(t.pnl) / Math.max(1, Number(t.margin));
+  const roe = (t: TradeRecord) => Number(netTradePnl(t)) / Math.max(1, Number(t.margin));
   for (const [account, items] of state.history) {
     for (const i of items) {
       if (i.kind !== "trade" || i.t < from || i.t > to) continue;
       const s = sums.get(account) ?? { pnl: 0n, trades: 0 };
-      s.pnl += BigInt(i.trade.pnl);
+      s.pnl += netTradePnl(i.trade);
       s.trades++;
       sums.set(account, s);
       if (!best || roe(i.trade) > roe(best)) best = { ...i.trade, account };

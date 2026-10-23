@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { OnExplorer } from "./ui";
-import { fmtUsdc } from "@oneup/sdk";
+import { fmtUsdc, netTradePnl } from "@oneup/sdk";
 import { useOneUp } from "@/lib/oneup";
 import type { HistoryItem } from "@/lib/server/activity";
 import { fmtOneup } from "./Header";
@@ -82,7 +82,7 @@ function Row({ i, me }: { i: HistoryItem; me: string }) {
   switch (i.kind) {
     case "trade": {
       const tr = i.trade;
-      const pnl = BigInt(tr.pnl);
+      const pnl = netTradePnl(tr);
       const margin = BigInt(tr.margin);
       const up = pnl >= 0n;
       icon = up ? "up" : "down";

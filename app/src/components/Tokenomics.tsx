@@ -2,6 +2,8 @@
 
 // $1UP: who gets it, how it's released, where its value comes from, and what's happened so far (D-15, D-16, D-26).
 
+import { useMemo } from "react";
+import { TokenomicsReader } from "@/lib/tokenomics";
 import { EMISSIONS_TOTAL, EMISSION_EPOCHS, ONEUP, ONEUP_PER_USDC, SUPPLY, fmtUsdc } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { useOneupPrice } from "@/lib/value";
@@ -25,27 +27,11 @@ export function Tokenomics() {
   const epoch = usePoll(() => o.epoch(), [], 10_000);
   const carry = usePoll(() => o.emissionCarry(), [], 10_000);
   const round = usePoll(() => o.backing(), [], 10_000);
-  // every round's emissions so far (a few hundred at most)
-  const history = usePoll(
-    async () => {
-      if (!epoch) return [];
-      const ids = Array.from({ length: Math.min(208, epoch.id - 1) }, (_, i) => i + 1);
-      return (await Promise.all(ids.map((e) => o.emissions(e)))).filter((x) => x !== null);
-    },
-    [epoch?.id],
-    30_000,
-  );
-  const released = (history ?? []).reduce((s, x) => s + BigInt(x!.released), 0n);
-  const buybacks = usePoll(
-    async () => {
-      if (!epoch) return 0n;
-      const ids = Array.from({ length: Math.min(208, epoch.id - 1) }, (_, i) => i + 1);
-      const bs = await Promise.all(ids.map((e) => o.buyback(e)));
-      return bs.reduce((s, b) => s + (b ? BigInt(b.usdc) : 0n), 0n);
-    },
-    [epoch?.id],
-    30_000,
-  );
+  const reader = useMemo(() => new TokenomicsReader(o), [o]);
+  const totals = usePoll(() => reader.read(Math.max(0, (epoch?.id ?? 1) - 1)), [reader, epoch?.id], 30_000);
+  const history = totals?.history;
+  const released = (history ?? []).reduce((sum, row) => sum + BigInt(row.released), 0n);
+  const buybacks = totals?.buybacks;
   const backersUsed = round ? 7_500_000n * ONEUP - BigInt(round.oneup_left) : 0n;
   const perRound = EMISSIONS_TOTAL / EMISSION_EPOCHS;
   const last = (history ?? []).slice(-24);

@@ -61,7 +61,14 @@ export async function startSession(main: Account, house: string, gasless: boolea
 }
 
 export async function endSession(main: Account, s: Session) {
-  await main.deleteKey(s.publicKey).catch(() => {}); // already gone is fine
+  try {
+    await main.deleteKey(s.publicKey);
+  } catch (error) {
+    // A prior revocation may have committed before its response was lost. Only a
+    // successful finalized key-list query can establish that retrying is unnecessary.
+    const keys = await main.provider.viewAccessKeyList({ accountId: main.accountId, finalityQuery: { finality: "final" } }).catch(() => { throw error; });
+    if (keys.keys.some(k => k.public_key === s.publicKey)) throw error;
+  }
   saveSession(main.accountId, null);
 }
 

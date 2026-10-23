@@ -39,6 +39,15 @@ pub struct Treasury {
     pub draw_epoch: u64,
 }
 
+#[near(serializers = [borsh])]
+pub struct DrawProgress {
+    pub target: u128,
+    pub cumulative: u128,
+    pub total: u128,
+    pub amount: u128,
+    pub winner: Option<(AccountId, u128)>,
+}
+
 #[near]
 impl House {
     /// Owner: the marketplace whose sales pay the house a cut (D-28).
@@ -155,27 +164,31 @@ impl House {
 
     /// Draws the jackpot among this period's tickets, from the block's random seed, and credits the winner.
     /// With no tickets (or no jackpot) it rolls over.
-    pub(crate) fn draw_jackpot(&mut self, epoch: u64) {
-        if self.jackpot == 0 || self.tickets_total == 0 {
-            Event::JackpotRolled { epoch, jackpot: U128(self.jackpot) }.emit();
-            return;
-        }
-        let seed = env::random_seed();
-        let r = u128::from_le_bytes(seed[..16].try_into().unwrap()) % self.tickets_total;
-        let mut acc = 0u128;
-        let mut winner = None;
-        for (account, t) in self.tickets.iter() {
-            acc += t;
-            if r < acc {
-                winner = Some((account.clone(), *t));
-                break;
+    pub(crate) fn draw_jackpot(&mut self, epoch: u64, progress: &mut Option<DrawProgress>, limit: usize) -> bool {
+        if progress.is_none() {
+            if self.jackpot == 0 || self.tickets_total == 0 {
+                Event::JackpotRolled { epoch, jackpot: U128(self.jackpot) }.emit();
+                return true;
             }
+            let seed = env::random_seed();
+            *progress = Some(DrawProgress {
+                target: u128::from_le_bytes(seed[..16].try_into().unwrap()) % self.tickets_total,
+                cumulative: 0, total: self.tickets_total,
+                amount: std::mem::take(&mut self.jackpot), winner: None,
+            });
         }
-        let (account, tickets) = winner.expect("a ticket wins");
-        let amount = std::mem::take(&mut self.jackpot);
-        self.credit(&account, amount);
-        Event::JackpotWon { epoch, account_id: account, amount: U128(amount), tickets: U128(tickets), total_tickets: U128(self.tickets_total) }.emit();
-        self.tickets.clear();
+        let draw = progress.as_mut().expect("draw initialized");
+        let batch: Vec<_> = self.tickets.iter().take(limit).map(|(a, t)| (a.clone(), *t)).collect();
+        for (account, tickets) in batch {
+            draw.cumulative += tickets;
+            if draw.winner.is_none() && draw.target < draw.cumulative { draw.winner = Some((account.clone(), tickets)); }
+            self.tickets.remove(&account);
+        }
+        if !self.tickets.is_empty() { return false; }
+        let (account, tickets) = draw.winner.clone().expect("a ticket wins");
+        self.credit(&account, draw.amount);
+        Event::JackpotWon { epoch, account_id: account, amount: U128(draw.amount), tickets: U128(tickets), total_tickets: U128(draw.total) }.emit();
         self.tickets_total = 0;
+        true
     }
 }

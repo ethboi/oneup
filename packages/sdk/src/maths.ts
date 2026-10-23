@@ -157,7 +157,27 @@ export const exitPenalty = (amount: bigint, epochsLeft: bigint) => {
 
 /** $1UP released to an epoch's losers: 20 per USDC of house profit, at most what's available. */
 export const releasedEmissions = (available: bigint, houseNet: bigint, rate = ONEUP_PER_USDC) =>
-  min(houseNet * rate * (ONEUP / USDC), available);
+  min((houseNet > 0n ? houseNet : 0n) * rate * (ONEUP / USDC), available);
+
+/** Current epoch's loser allocation, using the same positive wallet-net-loss denominator as close. */
+export function previewLossEmission(epoch: { id: number; losses: string; payouts: string; net_losses: string; fees: string }, carry: bigint, loss: bigint, rate = ONEUP_PER_USDC): bigint {
+  const denominator = BigInt(epoch.net_losses);
+  const net = BigInt(epoch.losses) + BigInt(epoch.fees) - BigInt(epoch.payouts);
+  const release = releasedEmissions(carry + emissionsForEpoch(BigInt(epoch.id)), net, rate);
+  return denominator > 0n ? release * loss / denominator : 0n;
+}
+
+/** Parse a form value exactly into token base units. Invalid or out-of-u128 values disable the action. */
+export function parseTokenAmount(value: string, decimals: number): bigint {
+  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 24 || value.length > 80) return 0n;
+  const text = value.trim();
+  if (!/^(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)$/.test(text)) return 0n;
+  const [whole, rawFraction = ""] = text.split(".");
+  const fraction = rawFraction.replace(/0+$/, "");
+  if (fraction.length > decimals) return 0n;
+  const raw = BigInt((whole || "0") + fraction.padEnd(decimals, "0"));
+  return raw <= (1n << 128n) - 1n ? raw : 0n;
+}
 
 // Display helpers
 
@@ -175,9 +195,14 @@ export const priceToNumber = (p: bigint) => Number(p) / 1e8;
 
 /** ppm → "1.84×" style number. */
 export const ppmToNumber = (p: bigint) => Number(p) / 1e6;
-export const numberToPrice = (x: number) => BigInt(Math.round(x * 1e8));
+export const numberToPrice = (x: number) => Number.isFinite(x) && x > 0 && Number.isFinite(x * 1e8) ? BigInt(Math.round(x * 1e8)) : 0n;
 
 /** Decision D-19: a take-profit fires once the price reaches it in the position's favour, a stop once it
  *  reaches it against. */
 export const targetHit = (side: Side, price: bigint, target: bigint) => (side === "Long" ? price >= target : price <= target);
 export const stopHit = (side: Side, price: bigint, stop: bigint) => (side === "Long" ? price <= stop : price >= stop);
+
+/** Realized profit actually retained by the trader; legacy loss records may omit the cut. */
+export function netTradePnl(trade: { pnl: string; cut?: string }): bigint {
+  return BigInt(trade.pnl) - BigInt(trade.cut ?? 0);
+}

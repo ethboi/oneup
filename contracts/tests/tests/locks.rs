@@ -19,6 +19,15 @@ async fn balance(e: &Env, a: &Account) -> anyhow::Result<u128> {
 
 #[tokio::test]
 async fn loss_becomes_a_lock_and_lockers_earn_the_buyback() -> anyhow::Result<()> {
+    buyback_flow(false).await
+}
+
+#[tokio::test]
+async fn refused_buyback_delivery_is_refunded_and_retried_on_chain() -> anyhow::Result<()> {
+    buyback_flow(true).await
+}
+
+async fn buyback_flow(reject_delivery: bool) -> anyhow::Result<()> {
     let e = setup(5).await?;
 
     // Swap liquidity: 100K USDC / 10M $1UP (the owner holds the Rhea seed allocation)
@@ -67,7 +76,19 @@ async fn loss_becomes_a_lock_and_lockers_earn_the_buyback() -> anyhow::Result<()
     let bb = view(&e.house, "get_buyback", json!({"epoch": 2})).await?;
     let usdc: u128 = bb["usdc"].as_str().unwrap().parse()?;
     let quote: String = view(&e.swap, "get_quote", json!({"usdc_in": usdc.to_string()})).await?.as_str().unwrap().into();
+    if reject_delivery {
+        // This registered account has no ft_on_transfer: delivery fails after the swap succeeds.
+        register(&e.owner, &e.oneup, e.market.id().as_str()).await?;
+        e.owner.call(e.house.id(), "set_token_and_ve").args_json(json!({"oneup": e.oneup.id(), "ve": e.market.id()})).transact().await?.into_result()?;
+    }
     e.owner.call(e.house.id(), "buyback").args_json(json!({"epoch": 2, "min_out": quote})).max_gas().transact().await?.into_result()?;
+    if reject_delivery {
+        let pending = view(&e.house, "get_buyback", json!({"epoch": 2})).await?;
+        assert_eq!(pending["status"]["DeliveryPending"]["remaining"], json!(quote));
+        assert_eq!(view(&e.ve, "get_rewards", json!({"epoch": 2})).await?, json!("0"));
+        e.owner.call(e.house.id(), "set_token_and_ve").args_json(json!({"oneup": e.oneup.id(), "ve": e.ve.id()})).transact().await?.into_result()?;
+        e.owner.call(e.house.id(), "retry_buyback_delivery").args_json(json!({"epoch": 2})).max_gas().transact().await?.into_result()?;
+    }
     assert_eq!(view(&e.house, "get_buyback", json!({"epoch": 2})).await?["status"], json!("Done"));
     assert_eq!(view(&e.ve, "get_rewards", json!({"epoch": 2})).await?, json!(quote));
 

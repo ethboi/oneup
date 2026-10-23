@@ -28,6 +28,7 @@ import {
 } from "@oneup/sdk";
 import { HermesSource, LiveSource, SimSource, sane, type PriceSource, type Steerable } from "./prices.ts";
 import { validSteer } from "./control.ts";
+import { processOrders } from "./orders.ts";
 
 const { values: args } = parseArgs({
   options: {
@@ -83,24 +84,7 @@ async function pushPrices(pusher: ReturnType<OneUp["calls"]>) {
 }
 
 async function handleOrders() {
-  for (const o of await oneup.listOrders(0, 200)) {
-    const limit = "Open" in o.kind && o.kind.Open.limit ? BigInt(o.kind.Open.limit) : null;
-    const label =
-      "Open" in o.kind
-        ? `${limit ? "limit " : ""}open ${o.kind.Open.side} ${o.market_id}`
-        : `${o.kind.Close.reason === "Close" ? "close" : o.kind.Close.reason.toLowerCase()} #${o.kind.Close.position_id}`;
-    if (nowS() > o.placed_at + (limit ? LIMIT_EXPIRY_S : FILL_WINDOW_S)) {
-      await keeper.expire(o.id);
-      log(`expired order ${o.id} (${label})`);
-      continue;
-    }
-    const px = latest.get(feeds.get(o.market_id) ?? "");
-    if (!px || px.time <= o.placed_at) continue; // wait for a price published after the order
-    // a resting limit only fills once the price reaches it (the house checks again): no call, no gas, until then
-    if (limit && "Open" in o.kind && (o.kind.Open.side === "Long" ? px.price > limit : px.price < limit)) continue;
-    const ok = await keeper.fill(o.id);
-    log(`${ok ? "filled" : "could not fill"} order ${o.id} (${label})`);
-  }
+  await processOrders(oneup.listOrders, keeper, feeds, latest, nowS, FILL_WINDOW_S, LIMIT_EXPIRY_S, log);
 }
 
 /** Liquidations, take-profits at the cap and trigger hits. They run on their own fast loop and key (riskLoop):

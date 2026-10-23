@@ -3,6 +3,7 @@
 // List an Extra Life or a lock on the marketplace, re-price it or take it down. Shared by the Lives, Locks and
 // Market tabs.
 
+import { parseTokenAmount } from "@oneup/sdk";
 import { useState } from "react";
 import { USDC, fmtUsdc, type Listing } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
@@ -47,7 +48,7 @@ export function Sell({ nft, tokenId, suggested, listings, compact }: { nft: stri
     );
   }
   // cents count: a small life can be worth under a dollar
-  const raw = BigInt(Math.floor((Number(price) || 0) * Number(USDC)));
+  const raw = parseTokenAmount(price, 6);
   return (
     <div className={`${mt} flex items-center gap-2`}>
       <span className="field flex-1">

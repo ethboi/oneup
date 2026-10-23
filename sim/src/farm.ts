@@ -2,7 +2,8 @@
 //
 // A farmer opens a long and a short on the same market. One side loses `x`, the other wins `x` and pays
 // the house the 10% cut, so the farmer's only cost is 0.1·x USDC, and the house books 0.1·x of profit.
-// The farmer is credited with a loss of `x` (and a cut of 0.1·x) alongside the honest traders.
+// Under current wallet-net-loss allocation, the farmer is credited only the 0.1·x cut.
+// The historical voting rule below deliberately retains the old gross-loss assumption.
 //
 // Break-even price = cost ÷ $1UP received. Shown as fully diluted value (× 1B supply) to read it as
 // "farming pays once $1UP trades above this FDV".
@@ -42,9 +43,10 @@ export function profitRelease(K: number): Rules {
     name: `Losers only, ${K} $1UP per $1 of house profit, locked`,
     farmerOneup: (L, N, x, state) => {
       const available = state.carry + SCHEDULE;
-      const release = Math.min(available, K * (N + CUT * x));
+      const release = Math.min(available, K * Math.max(0, N + CUT * x));
       state.carry = available - release;
-      return release * (x / (L + x));
+      const netLoss = CUT * x;
+      return L + netLoss > 0 ? release * (netLoss / (L + netLoss)) : 0;
     },
     liquidity: 1 - FRESH_LOCK_HAIRCUT,
   };

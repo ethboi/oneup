@@ -5,6 +5,7 @@
 // losers get). The money stays in the pool for good and comes back only from house profit; to leave
 // early, sell the Backer Life on the Market.
 
+import { parseTokenAmount } from "@oneup/sdk";
 import { useState } from "react";
 import { fmtUsdc, lifeCapPpm, ppmToNumber, LIFE_CAP_POOL, USDC } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
@@ -13,7 +14,7 @@ import { fmtOneup } from "./Header";
 export function Backing() {
   const { o, me, tx, run } = useOneUp();
   const [amount, setAmount] = useState("1000");
-  const amt = BigInt(Math.floor(Number(amount) || 0)) * USDC;
+  const amt = parseTokenAmount(amount, 6);
   const round = usePoll(() => o.backing(amt > 0n ? amt : undefined), [amount], 4000);
   const pool = usePoll(() => o.pool(), [], 4000);
   const wallet = usePoll(() => o.usdcBalance(me), [me]);

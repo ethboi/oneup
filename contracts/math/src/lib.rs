@@ -440,19 +440,17 @@ mod tests {
         let p = epoch_payout(usd(120_000), usd(50_000), owed_total, MIN_RESERVE);
         assert_eq!(p.lives_pot, usd(18_000));
         assert_eq!(p.buyback_pot, usd(9_000));
-        // the doc's whole-dollar vector: floors of 18_000 × owed / 36_840
-        let pays: Vec<u128> = [1_840u128, 10_000, 25_000].iter().map(|o| life_payment(18_000, *o, 36_840)).collect();
-        assert_eq!(pays, vec![899, 4_885, 12_214]);
+        // Per-life loser/backer allocation is covered through the actual ExtraLife contract V5 test.
     }
 
     #[test]
     fn v6_emissions() {
         let per = emissions_for_epoch(1);
         assert_eq!(per, 4_326_923_076_923_076_923_076_923);
-        let a = per * 600_000 / PPM;
-        let winners = a / 2;
-        assert_eq!(pro_rata(winners, 600, 800) / 1_000_000_000_000_000, 973_557_692);
-        assert_eq!(pro_rata(winners, 200, 800) / 1_000_000_000_000_000, 324_519_230);
+        let released = released_emissions(per, usd(1_350), 20);
+        assert_eq!(released, 27_000 * ONEUP);
+        assert_eq!(pro_rata(released, usd(1_000), usd(1_500)), 18_000 * ONEUP);
+        assert_eq!(pro_rata(released, usd(500), usd(1_500)), 9_000 * ONEUP);
         let total: u128 = (1..=EMISSION_EPOCHS).map(emissions_for_epoch).sum();
         assert_eq!(total, EMISSIONS_TOTAL);
         assert_eq!(emissions_for_epoch(EMISSION_EPOCHS + 1), 0);

@@ -60,6 +60,8 @@ pub struct Closing {
     pub oneup_assigned: u128,
     /// D-27: waiting on the vault for USDC the payout needs.
     pub recalling: bool,
+    pub draw: Option<crate::treasury::DrawProgress>,
+    pub draw_done: bool,
 }
 
 #[near(serializers = [json, borsh])]
@@ -108,6 +110,11 @@ impl House {
     /// "begun", "minting", "waiting for mints" or "closed".
     pub fn close_epoch(&mut self, limit: Option<u32>) -> String {
         let Some(mut c) = self.closing.take() else {
+            require!(now_s() >= self.epoch.started_at + self.params.epoch_length_s, "Epoch not over yet");
+            self.closing_requested = true;
+            if self.pending_backing > 0 || self.pending_backer_locks > 0 { return "waiting for backing".into(); }
+            if self.pending_pots > 0 { return "waiting for pot".into(); }
+            self.closing_requested = false;
             self.begin_close();
             return "begun".into();
         };
@@ -176,12 +183,16 @@ impl House {
             self.recall_from_vault(need, true).detach();
             "recalling"
         } else {
-            let draw = self.params.jackpot_epochs > 0 && c.epoch.id % self.params.jackpot_epochs == 0;
-            let id = c.epoch.id;
-            self.pay(c);
-            if draw {
-                self.draw_jackpot(id);
+            let draw = c.draw.is_some() || (self.params.jackpot_epochs > 0 && c.epoch.id % self.params.jackpot_epochs == 0);
+            if draw && !c.draw_done {
+                let n = limit.unwrap_or(DEFAULT_BATCH).clamp(1, MAX_BATCH) as usize;
+                c.draw_done = self.draw_jackpot(c.epoch.id, &mut c.draw, n);
+                if !c.draw_done {
+                    self.closing = Some(c);
+                    return "drawing jackpot".into();
+                }
             }
+            self.pay(c);
             return "closed".into();
         };
         self.closing = Some(c);
@@ -223,38 +234,34 @@ impl House {
 
     /// If the Backer Life couldn't be minted, the backing is undone into the backer's free balance.
     #[private]
-    pub fn on_backer_minted(&mut self, account_id: AccountId, amount: U128, owed: U128, #[callback_result] r: Result<String, PromiseError>) -> bool {
-        if r.is_ok() {
-            return true;
+    pub fn on_backer_minted(&mut self, account_id: AccountId, amount: U128, cap_ppm: U128, oneup: U128, #[callback_result] r: Result<String, PromiseError>) -> bool {
+        self.pending_backing -= amount.0;
+        if r.is_err() {
+            self.backer_oneup += oneup.0;
+            self.credit(&account_id, amount.0);
+            env::log_str("Backer Life mint failed; the backing is in your free balance");
+            return false;
         }
-        self.lives_owed = self.lives_owed.saturating_sub(owed.0);
-        self.pool = self.pool.saturating_sub(amount.0);
-        self.seed = self.seed.saturating_sub(amount.0);
-        self.credit(&account_id, amount.0);
-        env::log_str("Backer Life mint failed; the backing is in your free balance");
-        false
+        self.pool += amount.0;
+        self.seed += amount.0;
+        let owed = math::owed(amount.0, cap_ppm.0);
+        self.lives_owed += owed;
+        Event::Backed { account_id: account_id.clone(), amount, cap_ppm, owed: U128(owed), pool: U128(self.pool) }.emit();
+        if cap_ppm.0 == math::PPM { Event::Seed { amount, pool: U128(self.pool) }.emit(); }
+        self.lock_for_backer(account_id, oneup.0);
+        true
     }
 
     #[private]
     pub fn on_pot(&mut self, amount: U128, #[callback_result] used: Result<U128, PromiseError>) -> bool {
-        match used {
-            Ok(used) if used.0 == amount.0 => true,
-            Ok(used) if used.0 > 0 => {
-                // The life contract was owed less than we thought: everything is paid.
-                let back = amount.0 - used.0;
-                self.pool += back;
-                self.lives_paid -= back;
-                self.lives_owed = 0;
-                false
-            }
-            // refused or failed: the pot came back and is still owed
-            _ => {
-                self.pool += amount.0;
-                self.lives_paid -= amount.0;
-                self.lives_owed += amount.0;
-                false
-            }
-        }
+        self.pending_pots = self.pending_pots.saturating_sub(1);
+        let used = used.map_or(0, |x| x.0.min(amount.0));
+        let back = amount.0 - used;
+        // A partial refund may be rounding dust, and does not settle other outstanding lives.
+        self.pool += back;
+        self.lives_paid -= back;
+        self.lives_owed += back;
+        back == 0
     }
 
     pub fn get_epoch_summary(&self, epoch: u64) -> Option<EpochSummary> {
@@ -309,6 +316,8 @@ impl House {
             oneup_release,
             oneup_assigned: 0,
             recalling: false,
+            draw: None,
+            draw_done: false,
         });
     }
 
@@ -340,13 +349,12 @@ impl House {
     }
 
     /// Mints a Backer Life (D-22). The caller has already counted what it's owed.
-    pub(crate) fn mint_backer(&mut self, owner: AccountId, amount: u128, cap_ppm: u128) -> Promise {
+    pub(crate) fn mint_backer(&mut self, owner: AccountId, amount: u128, cap_ppm: u128, oneup: u128) -> Promise {
         let life = self.life.clone().unwrap_or_else(|| env::panic_str("Set the Extra Life contract first"));
-        let owed = math::owed(amount, cap_ppm);
         ext_life::ext(life)
             .with_static_gas(GAS_MINT_BASE.saturating_add(GAS_MINT_PER_LIFE))
             .mint_backer(owner.clone(), U128(amount), U128(cap_ppm))
-            .then(Self::ext(env::current_account_id()).with_static_gas(GAS_MINT_CALLBACK).on_backer_minted(owner, U128(amount), U128(owed)))
+            .then(Self::ext(env::current_account_id()).with_static_gas(Gas::from_tgas(80)).on_backer_minted(owner, U128(amount), U128(cap_ppm), U128(oneup)))
     }
 
     fn pay(&mut self, c: Closing) {
@@ -358,6 +366,7 @@ impl House {
             self.record_buyback(&c.epoch, p.buyback_pot);
         }
         if p.lives_pot > 0 {
+            self.pending_pots += 1;
             self.lives_owed -= p.lives_pot;
             self.lives_paid += p.lives_pot;
             let msg = format!(r#"{{"epoch_pot":{{"epoch":{}}}}}"#, c.epoch.id);
