@@ -1027,11 +1027,9 @@ body {
   width: 112%;
   padding: 18px 0 16px;
   transform: rotate(-6deg);
-  /* hazard stripes along both edges, on a red band */
-  background:
-    repeating-linear-gradient(-45deg, var(--lcd-ink) 0 12px, #f2b705 12px 24px) top / 100% 10px no-repeat,
-    repeating-linear-gradient(-45deg, var(--lcd-ink) 0 12px, #f2b705 12px 24px) bottom / 100% 10px no-repeat,
-    #c43636;
+  /* a red band edged in the screen's ink */
+  background: #c43636;
+  border-block: 5px solid var(--lcd-ink);
   box-shadow: 0 6px 0 rgb(0 0 0 / 0.35);
   animation: revenge-slam 3.6s cubic-bezier(0.2, 1.4, 0.4, 1) both;
 }
@@ -1051,7 +1049,7 @@ body {
   padding: 3px 12px;
   font-size: clamp(13px, 2.4vw, 18px);
   letter-spacing: 0.3em;
-  color: #f2b705;
+  color: #fff;
   background: var(--lcd-ink);
   animation: blink 0.4s steps(1) 0.5s 5;
 }
