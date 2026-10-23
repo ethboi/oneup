@@ -759,9 +759,22 @@ function Console({
 
 /** Leverage stops under the slider: the common picks, and where the track's log scale puts most of its length. */
 const LEVERAGE_STOPS = [2, 10, 25, 50, 100, 500, 1000];
-/** The leverage slider runs 1× to the market's cap on a log scale, so 2×–10× aren't squeezed into the first tenth. */
-const levToPos = (lev: number, max: number) => (Math.log(Math.max(1, lev)) / Math.log(max)) * 100;
-const posToLev = (pos: number, max: number) => Math.max(1, Math.min(max, Math.round(Math.exp((pos / 100) * Math.log(max)))));
+/** The leverage slider runs from 1× through each stop to the market's cap, the stops evenly spaced along it, and
+ *  moves evenly between neighbouring stops: so 25×, 50× and 100× don't crowd together, and 500× and 1000× each
+ *  get their own stretch. */
+const anchors = (max: number) => [...new Set([1, ...LEVERAGE_STOPS.filter((x) => x < max), max])];
+function levToPos(lev: number, max: number) {
+  const a = anchors(max);
+  const v = Math.max(1, Math.min(max, lev));
+  const i = Math.max(0, a.findIndex((x, k) => v <= a[k + 1]));
+  return ((i + (v - a[i]) / (a[i + 1] - a[i])) / (a.length - 1)) * 100;
+}
+function posToLev(pos: number, max: number) {
+  const a = anchors(max);
+  const f = (Math.max(0, Math.min(100, pos)) / 100) * (a.length - 1);
+  const i = Math.min(a.length - 2, Math.floor(f));
+  return Math.round(a[i] + (f - i) * (a[i + 1] - a[i]));
+}
 
 /**
  * The order ticket, laid out as on a trading terminal: side, what you can spend, margin, leverage on a slider,
@@ -965,9 +978,7 @@ function OrderForm({ t }: { t: Ticket }) {
               type="button"
               className="lev-stop num"
               aria-pressed={leverage === x}
-              // the last stop ends at the track's end rather than hanging past it
-              style={(x === maxLeverage ? { right: 0 } : { left: `${levToPos(x, maxLeverage)}%`, "--at": levToPos(x, maxLeverage) / 100 }) as React.CSSProperties}
-              data-end={x === maxLeverage || undefined}
+              style={{ left: `${levToPos(x, maxLeverage)}%`, "--at": levToPos(x, maxLeverage) / 100 } as React.CSSProperties}
               onClick={() => setLeverage(x)}
             >
               {x}×

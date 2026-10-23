@@ -524,10 +524,11 @@ body {
     position: absolute;
     top: 0;
     transform: translateX(calc(-50% + 9px - var(--at, 0) * 18px));
-    font-size: 11.5px;
+    font-size: 11px;
     font-weight: 800;
     color: var(--muted);
-    padding: 0 3px;
+    padding: 0 2px;
+    white-space: nowrap;
     border-radius: 5px;
   }
   .lev-stop:hover {
@@ -1364,9 +1365,6 @@ body {
   font-weight: 800;
   white-space: nowrap;
 }
-.lev-stop[data-end] {
-  transform: none;
-}
 
 /* the trades tape beside the chart */
 .tape-row {
@@ -1592,4 +1590,186 @@ kbd {
   height: 2px;
   border-radius: 1px;
   background: var(--primary);
+}
+
+/* the power-on screen (components/Boot.tsx) */
+.boot {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 16px;
+  background-color: var(--bg);
+  background-image: radial-gradient(var(--grille) 1.2px, transparent 1.6px);
+  background-size: 9px 9px;
+  cursor: pointer;
+}
+.boot-console {
+  width: min(440px, 100%);
+  padding: 22px 22px 26px;
+  animation: boot-rise 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.1) both;
+}
+.boot-screen {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  height: 230px;
+  overflow: hidden;
+  /* the screen lighting up: dark, then a flicker, then on */
+  animation: boot-power 0.6s steps(3) 0.25s both;
+}
+.boot-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  /* drops from above the screen in pixel steps, like a handheld's logo */
+  animation: boot-drop 0.9s steps(9) 0.45s both;
+}
+.boot-word {
+  font-size: 40px;
+  line-height: 1;
+  color: var(--lcd-ink);
+}
+.boot-tag {
+  min-height: 18px;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  color: var(--lcd-ink);
+}
+.boot-caret {
+  animation: blink 0.5s steps(1) infinite;
+}
+.boot-start {
+  font-size: 15px;
+  letter-spacing: 0.14em;
+  color: var(--lcd-ink);
+  opacity: 0;
+}
+.boot-start.on {
+  opacity: 1;
+  animation: blink 1s steps(1) infinite;
+}
+.boot-pad {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 22px 18px 0;
+}
+/* a pixel D-pad: a plus of the bezel's colour */
+.boot-dpad {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  background:
+    linear-gradient(var(--bezel), var(--bezel)) center / 20px 100% no-repeat,
+    linear-gradient(var(--bezel), var(--bezel)) center / 100% 20px no-repeat;
+  border-radius: 4px;
+}
+.boot-ab {
+  display: flex;
+  gap: 12px;
+  transform: rotate(-22deg);
+}
+.boot-ab > span {
+  display: grid;
+  place-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  background: var(--primary);
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--primary) 60%, #000);
+  color: var(--on-fill);
+  font: 800 13px var(--font-display);
+}
+.boot-pills {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  margin-top: 16px;
+}
+.boot-pills > span {
+  padding-top: 16px;
+  font: 800 9px var(--font-body);
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  background: linear-gradient(var(--bezel), var(--bezel)) top center / 44px 9px no-repeat;
+  border-radius: 6px;
+}
+.boot-pill-start {
+  animation: boot-nudge 1.6s ease-in-out 2.6s infinite;
+}
+.boot-hint {
+  font-size: 13px;
+  color: var(--muted);
+  animation: boot-fade 0.4s ease-out 2.4s both;
+}
+/* pressing start: the screen flashes white, then the console drops away */
+.boot-leave .boot-screen {
+  animation: boot-flash 0.35s steps(2) both;
+}
+.boot-leave {
+  animation: boot-out 0.65s steps(6) both;
+}
+@keyframes boot-rise {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+@keyframes boot-power {
+  0% {
+    filter: brightness(0.25);
+  }
+  50% {
+    filter: brightness(1.15);
+  }
+  100% {
+    filter: none;
+  }
+}
+@keyframes boot-drop {
+  from {
+    transform: translateY(-170px);
+  }
+}
+@keyframes boot-nudge {
+  50% {
+    transform: translateY(-3px);
+  }
+}
+@keyframes boot-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes boot-flash {
+  50% {
+    filter: brightness(1.8);
+  }
+}
+@keyframes boot-out {
+  to {
+    opacity: 0;
+    transform: scale(1.04);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .boot *,
+  .boot {
+    animation: none !important;
+  }
+  .boot-start.on {
+    opacity: 1;
+  }
+}
+/* already booted this session: hidden before the first paint (app/layout.tsx) */
+:root[data-booted] .boot {
+  display: none;
 }

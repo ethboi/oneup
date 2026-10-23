@@ -2,7 +2,7 @@
 // files. Browsers only allow sound after the page has been interacted with, so the context is created on
 // first use (always after a click here). Muting is per browser.
 
-export type Sfx = "send" | "fill" | "win" | "jackpot" | "lose" | "liquidated" | "plusOne" | "life" | "claim" | "error" | "tilt" | "badge" | "heal" | "round" | "revenge";
+export type Sfx = "send" | "fill" | "win" | "jackpot" | "lose" | "liquidated" | "plusOne" | "life" | "claim" | "error" | "tilt" | "badge" | "heal" | "round" | "revenge" | "boot";
 
 const KEY = "oneup.muted";
 const VOLUME = 0.12;
@@ -127,6 +127,8 @@ const SOUNDS: Record<Sfx, () => Tone[]> = {
       { note: "C7", at: 0.74, len: 0.45, gain: 0.9 },
     ),
   // round over: a short fanfare
+  // the start chime: two quick high notes, then a held one, as a handheld does when it boots
+  boot: () => run(["B5", "E6"], 0.07, "square", 0.7).concat({ note: "B6", at: 0.16, len: 0.4, gain: 0.7 }),
   round: () => run(["G4", "C5", "E5", "G5"], 0.09, "square", 0.8).concat({ note: "C6", at: 0.36, len: 0.35, gain: 0.8 }),
 };
 

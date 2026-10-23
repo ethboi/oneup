@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Boot } from "@/components/Boot";
 import { OneUpProvider } from "@/lib/oneup";
 import { Header } from "@/components/Header";
 import { Trade } from "@/components/Trade";
@@ -125,6 +126,7 @@ export default function Home() {
       <FullHeal />
       <JackpotWin />
       <EpochResults />
+      <Boot />
     </OneUpProvider>
   );
 }
