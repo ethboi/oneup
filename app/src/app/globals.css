@@ -1831,9 +1831,6 @@ kbd {
     0 2px 0 rgb(0 0 0 / 0.4);
   transition: transform 0.08s;
 }
-.boot-pills button i {
-  animation: boot-nudge 1.6s ease-in-out 3.2s infinite;
-}
 .boot-pills button:hover i,
 .boot-pills button.down i {
   transform: translateY(2px);
@@ -1904,11 +1901,6 @@ kbd {
 @keyframes boot-tape {
   to {
     transform: translateX(-50%);
-  }
-}
-@keyframes boot-nudge {
-  50% {
-    transform: translateY(-3px);
   }
 }
 @keyframes boot-fade {
