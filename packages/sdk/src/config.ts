@@ -9,7 +9,8 @@ export interface MarketConfig {
 }
 
 export interface Deployment {
-  network: "localnet";
+  /** Testnet and mainnet are what NearBlocks can show (app/src/lib/explorer.ts); localnet has no explorer. */
+  network: "localnet" | "testnet" | "mainnet";
   rpcUrl: string;
   epochLengthS: number;
   contracts: {

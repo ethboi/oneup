@@ -103,7 +103,9 @@ async function handleOrders() {
   }
 }
 
-async function handlePositions() {
+/** Liquidations, take-profits at the cap and trigger hits. They run on their own fast loop and key (riskLoop):
+ *  at 1000× a 0.09% move liquidates, so waiting behind a batch of fills would leave positions past it. */
+async function handlePositions(risk: ReturnType<OneUp["calls"]>) {
   let all: Position[] = [];
   for (let from = 0; ; from += 100) {
     const page = await oneup.listPositions(from, 100);
@@ -116,20 +118,20 @@ async function handlePositions() {
     const margin = BigInt(p.margin);
     const v = pnl(p.side, margin, p.leverage, BigInt(p.entry_price), px.price);
     if (isLiquidatable(v, margin)) {
-      const ok = await keeper.liquidate(p.id);
+      const ok = await risk.liquidate(p.id);
       log(`${ok ? "liquidated" : "could not liquidate"} #${p.id} ${p.owner} ${p.side} ${p.market_id} ${p.leverage}x`);
     } else if (atProfitCap(v, margin)) {
-      const ok = await keeper.takeProfit(p.id);
+      const ok = await risk.takeProfit(p.id);
       log(`${ok ? "took profit at cap" : "could not take profit"} #${p.id} ${p.owner}`);
     } else if (p.close_order === null && nowS() >= p.opened_at + minHoldS && px.time > p.triggers_set_at) {
       // the trader's own triggers: after the minimum hold, on a price newer than when they were set. A hit
       // places a close, which handleOrders fills at the next price (D-19)
       const { take_profit: tp, stop_loss: sl } = p.triggers;
       if (tp && targetHit(p.side, px.price, BigInt(tp))) {
-        const ok = await keeper.hitTarget(p.id);
+        const ok = await risk.hitTarget(p.id);
         log(`${ok ? "take-profit hit, close placed for" : "could not hit take-profit"} #${p.id} ${p.owner}`);
       } else if (sl && stopHit(p.side, px.price, BigInt(sl))) {
-        const ok = await keeper.hitStop(p.id);
+        const ok = await risk.hitStop(p.id);
         log(`${ok ? "stop-loss hit, close placed for" : "could not hit stop-loss"} #${p.id} ${p.owner}`);
       }
     }
@@ -230,9 +232,19 @@ function controlServer(port: number) {
  * loops don't fight over one key's nonce.
  */
 async function priceSender() {
+  return keySender("keeper-price-key", d.contracts.oracle, ["push_prices"]);
+}
+
+/** The risk loop's own key: it can only liquidate, take profit at the cap and fire triggers on the house. */
+async function riskSender() {
+  return keySender("keeper-risk-key", d.contracts.house, ["liquidate", "take_profit", "hit_target", "hit_stop"]);
+}
+
+/** A sender on the keeper account through a function-call key limited to `methods` on `receiver`. */
+async function keySender(file: string, receiver: string, methods: string[]) {
   // the key is kept beside the chain's state (.localnet/, wiped with it), so a restart reuses it rather than
   // adding another
-  const saved = resolve(dirname(args.config!), ".localnet/keeper-price-key");
+  const saved = resolve(dirname(args.config!), `.localnet/${file}`);
   let kp: KeyPair | null = null;
   try {
     kp = KeyPair.fromString(readFileSync(saved, "utf8").trim() as KeyPairString);
@@ -247,7 +259,7 @@ async function priceSender() {
     // no allowance: a capped key (the library's default is 0.25 NEAR) runs dry after about an hour of pushes
     await main.signAndSendTransaction({
       receiverId: d.keeper.id,
-      actions: [actions.addFunctionCallAccessKey(kp.getPublicKey(), d.contracts.oracle, ["push_prices"])],
+      actions: [actions.addFunctionCallAccessKey(kp.getPublicKey(), receiver, methods)],
     });
     try {
       if (existsSync(dirname(saved))) writeFileSync(saved, kp.toString(), { mode: 0o600 });
@@ -270,10 +282,21 @@ async function priceLoop(pusher: ReturnType<OneUp["calls"]>) {
   }
 }
 
+async function riskLoop(risk: ReturnType<OneUp["calls"]>) {
+  for (;;) {
+    const start = Date.now();
+    try {
+      await handlePositions(risk);
+    } catch (e) {
+      log(`positions: ${e instanceof Error ? e.message.split("\n")[0] : e}`);
+    }
+    await new Promise((r) => setTimeout(r, Math.max(0, Number(args["price-tick"]) - (Date.now() - start))));
+  }
+}
+
 async function tick() {
   const steps: [string, () => Promise<void>][] = [
     ["orders", handleOrders],
-    ["positions", handlePositions],
     ["epoch", handleEpoch],
     ["treasury", handleTreasury],
   ];
@@ -289,6 +312,7 @@ async function tick() {
 log(`keeper ${d.keeper.id} on ${d.rpcUrl}, ${args.prices} prices, ${d.markets.length} markets`);
 controlServer(Number(args.control));
 void priceLoop(await priceSender());
+void riskLoop(await riskSender());
 for (;;) {
   const start = Date.now();
   await tick();

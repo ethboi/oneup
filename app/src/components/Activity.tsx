@@ -3,6 +3,7 @@
 // Live activity: what's happening on the exchange, from the contracts' events (/api/activity).
 
 import { useEffect, useState } from "react";
+import { OnExplorer } from "./ui";
 import { useNow } from "./Header";
 import { Icon, type IconName } from "./Icon";
 
@@ -19,6 +20,8 @@ export interface ActivityItem {
   trade?: { market: string; side: "Long" | "Short"; size: string; price: string; open: boolean };
   /** On a jackpot draw: its round and the winner's tickets out of all of them (lib/server/activity.ts). */
   draw?: { epoch: number; tickets?: string; total?: string };
+  /** The transaction the event came from (lib/explorer.ts links it on testnet and mainnet). */
+  tx?: string;
 }
 
 const LOOK: Record<ActivityItem["kind"], { icon: IconName; color: string }> = {
@@ -74,6 +77,7 @@ export function ActivityList({ items, limit = 8, empty = "Waiting for activityâ€
           </span>
           <span className="min-w-0 flex-1 leading-snug">{a.text}</span>
           <span className="label num shrink-0">{ago(now, a.t)}</span>
+          {a.tx && <OnExplorer tx={a.tx} />}
         </li>
       ))}
     </ul>

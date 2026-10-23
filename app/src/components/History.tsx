@@ -4,6 +4,7 @@
 // Extra Lives and locks you got, and market sales. Built from chain events by /api/history.
 
 import { useEffect, useState } from "react";
+import { OnExplorer } from "./ui";
 import { fmtUsdc } from "@oneup/sdk";
 import { useOneUp } from "@/lib/oneup";
 import type { HistoryItem } from "@/lib/server/activity";
@@ -187,6 +188,7 @@ function Row({ i, me }: { i: HistoryItem; me: string }) {
       </span>
       {amount}
       {share}
+      {i.tx && <OnExplorer tx={i.tx} />}
     </li>
   );
 }

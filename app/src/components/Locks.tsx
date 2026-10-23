@@ -11,7 +11,7 @@ import { lockValue, useOneupPrice } from "@/lib/value";
 import { fmtOneup, fmtUsd } from "./Header";
 import { Icon } from "./Icon";
 import { Sell, useListings } from "./Sell";
-import { Empty, Explainer, PanelHead, Stat, SummaryBar } from "./ui";
+import { Empty, Explainer, OnExplorer, PanelHead, Stat, SummaryBar } from "./ui";
 
 const MAX = Number(VE_MAX_EPOCHS);
 
@@ -136,7 +136,10 @@ function LockRow({ l, epoch, px, claimable, listings }: { l: LockInfo; epoch: nu
       {/* fixed widths on the right, as on Extra Lives, so the bars line up */}
       <div className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_6.5rem_16rem] sm:gap-x-4">
         <div className="min-w-0">
-          <div className="num font-extrabold">{fmtOneup(l.amount)} $1UP</div>
+          <div className="num flex items-center gap-1.5 font-extrabold">
+            {fmtOneup(l.amount)} $1UP
+            <OnExplorer nft={{ contract: d.contracts.ve, id: l.token_id }} />
+          </div>
           <div className="label truncate">{origin}</div>
         </div>
         <div className="col-span-2 row-start-2 sm:col-span-1 sm:row-start-1 sm:col-start-2">

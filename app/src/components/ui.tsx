@@ -6,6 +6,8 @@
 
 import { useState } from "react";
 import { Icon } from "./Icon";
+import { useOneUp } from "@/lib/oneup";
+import { explorer } from "@/lib/explorer";
 
 export function Section({ title, action, children }: { title: React.ReactNode; action?: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -78,5 +80,18 @@ export function PanelHead({ title, action }: { title: React.ReactNode; action?: 
       <h3 className="font-extrabold">{title}</h3>
       {action}
     </div>
+  );
+}
+
+/** "View on NearBlocks" for a transaction, account or NFT; nothing on localnet, which no explorer indexes. */
+export function OnExplorer({ tx, account, nft }: { tx?: string; account?: string; nft?: { contract: string; id: string } }) {
+  const { d } = useOneUp();
+  const x = explorer(d.network);
+  const href = tx ? x.tx(tx) : account ? x.account(account) : nft ? x.nft(nft.contract, nft.id) : null;
+  if (!href) return null;
+  return (
+    <a href={href} target="_blank" rel="noreferrer" className="shrink-0 text-[var(--muted)] hover:text-[var(--text)]" title="View on NearBlocks" aria-label="View on NearBlocks">
+      <Icon name="share" size={13} />
+    </a>
   );
 }

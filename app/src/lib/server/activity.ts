@@ -27,6 +27,8 @@ export interface ActivityItem {
   /** On an open or a close: the trade, for the trades tape (size and price in USDC 1e6 and price 1e8 units). A
    *  close only carries it when its open was seen. */
   trade?: { market: string; side: "Long" | "Short"; size: string; price: string; open: boolean };
+  /** The transaction the event came from, for an explorer link. */
+  tx?: string;
 }
 
 /** One closed trade: its open and close events joined by position id. */
@@ -50,7 +52,8 @@ export interface TradeRecord {
 }
 
 export type HistoryItem = HistoryEntry & { seq: number };
-type HistoryEntry = { t: number } & (
+/** `tx`: the transaction the event came from, for an explorer link. */
+type HistoryEntry = { t: number; tx?: string } & (
   | { kind: "trade"; trade: TradeRecord }
   | { kind: "deposit" | "withdraw" | "claim_usdc"; amount: string }
   | { kind: "backed"; amount: string; cap_ppm: string }
@@ -273,10 +276,10 @@ export function toItems(ev: Event, executor: string, t: number, c: Record<string
 }
 
 /** Reads one block's OneUp events, without recording them (blocks are read in parallel, recorded in order). */
-async function readBlock(url: string, height: number, c: Record<string, string>): Promise<{ t: number; logs: [string, string][] }> {
+async function readBlock(url: string, height: number, c: Record<string, string>): Promise<{ t: number; logs: [string, string, string][] }> {
   const block = await rpc<{ header: { timestamp_nanosec: string }; chunks: { chunk_hash: string; tx_root: string }[] }>(url, "block", { block_id: height });
   const t = Math.floor(Number(block.header.timestamp_nanosec) / 1e6);
-  const logs: [string, string][] = [];
+  const logs: [string, string, string][] = [];
   for (const ch of block.chunks) {
     if (ch.tx_root === "11111111111111111111111111111111") continue; // no transactions
     const chunk = await rpc<{ transactions: { hash: string; signer_id: string; receiver_id: string }[] }>(url, "chunk", { chunk_id: ch.chunk_hash });
@@ -288,21 +291,25 @@ async function readBlock(url: string, height: number, c: Record<string, string>)
         wait_until: "NONE",
       }).catch(() => null);
       for (const r of res?.receipts_outcome ?? []) {
-        for (const log of r.outcome.logs) if (log.startsWith("EVENT_JSON:")) logs.push([r.outcome.executor_id, log.slice(11)]);
+        for (const log of r.outcome.logs) if (log.startsWith("EVENT_JSON:")) logs.push([r.outcome.executor_id, log.slice(11), tx.hash]);
       }
     }
   }
   return { t, logs };
 }
 
-function record(block: { t: number; logs: [string, string][] }, c: Record<string, string>) {
+function record(block: { t: number; logs: [string, string, string][] }, c: Record<string, string>) {
   const out: Out = { feed: [], history: [] };
-  for (const [executor, json] of block.logs) {
+  for (const [executor, json, tx] of block.logs) {
+    const [f, h] = [out.feed.length, out.history.length];
     try {
       toItems(JSON.parse(json), executor, block.t, c, out);
     } catch {
       // not ours or malformed
     }
+    // what this event added carries its transaction
+    for (const item of out.feed.slice(f)) item.tx = tx;
+    for (const [, item] of out.history.slice(h)) item.tx = tx;
   }
   for (const item of out.feed) {
     // a live sale waits for its valuation (valueSales), so it reaches the feed with it

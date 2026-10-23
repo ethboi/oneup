@@ -11,7 +11,7 @@ import { fmtClock, fmtOneup, fmtUsd as money, useNow } from "./Header";
 import { Icon } from "./Icon";
 import { HealthBar, PixelHeart } from "./Pixel";
 import { Sell, useListings } from "./Sell";
-import { Empty, Explainer, PanelHead, Stat, SummaryBar } from "./ui";
+import { Empty, Explainer, OnExplorer, PanelHead, Stat, SummaryBar } from "./ui";
 
 
 export function Lives() {
@@ -137,7 +137,10 @@ function LifeRow({ l, expiry, listings }: { l: LifeInfo; expiry?: number; listin
       {/* while earning the heart stays pink, filling as it pays out; finished ones go grey */}
       <PixelHeart size={34} fill={l.full_heal ? 1 : earning ? progress : 0} live={earning} label={`${state}, ${(progress * 100).toFixed(0)}% paid`} />
       <div className="min-w-0">
-        <div className="font-extrabold">{l.backer ? `Backer Life #${l.token_id.slice(1)}` : `From round ${l.epoch}`}</div>
+        <div className="flex items-center gap-1.5 font-extrabold">
+          {l.backer ? `Backer Life #${l.token_id.slice(1)}` : `From round ${l.epoch}`}
+          <OnExplorer nft={{ contract: d.contracts.life, id: l.token_id }} />
+        </div>
         <div className="label truncate">{state}</div>
       </div>
       <div className="col-span-3 row-start-2 sm:col-span-1 sm:row-start-1 sm:col-start-3">
