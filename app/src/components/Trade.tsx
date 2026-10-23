@@ -740,13 +740,17 @@ function Console({
           {(revenge || tilt > 0) && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center" role="status">
               {revenge ? (
+                // a warning banner slammed across the screen
                 <span key={revenge} className="revenge display">
-                  REVENGE TRADE
-                  <br />
-                  DETECTED
+                  <span className="revenge-word">REVENGE TRADE</span>
+                  <span className="revenge-tag">DETECTED</span>
                 </span>
               ) : (
-                <span className="tilt display">TILT</span>
+                // a pinball machine's TILT, with how long the cool-down has left
+                <span className="tilt display">
+                  <span className="tilt-word">TILT</span>
+                  <span className="tilt-cool num">COOL DOWN {fmtClock(tilt)}</span>
+                </span>
               )}
             </div>
           )}

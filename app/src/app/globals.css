@@ -1019,38 +1019,105 @@ body {
 
 /* "REVENGE TRADE DETECTED", stamped on the screen for a few seconds */
 .revenge {
-  font-size: 34px;
-  line-height: 1.1;
-  text-align: center;
-  color: #c43636;
-  text-shadow: 2px 2px 0 var(--lcd-ink);
-  animation: revenge-stamp 3.5s ease-out both;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 112%;
+  padding: 18px 0 16px;
+  transform: rotate(-6deg);
+  /* hazard stripes along both edges, on a red band */
+  background:
+    repeating-linear-gradient(-45deg, var(--lcd-ink) 0 12px, #f2b705 12px 24px) top / 100% 10px no-repeat,
+    repeating-linear-gradient(-45deg, var(--lcd-ink) 0 12px, #f2b705 12px 24px) bottom / 100% 10px no-repeat,
+    #c43636;
+  box-shadow: 0 6px 0 rgb(0 0 0 / 0.35);
+  animation: revenge-slam 3.6s cubic-bezier(0.2, 1.4, 0.4, 1) both;
 }
-@keyframes revenge-stamp {
+/* chunky letters: a thick ink outline and a hard drop, like an arcade warning */
+.revenge-word {
+  font-size: clamp(30px, 6.4vw, 54px);
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: #fff;
+  -webkit-text-stroke: 2px var(--lcd-ink);
+  paint-order: stroke fill;
+  text-shadow:
+    4px 4px 0 var(--lcd-ink),
+    5px 5px 0 var(--lcd-ink);
+}
+.revenge-tag {
+  padding: 3px 12px;
+  font-size: clamp(13px, 2.4vw, 18px);
+  letter-spacing: 0.3em;
+  color: #f2b705;
+  background: var(--lcd-ink);
+  animation: blink 0.4s steps(1) 0.5s 5;
+}
+@keyframes revenge-slam {
   0% {
-    transform: scale(2.2) rotate(-8deg);
+    transform: rotate(-6deg) scale(2.4);
     opacity: 0;
   }
-  12% {
-    transform: scale(1) rotate(-4deg);
+  10% {
+    transform: rotate(-6deg) scale(1);
     opacity: 1;
   }
-  80% {
+  13% {
+    transform: rotate(-6deg) translate(-6px, 3px);
+  }
+  16% {
+    transform: rotate(-6deg) translate(5px, -2px);
+  }
+  19%,
+  85% {
+    transform: rotate(-6deg);
     opacity: 1;
   }
   100% {
+    transform: rotate(-6deg) translateX(30px);
     opacity: 0;
   }
 }
 
 /* pinball TILT, flashed on the screen for a minute after three quick losses */
 .tilt {
-  font-size: 64px;
-  line-height: 1;
-  color: #c43636;
-  letter-spacing: 0.08em;
-  text-shadow: 3px 3px 0 var(--lcd-ink);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 30px 12px;
+  border: 5px double var(--lcd-ink);
+  border-radius: 6px;
+  background: var(--lcd);
+  box-shadow:
+    0 0 0 3px var(--lcd),
+    0 0 0 6px #c43636;
+}
+.tilt-word {
+  font-size: clamp(64px, 14vw, 120px);
+  line-height: 0.9;
+  letter-spacing: 0.1em;
+  color: #e23b3b;
+  -webkit-text-stroke: 3px var(--lcd-ink);
+  paint-order: stroke fill;
+  text-shadow:
+    5px 5px 0 var(--lcd-ink),
+    6px 6px 0 var(--lcd-ink);
   animation: blink 0.8s steps(1) infinite;
+}
+.tilt-cool {
+  font-size: clamp(12px, 2.2vw, 16px);
+  letter-spacing: 0.2em;
+  color: var(--lcd-ink);
+}
+@media (prefers-reduced-motion: reduce) {
+  .revenge,
+  .revenge-tag,
+  .tilt-word {
+    animation: none;
+  }
 }
 
 /* the console's mood (components/Mood.tsx) */
