@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Boot } from "@/components/Boot";
 import { OneUpProvider } from "@/lib/oneup";
 import { Header } from "@/components/Header";
@@ -44,13 +44,26 @@ const MORE_TABS: Tab[] = ["House", "About"];
 const NARROW_MORE_TABS: Tab[] = ["Leaders", "Backing", "$1UP"];
 const PHONE_LABEL: Partial<Record<Tab, string>> = { "Extra Lives": "Lives" };
 
+/** Each tab's address: /locks, /extra-lives, /house… (Trade is the root). */
+const slug = (t: Tab) => (t === "Trade" ? "" : t.toLowerCase().replace(/\$/g, "").replace(/\s+/g, "-"));
+const fromPath = (path: string): Tab => TABS.find((t) => slug(t) === path.replace(/^\/+|\/+$/g, "").toLowerCase()) ?? "Trade";
+
 export default function Home() {
   const [tab, setTab] = useState<Tab>("Trade");
   const [more, setMore] = useState(false);
+  // the address picks the tab, and Back and Forward move between tabs
+  useEffect(() => {
+    const read = () => setTab(fromPath(location.pathname));
+    read();
+    window.addEventListener("popstate", read);
+    return () => window.removeEventListener("popstate", read);
+  }, []);
   /** Opens a tab at its top, or at the section with id `at`. */
   const go = (t: Tab, at?: string) => {
     setTab(t);
     setMore(false);
+    const url = `/${slug(t)}${location.search}${at ? `#${at}` : ""}`;
+    if (url !== location.pathname + location.search + location.hash) history.pushState(null, "", url);
     if (at) setTimeout(() => document.getElementById(at)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
     else window.scrollTo({ top: 0 });
   };
