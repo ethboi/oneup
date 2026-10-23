@@ -76,7 +76,7 @@ const NEAR: { title: string; status: Status; body: string; points: string[]; mar
     body: "Nine contracts written with near-sdk 5, built with cargo-near.",
     points: [
       "House, Extra Life, $1UP, ve locks and the market, plus mock USDC, oracle, swap and yield vault",
-      "Contract accounts have their keys deleted after deploy, so nobody can redeploy them",
+      "Contract access keys are deleted after deploy; this does not remove any administrative methods built into a contract",
       "Cross-contract calls with callbacks for every payout, mint and recall",
     ],
   },
@@ -96,11 +96,11 @@ const NEAR: { title: string; status: Status; body: string; points: string[]; mar
     title: "NEAR Intents",
     marks: [{ name: "intents", label: "NEAR Intents" }],
     status: "simulated",
-    body: "Pay from Ethereum or Solana in one signature: bridge, swap to USDC and deposit, as one intent.",
+    body: "Simulate funding from Ethereum or Solana, then execute a signed swap and deposit on the local Intents Verifier.",
     points: [
       "The official Verifier and PoA token factory (release 0.4.2) run on the local chain",
       "Intents are signed with the official SDK; OneUp's solver fills them with execute_intents",
-      "Local bridge credit is simulated; no real Ethereum/Solana deposit or 1Click integration is implemented",
+      "No real Ethereum/Solana deposit or 1Click integration is implemented; first-use setup can require an additional signature",
     ],
   },
   {
@@ -190,7 +190,7 @@ export function About() {
         <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
           <div className="flex-1">
             <p className="label">
-              Our entry for NEAR HACKATHON, November 2026, by{" "}
+              Building toward NEAR HACKATHON, November 2026, by{" "}
               <a className="font-bold text-[var(--text)] underline decoration-dotted underline-offset-2" href="https://x.com/ethboi_" target="_blank" rel="noreferrer">
                 ethboi
               </a>
@@ -326,8 +326,8 @@ export function About() {
         <section className="p-5">
           <h2 className="text-lg font-extrabold">This demo</h2>
           <p className="mt-2 max-w-3xl text-sm text-[var(--muted)]">
-            Everything runs on a local NEAR chain started with one command. Prices are real (Binance, with Coinbase as a
-            fallback), pushed to a Pyth-compatible oracle; USDC and the buyback swap are local stand-ins. Planned integrations include Outlayer and Rhea, without real-network proof. The ordinary demo has live prices and 10-minute rounds; the separate judge profile has fixed controllable prices and 45-second rounds.
+            Everything runs on a local NEAR chain started with one command. Live mode pushes Binance prices (Coinbase as a
+            fallback) to a Pyth-compatible mock oracle; USDC and the buyback swap are local stand-ins. Planned integrations include Outlayer and Rhea, without real-network proof. Fresh ordinary demos default to live prices and 10-minute rounds; existing demos retain their configured cadence. The separate judge profile has fixed controllable prices and 45-second rounds.
           </p>
         </section>
       </div>

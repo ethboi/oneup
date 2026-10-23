@@ -1,6 +1,6 @@
 # Third-party notices and scope
 
-The future license chosen for original OneUp code does not relicense third-party works. Preserve the
+The license for original OneUp code does not relicense third-party works. Preserve the
 notices below when redistributing the corresponding binaries. This inventory is not a claim that all
 transitive dependency obligations have been audited.
 

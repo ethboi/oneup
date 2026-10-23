@@ -54,8 +54,8 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
           <p className="label">The bootstrap round</p>
           <h1 className="display mt-2 text-3xl leading-tight sm:text-4xl">Back the house</h1>
           <p className="mt-3 max-w-2xl text-[var(--muted)]">
-            The house can only take trades it could pay in full, so it needs a deep pool. Back it with USDC and you get a Backer Life
-            that pays you back from house profit, more the earlier you come in, plus $1UP locked for 104 rounds that earns the
+            Trade admission reserves capped maximum wins against the pool. Back it with USDC and you get a Backer Life
+            that can receive future house profit up to a cap, plus $1UP locked for 104 rounds that earns the
             house&apos;s buybacks.
           </p>
           <div className="mt-5 max-w-2xl">
@@ -71,7 +71,7 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
           </div>
           <dl className="num mt-5 grid max-w-2xl grid-cols-3 gap-4">
             <div>
-              <dt className="label">Owed per $1 now</dt>
+              <dt className="label">Payout cap per $1 now</dt>
               <dd className="text-xl font-extrabold">{capNow === null ? "…" : `${capNow.toFixed(2)}×`}</dd>
             </div>
             <div>
@@ -96,8 +96,8 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card icon={<PixelHeart size={26} />} title="A Backer Life">
-          An Extra Life that never expires. It&apos;s owed 2.0× for the round&apos;s first dollar down to 1.2× for its last, and is paid
-          from a third of every round&apos;s Extra Life payout until it&apos;s paid in full.
+          An Extra Life that never expires, with a cap determined by pool size. It shares a third of each round&apos;s Extra Life
+          payout, with unused shares passed across. Future profit may never repay the full cap.
         </Card>
         <Card icon={<PixelLock size={24} />} title="$1UP, locked">
           10 $1UP per $1, locked for 104 rounds like a loser&apos;s lock. It earns a share of every buyback, so you share in the
@@ -105,17 +105,17 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
         </Card>
         <Card icon={<Icon name="store" size={22} />} title="An exit">
           Backing can&apos;t be withdrawn: the USDC is the pool traders trade against. To get out early, sell the Backer Life (or the
-          lock) on the Market.
+          lock) on the Market if a buyer is willing. A listing does not guarantee a sale.
         </Card>
       </div>
 
       <Backing />
 
       <section className="panel p-5">
-        <h2 className="text-lg font-extrabold">When it pays back</h2>
+        <h2 className="text-lg font-extrabold">Illustrative payout times</h2>
         <p className="label mt-1 max-w-3xl">
           It depends on how much traders lose: a Backer Life is paid only from house profit. For a full $1M round, with weekly rounds and
-          the house keeping 15% of traders&apos; losses on average (median of 200 simulated runs, <code>pnpm --filter @oneup/sim backers</code>):
+          the house keeping 15% of traders&apos; losses on average (median of 200 simulated runs, <code>pnpm --filter @oneup/sim backers</code>). These scenarios are not forecasts; less profit can leave caps unpaid indefinitely:
         </p>
         <table className="num mt-3 w-full max-w-xl text-sm">
           <thead>
@@ -173,7 +173,7 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
         </section>
         <section className="panel p-5">
           <h2 className="text-lg font-extrabold">Backer Lives for sale</h2>
-          <p className="label mt-1">The exit: someone else&apos;s backing, bought at their price.</p>
+          <p className="label mt-1">Listings for someone else&apos;s Backer Life. A transfer requires a buyer willing to pay the listed price.</p>
           {listings.length === 0 ? (
             <p className="label mt-3">None listed right now.</p>
           ) : (

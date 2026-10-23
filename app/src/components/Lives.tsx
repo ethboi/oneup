@@ -63,7 +63,7 @@ export function Lives() {
         <div className="divide-y divide-[var(--line)]">
           <PanelHead title={`Earning (${earning.length})`} />
           {earning.length === 0 ? (
-            <Empty icon="heart">No Extra Lives earning. Lose a trade in a round the house ends in profit and one arrives when it closes.</Empty>
+            <Empty icon="heart">No Extra Lives earning. Eligible net losses in a profitable round can receive one when the round settles.</Empty>
           ) : (
             earning.map((l) => <LifeRow key={l.token_id} l={l} expiry={expiry} listings={listings} />)
           )}
@@ -104,10 +104,10 @@ function NextLife({ epochId, left }: { epochId?: number; left: number }) {
     <div className="flex items-center gap-3 bg-[var(--panel-2)] px-4 py-3">
       <PixelHeart size={28} fill={lost > 0n ? 0.5 : 0} />
       <div className="min-w-0 flex-1 text-sm">
-        <b>Next Extra Life, round {epochId ?? "…"}</b>
+        <b>Potential Extra Life, round {epochId ?? "…"}</b>
         <div className="label num">
           {lost > 0n
-            ? `$${fmtUsdc(lost)} lost so far${oneup > 0n ? `, plus about ${fmtOneup(oneup.toString())} $1UP` : ""}. Mints in ${fmtClock(Math.max(0, left - now))}.`
+            ? `$${fmtUsdc(lost)} net loss so far${oneup > 0n ? `, plus about ${fmtOneup(oneup.toString())} $1UP if settled now` : ""}. Round ends in ${fmtClock(Math.max(0, left - now))}; eligibility and amounts depend on final house profit.`
             : `Nothing lost this round. It closes in ${fmtClock(Math.max(0, left - now))}.`}
         </div>
       </div>
@@ -126,7 +126,7 @@ function LifeRow({ l, expiry, listings }: { l: LifeInfo; expiry?: number; listin
     : l.expired
       ? "Expired"
       : l.backer
-        ? "Earning until paid in full"
+        ? "No expiry; payouts depend on profit"
         : `Earning through round ${l.epoch + (expiry ?? 13)}`;
   const value = lifeValue(l);
   const claimable = BigInt(l.claimable);
@@ -152,7 +152,7 @@ function LifeRow({ l, expiry, listings }: { l: LifeInfo; expiry?: number; listin
         <div className="num font-extrabold" style={claimable > 0n ? { color: "var(--long)" } : undefined}>
           {claimable > 0n ? money(claimable) : earning ? money(value) : "–"}
         </div>
-        <div className="label">{claimable > 0n ? "to claim" : earning ? "to go" : ""}</div>
+        <div className="label">{claimable > 0n ? "to claim" : earning ? "remaining cap" : ""}</div>
       </div>
       <div className="col-span-3 sm:col-span-1">
         {value > 0n && <Sell nft={d.contracts.life} tokenId={l.token_id} suggested={(value * 7n) / 10n} listings={listings} compact />}

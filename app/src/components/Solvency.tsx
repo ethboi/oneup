@@ -46,8 +46,8 @@ export function Solvency() {
           <span className="num font-bold">{used.toFixed(1)}%</span> of the pool.
         </p>
         <p className="label mt-1">
-          Every trade that would push this past 100% is refused, so there is never a payout queue. Both sides of each market
-          are counted, because positions close at different times.
+          Admission refuses trades whose reserved maximum wins would exceed pool capacity. Both sides of each market
+          and pending opens are counted. This accounting check does not guarantee withdrawal timing or eliminate custody, oracle or contract risk.
         </p>
         {epoch && (
           <p className="mt-3 text-sm">
@@ -63,8 +63,8 @@ export function Solvency() {
           <p className="mt-3 flex items-center gap-2 text-sm">
             <Icon name="info" />
             <span>
-              No payouts until the pool is back above its <b className="num">${fmtUsdc(big(s.seed), 0)}</b> seed. It&apos;s{" "}
-              <b className="num">${fmtUsdc(big(s.seed) - pool, 0)}</b> short, so this round&apos;s Extra Lives and buyback wait for profit.
+              No surplus distributions until the pool is back above its <b className="num">${fmtUsdc(big(s.seed), 0)}</b> seed. It&apos;s{" "}
+              <b className="num">${fmtUsdc(big(s.seed) - pool, 0)}</b> short, so Extra Life payouts and buybacks need further surplus.
             </span>
           </p>
         )}

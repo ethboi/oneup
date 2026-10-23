@@ -104,7 +104,7 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
               <span style={{ color: "var(--jackpot)" }}>${fmtUsdc(jackpot, jackpot < 100n * USDC ? 2 : 0)}</span>
             </button>
           )}
-          <span className="bar-cell" title={`Round ${epoch?.id ?? ""} ends in ${fmtClock(left)}, with Extra Lives and $1UP locks for its losers`}>
+          <span className="bar-cell" title={`Round ${epoch?.id ?? ""} ends in ${fmtClock(left)}. Eligible net losses can receive Extra Lives and $1UP locks if the house profits`}>
             {/* the label goes on narrow desktops too, where the tabs need the room */}
             <span className="label hidden sm:inline lg:hidden 2xl:inline">Round {epoch?.id ?? "…"}</span>
             <b>{fmtClock(left)}</b>
@@ -114,7 +114,7 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
               className="bar-cell"
               title={
                 round.net < 0n
-                  ? "Your net loss this round. When the round ends it becomes an Extra Life and a $1UP lock, sized from the house's profit."
+                  ? "Your net loss this round. If the house ends in profit, eligible net losses can receive an Extra Life and a $1UP lock. Recovery can be zero."
                   : "Your net profit this round, after the winner's cut."
               }
             >
@@ -123,7 +123,7 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
                 {round.net < 0n ? "−" : "+"}${fmtUsdc(round.net < 0n ? -round.net : round.net, (round.net < 0n ? -round.net : round.net) < 100n * USDC ? 2 : 0)}
               </b>
               {round.net < 0n && (
-                <span aria-label="Extra Life at the end of the round">
+                <span aria-label="Potential Extra Life if this round ends in house profit">
                   <PixelHeart size={14} />
                 </span>
               )}
@@ -316,7 +316,7 @@ function ChainDeposit() {
   const leftovers = Object.entries(held ?? {}).filter(([, v]) => v > 0n);
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-[var(--line)] p-3">
-      <div className="text-sm font-bold">Deposit from another chain</div>
+      <div className="text-sm font-bold">Simulate a cross-chain deposit</div>
       <div className="flex gap-2">
         <select className="input min-w-0 flex-1" value={token} onChange={(e) => setToken(e.target.value)} aria-label="Source asset">
           {assets.map((x) => (
@@ -334,7 +334,7 @@ function ChainDeposit() {
         className="btn btn-ghost"
         disabled={usdc === 0n || step !== null}
         onClick={() =>
-          run(`Deposit $${amount} from ${a.symbol} on ${a.chain}`, () =>
+          run(`Simulate $${amount} from ${a.symbol} on ${a.chain}`, () =>
             payFromChain({ o, d, main, keyString: mainKey, asset: a, usdc, then: { kind: "deposit" }, onStep: setStep }).finally(() => setStep(null)),
           )
         }
@@ -344,10 +344,10 @@ function ChainDeposit() {
             <Icon name="spinner" /> {step}
           </>
         ) : (
-          "Deposit via NEAR Intents"
+          "Simulate deposit via NEAR Intents"
         )}
       </button>
-      <p className="label">The bridge is simulated on this local chain; the swap runs on the real NEAR Intents Verifier.</p>
+      <p className="label">Bridge credits are simulated. Signed intents execute on the official Verifier deployed locally; no funds arrive from another chain. First-use setup can require an additional signature.</p>
       {leftovers.length > 0 && (
         <p className="label num">
           Held in NEAR Intents:{" "}

@@ -149,7 +149,7 @@ function EmptyMarket({ filter }: { filter: Filter }) {
         {filter === "lock" ? <PixelLock size={28} /> : <PixelHeart size={28} />}
         <span>
           <b className="block">No {what} for sale right now.</b>
-          <span className="label">Lost a trade? Your Extra Life and $1UP lock can be listed here.</span>
+          <span className="label">Own an Extra Life or $1UP lock? List it here to seek a buyer.</span>
         </span>
       </span>
       <a href="#sell" className="btn btn-ghost">
@@ -171,13 +171,12 @@ function YourItems({ px, listings }: { px: bigint; listings: Listing[] }) {
   const shownLives = all ? lives : lives.slice(0, 3);
   const shownLocks = all ? locks : locks.slice(0, Math.max(0, 3 - shownLives.length));
   if (total === 0) {
-    return <p className="label px-4 pb-4">Nothing to sell yet. Extra Lives and $1UP locks arrive when you lose a trade.</p>;
+    return <p className="label px-4 pb-4">Nothing to sell yet. Eligible net losses in profitable rounds can receive Extra Lives and $1UP locks.</p>;
   }
   return (
     <div className="divide-y divide-[var(--line)]">
       <p className="label px-4 pb-3">
-        Suggested prices are 70% of what a life can still pay and 80% of a lock&apos;s value if left today. You get the price less a 2% fee
-        that goes to the house pool.
+        Suggested prices use 70% of a Life&apos;s remaining payout cap or 80% of a lock&apos;s current exit estimate. These are listing defaults, not expected values. A willing buyer is required; sellers receive the price less the 2% fee.
       </p>
       {shownLives.map((l) => (
         <div key={l.token_id} className="flex flex-col gap-2 p-3">
@@ -185,7 +184,7 @@ function YourItems({ px, listings }: { px: bigint; listings: Listing[] }) {
             <PixelHeart size={24} />
             <span className="min-w-0">
               <b className="block">{l.backer ? "Backer Life" : `Extra Life from round ${l.epoch}`}</b>
-              <span className="label num">{usd(lifeValue(l))} still to pay</span>
+              <span className="label num">{usd(lifeValue(l))} maximum remaining payout</span>
             </span>
           </span>
           <Sell nft={d.contracts.life} tokenId={l.token_id} suggested={(lifeValue(l) * 7n) / 10n} listings={listings} compact />

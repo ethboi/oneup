@@ -1,20 +1,21 @@
 # OneUp contract interfaces
 
-Five contracts plus three mocks, all near-sdk Rust. Amounts are `U128` strings in JSON, units as in
+Five product contracts plus four mocks, all near-sdk Rust. Amounts are `U128` strings in JSON, units as in
 [maths.md](maths.md). Events follow NEP-297 with `standard: "oneup"`, `version: "1.0.0"`.
 
-| Contract | Testnet account | Holds |
+| Contract | Example local account | Holds |
 |---|---|---|
-| `house` | `house.oneup.testnet` | pool + trader USDC, positions, epochs, 900M $1UP for emissions |
-| `extra-life` (`oneup-extra-life`) | `life.oneup.testnet` | Extra Life NFTs + USDC paid to them, until claimed |
-| `oneup-token` | `token.oneup.testnet` | $1UP ledger |
-| `ve` | `ve.oneup.testnet` | locked $1UP as lock NFTs, buyback $1UP and exit penalties for lockers |
-| `market` (`oneup-market`) | `market.oneup.testnet` | listings of Extra Lives and locks; USDC only while a purchase is in flight |
-| `mock-usdc` | `usdc.oneup.testnet` | demo collateral with a faucet (D-8) |
-| `mock-oracle` | `oracle.oneup.testnet` | testnet prices pushed by the keeper from Pyth Hermes (D-6) |
-| `mock-swap` | `swap.oneup.testnet` | USDC → $1UP buybacks on testnet (D-9) |
+| `house` | `house.test.near` | pool + trader USDC, positions, epochs, 900M $1UP for emissions |
+| `extra-life` (`oneup-extra-life`) | `life.test.near` | Extra Life NFTs + USDC paid to them, until claimed |
+| `oneup-token` | `oneup.test.near` | $1UP ledger |
+| `ve` | `ve.test.near` | locked $1UP as lock NFTs, buyback $1UP and exit penalties for lockers |
+| `market` (`oneup-market`) | `market.test.near` | listings of Extra Lives and locks; USDC only while a purchase is in flight |
+| `mock-usdc` | `usdc.test.near` | demo collateral with a faucet (D-8) |
+| `mock-oracle` | `oracle.test.near` | Pyth-compatible mock; keeper pushes live, simulated or fixed prices |
+| `mock-swap` | `swap.test.near` | local constant-product USDC → $1UP buybacks |
+| `mock-vault` | `vault.test.near` | mock USDC lending and accelerated interest |
 
-Account names are placeholders until `oneup.testnet` is created.
+Account names are examples under the local root `test.near`; use the generated deployment config for authoritative addresses. No testnet or mainnet deployment is implied.
 
 ## Who calls what
 
@@ -36,8 +37,7 @@ buyer  ──ft_transfer_call──▶ usdc ──▶ market ──▶ life|ve.n
 
 | Method | Caller | Does |
 |---|---|---|
-| `ft_on_transfer(sender_id, amount, msg)` | USDC contract | `msg = ""` credits the sender's free balance; `{"open":{market_id, side, margin, leverage, take_profit?, stop_loss?, limit_price?}}` credits it and places an open in the same step (a refused open refunds the whole transfer); `{"seed":{}}` (owner) adds to the pool and mints a 1.0× Backer Life; `{"back":{}}` (anyone, ≥ 10 USDC, until the total seeded reaches `backing_target`) adds to the pool, mints a Backer Life owed `backer_cap_ppm(pool, amount)` (D-22) and locks
-`backer_oneup_per_usdc` (10) $1UP per USDC for two years from the backers' allocation (D-26); from the Intents Verifier only, `{"for":{account_id}}` and `open` with `account_id` credit that account, and an open may not exceed the deposit (D-21). A new balance needs at least `min_margin` |
+| `ft_on_transfer(sender_id, amount, msg)` | USDC contract | `msg = ""` credits the sender's free balance; `{"open":{market_id, side, margin, leverage, take_profit?, stop_loss?, limit_price?}}` credits it and places an open in the same step (a refused open refunds the whole transfer); `{"seed":{}}` (owner) adds to the pool and mints a 1.0× Backer Life; `{"back":{}}` (anyone, ≥ 10 USDC, until the total seeded reaches `backing_target`) adds to the pool, mints a Backer Life owed `backer_cap_ppm(pool, amount)` (D-22) and locks `backer_oneup_per_usdc` (10) $1UP per USDC for 104 epochs (two years only at weekly cadence) from the backers' allocation (D-26); from the Intents Verifier only, `{"for":{account_id}}` and `open` with `account_id` credit that account, and an open may not exceed the deposit (D-21). A new balance needs at least `min_margin` |
 | `withdraw(amount)` | trader | sends free balance; refunds on failed transfer |
 | `place_open(market_id, side, margin, leverage, take_profit?, stop_loss?) → order_id` | trader | moves margin from free balance into the order; pre-checks solvency and capacity with the order counted; optional trigger prices go with the position (D-19) |
 | `place_limit_open(market_id, side, margin, leverage, limit_price, take_profit?, stop_loss?) → order_id` | trader | as `place_open`, but rests until a newer price is at or past `limit_price` (≤ for a long, ≥ for a short) and fills at that price; expires after `limit_expiry_s` (D-30) |
@@ -48,7 +48,7 @@ buyer  ──ft_transfer_call──▶ usdc ──▶ market ──▶ life|ve.n
 | `expire(order_id)` | anyone | after `FILL_WINDOW` (a limit: `limit_expiry_s`) with no valid price; refunds margin |
 | `liquidate(position_id)` | anyone | latest price; pnl ≤ −0.9M → margin to pool |
 | `take_profit(position_id)` | anyone | latest price; pnl at cap → close |
-| `hit_target(position_id)` / `hit_stop(position_id)` | anyone | latest price past the trader's trigger, after the minimum hold and newer than the trigger → places a close (reason `Target` / `Stop`) that fills at the next price (D-19) |
+| `hit_target(position_id)` / `hit_stop(position_id)` | anyone | latest price past the trader's trigger, after the minimum hold and newer than the trigger → places a close (reason `Target` / `Stop`) that fills using a later valid price within its execution window (D-19); prompt execution trusts the keeper |
 | `close_epoch(limit)` | anyone | resumable: first call freezes epoch `e`, fixes its $1UP release (maths §8), checkpoints `ve` and starts `e+1` ("begun"); then mints Extra Lives and loser locks, `limit` (≤ 15) losers per call ("minting"), waits for both to land ("waiting for mints"), expires lives past their window ("expiring"), pays the pot and sets aside buyback USDC ("closed") |
 | `set_keeper(keeper)` / `set_operator(operator)` / `set_owner(owner)` / `set_intents(intents)` | owner | roles (D-20, D-21, D-23) |
 | `buyback(epoch, min_out)` | owner or operator (D-10) | swaps the epoch's buyback USDC; the $1UP goes to `ve` for that epoch's lockers |
@@ -63,7 +63,7 @@ buyer  ──ft_transfer_call──▶ usdc ──▶ market ──▶ life|ve.n
 `get_balance(account_id)`, `get_position(id)`, `get_positions(account_id)`, `get_orders(account_id)`,
 `get_markets()`, `get_solvency()` → `{pool, liability, reserve, surplus, markets: [{id, long_liab,
 short_liab, capacity}]}`, `get_epoch()` → `{id, started_at, ends_at, losses, payouts, close_state}`,
-`get_pending_life(account_id)` → losses so far this epoch, `quote_open(market_id, side, margin, leverage)`
+`get_pending_life(account_id)` → positive wallet net loss so far this epoch (not a guaranteed mint or payout), `quote_open(market_id, side, margin, leverage)`
 → `{allowed, reason?, cut_rate, liq_price, max_profit}`, `get_emissions(epoch)` → `{scheduled, released,
 locked, carry}`, `get_emission_carry()`, `get_buyback(epoch)`, `get_params()`, `get_backing(amount?)` → `{backed, target,
 open, min, cap_ppm, owed}` for backing `amount` now, `get_owner()` → `(owner, operator)`, `get_keeper()`.
@@ -126,9 +126,8 @@ Views: `life_info(token_id)` → `{epoch, face, cap, owed, paid, claimable, full
 
 ## oneup-token (NEP-141 + NEP-148)
 
-1_000_000_000 $1UP, 18 decimals, minted once at `new()`: 900M to `house` (emissions), 50M to the Rhea seed
-account, 50M to the treasury. No mint function after that, so the supply is fixed by code (the spec's
-"emissions minter" is the house's emissions schedule paying from its 900M).
+1_000_000_000 $1UP, 18 decimals, minted once at `new()`: 900M to `house` (emissions), 50M to the spot-liquidity seed
+account, 50M to treasury. Deployment moves 7.5M from treasury into house backing incentives, leaving 42.5M in treasury; the liquidity seed funds the local mock swap, not a demonstrated Rhea integration. No mint function exists after construction: emissions spend the house's 900M allocation.
 
 ## ve
 
@@ -173,8 +172,8 @@ price_feed_exists(price_identifier) → bool
 `price_identifier` is a Pyth feed id, hex without `0x`. The house calls `get_price_unsafe` and applies its own
 checks (maths §2), so the fill rules don't depend on the oracle's 60 s threshold.
 
-- Mainnet: Outlayer `price-oracle-pyth.near`.
-- Testnet: `mock-oracle` (D-6). Outlayer `price-oracle-pyth.testnet` is stale. `mock-oracle` implements
+- Planned external integration: Outlayer; real-network deployment and feed behavior remain unverified.
+- Local implementation: `mock-oracle`, supplied by live Binance/Coinbase prices or controlled simulation/fixed prices. It implements
   the calls above plus `push_prices([{feed_id, price, conf, expo, publish_time}])` (pusher only). It
   rejects a `publish_time` that isn't newer than the stored one.
 

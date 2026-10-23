@@ -73,7 +73,7 @@ export default function Home() {
       <div className="bg-[var(--primary)] text-white">
         <div className="mx-auto flex max-w-[1280px] items-center justify-center gap-x-2 px-4 py-1.5 text-center text-[12.5px] font-bold">
           <span>
-            Our entry for <span className="font-extrabold">NEAR HACKATHON</span>, November 2026
+            Building toward <span className="font-extrabold">NEAR HACKATHON</span>, November 2026
             <span className="hidden sm:inline"> · a proof of concept on a local NEAR chain, with test money only</span>
           </span>
           <button type="button" className="underline decoration-dotted underline-offset-2 opacity-80 hover:opacity-100" onClick={() => go("About")}>
@@ -155,7 +155,7 @@ function Footer({ go }: { go: (t: Tab, at?: string) => void }) {
           <div>
             <b className="display text-base">OneUp</b>
             <p className="label mt-0.5 max-w-sm">
-              Capped-payout perps with tradable recovery NFTs. Lose a trade, get a life. Our entry for NEAR HACKATHON, November 2026.
+              Eligible loss → recovery NFT → claim earned USDC or transfer ownership. Capped-payout perps in development for NEAR HACKATHON, November 2026.
             </p>
           </div>
         </div>
@@ -192,8 +192,8 @@ function Footer({ go }: { go: (t: Tab, at?: string) => void }) {
         <div>
           <b className="block">Built on NEAR</b>
           <p className="label mt-1.5">
-            Rust contracts (near-sdk), NEAR Intents deposits, a Sputnik DAO owning the house, gasless one-tap trading, and an MCP server
-            for AI agents.
+            Local Rust contracts, signed NEAR Intents with simulated bridge credits, Sputnik DAO ownership, sponsored trading, and an MCP server
+            using demo account keys.
           </p>
           <button
             type="button"

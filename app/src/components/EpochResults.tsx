@@ -108,7 +108,7 @@ export function EpochResults() {
             <div className="num text-xl font-extrabold" style={{ color: mine.length ? (lost ? "var(--short)" : "var(--long)") : undefined }}>
               {mine.length ? `${signed(myPnl)} on ${mine.length} trade${mine.length === 1 ? "" : "s"}` : "Sat this one out"}
             </div>
-            {lost && net > 0n && <div className="label">Your Extra Life is minting now. Check Extra Lives.</div>}
+            {lost && net > 0n && <div className="label">This round was profitable. Check Extra Lives for any NFT allocated to your eligible net loss.</div>}
             {lost && net === 0n && <div className="label">The house didn&apos;t profit, so no lives this time.</div>}
           </div>
         </section>
@@ -157,7 +157,7 @@ export function EpochResults() {
               )}
               {board.biggestLoss && (
                 <div className="rounded-lg bg-[var(--panel-2)] p-2.5">
-                  <div className="label">{net > 0n ? "Biggest loss (biggest life on its way)" : "Biggest loss"}</div>
+                  <div className="label">Biggest single-trade loss</div>
                   <b>{short(board.biggestLoss.account)}</b> <span className="num">{signed(BigInt(board.biggestLoss.pnl))}</span>
                 </div>
               )}

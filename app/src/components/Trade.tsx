@@ -683,7 +683,7 @@ function Console({
   const entryActions =
     pos && pos.close_order === null ? (
       <>
-        <button type="button" disabled={hold > 0} onClick={() => run(`Close #${pos.id}`, () => tx.placeClose(pos.id))} title={hold > 0 ? "Positions are held at least a minute" : "Close at the next price"}>
+        <button type="button" disabled={hold > 0} onClick={() => run(`Close #${pos.id}`, () => tx.placeClose(pos.id))} title={hold > 0 ? "Positions are held at least a minute" : "Request a close using a later valid oracle price"}>
           {hold > 0 ? `Close ${hold}s` : "Close"}
         </button>
         <button type="button" disabled={hold > 0} onClick={reverse} title={`Close, then open a ${pos.side === "Long" ? "short" : "long"} of the same size`}>
@@ -1278,7 +1278,7 @@ function PendingOpen({ x }: { x: Order }) {
     return (
       <p className="mt-2 flex items-center gap-2 text-sm text-[var(--muted)]">
         <Icon name="spinner" />
-        {what}: filling at the next oracle price
+        {what}: waiting for a later valid oracle price
       </p>
     );
   const mark = prices[x.market_id];
@@ -1446,7 +1446,7 @@ function TriggerFields(props: {
         <TriggerInput label="Take profit" value={tp} set={setTp} hint={hint(side, entry, margin, leverage, tp, "tp", liq)} slider={{ side, entry, leverage, kind: "tp" }} />
         <TriggerInput label="Stop loss" value={sl} set={setSl} hint={hint(side, entry, margin, leverage, sl, "sl", liq)} slider={{ side, entry, leverage, kind: "sl" }} />
       </div>
-      <p className="label">Slide to a gain or loss on your margin, or type a price. Closes at the first oracle price past it, after the 60 s minimum hold.</p>
+      <p className="label">Slide to a gain or loss on your margin, or type a price. A valid price crossing the trigger after the 60 s minimum hold requests a close; it fills using a later valid price.</p>
     </div>
   );
 }
@@ -1585,7 +1585,7 @@ function EditTriggers({ p }: { p: Position }) {
             <TriggerInput label="Take profit" value={tp} set={setTp} hint={hint(p.side, mark, margin, p.leverage, tp, "tp", liq)} slider={{ side: p.side, entry: mark, leverage: p.leverage, kind: "tp" }} />
             <TriggerInput label="Stop loss" value={sl} set={setSl} hint={hint(p.side, mark, margin, p.leverage, sl, "sl", liq)} slider={{ side: p.side, entry: mark, leverage: p.leverage, kind: "sl" }} />
           </div>
-          <p className="label">Gains and losses shown from the current price. Fires on the next oracle price past it; blank clears.</p>
+          <p className="label">Gains and losses shown from the current price. A valid crossing requests a close after the minimum hold; it fills using a later valid price. Blank clears.</p>
           <button
             className="btn btn-accent"
             disabled={!edited}
@@ -1631,13 +1631,12 @@ function LossBanner() {
       {/* keyed by the running total so the pop replays on every new loss */}
       <span key={loss.total.toString()} className="relative shrink-0">
         <PixelHeart size={44} className="heart-pop" />
-        <span className="display plus-one absolute -top-3 left-1/2 -translate-x-1/2 text-lg text-[var(--heart)]">+1</span>
       </span>
       <div className="flex-1">
-        <div className="text-lg font-extrabold leading-tight">Extra Life incoming</div>
+        <div className="text-lg font-extrabold leading-tight">Recovery eligibility pending</div>
         <div className="label num mt-1">
-          You lost ${fmtUsdc(loss.amount)} (${fmtUsdc(loss.total)} this round). Your Extra Life and $1UP lock mint
-          when the round ends in {fmtClock(left)}, sized from what the house made.
+          Your net loss rose by ${fmtUsdc(loss.amount)} to ${fmtUsdc(loss.total)} this round. The round ends in {fmtClock(left)}.
+          If it ends in profit, eligible net losses can receive an Extra Life and a $1UP lock. Amounts are finalized at settlement; recovery can be zero.
         </div>
       </div>
       <button className="btn btn-ghost px-2.5" onClick={() => setLoss(null)} aria-label="Dismiss">

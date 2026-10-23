@@ -220,8 +220,8 @@ export function PoolAtWork({ pool, liability }: { pool: bigint; liability: bigin
         <p className="label mt-1.5 flex items-start gap-1.5 text-xs">
           <span className="mt-0.5 inline-block h-3 w-0.5 shrink-0 bg-[var(--text)]" />
           <span>
-            Must stay on hand: <b className="num text-[var(--text)]">${fmtUsdc(mustStay, 0)}</b>. Before a round pays out, the house brings
-            home whatever the payout needs, so winners are always paid.
+            Must stay on hand: <b className="num text-[var(--text)]">${fmtUsdc(mustStay, 0)}</b>. Before a round distributes profit, the house attempts to recall
+            the required USDC from the vault. Failed recalls can delay settlement; vault and custody risks remain.
           </span>
         </p>
       </div>

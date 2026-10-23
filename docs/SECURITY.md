@@ -48,10 +48,9 @@ trader's and the bots' keys (`/api/config`); the root, keeper and solver keys st
   a wrong settlement.
 - **The yield vault** (D-27) holds most of the pool between rounds. If it failed, the house couldn't pay out what's
   deployed: the contract keeps 1.2× the worst case plus 10% on hand, but the vault's own safety is a trust
-  assumption, which is why the DAO picks it and the mainnet choice is plain USDC lending.
+  assumption. External USDC lending is planned, not implemented; the local vault is a mock chosen by the owner/DAO.
 - **The jackpot draw** uses NEAR's block random seed, which a validator could bias slightly.
-- **The keeper** is trusted to fill promptly at the first price after each order (D-23). It can delay a
-  fill, which expires the order and refunds the margin; it can't choose an older price.
+- **The keeper** is trusted to fill promptly (D-23). The contract requires a price published after the order and within its window; it does not establish that the first valid price was used. The keeper can delay within that window or let an order expire. Older prices are rejected.
 - **The owner** can change the oracle, the swap contract and the params, so it can take funds. That's why
   a DAO owns the house; on mainnet the DAO's council and voting period are the protection.
 
