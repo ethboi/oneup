@@ -128,8 +128,13 @@ export function Boot() {
         </div>
         {/* the keys: leverage on the pad, LONG and SHORT where A and B would be */}
         <div className="boot-pad">
+          {/* leverage on the pad, an amount on each arm */}
           <span className="boot-dpad" aria-hidden>
             <span className="boot-dpad-label">LEV</span>
+            <span className="boot-lev up">1000×</span>
+            <span className="boot-lev right">100×</span>
+            <span className="boot-lev down">10×</span>
+            <span className="boot-lev left">2×</span>
           </span>
           <span className="boot-ab">
             <button type="button" data-key="short" className={`boot-key short ${pressed === "short" ? "down" : ""}`} aria-label="Short">

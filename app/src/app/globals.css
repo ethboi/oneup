@@ -1018,90 +1018,131 @@ body {
 }
 
 /* "REVENGE TRADE DETECTED", stamped on the screen for a few seconds */
-.revenge {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: clamp(10px, 2.5vw, 22px);
-  width: 112%;
-  padding: 18px 0 16px;
-  transform: rotate(-6deg);
-  /* a red band edged in the screen's ink */
-  background: #c43636;
-  border-block: 5px solid var(--lcd-ink);
-  box-shadow: 0 6px 0 rgb(0 0 0 / 0.35);
-  animation: revenge-slam 3.6s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+/* REVENGE TRADE as a fighting game's versus screen: the screen splits, you on the left, the market on the
+   right, VS slams in the middle, then ROUND 2, FIGHT! */
+.versus {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 8px;
+  animation: versus-out 3.6s steps(1) both;
 }
-/* chunky letters: a thick ink outline and a hard drop, like an arcade warning */
-.revenge-word {
-  font-size: clamp(20px, 5.4vw, 54px);
-  line-height: 1;
-  letter-spacing: 0.04em;
+/* one diagonal split across the screen: each side fills its half and centres its fighter there */
+.versus-side {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  padding-bottom: 14%;
+  zoom: var(--fighter-zoom, 1);
+}
+.versus-side.you {
+  align-items: flex-start;
+  padding-left: 12%;
+  background: linear-gradient(100deg, #3b2a8c, #1f1650);
+  clip-path: polygon(0 0, 56% 0, 44% 100%, 0 100%);
+  animation: versus-in-left 0.35s cubic-bezier(0.2, 1, 0.3, 1) both;
+}
+.versus-side.market {
+  align-items: flex-end;
+  padding-right: 10%;
+  background: linear-gradient(100deg, #2a1416, #120a0b);
+  clip-path: polygon(56% 0, 100% 0, 100% 100%, 44% 100%);
+  animation: versus-in-right 0.35s cubic-bezier(0.2, 1, 0.3, 1) both;
+}
+.versus-side > :first-child {
+  filter: drop-shadow(0 0 14px rgb(255 255 255 / 0.18));
+}
+/* bigger screens: bigger fighters */
+@media (min-width: 640px) {
+  .versus-side {
+    --fighter-zoom: 1.6;
+  }
+}
+.versus-name {
+  font-size: clamp(14px, 3vw, 24px);
+  letter-spacing: 0.12em;
   color: #fff;
-  -webkit-text-stroke: 2px var(--lcd-ink);
+  -webkit-text-stroke: 1px var(--lcd-ink);
+  paint-order: stroke fill;
+  text-shadow: 3px 3px 0 var(--lcd-ink);
+}
+.versus-vs {
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  font-size: clamp(48px, 11vw, 92px);
+  line-height: 1;
+  color: #f2b705;
+  -webkit-text-stroke: 3px var(--lcd-ink);
   paint-order: stroke fill;
   text-shadow:
-    4px 4px 0 var(--lcd-ink),
-    5px 5px 0 var(--lcd-ink);
+    5px 5px 0 var(--lcd-ink),
+    0 0 24px rgb(242 183 5 / 0.6);
+  transform: translate(-50%, -50%) rotate(-8deg);
+  animation: versus-slam 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) 0.3s both;
 }
-/* the angry heart: it lands a beat after the band, with a punch */
-.revenge-face {
-  flex: none;
-  zoom: var(--face-zoom, 1);
-  animation: revenge-punch 0.5s cubic-bezier(0.2, 1.6, 0.4, 1) 0.25s both;
+.versus-call {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 9%;
+  text-align: center;
+  font-size: clamp(16px, 3.4vw, 28px);
+  letter-spacing: 0.14em;
+  color: #fff;
+  -webkit-text-stroke: 1px var(--lcd-ink);
+  paint-order: stroke fill;
+  text-shadow: 3px 3px 0 var(--lcd-ink);
+  animation: versus-stamp 0.3s steps(3) 0.9s both;
+}
+.versus-fight {
+  color: #f2b705;
+  animation: versus-stamp 0.3s steps(3) 1.4s both;
+}
+@keyframes versus-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+}
+@keyframes versus-in-right {
+  from {
+    transform: translateX(100%);
+  }
+}
+@keyframes versus-slam {
+  0% {
+    transform: translate(-50%, -50%) rotate(-8deg) scale(3);
+    opacity: 0;
+  }
+  70% {
+    transform: translate(-50%, -50%) rotate(-8deg) scale(0.9);
+    opacity: 1;
+  }
+}
+@keyframes versus-stamp {
+  from {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+/* gone in one cut at the end, like a game moving on */
+@keyframes versus-out {
+  92% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 .angry-flame {
   animation: angry-flicker 0.3s steps(2) infinite;
 }
-/* phones: a smaller heart, so the words keep the band's width */
-@media (max-width: 520px) {
-  .revenge-face {
-    --face-zoom: 0.6;
-  }
-}
-@keyframes revenge-punch {
-  from {
-    transform: scale(0) rotate(-30deg);
-  }
-}
 @keyframes angry-flicker {
   50% {
     transform: translateY(-2px) scaleY(1.12);
-  }
-}
-.revenge-tag {
-  padding: 3px 12px;
-  font-size: clamp(13px, 2.4vw, 18px);
-  letter-spacing: 0.3em;
-  color: #fff;
-  background: var(--lcd-ink);
-  /* three quick blinks, then it stays */
-  animation: blink 0.3s steps(1) 0.5s 3;
-}
-@keyframes revenge-slam {
-  0% {
-    transform: rotate(-6deg) scale(2.4);
-    opacity: 0;
-  }
-  10% {
-    transform: rotate(-6deg) scale(1);
-    opacity: 1;
-  }
-  13% {
-    transform: rotate(-6deg) translate(-6px, 3px);
-  }
-  16% {
-    transform: rotate(-6deg) translate(5px, -2px);
-  }
-  19%,
-  85% {
-    transform: rotate(-6deg);
-    opacity: 1;
-  }
-  100% {
-    transform: rotate(-6deg) translateX(30px);
-    opacity: 0;
   }
 }
 
@@ -1137,10 +1178,9 @@ body {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .revenge,
-  .revenge-face,
+  .versus,
+  .versus *,
   .angry-flame,
-  .revenge-tag,
   .tilt-word {
     animation: none;
   }
@@ -1851,6 +1891,33 @@ kbd {
   font: 800 8px var(--font-body);
   letter-spacing: 0.1em;
   color: var(--muted);
+}
+.boot-lev {
+  position: absolute;
+  font: 800 9px var(--font-body);
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.boot-lev.up {
+  bottom: 100%;
+  left: 50%;
+  transform: translate(-50%, -4px);
+}
+.boot-lev.down {
+  top: 100%;
+  left: 50%;
+  transform: translate(-50%, 4px);
+}
+.boot-lev.left {
+  right: 100%;
+  top: 50%;
+  transform: translate(-5px, -50%);
+}
+.boot-lev.right {
+  left: 100%;
+  top: 50%;
+  transform: translate(5px, -50%);
 }
 .boot-ab {
   display: flex;

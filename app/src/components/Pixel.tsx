@@ -198,3 +198,23 @@ export function AngryHeart({ size = 72 }: { size?: number }) {
     </span>
   );
 }
+
+/** The market as a fighter: three red candles stepping down, wicks in ink (REVENGE TRADE's opponent). */
+const FALLING_CANDLES = [
+  ".K..........",
+  "RRR.........",
+  "RRR..K......",
+  "RRR.RRR.....",
+  "RRR.RRR.....",
+  ".K..RRR..K..",
+  "....RRR.RRR.",
+  ".....K..RRR.",
+  "........RRR.",
+  "........RRR.",
+  "........RRR.",
+  ".........K..",
+];
+
+export function FallingCandles({ size = 64 }: { size?: number }) {
+  return <Sprite rows={FALLING_CANDLES} colors={{ R: "#e23b3b", K: "var(--edge)" }} size={size} />;
+}

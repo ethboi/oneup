@@ -23,7 +23,7 @@ import {
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { PriceChart, type Mark } from "./PriceChart";
 import { fmtClock, useNow } from "./Header";
-import { AngryHeart, PixelCoin, PixelHeart } from "./Pixel";
+import { AngryHeart, FallingCandles, PixelCoin, PixelHeart } from "./Pixel";
 import { Icon } from "./Icon";
 import { Popover } from "./Popover";
 import { useTilt } from "@/lib/tilt";
@@ -741,13 +741,23 @@ function Console({
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center" role="status">
               {revenge ? (
                 // a warning banner slammed across the screen
-                <span key={revenge} className="revenge display">
-                  <span className="revenge-face">
-                    <AngryHeart size={64} />
+                // a fighting game's versus screen: you against the market, round two
+                <span key={revenge} className="versus display" aria-label="Revenge trade">
+                  <span className="versus-side you">
+                    <span className="flex flex-col items-center gap-2.5">
+                      <AngryHeart size={60} />
+                      <span className="versus-name">YOU</span>
+                    </span>
                   </span>
-                  <span className="flex flex-col items-center gap-2">
-                    <span className="revenge-word">REVENGE TRADE</span>
-                    <span className="revenge-tag">DETECTED</span>
+                  <span className="versus-side market">
+                    <span className="flex flex-col items-center gap-2.5">
+                      <FallingCandles size={60} />
+                      <span className="versus-name">THE MARKET</span>
+                    </span>
+                  </span>
+                  <span className="versus-vs">VS</span>
+                  <span className="versus-call">
+                    ROUND 2 <span className="versus-fight">FIGHT!</span>
                   </span>
                 </span>
               ) : (
