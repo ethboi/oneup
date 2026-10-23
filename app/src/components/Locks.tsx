@@ -59,7 +59,6 @@ export function Locks() {
             and the penalty goes to everyone still locked. Losers&apos; $1UP arrives already locked for {MAX} rounds. A lock is an
             NFT: sell it on the market instead of leaving early.
           </Explainer>
-
         </div>
         <div className="panel order-3 min-w-0 divide-y divide-[var(--line)]">
           <SummaryBar
