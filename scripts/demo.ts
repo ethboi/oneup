@@ -5,7 +5,7 @@
 // the localnet's throwaway dev keys, so only use it on a network you trust.
 
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { networkInterfaces } from "node:os";
 import { resolve } from "node:path";
 
@@ -64,7 +64,20 @@ function step(msg: string, cmd: string, args: string[], cwd = ROOT) {
   }
 }
 
-if (WASMS.some((w) => !existsSync(resolve(ROOT, `contracts/target/near/${w}/${w}.wasm`)))) {
+/** The newest change to any contract's Rust source, so an edited contract is rebuilt before it's deployed. */
+function newestSource(dir = resolve(ROOT, "contracts")): number {
+  let t = 0;
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    if (e.name === "target" || e.name === "vendor" || e.name.startsWith(".")) continue;
+    const p = resolve(dir, e.name);
+    if (e.isDirectory()) t = Math.max(t, newestSource(p));
+    else if (e.name.endsWith(".rs") || e.name === "Cargo.toml") t = Math.max(t, statSync(p).mtimeMs);
+  }
+  return t;
+}
+const wasm = (w: string) => resolve(ROOT, `contracts/target/near/${w}/${w}.wasm`);
+const src = newestSource();
+if (WASMS.some((w) => !existsSync(wasm(w)) || statSync(wasm(w)).mtimeMs < src)) {
   step("Building contracts (needs Rust + cargo-near; see README)", "./build.sh", [], resolve(ROOT, "contracts"));
 }
 if (!existsSync(resolve(ROOT, "sim/out/results.json"))) {

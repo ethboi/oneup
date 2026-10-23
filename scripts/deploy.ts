@@ -89,7 +89,7 @@ export async function deploy(opts: { home: string; rpcUrl: string; epochLengthS:
     usdc: id("usdc"),
     oracle: id("oracle"),
     params: {
-      leverage_hard_limit: 250,
+      leverage_hard_limit: 1000,
       min_margin: USDC.toString(),
       min_hold_s: 60,
       fill_window_s: 30,
