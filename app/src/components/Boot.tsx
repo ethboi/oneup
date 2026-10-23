@@ -12,6 +12,16 @@ import { Logo } from "./Pixel";
 import { fmtPrice } from "./Trade";
 
 const KEY = "oneup.booted";
+/** Any page with ?boot shows it again, whatever this session has seen. */
+const forced = () => typeof location !== "undefined" && new URLSearchParams(location.search).has("boot");
+
+/** Plays the power-on screen again (the Demo menu's "Show the intro again"). */
+export function showBoot() {
+  try {
+    sessionStorage.removeItem(KEY);
+  } catch {}
+  location.reload();
+}
 const TAGLINE = "LOSE A TRADE, GET A LIFE";
 
 export function Boot() {
@@ -22,7 +32,7 @@ export function Boot() {
   const [pressed, setPressed] = useState<"long" | "short" | "start" | null>(null);
   useEffect(() => {
     try {
-      if (sessionStorage.getItem(KEY) === "1") return setState("gone");
+      if (sessionStorage.getItem(KEY) === "1" && !forced()) return setState("gone");
     } catch {}
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return setTyped(TAGLINE.length);
     // the logo lands at 1.5 s, then the tagline types a letter every 45 ms

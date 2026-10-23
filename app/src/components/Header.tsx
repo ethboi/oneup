@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { showBoot } from "./Boot";
 import { USDC, fmtUsdc, ONEUP } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { Logo, PixelCoin, PixelHeart } from "./Pixel";
@@ -203,6 +204,10 @@ function DemoMenu() {
               ))}
             </div>
           </div>
+          {/* the power-on screen shows once a session; this brings it back */}
+          <button type="button" className="chip self-start" onClick={() => (close(), showBoot())}>
+            Show the intro again
+          </button>
         </div>
       )}
     </Popover>

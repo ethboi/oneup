@@ -20,7 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem("oneup.theme");document.documentElement.dataset.theme=t==="light"?"light":"dark";if(sessionStorage.getItem("oneup.booted")==="1")document.documentElement.dataset.booted="1"}catch(e){document.documentElement.dataset.theme="dark"}`,
+            __html: `try{var t=localStorage.getItem("oneup.theme");document.documentElement.dataset.theme=t==="light"?"light":"dark";if(sessionStorage.getItem("oneup.booted")==="1"&&!new URLSearchParams(location.search).has("boot"))document.documentElement.dataset.booted="1"}catch(e){document.documentElement.dataset.theme="dark"}`,
           }}
         />
       </head>
