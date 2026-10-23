@@ -10,6 +10,7 @@ import { useOneUp, usePoll } from "@/lib/oneup";
 import { Icon } from "./Icon";
 import { Governance } from "./Governance";
 import { PageTitle } from "./ui";
+import { PoolAtWork } from "./PoolAtWork";
 
 const big = (x?: string) => (x === undefined ? 0n : BigInt(x));
 const pct = (a: bigint, b: bigint) => (b === 0n ? 0 : Number((a * 10_000n) / b) / 100);
@@ -183,7 +184,7 @@ export function Solvency() {
           )}
         </div>
       </div>
-      <MoneyAtWork pool={pool} liability={liability} />
+      <PoolAtWork pool={pool} liability={liability} />
 
       <div className="panel p-5 text-sm">
         <b>Where the pool comes from:</b> the house&apos;s seed and the bootstrap round. Backing has its own tab: the round, the
@@ -210,37 +211,5 @@ function Legend({ color, label }: { color: string; label: string }) {
       <span className="inline-block h-3 w-3 rounded-sm" style={{ background: color }} />
       {label}
     </span>
-  );
-}
-
-/** D-27: the pool USDC on hand and in the vault, and what the vault has earned for the jackpot. */
-function MoneyAtWork({ pool, liability }: { pool: bigint; liability: bigint }) {
-  const { o } = useOneUp();
-  const t = usePoll(() => o.treasury(), [], 5000);
-  const dep = usePoll(() => o.vaultDeposit(), [], 10_000);
-  if (!t || !t.vault) return null;
-  const deployed = big(t.deployed);
-  const onHand = pool > deployed ? pool - deployed : 0n;
-  const keep = (liability * 12n) / 10n;
-  return (
-    <div className="panel p-5">
-      <h2 className="text-lg font-extrabold">The pool at work</h2>
-      <p className="label mt-1 max-w-3xl">
-        Pool USDC the house doesn&apos;t need on hand earns interest in a vault (5% here; USDC lending on Ethereum through NEAR Intents on
-        mainnet). It always keeps 1.2× the worst-case payout plus 10% of the pool on hand, and brings money home before a round&apos;s
-        payout. All the interest goes to the jackpot.
-      </p>
-      <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Tile label="On hand" value={onHand} />
-        <Tile label="Earning in the vault" value={deployed} />
-        <Tile label="Kept for the worst case (1.2×)" value={keep} />
-        <Tile label="Interest waiting for the jackpot" value={dep ? big(dep.interest) : 0n} />
-      </div>
-      <svg viewBox="0 0 1000 24" preserveAspectRatio="none" className="mt-4 h-6 w-full" role="img" aria-label={`${pct(deployed, pool).toFixed(0)}% of the pool is earning`}>
-        <rect x="0" y="2" width="1000" height="20" rx="4" fill="var(--panel-2)" stroke="var(--line)" />
-        <rect x="0" y="2" width={Math.min(1000, pct(deployed, pool) * 10)} height="20" rx="4" fill="var(--accent)" />
-      </svg>
-      <p className="label num mt-1">{pct(deployed, pool).toFixed(0)}% of the pool is earning</p>
-    </div>
   );
 }
