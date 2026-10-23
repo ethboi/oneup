@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { scrollToAnchorWhenReady } from "@/lib/anchors";
 import { Boot } from "@/components/Boot";
 import { OneUpProvider } from "@/lib/oneup";
 import { Header } from "@/components/Header";
@@ -39,9 +40,9 @@ const TAB_ICONS: Record<Tab, IconName> = {
 /** Phones: the four you use; the ones you read sit behind More. */
 const PHONE_TABS: Tab[] = ["Trade", "Extra Lives", "Locks", "Market"];
 /** Desktop: the reading tabs sit under More. */
-const MORE_TABS: Tab[] = ["House", "About"];
+const MORE_TABS: Tab[] = ["Leaders", "Backing", "$1UP", "House", "About"];
 /** Below 1280px these join them, so the bar fits beside the round strip. */
-const NARROW_MORE_TABS: Tab[] = ["Leaders", "Backing", "$1UP"];
+const NARROW_MORE_TABS: Tab[] = [];
 const PHONE_LABEL: Partial<Record<Tab, string>> = { "Extra Lives": "Lives" };
 
 /** Each tab's address: /locks, /extra-lives, /house… (Trade is the root). */
@@ -51,20 +52,44 @@ const fromPath = (path: string): Tab => TABS.find((t) => slug(t) === path.replac
 export default function Home() {
   const [tab, setTab] = useState<Tab>("Trade");
   const [more, setMore] = useState(false);
+  const [anchor, setAnchor] = useState("");
   // the address picks the tab, and Back and Forward move between tabs
   useEffect(() => {
-    const read = () => setTab(fromPath(location.pathname));
+    const previousRestoration = history.scrollRestoration;
+    history.scrollRestoration = "manual";
+    const read = () => {
+      setTab(fromPath(location.pathname));
+      setAnchor(location.hash.slice(1));
+      if (!location.hash) window.scrollTo({ top: 0 });
+    };
     read();
     window.addEventListener("popstate", read);
-    return () => window.removeEventListener("popstate", read);
+    window.addEventListener("hashchange", read);
+    return () => {
+      window.removeEventListener("popstate", read);
+      window.removeEventListener("hashchange", read);
+      history.scrollRestoration = previousRestoration;
+    };
   }, []);
-  /** Opens a tab at its top, or at the section with id `at`. */
+  useEffect(() => {
+    if (!anchor || anchor.startsWith("life=")) return;
+    return scrollToAnchorWhenReady(anchor, {
+      find: (id) => document.getElementById(id),
+      observe: (check) => {
+        const observer = new MutationObserver(check);
+        observer.observe(document.body, { childList: true, subtree: true });
+        return () => observer.disconnect();
+      },
+    });
+  }, [tab, anchor]);
+  /** Opens a tab at its top, or follows its section through asynchronous loading. */
   const go = (t: Tab, at?: string) => {
     setTab(t);
     setMore(false);
     const url = `/${slug(t)}${location.search}${at ? `#${at}` : ""}`;
     if (url !== location.pathname + location.search + location.hash) history.pushState(null, "", url);
-    if (at) setTimeout(() => document.getElementById(at)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    setAnchor(at ?? "");
+    if (at) document.getElementById(at)?.scrollIntoView({ block: "start" });
     else window.scrollTo({ top: 0 });
   };
   return (

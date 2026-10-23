@@ -27,9 +27,9 @@ export function Fairness() {
   const [r, setR] = useState<Results | null>(null);
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
-    fetch("/api/sim").then(async (x) => (x.ok ? setR(await x.json()) : setErr((await x.json()).error)));
+    fetch("/api/sim").then(async (x) => (x.ok ? setR(await x.json()) : setErr((await x.json()).error))).catch(() => setErr("Recovery scenarios could not load. Please try again."));
   }, []);
-  if (err) return <p className="label">{err}</p>;
+  if (err) return <p id="fairness" className="label scroll-mt-4">{err}</p>;
   if (!r) return <p className="label">Loading the simulation…</p>;
   const [first, , , last] = r.quarters.oneup;
 

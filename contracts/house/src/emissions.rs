@@ -6,16 +6,12 @@
 //! USDC and earn no $1UP. The house holds the 900M emissions supply.
 
 use near_sdk::json_types::U128;
-use near_sdk::{env, ext_contract, near, AccountId, Gas, NearToken, Promise, PromiseError};
+use near_sdk::{ext_contract, near, AccountId, Gas};
 use oneup_math as math;
 
-use crate::oracle::ext_ft;
 use crate::{Epoch, House, HouseExt, MarketTotals};
 
 const GAS_VE_CHECKPOINT: Gas = Gas::from_tgas(20);
-const GAS_LOCKS_BASE: Gas = Gas::from_tgas(30);
-const GAS_LOCK_EACH: Gas = Gas::from_tgas(6);
-const GAS_LOCKS_CALLBACK: Gas = Gas::from_tgas(10);
 
 #[near(serializers = [json, borsh])]
 #[derive(Clone, Debug)]
@@ -25,7 +21,7 @@ pub struct EpochEmissions {
     pub scheduled: U128,
     /// Released to this epoch's losers: `oneup_per_usdc` × house profit, at most schedule + carry.
     pub released: U128,
-    /// Of the release, what landed in locks (rounding and failed transfers go back to the carry).
+    /// Of the release, what is confirmed in locks. Failed receipts retain the original recipient entitlement.
     pub locked: U128,
     /// Unreleased $1UP carried into the next epoch.
     pub carry: U128,
@@ -48,38 +44,7 @@ impl House {
         U128(self.emission_carry)
     }
 
-    /// After a backer's `lock_for` transfer: anything `ve` didn't take goes back to the backers' allocation.
-    #[private]
-    pub fn on_backer_lock(&mut self, amount: U128, #[callback_result] used: Result<U128, PromiseError>) -> U128 {
-        self.pending_backer_locks = self.pending_backer_locks.saturating_sub(1);
-        let back = amount.0 - used.map_or(0, |u| u.0.min(amount.0));
-        self.backer_oneup += back;
-        if back > 0 {
-            env::log_str(&format!("Backer lock failed; {back} $1UP back to the allocation"));
-        }
-        U128(back)
-    }
 
-    /// After a `lock_for` transfer: anything `ve` didn't take goes back to the carry.
-    #[private]
-    pub fn on_locks(&mut self, epoch: u64, amount: U128, #[callback_result] used: Result<U128, PromiseError>) -> bool {
-        if let Some(c) = self.closing.as_mut() {
-            c.pending_mints = c.pending_mints.saturating_sub(1);
-        }
-        let used = used.map(|u| u.0).unwrap_or(0);
-        if used == amount.0 {
-            return true;
-        }
-        let back = amount.0 - used;
-        self.emission_carry += back;
-        if let Some(mut rec) = self.emissions.get(&epoch).cloned() {
-            rec.locked.0 -= back;
-            rec.carry.0 += back;
-            self.emissions.insert(epoch, rec);
-        }
-        env::log_str(&format!("Loser locks failed; {back} $1UP back to the carry"));
-        false
-    }
 }
 
 impl House {
@@ -121,23 +86,6 @@ impl House {
         release
     }
 
-    /// Sends a batch of losers' $1UP to `ve` as max-length locks.
-    pub(crate) fn lock_for_losers(&mut self, epoch: u64, items: Vec<(AccountId, u128)>) -> Promise {
-        let total: u128 = items.iter().map(|(_, a)| a).sum();
-        if let Some(mut rec) = self.emissions.get(&epoch).cloned() {
-            rec.locked.0 += total;
-            self.emissions.insert(epoch, rec);
-        }
-        let items: Vec<(AccountId, U128)> = items.into_iter().map(|(o, a)| (o, U128(a))).collect();
-        let gas = GAS_LOCKS_BASE.saturating_add(GAS_LOCK_EACH.saturating_mul(items.len() as u64));
-        let msg = near_sdk::serde_json::json!({ "lock_for": { "items": items } }).to_string();
-        ext_ft::ext(self.oneup.clone().expect("oneup"))
-            .with_attached_deposit(NearToken::from_yoctonear(1))
-            .with_static_gas(gas)
-            .ft_transfer_call(self.ve.clone().expect("ve"), U128(total), None, msg)
-            .then(Self::ext(env::current_account_id()).with_static_gas(GAS_LOCKS_CALLBACK).on_locks(epoch, U128(total)))
-    }
-
     /// $1UP owed a backer for `usdc` backed (D-26): the rate, capped by what's left of the allocation.
     pub(crate) fn backer_oneup_for(&self, usdc: u128) -> u128 {
         if self.oneup.is_none() || self.ve.is_none() {
@@ -147,20 +95,11 @@ impl House {
         (usdc * self.params.backer_oneup_per_usdc as u128 * 1_000_000_000_000).min(self.backer_oneup)
     }
 
-    /// Locks a backer's $1UP for two years, like a loser's (D-26). What `ve` doesn't take goes back to the
-    /// allocation.
+    /// Reserves a durable backer lock. Failed transfers remain owed to this backer.
     pub(crate) fn lock_for_backer(&mut self, account: AccountId, amount: u128) {
-        if amount == 0 {
-            return;
-        }
+        if amount == 0 { return; }
         self.pending_backer_locks += 1;
-        let msg = near_sdk::serde_json::json!({ "lock_for": { "items": [[account, U128(amount)]] } }).to_string();
-        ext_ft::ext(self.oneup.clone().expect("oneup"))
-            .with_attached_deposit(NearToken::from_yoctonear(1))
-            .with_static_gas(GAS_LOCKS_BASE.saturating_add(GAS_LOCK_EACH))
-            .ft_transfer_call(self.ve.clone().expect("ve"), U128(amount), None, msg)
-            .then(Self::ext(env::current_account_id()).with_static_gas(GAS_LOCKS_CALLBACK).on_backer_lock(U128(amount)))
-            .detach();
+        self.queue_recovery(self.epoch.id, self.epoch.id, vec![], vec![(account, amount)], false);
     }
 
     /// Release not handed out (rounding across losers) goes back to the carry.

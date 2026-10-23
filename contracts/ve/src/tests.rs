@@ -483,3 +483,38 @@ fn pagination_finishes_at_exact_page_boundary_and_accepts_exhausted_cursor() {
     assert!(end.locks.is_empty());
     assert_eq!(end.next_index, None);
 }
+
+#[test]
+fn recovery_locks_repair_checkpoint_and_refund_duplicates_without_resetting_ownership() {
+    let mut v = setup();
+    let msg = r#"{"recovery_locks":{"batch_id":7,"created":2,"items":[["alice","100000000000000000000"]]}}"#;
+    assert_eq!(send(&mut v, "house", 100 * ONEUP, msg), 0);
+    assert_eq!(v.epoch, 2);
+    let l = v.lock_info("1".into()).unwrap();
+    assert_eq!((l.created, l.end), (2, 107));
+    assert_eq!(v.totals.get(&2), Some(&0)); // no retroactive share of the current checkpoint
+    approve(&mut v, "alice", "1");
+    market_sells(&mut v, "1");
+    checkpoint(&mut v, 3);
+    let total = v.totals.get(&3).copied().unwrap();
+    for _ in 0..3 { assert_eq!(send(&mut v, "house", 100 * ONEUP, msg), 100 * ONEUP); }
+    assert_eq!(v.next_lock, 2);
+    assert_eq!(v.lock_info("1".into()).unwrap().owner_id, acc("bob"));
+    assert_eq!(v.totals.get(&3), Some(&total));
+    assert!(v.get_recovery_receipt(7).is_some());
+}
+
+#[test]
+#[should_panic(expected = "Conflicting lock entitlement")]
+fn recovery_batch_id_cannot_be_reused_for_different_terms() {
+    let mut v = setup();
+    send(&mut v, "house", ONEUP, r#"{"recovery_locks":{"batch_id":7,"created":1,"items":[["alice","1000000000000000000"]]}}"#);
+    send(&mut v, "house", ONEUP, r#"{"recovery_locks":{"batch_id":7,"created":1,"items":[["bob","1000000000000000000"]]}}"#);
+}
+
+#[test]
+#[should_panic(expected = "Only the house")]
+fn recovery_lock_receipts_cannot_be_forged_by_a_trader() {
+    let mut v = setup();
+    send(&mut v, "mallory", ONEUP, r#"{"recovery_locks":{"batch_id":7,"created":1,"items":[["mallory","1000000000000000000"]]}}"#);
+}

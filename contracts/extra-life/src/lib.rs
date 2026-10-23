@@ -171,6 +171,14 @@ impl ExtraLife {
                 continue;
             }
             let id = token_id(epoch, &item.owner);
+            // A successful receipt may have lost its callback. Never recreate or reassign its NFT,
+            // even if the current owner has sold it or claimed since the original mint.
+            if let Some(existing) = self.lives.get(&id) {
+                require!(existing.epoch == epoch && existing.face == item.face.0
+                    && existing.cap_ppm == item.cap_ppm.0 && !existing.backer, "Conflicting Life entitlement");
+                ids.push(id);
+                continue;
+            }
             let key = cohort_key(epoch);
             match self.groups.get_mut(&key) {
                 Some(g) => {

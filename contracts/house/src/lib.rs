@@ -11,6 +11,7 @@ mod emissions;
 mod epochs;
 mod events;
 mod oracle;
+mod recovery;
 mod trading;
 mod treasury;
 mod views;
@@ -227,6 +228,7 @@ enum StorageKey {
     Emissions,
     Buybacks,
     Tickets,
+    RecoveryBatches,
 }
 
 #[near(contract_state)]
@@ -290,6 +292,8 @@ pub struct House {
     pending_backer_locks: u32,
     pending_pots: u32,
     closing_requested: bool,
+    recovery_batches: IterableMap<u64, recovery::RecoveryBatch>,
+    next_recovery_batch: u64,
 }
 
 pub(crate) fn now_s() -> u64 {
@@ -341,6 +345,8 @@ impl House {
             pending_backer_locks: 0,
             pending_pots: 0,
             closing_requested: false,
+            recovery_batches: IterableMap::new(StorageKey::RecoveryBatches),
+            next_recovery_batch: 1,
         }
     }
 
@@ -421,11 +427,13 @@ impl House {
 
     pub fn set_life(&mut self, life: AccountId) {
         self.assert_owner();
+        self.assert_reward_configuration_idle();
         self.life = Some(life);
     }
 
     pub fn set_token_and_ve(&mut self, oneup: AccountId, ve: AccountId) {
         self.assert_owner();
+        self.assert_reward_configuration_idle();
         self.oneup = Some(oneup);
         self.ve = Some(ve);
     }
@@ -516,5 +524,12 @@ impl House {
         let id = self.next_id;
         self.next_id += 1;
         id
+    }
+}
+
+impl House {
+    fn assert_reward_configuration_idle(&self) {
+        require!(self.closing.is_none() && self.pending_backing == 0 && self.pending_pots == 0
+            && self.recovery_batches.is_empty(), "Rewards pending: receiver configuration is frozen");
     }
 }

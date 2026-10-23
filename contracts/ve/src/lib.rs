@@ -81,6 +81,7 @@ enum TransferMsg {
     Lock { epochs: u64 },
     /// House only: one max-length lock per loser.
     LockFor { items: Vec<(AccountId, U128)> },
+    RecoveryLocks { batch_id: u64, created: u64, items: Vec<(AccountId, U128)> },
     /// House only: an epoch's buyback, for that epoch's lockers.
     Buyback { epoch: u64 },
 }
@@ -97,6 +98,7 @@ enum StorageKey {
     Rewards,
     Claimed,
     Owed,
+    RecoveryReceipts,
 }
 
 #[allow(dead_code)]
@@ -131,6 +133,7 @@ pub struct Ve {
     claimed: LookupMap<(TokenId, u64), u128>,
     /// $1UP owed after a failed transfer.
     owed: LookupMap<AccountId, u128>,
+    recovery_receipts: LookupMap<u64, Vec<u8>>,
 }
 
 #[near]
@@ -156,6 +159,7 @@ impl Ve {
             rewards: LookupMap::new(StorageKey::Rewards),
             claimed: LookupMap::new(StorageKey::Claimed),
             owed: LookupMap::new(StorageKey::Owed),
+            recovery_receipts: LookupMap::new(StorageKey::RecoveryReceipts),
         }
     }
 
@@ -180,6 +184,23 @@ impl Ve {
                     self.mint_lock(owner, a.0, math::VE_MAX_EPOCHS, true);
                 }
             }
+            TransferMsg::RecoveryLocks { batch_id, created, items } => {
+                require!(sender_id == self.house, "Only the house");
+                require!(!items.is_empty() && items.len() <= MAX_LOCKS_PER_TRANSFER, "Invalid recovery batch size");
+                require!(items.iter().all(|(_, a)| a.0 > 0), "Nothing to lock");
+                require!(items.iter().map(|(_, a)| a.0).sum::<u128>() == amount.0, "Locks don't add up");
+                let fingerprint = env::sha256(&near_sdk::serde_json::to_vec(&(created, &items)).unwrap());
+                if let Some(previous) = self.recovery_receipts.get(&batch_id) {
+                    require!(*previous == fingerprint, "Conflicting lock entitlement");
+                    return PromiseOrValue::Value(amount); // duplicate deposit is refunded in full
+                }
+                // Closing waits for this batch, so its creation epoch cannot legitimately be past.
+                // A failed checkpoint is repaired here before minting, fixing the original earning window.
+                require!(created >= self.epoch, "Recovery epoch already passed");
+                if created > self.epoch { self.advance_checkpoint(created); }
+                for (owner, a) in items { self.mint_lock(owner, a.0, math::VE_MAX_EPOCHS, true); }
+                self.recovery_receipts.insert(batch_id, fingerprint);
+            }
             TransferMsg::Buyback { epoch } => {
                 require!(sender_id == self.house, "Only the house");
                 // an epoch nobody was locked for passes its buyback to the next open epoch
@@ -193,16 +214,13 @@ impl Ve {
     /// House only, at each epoch start: fixes the total weight for `epoch`.
     pub fn checkpoint(&mut self, epoch: u64) {
         require!(env::predecessor_account_id() == self.house, "Only the house");
-        require!(epoch > self.epoch, "Epoch already checkpointed");
-        let total = self.tally.checkpoint(epoch);
-        self.totals.insert(epoch, total);
-        // rewards waiting for an epoch nobody is locked for move on to the next one
-        if total == 0 {
-            if let Some(r) = self.rewards.remove(&epoch) {
-                self.add_reward(epoch + 1, r);
-            }
-        }
-        self.epoch = epoch;
+        // An idempotent recovery transfer may have repaired this checkpoint already.
+        require!(epoch >= self.epoch, "Epoch already checkpointed");
+        if epoch > self.epoch { self.advance_checkpoint(epoch); }
+    }
+
+    pub fn get_recovery_receipt(&self, batch_id: u64) -> Option<Vec<u8>> {
+        self.recovery_receipts.get(&batch_id).cloned()
     }
 
     /// Pays a lock's rewards for finished epochs. Rewards that arrive late can be claimed later.
@@ -388,6 +406,15 @@ impl Ve {
 }
 
 impl Ve {
+    fn advance_checkpoint(&mut self, epoch: u64) {
+        let total = self.tally.checkpoint(epoch);
+        self.totals.insert(epoch, total);
+        if total == 0 {
+            if let Some(r) = self.rewards.remove(&epoch) { self.add_reward(epoch + 1, r); }
+        }
+        self.epoch = epoch;
+    }
+
     fn assert_lock_owner(&self, token_id: &TokenId) -> AccountId {
         let account = env::predecessor_account_id();
         require!(self.tokens.owner_by_id.get(token_id).as_ref() == Some(&account), "Not your lock");

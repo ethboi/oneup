@@ -55,7 +55,7 @@ const LINEAGE: { from: string; idea: string; rows: { topic: string; them: string
 const BUILT: { icon: IconName; title: string; body: string }[] = [
   { icon: "shield", title: "9 Rust contracts", body: "House, Extra Life (NEP-171), $1UP (NEP-141), locks, market (NEP-178 approvals), and mock USDC, oracle, swap and yield vault. Events follow NEP-297." },
   { icon: "check", title: "Failure-path regression tests", body: "Unit, property, SDK and fresh-sandbox integration tests. Run pnpm verify for current results; review findings and regression coverage are documented in docs/SECURITY.md." },
-  { icon: "demo", title: "Keeper and bots", body: "Anyone can run the keeper: it pushes prices, fills orders, liquidates, fires take-profits and stop-losses, and closes rounds. Twelve bots with different styles trade, lock and shop, and an MCP server lets AI agents trade too." },
+  { icon: "demo", title: "Keeper and bots", body: "The keeper software is public, but order fills require the configured keeper, owner or operator. It pushes prices, fills orders, liquidates, fires take-profits and stop-losses, and closes rounds. Twelve bots with different styles trade, lock and shop, and an MCP server lets AI agents trade too." },
   { icon: "scale", title: "Simulations", body: "Aggregate recovery sensitivity and same/separate-wallet farming assumptions. These models do not prove demand, fairness or Sybil resistance." },
 ];
 

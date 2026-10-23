@@ -19,14 +19,13 @@ use crate::{now_s, Epoch, House, HouseExt, StorageKey};
 
 const GAS_MINT_BASE: Gas = Gas::from_tgas(10);
 const GAS_MINT_PER_LIFE: Gas = Gas::from_tgas(6);
-const GAS_MINT_CALLBACK: Gas = Gas::from_tgas(10);
 const GAS_FT_TRANSFER_CALL: Gas = Gas::from_tgas(60);
 const GAS_POT_CALLBACK: Gas = Gas::from_tgas(15);
 const GAS_EXPIRE: Gas = Gas::from_tgas(30);
 const GAS_EXPIRE_CALLBACK: Gas = Gas::from_tgas(10);
 // each batch mints up to this many lives and as many locks, so it has to fit one transaction's gas
 const DEFAULT_BATCH: u32 = 10;
-const MAX_BATCH: u32 = 15;
+const MAX_BATCH: u32 = 10;
 
 #[near(serializers = [json])]
 pub struct MintItem {
@@ -112,13 +111,18 @@ impl House {
         let Some(mut c) = self.closing.take() else {
             require!(now_s() >= self.epoch.started_at + self.params.epoch_length_s, "Epoch not over yet");
             self.closing_requested = true;
-            if self.pending_backing > 0 || self.pending_backer_locks > 0 { return "waiting for backing".into(); }
+            if self.pending_backing > 0 || self.pending_backer_locks > 0 {
+                self.retry_first_recovery();
+                return "waiting for backing".into();
+            }
             if self.pending_pots > 0 { return "waiting for pot".into(); }
             self.closing_requested = false;
             self.begin_close();
             return "begun".into();
         };
-        let result = if !c.losers.is_empty() {
+        let result = if !self.recovery_batches.is_empty() {
+            if self.retry_first_recovery() { "retrying recovery" } else { "waiting for mints" }
+        } else if !c.losers.is_empty() {
             let n = limit.unwrap_or(DEFAULT_BATCH).clamp(1, MAX_BATCH) as usize;
             let taken: Vec<(AccountId, i128)> = c.losers.iter().take(n).map(|(k, v)| (k.clone(), *v)).collect();
             for (k, _) in &taken {
@@ -146,15 +150,10 @@ impl House {
                     })
                     .filter(|(_, a)| *a > 0)
                     .collect();
-                if !items.is_empty() {
-                    c.lives_minted += items.len() as u32;
-                    c.pending_mints += 1;
-                    self.mint_lives(c.epoch.id, items, true).detach();
-                }
-                if !locks.is_empty() {
+                if !items.is_empty() || !locks.is_empty() {
+                    c.pending_mints += u32::from(!items.is_empty()) + u32::from(!locks.is_empty());
                     c.oneup_assigned += locks.iter().map(|(_, a)| a).sum::<u128>();
-                    c.pending_mints += 1;
-                    self.lock_for_losers(c.epoch.id, locks).detach();
+                    self.queue_recovery(c.epoch.id, c.epoch.id + 1, items, locks, true);
                 }
             }
             "minting"
@@ -197,22 +196,6 @@ impl House {
         };
         self.closing = Some(c);
         result.into()
-    }
-
-    #[private]
-    pub fn on_minted(&mut self, owed: U128, for_close: bool, #[callback_result] r: Result<Vec<String>, PromiseError>) -> bool {
-        if for_close {
-            if let Some(c) = self.closing.as_mut() {
-                c.pending_mints = c.pending_mints.saturating_sub(1);
-            }
-        }
-        if r.is_err() {
-            // The lives weren't created, so nothing is owed for them.
-            self.lives_owed = self.lives_owed.saturating_sub(owed.0);
-            env::log_str(&format!("Extra Life mint failed; {} no longer owed", owed.0));
-            return false;
-        }
-        true
     }
 
     /// The life contract's total still owed after expiry: the house mirrors it exactly.
@@ -332,29 +315,13 @@ impl House {
         (self.deployed > after).then(|| self.deployed - after)
     }
 
-    /// Mints lives `(owner, face, cap_ppm)` and counts what they're owed straight away.
-    pub(crate) fn mint_lives(&mut self, epoch: u64, items: Vec<(AccountId, u128, u128)>, for_close: bool) -> Promise {
-        let life = self.life.clone().unwrap_or_else(|| env::panic_str("Set the Extra Life contract first"));
-        let owed: u128 = items.iter().map(|(_, face, cap)| math::owed(*face, *cap)).sum();
-        self.lives_owed += owed;
-        let gas = GAS_MINT_BASE.saturating_add(GAS_MINT_PER_LIFE.saturating_mul(items.len() as u64));
-        let items = items
-            .into_iter()
-            .map(|(owner, face, cap)| MintItem { owner, face: U128(face), cap_ppm: U128(cap) })
-            .collect();
-        ext_life::ext(life)
-            .with_static_gas(gas)
-            .mint_batch(epoch, items)
-            .then(Self::ext(env::current_account_id()).with_static_gas(GAS_MINT_CALLBACK).on_minted(U128(owed), for_close))
-    }
-
     /// Mints a Backer Life (D-22). The caller has already counted what it's owed.
     pub(crate) fn mint_backer(&mut self, owner: AccountId, amount: u128, cap_ppm: u128, oneup: u128) -> Promise {
         let life = self.life.clone().unwrap_or_else(|| env::panic_str("Set the Extra Life contract first"));
         ext_life::ext(life)
             .with_static_gas(GAS_MINT_BASE.saturating_add(GAS_MINT_PER_LIFE))
             .mint_backer(owner.clone(), U128(amount), U128(cap_ppm))
-            .then(Self::ext(env::current_account_id()).with_static_gas(Gas::from_tgas(80)).on_backer_minted(owner, U128(amount), U128(cap_ppm), U128(oneup)))
+            .then(Self::ext(env::current_account_id()).with_static_gas(Gas::from_tgas(100)).on_backer_minted(owner, U128(amount), U128(cap_ppm), U128(oneup)))
     }
 
     fn pay(&mut self, c: Closing) {

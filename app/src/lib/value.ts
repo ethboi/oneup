@@ -1,14 +1,15 @@
 "use client";
 
-// What Extra Lives and locks are worth, for suggested prices and the marketplace's "worth" column.
+// Nominal payout caps and spot exit estimates. These are not NFT market valuations.
 
 import { ONEUP, USDC, type LifeInfo, type LockInfo } from "@oneup/sdk";
 import { useOneUp, usePoll } from "./oneup";
+import { lifeEconomics } from "./life-economics";
 
-/** USDC an Extra Life can still pay: unclaimed, plus what's left to earn while it's live. */
+/** Nominal maximum, including claimable funds; future allocations are conditional. */
 export function lifeValue(l: LifeInfo): bigint {
-  if (l.expired || l.full_heal) return BigInt(l.claimable);
-  return BigInt(l.owed) - BigInt(l.paid) + BigInt(l.claimable);
+  const { claimable, additionalCap } = lifeEconomics(l);
+  return claimable + additionalCap;
 }
 
 /** A lock's $1UP if left today (after the penalty), at `px` USDC per $1UP. */

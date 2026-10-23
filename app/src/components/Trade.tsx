@@ -362,7 +362,10 @@ export function Trade() {
         <OrderForm t={ticket} />
         <Account t={ticket} positions={positions} orders={orders} />
         {/* under the form on every screen: on a desktop it fills the column beside the tall chart */}
-        <Jackpot compact />
+        <details className="panel p-3">
+          <summary className="cursor-pointer text-sm font-semibold">Optional: jackpot and tickets</summary>
+          <div className="mt-3"><Jackpot compact /></div>
+        </details>
       </div>
       {!formVisible && <TradeBar t={ticket} />}
     </div>

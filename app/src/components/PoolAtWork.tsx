@@ -91,7 +91,7 @@ export function PoolAtWork({ pool, liability }: { pool: bigint; liability: bigin
         <h2 className="text-lg font-extrabold">The pool at work</h2>
         <span className="flex items-center gap-2 rounded-lg border border-[var(--line)] px-2 py-1 text-xs font-bold">
           <PixelMark name="intents" label="NEAR Intents" size={20} />
-          Idle USDC earns via NEAR Intents
+          Simulated yield · local mock vault
         </span>
       </div>
 
@@ -102,18 +102,18 @@ export function PoolAtWork({ pool, liability }: { pool: bigint; liability: bigin
             <b className="num" style={{ color: "var(--long)" }}>
               ${fmtUsdc(deployed, 0)}
             </b>{" "}
-            of the pool is out earning <b className="num">{(rate * 100).toFixed(rate * 100 < 10 ? 1 : 0).replace(/\.0$/, "")}%</b> a year.
+            of the pool is in the mock vault, simulating <b className="num">{(rate * 100).toFixed(rate * 100 < 10 ? 1 : 0).replace(/\.0$/, "")}%</b> a year.
           </p>
           <p className="label mt-1 max-w-2xl">
             That&apos;s <b className="num text-[var(--text)]">{earningPct.toFixed(0)}%</b> of the pool, making about{" "}
             <b className="num text-[var(--text)]">{money(perRound, perRound < 100 ? 2 : 0)}</b> a round ({money(perYear)} a year). Every cent
-            of it goes to the jackpot.
+            of simulated interest goes to the test-money jackpot.
           </p>
         </div>
         <div className="shrink-0">
-          <div className="label mb-1 text-xs">Interest so far, on its way to the jackpot</div>
+          <div className="label mb-1 text-xs">Simulated interest so far</div>
           <div className="bezel inline-block rounded-xl px-2.5 py-2">
-            <div className="lcd rounded-lg px-3 py-2" aria-label={`Interest earned ${money(accrued, 4)}`}>
+            <div className="lcd rounded-lg px-3 py-2" aria-label={`Simulated interest ${money(accrued, 4)}`}>
               <PixelAmount text={money(accrued, 4)} height={28} />
             </div>
           </div>

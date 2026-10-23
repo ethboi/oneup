@@ -49,7 +49,7 @@ buyer  ──ft_transfer_call──▶ usdc ──▶ market ──▶ life|ve.n
 | `liquidate(position_id)` | anyone | latest price; pnl ≤ −0.9M → margin to pool |
 | `take_profit(position_id)` | anyone | latest price; pnl at cap → close |
 | `hit_target(position_id)` / `hit_stop(position_id)` | anyone | latest price past the trader's trigger, after the minimum hold and newer than the trigger → places a close (reason `Target` / `Stop`) that fills using a later valid price within its execution window (D-19); prompt execution trusts the keeper |
-| `close_epoch(limit)` | anyone | resumable: first call freezes epoch `e`, fixes its $1UP release (maths §8), checkpoints `ve` and starts `e+1` ("begun"); then mints Extra Lives and loser locks, `limit` (≤ 15) losers per call ("minting"), waits for both to land ("waiting for mints"), expires lives past their window ("expiring"), pays the pot and sets aside buyback USDC ("closed") |
+| `close_epoch(limit)` | anyone | resumable: first call freezes epoch `e`, fixes its $1UP release (maths §8), checkpoints `ve` and starts `e+1` ("begun"); then mints Extra Lives and loser locks, `limit` (≤ 10) losers per call ("minting"), retains and retries failed batches ("retrying recovery"), waits for both destinations to confirm ("waiting for mints"), expires lives past their window ("expiring"), pays the pot and sets aside buyback USDC ("closed") |
 | `set_keeper(keeper)` / `set_operator(operator)` / `set_owner(owner)` / `set_intents(intents)` | owner | roles (D-20, D-21, D-23) |
 | `buyback(epoch, min_out)` | owner or operator (D-10) | swaps the epoch's buyback USDC; the $1UP goes to `ve` for that epoch's lockers |
 | `add_market(market_id, feed_id, max_leverage)` | owner | new markets get `market_capacity_ppm` of the pool (D-14) |
@@ -63,6 +63,8 @@ buyer  ──ft_transfer_call──▶ usdc ──▶ market ──▶ life|ve.n
 `get_balance(account_id)`, `get_position(id)`, `get_positions(account_id)`, `get_orders(account_id)`,
 `get_markets()`, `get_solvency()` → `{pool, liability, reserve, surplus, markets: [{id, long_liab,
 short_liab, capacity}]}`, `get_epoch()` → `{id, started_at, ends_at, losses, payouts, close_state}`,
+`get_recovery_batches(from_index?, limit?)` exposes queued recipients, terms and confirmation status (maximum 100); `retry_recovery(batch_id)` permissionlessly retries a failed attempt or an attempt whose 60-second lease expired.
+
 `get_pending_life(account_id)` → positive wallet net loss so far this epoch (not a guaranteed mint or payout), `quote_open(market_id, side, margin, leverage)`
 → `{allowed, reason?, cut_rate, liq_price, max_profit}`, `get_emissions(epoch)` → `{scheduled, released,
 locked, carry}`, `get_emission_carry()`, `get_buyback(epoch)`, `get_params()`, `get_backing(amount?)` → `{backed, target,
@@ -114,7 +116,7 @@ A pot is O(groups earning): at most 14 cohorts plus the bootstrap round's backer
 
 | Method | Caller | Does |
 |---|---|---|
-| `mint_batch(epoch, items: [{owner, face, cap_ppm}])` | `house` | one token per loser, in the epoch's group, so the same epoch's pot pays them (D-4) |
+| `mint_batch(epoch, items: [{owner, face, cap_ppm}])` | `house` | one deterministic token per loser, in the epoch's group; retries verify immutable terms and return existing IDs without restoring former ownership (D-4) |
 | `mint_backer(owner, face, cap_ppm) → "b<n>"` | `house` | a Backer Life (D-22): never expires, shares pots from the moment it's minted |
 | `ft_on_transfer(sender_id, amount, msg)` | USDC, sender `house` | `{"epoch_pot":{"epoch":e}}` → shares the pot across the earning groups, returns what lives couldn't use |
 | `expire(through_epoch) → U128` | `house` | lives minted in `through_epoch` or earlier stop earning (D-13); returns the total still owed, which the house mirrors |
@@ -134,7 +136,8 @@ account, 50M to treasury. Deployment moves 7.5M from treasury into house backing
 | Method | Caller | Does |
 |---|---|---|
 | `ft_on_transfer` from $1UP, `{"lock":{"epochs":n}}` | holder | mints a lock NFT, 1 ≤ n ≤ 104 |
-| `ft_on_transfer` from $1UP, sender `house`, `{"lock_for":{"items":[[owner, amount], …]}}` | `house` | 104-epoch locks for losers (≤ 30 per transfer) |
+| `ft_on_transfer` from $1UP, sender `house`, `{"recovery_locks":{"batch_id":id,"created":epoch,"items":[[owner, amount], …]}}` | `house` | idempotent 104-epoch reward locks; an identical batch refunds duplicate token transfers; a mismatched batch is rejected |
+| `get_recovery_receipt(batch_id)` | anyone (view) | receiver fingerprint for confirmed lock issuance |
 | `ft_on_transfer` from $1UP, sender `house`, `{"buyback":{"epoch":e}}` | `house` | rewards for epoch `e`'s lockers |
 | `checkpoint(epoch)` | `house` | fixes the total weight for `epoch` |
 | `claim(token_id, epochs)` | lock owner | the lock's share of each finished epoch's rewards |

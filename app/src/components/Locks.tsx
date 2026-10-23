@@ -6,7 +6,7 @@
 
 import { parseTokenAmount } from "@oneup/sdk";
 import { useEffect, useState } from "react";
-import { ONEUP, USDC, VE_MAX_EPOCHS, type LockInfo } from "@oneup/sdk";
+import { ONEUP, VE_MAX_EPOCHS, type LockInfo } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { lockOrigin, lockCountdown } from "@/lib/locks";
 import { lockValue, useOneupPrice } from "@/lib/value";
@@ -183,7 +183,7 @@ function LockRow({ l, epoch, px, claimable, listings }: { l: LockInfo; epoch: nu
             ) : (
               <>
                 <div className="min-w-0 flex-1">
-                  <Sell nft={d.contracts.ve} tokenId={l.token_id} suggested={px > 0n ? (lockValue(l, px) * 8n) / 10n : USDC} listings={listings} compact />
+                  <Sell nft={d.contracts.ve} tokenId={l.token_id} listings={listings} compact />
                 </div>
                 <button className="btn btn-ghost px-2.5" onClick={() => setLeaving(!leaving)} aria-expanded={leaving} aria-label="Leave early" title="Leave early">
                   <Icon name="leave" />

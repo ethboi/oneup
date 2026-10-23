@@ -288,6 +288,18 @@ fn d1_spec_rule_can_go_bust() {
     h.internal_keeper_close(short, CloseReason::TakeProfit, px(12, T0 + 30), T0 + 30).unwrap();
 }
 
+/// Land each persisted receiver receipt, as the cross-contract callbacks would.
+fn confirm_recoveries(h: &mut House) {
+    let batches: Vec<_> = h.recovery_batches.iter().map(|(id, b)| (*id, b.clone())).collect();
+    for (id, b) in batches {
+        if !b.life_done {
+            let ids = b.lives.iter().map(|(o, _, _)| format!("{}:{o}", b.epoch)).collect();
+            assert!(h.on_recovery_lives(id, b.life_attempt, Ok(ids)));
+        }
+        if !b.locks_done { assert!(h.on_recovery_locks(id, b.locks_attempt, Ok(Some(b.fingerprint())))); }
+    }
+}
+
 /// Runs `close_epoch` to the end, landing each mint batch as the life contract would.
 fn close_epoch_fully(h: &mut House) -> u32 {
     let mut steps = 0;
@@ -305,10 +317,7 @@ fn close_epoch_fully(h: &mut House) -> u32 {
                 return steps;
             },
             "waiting for mints" => {
-                // lives and loser locks both land through a callback that counts one pending batch down
-                for _ in 0..h.get_closing().unwrap().pending_mints {
-                    let _ = h.on_minted(U128(0), true, Ok(vec![]));
-                }
+                confirm_recoveries(h);
             }
             "expiring" => {
                 let owed = h.lives_owed;
@@ -387,18 +396,13 @@ fn epoch_close_mints_and_pays() {
     // Alice is listed too (a net winner) but gets nothing
     assert_eq!(v.losers_left, 3);
 
-    assert_eq!(h.close_epoch(Some(1)), "minting");
-    assert_eq!(h.close_epoch(Some(1)), "minting");
-    assert_eq!(h.close_epoch(Some(1)), "minting");
-    assert_eq!(h.close_epoch(Some(1)), "waiting for mints");
-    // faces 900 (Bob) and 450 (Carol) at 1.97892×
+    // Batches are bounded and confirmed before processing more recipients.
+    for _ in 0..3 {
+        assert_eq!(h.close_epoch(Some(1)), "minting");
+        confirm_recoveries(&mut h);
+    }
     assert_eq!(h.lives_owed, usd(25_000) + 1_781_028_000 + 890_514_000);
-    // two life batches and two lock batches: 20 $1UP per $1 of the 1_350 profit, by loss 1_000 : 500
-    assert_eq!(h.get_closing().unwrap().pending_mints, 4);
-    let _ = h.on_minted(U128(0), true, Ok(vec![]));
-    let _ = h.on_minted(U128(0), true, Ok(vec![]));
-    let _ = h.on_locks(1, U128(18_000 * ONEUP), Ok(U128(18_000 * ONEUP)));
-    let _ = h.on_locks(1, U128(9_000 * ONEUP), Ok(U128(9_000 * ONEUP)));
+    assert_eq!(h.get_closing().unwrap().pending_mints, 0);
     assert_eq!(h.close_epoch(None), "expiring");
     assert_eq!(h.close_epoch(None), "waiting for expiry");
     // the life contract reports what's still owed; the house takes its number
@@ -431,12 +435,46 @@ fn no_lives_when_the_house_loses() {
     assert_eq!((s.house_net.0, s.lives_minted, s.lives_pot.0), (0, 0, 0));
 }
 
+/// A receipt failure retains every immutable entitlement, blocks payout, and can be retried
+/// repeatedly or after a lost callback without double-counting liabilities or confirmed mints.
 #[test]
-fn failed_mint_is_not_owed() {
+fn failed_and_interrupted_receipts_keep_entitlements_until_confirmed() {
     let mut h = setup(usd(25_000));
-    let before = h.lives_owed;
-    let _ = h.on_minted(U128(usd(500)), false, Err(near_sdk::PromiseError::Failed));
-    assert_eq!(h.lives_owed, before - usd(500));
+    deposit(&mut h, "bob", usd(1_000));
+    let p = open(&mut h, "bob", Side::Short, usd(1_000), 10, 500, T0);
+    close(&mut h, "bob", p, 525, T0 + 100);
+    ctx("keeper", T0 + 600);
+    assert_eq!(h.close_epoch(None), "begun");
+    assert_eq!(h.close_epoch(None), "minting");
+    let (id, original) = h.recovery_batches.iter().next().map(|(i, b)| (*i, b.clone())).unwrap();
+    let owed = h.lives_owed;
+    let carry = h.emission_carry;
+    assert_eq!(h.get_closing().unwrap().lives_minted, 0);
+    assert!(!h.on_recovery_lives(id, 1, Err(near_sdk::PromiseError::Failed)));
+    assert!(!h.on_recovery_locks(id, 1, Ok(None)));
+    assert_eq!(h.lives_owed, owed);
+    assert_eq!(h.emission_carry, carry);
+    assert_eq!(h.get_emissions(1).unwrap().locked.0, 0);
+    assert_eq!(h.close_epoch(None), "retrying recovery");
+    assert_eq!(h.close_epoch(None), "waiting for mints");
+    assert!(h.get_epoch_summary(1).is_none());
+    assert_eq!(h.recovery_batches.get(&id).unwrap().lives, original.lives);
+    assert_eq!(h.recovery_batches.get(&id).unwrap().locks, original.locks);
+    // Lose both second callbacks. The persisted leases allow any caller to resume later.
+    ctx("alice", T0 + 661);
+    assert!(h.retry_recovery(id));
+    assert!(!h.on_recovery_lives(id, 2, Ok(vec!["1:bob".into()])));
+    assert!(!h.on_recovery_locks(id, 2, Ok(Some(original.fingerprint()))));
+    assert_eq!(h.get_closing().unwrap().pending_mints, 2);
+    confirm_recoveries(&mut h);
+    assert_eq!(h.get_closing().unwrap().lives_minted, 1);
+    assert_eq!(h.get_emissions(1).unwrap().locked.0, 10_000 * ONEUP);
+    assert_eq!(h.lives_owed, owed);
+    assert!(!h.retry_recovery(id));
+    assert!(!h.on_recovery_lives(id, 3, Ok(vec!["1:bob".into()])));
+    assert!(!h.on_recovery_locks(id, 3, Ok(Some(original.fingerprint()))));
+    close_epoch_fully(&mut h);
+    assert_eq!(h.get_epoch_summary(1).unwrap().lives_minted, 1);
 }
 
 #[test]
@@ -477,21 +515,6 @@ fn no_release_when_the_house_loses() {
     // the whole schedule waits for profit
     assert_eq!(h.get_emissions(1).unwrap().released.0, 0);
     assert_eq!(h.get_emission_carry().0, oneup_math::emissions_for_epoch(1));
-}
-
-#[test]
-fn failed_locks_go_back_to_the_carry() {
-    let mut h = setup(usd(25_000));
-    deposit(&mut h, "bob", usd(1_000));
-    let b = open(&mut h, "bob", Side::Short, usd(1_000), 10, 500, T0);
-    close(&mut h, "bob", b, 525, T0 + 100); // −500
-    ctx("keeper", T0 + 600);
-    assert_eq!(h.close_epoch(None), "begun");
-    assert_eq!(h.close_epoch(None), "minting");
-    let carry = h.get_emission_carry().0;
-    let _ = h.on_locks(1, U128(10_000 * ONEUP), Ok(U128(0)));
-    assert_eq!(h.get_emission_carry().0, carry + 10_000 * ONEUP);
-    assert_eq!(h.get_emissions(1).unwrap().locked.0, 0);
 }
 
 #[test]
@@ -1134,10 +1157,17 @@ fn a_backing_locks_its_oneup_from_the_allocation() {
     ctx("house", T0);
     assert!(h.on_backer_minted(acc("bob"), U128(usd(10_000)), U128(1_976_000), U128(100_000 * ONEUP_UNIT), Ok("b2".into())));
     assert_eq!(h.pending_backer_locks, 1);
-    // a lock ve refused comes back to the allocation
-    ctx("house", T0);
-    h.on_backer_lock(U128(100_000 * ONEUP_UNIT), Err(near_sdk::PromiseError::Failed));
-    assert_eq!(h.get_backing(None).oneup_left.0, 150_000 * ONEUP_UNIT);
+    // A failed lock stays reserved for this backer, never reassigned to a later backer.
+    let (id, batch) = h.recovery_batches.iter().next().map(|(id, b)| (*id, b.clone())).unwrap();
+    assert!(!h.on_recovery_locks(id, 1, Err(near_sdk::PromiseError::Failed)));
+    assert_eq!(h.get_backing(None).oneup_left.0, 50_000 * ONEUP_UNIT);
+    assert_eq!(h.pending_backer_locks, 1);
+    ctx("keeper", T0 + 600);
+    assert_eq!(h.close_epoch(None), "waiting for backing");
+    assert!(h.on_recovery_locks(id, 2, Ok(Some(batch.fingerprint()))));
+    assert_eq!(h.pending_backer_locks, 0);
+    assert_eq!(h.get_backing(None).oneup_left.0, 50_000 * ONEUP_UNIT);
+    assert_eq!(h.close_epoch(None), "begun");
 }
 
 #[test]
@@ -1227,9 +1257,7 @@ fn the_close_brings_home_what_the_payout_needs() {
                 h.on_recalled(U128(need), true, Ok(()));
             }
             "waiting for mints" => {
-                for _ in 0..h.get_closing().unwrap().pending_mints {
-                    let _ = h.on_minted(U128(0), true, Ok(vec![]));
-                }
+                confirm_recoveries(&mut h);
             }
             "expiring" => {
                 let owed = h.lives_owed;
@@ -1621,4 +1649,22 @@ fn a_frozen_jackpot_finishes_even_if_future_draws_are_disabled() {
     close_epoch_fully(&mut h);
     assert!(h.tickets.is_empty());
     assert_eq!((0..21).map(|i| h.get_balance(acc(&format!("player{i}"))).0).sum::<u128>(), usd(100));
+}
+
+#[test]
+#[should_panic(expected = "Rewards pending: receiver configuration is frozen")]
+fn pending_recovery_prevents_receiver_reconfiguration() {
+    let mut h = setup(usd(25_000));
+    ctx("owner", T0);
+    h.lock_for_backer(acc("bob"), ONEUP);
+    h.set_token_and_ve(acc("other-token"), acc("other-ve"));
+}
+
+#[test]
+#[should_panic(expected = "Rewards pending: receiver configuration is frozen")]
+fn epoch_close_prevents_life_receiver_reconfiguration() {
+    let mut h = setup(usd(25_000));
+    ctx("owner", T0 + 600);
+    h.close_epoch(None);
+    h.set_life(acc("other-life"));
 }

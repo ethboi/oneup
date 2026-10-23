@@ -87,13 +87,16 @@ off-chain code (API routes, keeper, deploy). Every finding below has a test that
 
 - **Splitting a position lowers the winner's cut** (cut is sized by the position's own liability, not the
   market's). Ten small positions pay ~10% instead of up to 25%. It's a fee question, not a solvency one.
-- **Failed Extra Life or lock mints aren't retried.** A loser whose mint fails loses that epoch's life
-  (the house stops counting it as owed). Not seen in testing; a retry queue is the fix.
+- **Failed issuance retains its entitlement.** Life and lock batches persist on-chain and are retried
+  by `close_epoch` or permissionless `retry_recovery`. Receiver idempotence and attempt guards prevent
+  duplicate issuance; debt remains owed and settlement waits for confirmation. Permanent destination
+  failure can still delay settlement. Backer lock reservations use the same queue. See [recovery](RECOVERY_JOURNEY.md).
 - **Buyback delivery is tracked.** Rejected or failed deliveries retain the refunded amount for
   `retry_buyback_delivery(epoch)` by the owner or operator; in-flight retries are refused.
 - **Ownership hands over in one step** (`set_owner`). A typo loses the house; propose-and-accept is the fix.
-- **ve and the house can drift by an epoch** if ve is deployed late or a checkpoint fails; locks made in
-  that gap are weighted from the wrong epoch.
+- **House-issued lock epochs are explicit.** Recovery retries checkpoint to the preserved creation
+  epoch before minting, so checkpoint timing cannot move these entitlements. Ordinary user-created
+  locks still use ve's current checkpoint; delayed keeper checkpoints remain an operational risk.
 - **Claiming a lock built from many merges walks the whole merge tree** per epoch; claim fewer epochs per
   call.
 - **Stale market listings stay listed** until someone tries to buy (who is refunded in full).

@@ -109,7 +109,7 @@ fn only_house_mints() {
 }
 
 #[test]
-#[should_panic(expected = "token_id must be unique")]
+#[should_panic(expected = "Conflicting Life entitlement")]
 fn one_life_per_wallet_per_epoch() {
     let mut c = setup();
     ctx("house", 0);
@@ -386,4 +386,25 @@ fn a_side_passes_on_what_it_cant_use() {
     assert_eq!(pot(&mut c, 3_000), 0);
     assert!(c.life_info("1:alice".into()).unwrap().full_heal);
     assert_eq!(c.life_info(b).unwrap().paid.0, 2_900 * USDC);
+}
+
+#[test]
+fn retrying_a_mint_after_sale_and_payout_keeps_the_current_owner_and_terms() {
+    let mut c = setup();
+    ctx("house", 0);
+    c.mint_batch(1, vec![item("alice", 1_000, 2_000_000)]);
+    pot(&mut c, 400);
+    ctx("alice", 1);
+    c.nft_transfer(acc("bob"), "1:alice".into(), None, None);
+    let owed = c.total_owed_remaining().0;
+    ctx("house", 0);
+    for _ in 0..3 {
+        assert_eq!(c.mint_batch(1, vec![item("alice", 1_000, 2_000_000)]), vec!["1:alice"]);
+    }
+    let life = c.life_info("1:alice".into()).unwrap();
+    assert_eq!(life.owner_id, acc("bob"));
+    assert_eq!(life.claimable.0, 400 * USDC);
+    assert_eq!(life.owed.0, 2_000 * USDC);
+    assert_eq!(c.total_owed_remaining().0, owed);
+    assert_eq!(c.tokens.owner_by_id.len(), 1);
 }

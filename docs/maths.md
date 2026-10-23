@@ -171,12 +171,14 @@ per_epoch     = floor(EMISSIONS / 208)          # = 4_326_923.076923076923076923
                                                 # epoch 208 also gets the remainder
 available_e   = carry_{e−1} + per_epoch
 release_e     = min(available_e, RATE × house_net_e)      # RATE = 20 $1UP per USDC
-carry_e       = available_e − release_e (+ rounding and failed locks)
+carry_e       = available_e − release_e (+ unassigned rounding)
 loser i gets  release_e × loss_i / net_losses_e, as a 104-epoch lock (§9)
 ```
 
 Winners earn USDC, not $1UP. With `house_net ≤ 0` nothing is released and the whole schedule carries.
-After epoch 208 the schedule is 0 but the carry keeps releasing.
+After epoch 208 the schedule is 0 but the carry keeps releasing. Failed lock receipts retain their
+original recipient allocations in the on-chain recovery queue; they do not become carry. Settlement
+waits for confirmed issuance. Retries preserve the original creation epoch and cannot issue twice.
 
 ## 9. Locks (ve1UP, D-15)
 

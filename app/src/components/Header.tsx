@@ -37,8 +37,6 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
   const left = epoch ? Math.max(0, epoch.started_at + d.epochLengthS - now) : 0;
   const alive = lives?.filter((l) => !l.expired && !l.full_heal).length ?? 0;
   const round = useMyRound(me, epoch?.started_at);
-  const treasury = usePoll(() => o.treasury(), [], 5000);
-  const jackpot = treasury?.vault ? BigInt(treasury.jackpot) : null;
   // tabs that don't fit beside the strip fold into More from the end, one at a time until the bar fits
   const nav = useRef<HTMLElement>(null);
   const bar = tabs.filter((t) => !t.more);
@@ -90,20 +88,6 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
       {/* the round's clock and your result in it, one strip like the chart's market bar */}
       <div className="flex min-w-0 flex-1 justify-end lg:flex-none">
         <div className="hdr-strip bar-strip num text-sm">
-          {jackpot !== null && (
-            <button
-              type="button"
-              // phones have room for two cells: while you have a result this round, it takes the jackpot's place
-              className={`bar-cell font-extrabold ${round ? "hidden sm:flex" : ""}`}
-              onClick={() => go("Leaders")}
-              title="The jackpot: the house's idle USDC earns interest, and one loser's ticket takes it all. Tap for your tickets."
-              aria-label={`Jackpot $${fmtUsdc(jackpot, 2)}`}
-            >
-              {/* labelled, so it doesn't read as your own money */}
-              <span className="label font-normal">Jackpot</span>
-              <span style={{ color: "var(--jackpot)" }}>${fmtUsdc(jackpot, jackpot < 100n * USDC ? 2 : 0)}</span>
-            </button>
-          )}
           <span className="bar-cell" title={`Round ${epoch?.id ?? ""} ends in ${fmtClock(left)}. Eligible net losses can receive Extra Lives and $1UP locks if the house profits`}>
             {/* the label goes on narrow desktops too, where the tabs need the room */}
             <span className="label hidden sm:inline lg:hidden 2xl:inline">Round {epoch?.id ?? "…"}</span>

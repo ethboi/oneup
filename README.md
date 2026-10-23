@@ -33,7 +33,11 @@ USDC, sells another NFT, verifies the former owner cannot claim, and verifies th
 Its `e2e.json` records source identity, assertions and nine deployed WASM hashes beside the isolated config.
 All pre-existing bootstrap backing is prepared demo state, not external fundraising.
 On the Trade screen, **How recovery works** stays available after trading or dismissal. Expand it
-for the four-step loop and direct links to your Lives, claimable USDC and the marketplace.
+for the four-step loop and a next action based on the selected wallet. Open any Life to inspect its
+current owner, token ID, originating round, claimable USDC, additional conditional cap and expiry.
+Expired Lives with unclaimed USDC remain visible and sellable. Marketplace prices are seller-entered;
+no cap discount is presented as expected value. NFT totals span all owners, not personal profit.
+See [the recovery journey and retry protocol](docs/RECOVERY_JOURNEY.md) for limits and a walkthrough.
 
 For the animated live-price demo use `pnpm demo` at http://127.0.0.1:3020. It runs twelve bots and
 10-minute epochs; state persists in `.localnet/`. It deploys five product contracts and four mocks,

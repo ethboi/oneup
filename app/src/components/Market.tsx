@@ -1,13 +1,14 @@
 "use client";
 
-// The marketplace: Extra Lives and $1UP locks for sale, priced in USDC. Each listing says in plain words what
-// the buyer gets and how far under (or over) its value it's priced, best deals first. A Sell panel beside it
-// lists what you could sell and what you have up, and recent sales show what things went for against their value.
+// The marketplace keeps the asking price separate from current funds and conditional future entitlements.
 
 import { useState } from "react";
-import { USDC, type LifeInfo, type Listing, type LockInfo } from "@oneup/sdk";
+import { type LifeInfo, type Listing, type LockInfo } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
-import { lifeValue, lockValue, useOneupPrice } from "@/lib/value";
+import { lockValue, useOneupPrice } from "@/lib/value";
+import { lifeEconomics, lifeEarningLabel } from "@/lib/life-economics";
+import { compareAskingPrices, listingPriceInput, listingsPollKey, type AskingPriceOrder } from "@/lib/market-pricing";
+import { lifeHref } from "@/lib/recovery-journey";
 import { fmtOneup, fmtUsd } from "./Header";
 import { PixelHeart, PixelLock } from "./Pixel";
 import { Sell, useListings } from "./Sell";
@@ -15,21 +16,15 @@ import { useActivity, type ActivityItem } from "./Activity";
 import { Explainer, PanelHead } from "./ui";
 import { Icon } from "./Icon";
 
-/** A life shares the pots of the epoch it's minted in and the 13 after (`life_expiry_epochs`). */
-const LIFE_POTS = 14;
-
 type Item =
-  | { kind: "life"; l: Listing; info: LifeInfo; value: bigint }
+  | { kind: "life"; l: Listing; info: LifeInfo }
   | { kind: "lock"; l: Listing; info: LockInfo; value: bigint };
 
 type Filter = "all" | "life" | "lock";
-type Sort = "deal" | "cheap" | "value";
+type Sort = AskingPriceOrder;
 
 /** Prices in cents under $100, whole dollars above. */
 const usd = (x: bigint) => fmtUsd(x);
-
-/** How far under value (positive) or over it (negative) a price is, in %; null when it has no value. */
-const discount = (price: bigint, value: bigint) => (value > 0n ? Math.round((1 - Number(price) / Number(value)) * 100) : null);
 
 export function Market() {
   const { o, d, me } = useOneUp();
@@ -37,19 +32,20 @@ export function Market() {
   const px = useOneupPrice();
   const wallet = BigInt(usePoll(() => o.usdcBalance(me), [me]) ?? "0");
   const epoch = usePoll(() => o.epoch(), [], 10_000);
+  const params = usePoll(() => o.params(), [], 60_000);
   const sales = useActivity(100).filter((a) => a.kind === "sold");
   const [filter, setFilter] = useState<Filter>("all");
-  const [sort, setSort] = useState<Sort>("deal");
+  const [sort, setSort] = useState<Sort>("cheap");
 
-  // every listing's NFT, read once a poll: expired lives earn nothing more, so they aren't shown
-  const key = listings.map((l) => `${l.nft_contract}:${l.token_id}:${l.price}`).join();
+  // Expired Lives can still carry claimable USDC, which transfers with the NFT.
+  const key = listingsPollKey(listings);
   const items = usePoll(
     async () => {
       const got = await Promise.all(
         listings.map(async (l): Promise<Item | null> => {
           if (l.nft_contract === d.contracts.life) {
             const info = await o.lifeInfo(l.token_id).catch(() => null);
-            return info && !info.expired ? { kind: "life", l, info, value: lifeValue(info) } : null;
+            return info && lifeEconomics(info).hasRecoverableFunds ? { kind: "life", l, info } : null;
           }
           if (l.nft_contract === d.contracts.ve) {
             const info = await o.lockInfo(l.token_id).catch(() => null);
@@ -69,24 +65,18 @@ export function Market() {
   const all = items ?? [];
   const shown = all
     .filter((x) => filter === "all" || x.kind === filter)
-    .sort((a, b) => {
-      const pa = BigInt(a.l.price);
-      const pb = BigInt(b.l.price);
-      if (sort === "cheap") return pa < pb ? -1 : pa > pb ? 1 : 0;
-      if (sort === "value") return a.value > b.value ? -1 : a.value < b.value ? 1 : 0;
-      return (discount(pb, b.value) ?? -999) - (discount(pa, a.value) ?? -999);
-    });
+    .sort((a, b) => compareAskingPrices(a.l, b.l, sort));
   const lives = all.filter((x) => x.kind === "life").length;
   const locks = all.length - lives;
 
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_360px] lg:items-start">
       <div className="flex min-w-0 flex-col gap-5">
-        <Explainer title="Market" line={<>List or buy Extra Lives and $1UP locks for USDC. Caps are conditional; listings need buyers. Reference gaps are not investment returns. You have <b className="num text-[var(--text)]">{usd(wallet)}</b> in your wallet.</>}>
-          Buy someone&apos;s Extra Life and its USDC payouts are yours. Buy a lock and you get its $1UP when it ends, and its share
+        <Explainer title="Market" line={<>List or buy Extra Lives and $1UP locks for USDC. Compare the asking price with claimable funds and conditional future caps separately. You have <b className="num text-[var(--text)]">{usd(wallet)}</b> in your wallet.</>}>
+          An Extra Life transfers its unclaimed USDC and eligibility for future payouts to its buyer. Its additional cap is a limit, not promised income; future payouts depend on profitable rounds before expiry. Buy a lock and you get its $1UP when it ends, and its share
           of buybacks until then. You pay from your wallet&apos;s USDC and the NFT moves to you in the same step; if it was
           sold elsewhere first, your USDC comes straight back. Sellers pay 2% of the price, which goes into the house pool
-          as profit (and so back to Extra Lives and buybacks).
+          as profit (and so back to Extra Lives and buybacks). Displayed balances refresh periodically. If a seller claims before purchase, the claim revokes the listing approval: a stale purchase is refunded, and the seller must relist.
         </Explainer>
 
         <div className="panel">
@@ -107,12 +97,12 @@ export function Market() {
             <label className="flex items-center gap-2 text-sm">
               <span className="label">Sort</span>
               <select className="bar-select num" value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
-                <option value="deal">Largest cap / exit-price gap</option>
-                <option value="cheap">Cheapest</option>
-                <option value="value">Highest cap / exit estimate</option>
+                <option value="cheap">Lowest asking price</option>
+                <option value="expensive">Highest asking price</option>
               </select>
             </label>
           </div>
+          <p className="label border-b border-[var(--line)] px-4 py-2">Future payouts are conditional. A seller claim invalidates the listing; a purchase against that stale listing is refunded.</p>
           {items === undefined ? (
             <p className="label p-4">Loading…</p>
           ) : shown.length === 0 ? (
@@ -120,7 +110,7 @@ export function Market() {
           ) : (
             <div className="divide-y divide-[var(--line)]">
               {shown.map((x) => (
-                <Row key={`${x.l.nft_contract}:${x.l.token_id}`} x={x} wallet={wallet} epoch={epoch?.id} totalPower={totalPower ? BigInt(totalPower) : 0n} />
+                <Row key={`${x.l.nft_contract}:${x.l.token_id}`} x={x} wallet={wallet} epoch={epoch?.id} expiryEpochs={params?.life_expiry_epochs} totalPower={totalPower ? BigInt(totalPower) : 0n} />
               ))}
             </div>
           )}
@@ -130,7 +120,7 @@ export function Market() {
       <div className="flex flex-col gap-5">
         <div id="sell" className="panel scroll-mt-4">
           <PanelHead title="Sell" />
-          <YourItems px={px} listings={listings} />
+          <YourItems px={px} listings={listings} epoch={epoch?.id} expiryEpochs={params?.life_expiry_epochs} />
         </div>
         <div className="panel">
           <PanelHead title="Recent sales" />
@@ -161,9 +151,9 @@ function EmptyMarket({ filter }: { filter: Filter }) {
 }
 
 /** What you could sell (lives that can still pay, locks not yet withdrawn), each with its Sell control. */
-function YourItems({ px, listings }: { px: bigint; listings: Listing[] }) {
+function YourItems({ px, listings, epoch, expiryEpochs }: { px: bigint; listings: Listing[]; epoch?: number; expiryEpochs?: number }) {
   const { o, d, me } = useOneUp();
-  const lives = (usePoll(() => o.lives(me), [me]) ?? []).filter((l) => lifeValue(l) > 0n && !l.expired);
+  const lives = (usePoll(() => o.lives(me), [me]) ?? []).filter((l) => lifeEconomics(l).hasRecoverableFunds);
   const locks = (usePoll(() => o.locks(me), [me]) ?? []).filter((l) => !l.withdrawn);
   // the first three, so Recent sales stays in view; the rest on request
   const [all, setAll] = useState(false);
@@ -176,7 +166,7 @@ function YourItems({ px, listings }: { px: bigint; listings: Listing[] }) {
   return (
     <div className="divide-y divide-[var(--line)]">
       <p className="label px-4 pb-3">
-        Suggested prices use 70% of a Life&apos;s remaining payout cap or 80% of a lock&apos;s current exit estimate. These are listing defaults, not expected values. A willing buyer is required; sellers receive the price less the 2% fee.
+        Choose your asking price. A conditional payout cap or spot exit estimate is not a market valuation. A willing buyer is required; sellers receive the price less the 2% fee.
       </p>
       {shownLives.map((l) => (
         <div key={l.token_id} className="flex flex-col gap-2 p-3">
@@ -184,10 +174,11 @@ function YourItems({ px, listings }: { px: bigint; listings: Listing[] }) {
             <PixelHeart size={24} />
             <span className="min-w-0">
               <b className="block">{l.backer ? "Backer Life" : `Extra Life from round ${l.epoch}`}</b>
-              <span className="label num">{usd(lifeValue(l))} maximum remaining payout</span>
+              <span className="label num block">{usd(lifeEconomics(l).claimable)} claimable now · up to {usd(lifeEconomics(l).additionalCap)} additional, conditional</span>
+              <span className="label block">{lifeEarningLabel(l, epoch, expiryEpochs)}</span>
             </span>
           </span>
-          <Sell nft={d.contracts.life} tokenId={l.token_id} suggested={(lifeValue(l) * 7n) / 10n} listings={listings} compact />
+          <Sell nft={d.contracts.life} tokenId={l.token_id} listings={listings} compact />
         </div>
       ))}
       {shownLocks.map((l) => (
@@ -199,7 +190,7 @@ function YourItems({ px, listings }: { px: bigint; listings: Listing[] }) {
               <span className="label num">{px > 0n ? `${usd(lockValue(l, px))} if left today` : `unlocks in round ${l.end}`}</span>
             </span>
           </span>
-          <Sell nft={d.contracts.ve} tokenId={l.token_id} suggested={px > 0n ? (lockValue(l, px) * 8n) / 10n : USDC} listings={listings} compact />
+          <Sell nft={d.contracts.ve} tokenId={l.token_id} listings={listings} compact />
         </div>
       ))}
       {total > 3 && (
@@ -211,10 +202,10 @@ function YourItems({ px, listings }: { px: bigint; listings: Listing[] }) {
   );
 }
 
-function Row({ x, wallet, epoch, totalPower }: { x: Item; wallet: bigint; epoch?: number; totalPower: bigint }) {
+function Row({ x, wallet, epoch, expiryEpochs, totalPower }: { x: Item; wallet: bigint; epoch?: number; expiryEpochs?: number; totalPower: bigint }) {
   const { me, tx, run } = useOneUp();
   const price = BigInt(x.l.price);
-  const off = discount(price, x.value);
+  const askingPrice = `$${listingPriceInput(x.l)}`;
   const mine = x.l.seller === me;
   const short = wallet < price;
 
@@ -222,10 +213,8 @@ function Row({ x, wallet, epoch, totalPower }: { x: Item; wallet: bigint; epoch?
   let detail: string;
   if (x.kind === "life") {
     const i = x.info;
-    title = i.backer ? "Backer Life" : "Extra Life";
-    const left = epoch === undefined || i.backer ? null : Math.max(0, i.epoch + LIFE_POTS - epoch);
-    const earning = i.backer ? "earns until paid in full" : i.full_heal ? "paid in full" : left === null ? "…" : `earning for ${left} more round${left === 1 ? "" : "s"}`;
-    detail = `Pays up to ${usd(x.value)} more · ${earning}`;
+    title = i.backer ? "Backer Life" : `Extra Life from round ${i.epoch}`;
+    detail = lifeEarningLabel(i, epoch, expiryEpochs);
   } else {
     const i = x.info;
     title = `${fmtOneup(i.amount)} $1UP lock`;
@@ -239,22 +228,24 @@ function Row({ x, wallet, epoch, totalPower }: { x: Item; wallet: bigint; epoch?
     // phones: price and button on their own line under the details
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3 sm:flex-nowrap sm:px-4">
       <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--panel-2)]">
-        {x.kind === "life" ? <PixelHeart size={28} fill={x.info.full_heal ? 1 : lifeProgress(x.info)} live={!x.info.full_heal} /> : <PixelLock size={24} />}
+        {x.kind === "life" ? <PixelHeart size={28} fill={x.info.full_heal ? 1 : lifeProgress(x.info)} live={!x.info.full_heal && !x.info.expired} /> : <PixelLock size={24} />}
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <b className="truncate">{title}</b>
-          {off !== null && off > 0 && <span className="deal num">{off}% below reference</span>}
-          {off !== null && off < 0 && <span className="label num">{-off}% above reference</span>}
         </div>
-        <div className="label">{detail}</div>
-        <div className="label num">
-          {x.kind === "life" ? "Maximum remaining payout" : "Exit estimate"} {usd(x.value)}
-          {x.kind === "lock" ? " if left today" : ""}
-        </div>
+        {x.kind === "life" ? (
+          <div className="mt-1 grid gap-x-5 gap-y-1 text-sm sm:grid-cols-2">
+            <span><span className="label block">Claimable now</span><b className="num">{usd(lifeEconomics(x.info).claimable)}</b></span>
+            <span><span className="label block">Additional conditional cap</span><b className="num">Up to {usd(lifeEconomics(x.info).additionalCap)}</b></span>
+          </div>
+        ) : <div className="label num">Spot exit estimate {usd(x.value)} if left today</div>}
+        <div className="label mt-1">{detail}</div>
+        <div className="label num break-all">Token {x.l.token_id}</div>
+        {x.kind === "life" && <a className="mt-1 inline-block text-sm font-bold underline decoration-dotted underline-offset-2" href={lifeHref(x.l.token_id)}>View Life details</a>}
       </div>
       <div className="flex w-full shrink-0 items-center justify-between gap-2 pl-14 sm:w-auto sm:flex-col sm:items-end sm:gap-1 sm:pl-0">
-        <span className="display num text-lg">{usd(price)}</span>
+        <span className="text-right"><span className="label block">Asking price</span><span className="display num text-lg">{askingPrice}</span></span>
         {mine ? (
           <button className="btn btn-ghost px-3 py-1" onClick={() => run("Take down listing", () => tx.delist(x.l.nft_contract, x.l.token_id))}>
             Take down
@@ -264,7 +255,7 @@ function Row({ x, wallet, epoch, totalPower }: { x: Item; wallet: bigint; epoch?
             className="btn btn-accent px-3 py-1"
             disabled={short}
             title={short ? `You need ${usd(price - wallet)} more USDC. Get test USDC from the Demo menu.` : undefined}
-            onClick={() => run(`Buy for ${usd(price)}`, () => tx.buy(x.l.nft_contract, x.l.token_id, price))}
+            onClick={() => run(`Buy for ${askingPrice}`, () => tx.buy(x.l.nft_contract, x.l.token_id, price))}
           >
             <Icon name="cart" size={15} />
             {short ? "Not enough USDC" : "Buy"}
@@ -278,7 +269,7 @@ function Row({ x, wallet, epoch, totalPower }: { x: Item; wallet: bigint; epoch?
 /** How much of a life's cap it has been paid, for its heart (never drawn empty). */
 const lifeProgress = (i: LifeInfo) => (BigInt(i.owed) > 0n ? Math.max(0.12, Number((BigInt(i.paid) * 10_000n) / BigInt(i.owed)) / 10_000) : 0.12);
 
-/** Recent sales, each against what it was worth when it sold (when the app saw it live). */
+/** Observed sale prices. Historical cap snapshots are not valuations. */
 function Sales({ items }: { items: ActivityItem[] }) {
   if (items.length === 0) return <p className="label px-4 pb-4">No sales yet.</p>;
   const now = Date.now();
@@ -286,7 +277,6 @@ function Sales({ items }: { items: ActivityItem[] }) {
     <ul className="divide-y divide-[var(--line)] px-4 pb-1">
       {items.map((a) => {
         const s = a.sale;
-        const off = s?.value ? discount(BigInt(s.price), BigInt(s.value)) : null;
         const ago = Math.max(0, Math.round((now - a.t) / 60_000));
         // "bot2 bought bot4's Extra Life for $4.30": the price goes in its own column
         const [, who, price] = a.text.match(/^(.*) for (\$[\d,.]+)$/) ?? [, a.text, null];
@@ -296,11 +286,6 @@ function Sales({ items }: { items: ActivityItem[] }) {
             <span className="shrink-0">{(s?.nft ?? (a.text.includes("lock") ? "lock" : "life")) === "lock" ? <PixelLock size={18} /> : <PixelHeart size={20} />}</span>
             <span className="min-w-0 flex-1">
               <span className="block">{who}</span>
-              {off !== null && (
-                <span className="label num" style={{ color: off > 0 ? "var(--long)" : undefined }}>
-                  {off > 0 ? `${off}% below reference` : off < 0 ? `${-off}% above reference` : "at reference"}
-                </span>
-              )}
             </span>
             <span className="shrink-0 text-right">
               {price && <b className="num block">{price}</b>}
