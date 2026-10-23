@@ -53,3 +53,12 @@ export function useTilt(account: string): number {
   }, [account]);
   return left;
 }
+
+/** The Demo menu's preview: TILT for a few seconds, without touching the losses that count toward a real one. */
+export function previewTilt(account: string, ms = 6000) {
+  const s = read(account);
+  try {
+    localStorage.setItem(key(account), JSON.stringify({ ...s, until: Date.now() + ms }));
+  } catch {}
+  window.dispatchEvent(new Event("oneup-tilt"));
+}

@@ -23,7 +23,7 @@ import {
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { PriceChart, type Mark } from "./PriceChart";
 import { fmtClock, useNow } from "./Header";
-import { PixelCoin, PixelHeart } from "./Pixel";
+import { AngryHeart, PixelCoin, PixelHeart } from "./Pixel";
 import { Icon } from "./Icon";
 import { Popover } from "./Popover";
 import { useTilt } from "@/lib/tilt";
@@ -742,8 +742,13 @@ function Console({
               {revenge ? (
                 // a warning banner slammed across the screen
                 <span key={revenge} className="revenge display">
-                  <span className="revenge-word">REVENGE TRADE</span>
-                  <span className="revenge-tag">DETECTED</span>
+                  <span className="revenge-face">
+                    <AngryHeart size={64} />
+                  </span>
+                  <span className="flex flex-col items-center gap-2">
+                    <span className="revenge-word">REVENGE TRADE</span>
+                    <span className="revenge-tag">DETECTED</span>
+                  </span>
                 </span>
               ) : (
                 // a pinball machine's TILT

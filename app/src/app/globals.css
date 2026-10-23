@@ -1021,9 +1021,9 @@ body {
 .revenge {
   position: relative;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: clamp(10px, 2.5vw, 22px);
   width: 112%;
   padding: 18px 0 16px;
   transform: rotate(-6deg);
@@ -1035,7 +1035,7 @@ body {
 }
 /* chunky letters: a thick ink outline and a hard drop, like an arcade warning */
 .revenge-word {
-  font-size: clamp(30px, 6.4vw, 54px);
+  font-size: clamp(20px, 5.4vw, 54px);
   line-height: 1;
   letter-spacing: 0.04em;
   color: #fff;
@@ -1045,13 +1045,39 @@ body {
     4px 4px 0 var(--lcd-ink),
     5px 5px 0 var(--lcd-ink);
 }
+/* the angry heart: it lands a beat after the band, with a punch */
+.revenge-face {
+  flex: none;
+  zoom: var(--face-zoom, 1);
+  animation: revenge-punch 0.5s cubic-bezier(0.2, 1.6, 0.4, 1) 0.25s both;
+}
+.angry-flame {
+  animation: angry-flicker 0.3s steps(2) infinite;
+}
+/* phones: a smaller heart, so the words keep the band's width */
+@media (max-width: 520px) {
+  .revenge-face {
+    --face-zoom: 0.6;
+  }
+}
+@keyframes revenge-punch {
+  from {
+    transform: scale(0) rotate(-30deg);
+  }
+}
+@keyframes angry-flicker {
+  50% {
+    transform: translateY(-2px) scaleY(1.12);
+  }
+}
 .revenge-tag {
   padding: 3px 12px;
   font-size: clamp(13px, 2.4vw, 18px);
   letter-spacing: 0.3em;
   color: #fff;
   background: var(--lcd-ink);
-  animation: blink 0.4s steps(1) 0.5s 5;
+  /* three quick blinks, then it stays */
+  animation: blink 0.3s steps(1) 0.5s 3;
 }
 @keyframes revenge-slam {
   0% {
@@ -1102,10 +1128,18 @@ body {
   text-shadow:
     5px 5px 0 var(--lcd-ink),
     6px 6px 0 var(--lcd-ink);
-  animation: blink 0.8s steps(1) infinite;
+  /* flashes red and dark like a pinball backglass, never blank */
+  animation: tilt-flash 0.8s steps(1) infinite;
+}
+@keyframes tilt-flash {
+  50% {
+    color: var(--lcd-2);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .revenge,
+  .revenge-face,
+  .angry-flame,
   .revenge-tag,
   .tilt-word {
     animation: none;

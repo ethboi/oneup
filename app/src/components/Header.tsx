@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { previewTilt } from "@/lib/tilt";
 import { showBoot } from "./Boot";
 import { USDC, fmtUsdc, ONEUP } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
@@ -202,6 +203,17 @@ function DemoMenu() {
                   ${usd.toLocaleString("en-US")}
                 </button>
               ))}
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="label">Preview the screen&apos;s warnings</span>
+            <div className="flex gap-1.5">
+              <button type="button" className="chip flex-1 px-0" onClick={() => (close(), sfx("revenge"), emitFx({ kind: "revenge" }))}>
+                Revenge trade
+              </button>
+              <button type="button" className="chip flex-1 px-0" onClick={() => (close(), sfx("tilt"), previewTilt(me))}>
+                Tilt
+              </button>
             </div>
           </div>
           {/* the power-on screen shows once a session; this brings it back */}

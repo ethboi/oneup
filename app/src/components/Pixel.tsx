@@ -166,3 +166,35 @@ export function PixelMark({ name, size = 36, label }: { name: MarkName; size?: n
     </svg>
   );
 }
+
+/** The heart, angry: slanted brows, glaring eyes and gritted teeth, with flames off its top (REVENGE TRADE). */
+const ANGRY_HEART = [
+  ".###...###.",
+  "#####.#####",
+  "#K#######K#",
+  "##KK###KK##",
+  "##WK###KW##",
+  ".#########.",
+  "..KWKWKWK..",
+  "...#####...",
+  "....###....",
+  ".....#.....",
+];
+const FLAME_ROWS = ["..#..", ".##..", ".###.", "##Y##", "#YYY#", ".#Y#."];
+
+export function AngryHeart({ size = 72 }: { size?: number }) {
+  const flame = { "#": "#ff7a1a", Y: "#f2b705" };
+  return (
+    <span className="relative inline-block" style={{ width: size, height: size * 1.2 }} aria-hidden>
+      <span className="angry-flame absolute" style={{ left: size * 0.06, top: 0 }}>
+        <Sprite rows={FLAME_ROWS} colors={flame} size={size * 0.34} />
+      </span>
+      <span className="angry-flame absolute" style={{ right: size * 0.06, top: 0, animationDelay: "0.15s" }}>
+        <Sprite rows={FLAME_ROWS} colors={flame} size={size * 0.34} />
+      </span>
+      <span className="absolute bottom-0 left-0">
+        <Sprite rows={ANGRY_HEART} colors={{ "#": "var(--heart)", K: "var(--edge)", W: "#fff" }} size={size} />
+      </span>
+    </span>
+  );
+}
