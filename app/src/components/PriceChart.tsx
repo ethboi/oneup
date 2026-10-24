@@ -403,10 +403,10 @@ export function PriceChart({
 
   return (
     <div ref={ref} className="lcd relative" data-busy={marks.some((m) => m.kind === "entry") || undefined}>
-      {/* far behind the price: a platformer's landscape (clouds, hills, bushes, pipes, a brick ground), drifting slowly */}
+      {/* far behind the price: a platformer's landscape (clouds, hills, floating blocks, bushes, pipes, a brick ground), drifting slowly */}
       <div className="lcd-scenery" aria-hidden style={{ left: PAD.l, right: PAD.r, top: PAD.t, bottom: PAD.b }}>
         {/* back to front, each a fill and its outline */}
-        {["cloud", "hill", "bush", "pipe", "ground"].flatMap((n) => [<div key={n} className={`lcd-${n}`} />, <div key={`${n}-line`} className={`lcd-${n}-line`} />])}
+        {["cloud", "hill", "brick", "qblock", "bush", "pipe", "ground"].flatMap((n) => [<div key={n} className={`lcd-${n}`} />, <div key={`${n}-line`} className={`lcd-${n}-line`} />])}
       </div>
       <svg
         width={W}
