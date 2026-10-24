@@ -4,6 +4,7 @@
 // biggest losers get the biggest Extra Lives, so they have a board too.
 
 import { useEffect, useState } from "react";
+import { AgentBadge } from "./ui";
 import { fmtUsdc } from "@oneup/sdk";
 import { fmtUsd } from "./Header";
 import { useOneUp, usePoll } from "@/lib/oneup";
@@ -154,6 +155,7 @@ function Board({ title, note, icon, rows, me, empty }: { title: string; note?: s
                   </td>
                   <td className="py-2">
                     <span className={you ? "font-extrabold" : undefined}>{short(r.account)}</span>
+                    <AgentBadge account={r.account} />
                     {you && <span className="you-tag">you</span>}
                     {r.liquidations > 0 && <span className="label" title={`${r.liquidations} liquidations`}> · {r.liquidations}× liquidated</span>}
                   </td>

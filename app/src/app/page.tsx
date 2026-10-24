@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Agents } from "@/components/Agents";
 import { scrollToAnchorWhenReady } from "@/lib/anchors";
 import { Boot } from "@/components/Boot";
 import { OneUpProvider, useOneUp } from "@/lib/oneup";
@@ -24,13 +25,14 @@ import { Onboarding } from "@/components/Onboarding";
 import { Icon, type IconName } from "@/components/Icon";
 import { Logo } from "@/components/Pixel";
 
-const TABS = ["Trade", "Extra Lives", "Locks", "Market", "Leaders", "Backing", "$1UP", "House", "About"] as const;
+const TABS = ["Trade", "Extra Lives", "Locks", "Market", "Agents", "Leaders", "Backing", "$1UP", "House", "About"] as const;
 type Tab = (typeof TABS)[number];
 const TAB_ICONS: Record<Tab, IconName> = {
   Trade: "chart",
   "Extra Lives": "heart",
   Locks: "lock",
   Market: "store",
+  Agents: "agent",
   Leaders: "trophy",
   Backing: "deposit",
   $1UP: "claim",
@@ -125,6 +127,7 @@ export default function Home() {
           {tab === "Extra Lives" && <Lives />}
           {tab === "Locks" && <Locks />}
           {tab === "Market" && <Market />}
+          {tab === "Agents" && <Agents />}
           {tab === "Leaders" && <Leaderboard />}
           {tab === "Backing" && <BackPage go={(t) => go(t as Tab)} />}
           {tab === "$1UP" && <Tokenomics />}
@@ -138,7 +141,7 @@ export default function Home() {
       <nav className="bottom-nav lg:hidden" aria-label="Sections">
         {more && (
           <div className="absolute inset-x-3 bottom-[68px] flex flex-col gap-1 rounded-xl border border-[var(--panel-edge)] bg-[var(--panel)] p-2 shadow-[var(--panel-shadow)]">
-            {(["Leaders", "Backing", "$1UP", "House", "About"] as const).map((t) => (
+            {(["Agents", "Leaders", "Backing", "$1UP", "House", "About"] as const).map((t) => (
               <button key={t} className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-left font-bold hover:bg-[var(--panel-2)]" onClick={() => go(t)}>
                 <Icon name={TAB_ICONS[t]} />
                 {t}
@@ -152,7 +155,7 @@ export default function Home() {
             {PHONE_LABEL[t] ?? t}
           </button>
         ))}
-        <button aria-current={tab === "House" || tab === "About" ? "page" : undefined} aria-expanded={more} onClick={() => setMore(!more)}>
+        <button aria-current={tab === "Agents" || tab === "Leaders" || tab === "Backing" || tab === "$1UP" || tab === "House" || tab === "About" ? "page" : undefined} aria-expanded={more} onClick={() => setMore(!more)}>
           <Icon name="more" size={20} />
           More
         </button>

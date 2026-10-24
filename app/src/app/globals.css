@@ -2702,3 +2702,81 @@ kbd {
     -webkit-mask-size: 1600px 16px;
   }
 }
+
+/* agents (components/ui.tsx AgentBadge, components/Agents.tsx) */
+.agent-badge {
+  display: inline-block;
+  margin-left: 5px;
+  padding: 0 4px;
+  border-radius: 4px;
+  font: 800 9.5px/15px var(--font-body);
+  letter-spacing: 0.06em;
+  vertical-align: 1px;
+}
+.agent-badge.ai {
+  color: #fff;
+  background: linear-gradient(90deg, #7c4dff, #2a9ae0);
+  box-shadow: 0 0 8px rgb(124 77 255 / 0.45);
+}
+.agent-badge.bot {
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+.agent-avatar {
+  display: grid;
+  flex: none;
+  place-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  color: #fff;
+  background: linear-gradient(135deg, #7c4dff, #2a9ae0);
+  box-shadow: 0 3px 0 #3b1f8c;
+}
+.journal-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+}
+.journal-icon {
+  display: grid;
+  flex: none;
+  place-content: center;
+  width: 26px;
+  height: 26px;
+  margin-top: 1px;
+  border-radius: 999px;
+  color: #b9a4ff;
+  background: rgb(124 77 255 / 0.16);
+}
+.journal-icon.failed {
+  color: var(--short);
+  background: color-mix(in srgb, var(--short) 14%, transparent);
+}
+.journal-reason {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--muted);
+}
+.journal-failed {
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: var(--short);
+  border: 1px solid color-mix(in srgb, var(--short) 50%, transparent);
+}
+.agent-code {
+  margin-top: 10px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  border-radius: 8px;
+  font: 12.5px/1.6 ui-monospace, monospace;
+  color: var(--text);
+  background: var(--panel-2);
+}

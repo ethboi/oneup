@@ -7,6 +7,7 @@
 import { useState } from "react";
 import { Icon } from "./Icon";
 import { useOneUp } from "@/lib/oneup";
+import { useAgentOf } from "@/lib/agents";
 import { explorer } from "@/lib/explorer";
 
 export function Section({ title, action, children }: { title: React.ReactNode; action?: React.ReactNode; children: React.ReactNode }) {
@@ -94,5 +95,17 @@ export function OnExplorer({ tx, account, nft }: { tx?: string; account?: string
     <a href={href} target="_blank" rel="noreferrer" className="shrink-0 text-[var(--muted)] hover:text-[var(--text)]" title="View on NearBlocks" aria-label="View on NearBlocks">
       <Icon name="share" size={13} />
     </a>
+  );
+}
+
+/** "AI" beside an AI agent's name, "BOT" (with its strategy on hover) beside a rule-based bot's; nothing for a
+ *  person. `bots`: false shows AI agents only (where every other row is a bot anyway). */
+export function AgentBadge({ account, bots = true }: { account?: string; bots?: boolean }) {
+  const a = useAgentOf()(account);
+  if (!a || (a.kind === "bot" && !bots)) return null;
+  return (
+    <span className={`agent-badge ${a.kind}`} title={a.kind === "ai" ? "An AI agent, trading through OneUp's MCP server" : `A rule-based bot: the ${a.name} strategy`}>
+      {a.kind === "ai" ? "AI" : "BOT"}
+    </span>
   );
 }

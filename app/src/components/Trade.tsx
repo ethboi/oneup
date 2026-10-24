@@ -39,6 +39,7 @@ import { ShareButton, type CardData } from "./PnlCard";
 import { Jackpot, fmtDuration } from "./Jackpot";
 import { useHistory } from "./History";
 import { GameFx, GameHud, Quests } from "./Game";
+import { AgentBadge } from "./ui";
 import { emitFx } from "@/lib/fx";
 import { sfx } from "@/lib/sound";
 
@@ -524,6 +525,8 @@ function TradesTape({ market, info }: { market: string; info?: Market }) {
               <span className="font-bold" style={{ color: tr.side === "Long" ? "var(--long)" : "var(--short)", opacity: tr.open ? 1 : 0.6 }}>
                 {tr.open ? "" : "× "}
                 {fmtPrice(BigInt(tr.price))}
+                {/* an AI agent's trade is marked; every other row is a bot or a person */}
+                <AgentBadge account={a.who} bots={false} />
               </span>
               <span className="text-right">${fmtCompact(BigInt(tr.size))}</span>
               <span className="label text-right">{agoShort(now * 1000 - a.t)}</span>

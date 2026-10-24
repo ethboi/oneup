@@ -16,6 +16,7 @@
     "bots": "pnpm --filter @oneup/bots start",
     "bots:add": "tsx scripts/add-bots.ts",
     "mcp": "pnpm --silent --filter @oneup/mcp start",
+    "agent": "pnpm --silent --filter @oneup/mcp agent",
     "sim": "pnpm --filter @oneup/sim start",
     "demo": "tsx scripts/demo.ts",
     "test:sandbox": "contracts/build.sh && PATH=\"$HOME/.cargo/bin:$PATH\" cargo test --manifest-path contracts/Cargo.toml -p oneup-integration",

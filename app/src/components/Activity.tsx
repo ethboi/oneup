@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { useOneUp } from "@/lib/oneup";
 import { pollActivity } from "../lib/activity-feed";
-import { OnExplorer } from "./ui";
+import { AgentBadge, OnExplorer } from "./ui";
 import { useNow } from "./Header";
 import { Icon, type IconName } from "./Icon";
 
@@ -72,7 +72,10 @@ export function ActivityList({ items, limit = 8, empty = "Waiting for activityâ€
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--panel-2)]" style={{ color: LOOK[a.kind].color }}>
             <Icon name={LOOK[a.kind].icon} size={15} />
           </span>
-          <span className="min-w-0 flex-1 leading-snug">{a.text}</span>
+          <span className="min-w-0 flex-1 leading-snug">
+            {a.text}
+            <AgentBadge account={a.who} />
+          </span>
           <span className="label num shrink-0">{ago(now, a.t)}</span>
           {a.tx && <OnExplorer tx={a.tx} />}
         </li>

@@ -1,12 +1,14 @@
 // OneUp as an MCP server: an AI agent can read the markets, open and close trades, set take-profit and
-// stop-loss, see its Extra Lives and claim them, on the local chain. It signs as one account from
-// localnet.json: the demo trader by default, or a bot (ONEUP_ACCOUNT=bot3). Localnet only: the keys it uses
-// are the demo's throwaway ones.
+// stop-loss, see its Extra Lives and claim them, and buy Extra Lives and locks on the market, on the local
+// chain. It signs as one account from localnet.json: the AI agent's (bot12, which the bots leave alone) by
+// default, or another (ONEUP_ACCOUNT=bot3, or demo). Every action, with the reason the agent gives for it, goes
+// into a journal the app shows (.localnet/agent-journal.jsonl). Localnet only: the keys it uses are the demo's
+// throwaway ones.
 //
 //   pnpm mcp                                  (stdio; .mcp.json at the repo root registers it for Claude Code)
 //   ONEUP_ACCOUNT=bot3 pnpm mcp
 
-import { readFileSync } from "node:fs";
+import { appendFileSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -23,21 +25,40 @@ import {
   normalizePrice,
   pnl,
   type Deployment,
+  type JournalEntry,
+  type LifeInfo,
+  type LockInfo,
   type Position,
   type Side,
+  aiAgents,
 } from "@oneup/sdk";
 
-const d: Deployment = JSON.parse(readFileSync(resolve(import.meta.dirname, "../../localnet.json"), "utf8"));
+const ROOT = resolve(import.meta.dirname, "../..");
+const d: Deployment = JSON.parse(readFileSync(process.env.ONEUP_CONFIG ?? resolve(ROOT, "localnet.json"), "utf8"));
 if (d.network !== "localnet" || !["127.0.0.1", "localhost"].includes(new URL(d.rpcUrl).hostname)) throw new Error("Localnet only");
 
-// the account it trades as: the demo trader, or a bot by name ("bot3") or full id
-const want = process.env.ONEUP_ACCOUNT ?? "demo";
+// the account it trades as: the AI agent's by default, or the demo trader or a bot by name ("bot3") or full id
+const want = process.env.ONEUP_ACCOUNT ?? aiAgents(process.env.ONEUP_AI_AGENTS)[0];
 const signer = [d.demo, ...d.bots].find((a) => a.id === want || a.id.split(".")[0] === want);
 if (!signer) throw new Error(`ONEUP_ACCOUNT ${want} isn't the demo trader or a bot in localnet.json`);
 
 const o = new OneUp(d);
 const tx = o.calls(accountSender(new Account(signer.id, o.provider, signer.key as KeyPairString)));
 const me = signer.id;
+
+// the journal: every action this agent takes, with the reason it gives, for the app's Agents tab
+const JOURNAL = resolve(process.env.ONEUP_STATE_DIR ?? resolve(ROOT, ".localnet"), "agent-journal.jsonl");
+function record(tool: string, args: Record<string, unknown>, ok: boolean, result: unknown) {
+  const { reason, ...rest } = args as { reason?: string };
+  const entry: JournalEntry = { t: Date.now(), account: me, tool, args: rest, reason, ok, result: typeof result === "string" ? result : JSON.stringify(result, (_, v) => (typeof v === "bigint" ? v.toString() : v)).slice(0, 400) };
+  try {
+    appendFileSync(JOURNAL, JSON.stringify(entry) + "\n");
+  } catch {
+    // no state directory: the action still happened
+  }
+}
+/** Why the agent is doing this, in a sentence: shown in the app beside the action. */
+const reason = z.string().max(400).optional().describe("Why you're doing this, in a sentence. Shown publicly in the app's agent journal.");
 
 /** USDC from a number of dollars (cents kept). */
 const usdc = (x: number) => BigInt(Math.round(x * 1e6));
@@ -94,6 +115,21 @@ const safe =
     }
   };
 
+/** `safe`, and the action goes into the journal (with its reason) whether it worked or not. */
+const logged =
+  <A extends Record<string, unknown>>(tool: string, f: (a: A) => Promise<unknown>) =>
+  async (a: A) => {
+    try {
+      const out = await f(a);
+      record(tool, a, true, out);
+      return json(out);
+    } catch (e) {
+      const r = fail(e);
+      record(tool, a, false, r.content[0].text);
+      return r;
+    }
+  };
+
 const server = new McpServer({ name: "oneup", version: "0.1.0" });
 
 server.registerTool(
@@ -105,12 +141,14 @@ server.registerTool(
       account: me,
       network: "localnet",
       signing: "Full-access development key. Open-trade calls can deposit wallet USDC automatically; this is not a constrained agent wallet.",
+      journal: "Every action you take (open, close, set_triggers, claim_lives, buy_listing) is recorded with the `reason` you give and shown publicly in the app's Agents tab. Give a short, honest reason each time.",
       rules: [
         `Perpetuals against a USDC house pool. No entry or funding fee; winners pay 10–25% of profit. Contract leverage limit is ${params.leverage_hard_limit}x; this MCP tool caps orders at 100x and market limits may be lower.`,
         `A fill requires an oracle price published after placement and inside the allowed window. A trusted keeper chooses when to execute; first-price execution is not proven. Minimum voluntary hold: ${params.min_hold_s} seconds.`,
         "Maximum profit before the fee is 9x margin. Liquidation at a 90% loss takes the full margin.",
         `Positive wallet net loss in a profitable round can earn an Extra Life and token locks. Life face value is a share of house profit, not necessarily the full loss; its total payout cap is 1.2–2x face. Trader Lives earn in the mint round and ${params.life_expiry_epochs} subsequent rounds. Recovery may be zero.`,
         "Claiming withdraws allocated USDC. Selling a Life transfers its unclaimed cash and remaining conditional rights; expiry stops future allocations but preserves allocated cash. Marketplace sellers pay 2%.",
+        "Extra Lives and locks trade on a market (market_listings, buy_listing): a Life listed below what it can still pay is a discounted claim on future house profit, not a guaranteed return.",
         "Token rewards can be locked for up to 104 rounds. Two years applies only to weekly rounds; local rounds are accelerated. Tokens and NFTs have no guaranteed resale value.",
         "Admission reserves capped payout liability, but a refusal may also reflect invalid inputs, a paused market or another contract condition. Read the quote reason; do not automatically retry with smaller trades.",
       ],
@@ -201,9 +239,9 @@ server.registerTool(
     title: "Open a trade",
     description:
       "Places an order to open a position; a keeper fills using an eligible later oracle price (check `account` for status). Takes margin from the free balance at the house, depositing from the wallet if needed. Optional take-profit and stop-loss are prices.",
-    inputSchema: { ...tradeArgs, take_profit: z.number().positive().optional(), stop_loss: z.number().positive().optional() },
+    inputSchema: { ...tradeArgs, take_profit: z.number().positive().optional(), stop_loss: z.number().positive().optional(), reason },
   },
-  safe(async ({ market, side, margin_usd, leverage, take_profit, stop_loss }) => {
+  logged("open_trade", async ({ market, side, margin_usd, leverage, take_profit, stop_loss }) => {
     const margin = usdc(margin_usd);
     const q = await o.quoteOpen(market, side as Side, margin, leverage);
     if (!q.allowed) throw new Error(q.reason ?? "The house won't take this trade");
@@ -222,8 +260,8 @@ server.registerTool(
 
 server.registerTool(
   "close_trade",
-  { title: "Close a trade", description: "Places a close for a position; a keeper settles it using an eligible later oracle price. Positions must be held 60 s first.", inputSchema: { position_id: z.number().int() } },
-  safe(async ({ position_id }) => ({ placed: true, order_id: await tx.placeClose(position_id), note: "Awaiting keeper execution at an eligible later oracle price." })),
+  { title: "Close a trade", description: "Places a close for a position; a keeper settles it using an eligible later oracle price. Positions must be held 60 s first.", inputSchema: { position_id: z.number().int(), reason } },
+  logged("close_trade", async ({ position_id }) => ({ placed: true, order_id: await tx.placeClose(position_id), note: "Awaiting keeper execution at an eligible later oracle price." })),
 );
 
 server.registerTool(
@@ -231,9 +269,9 @@ server.registerTool(
   {
     title: "Set take-profit and stop-loss",
     description: "Sets a position's take-profit and stop-loss prices. Omit one to clear it.",
-    inputSchema: { position_id: z.number().int(), take_profit: z.number().positive().optional(), stop_loss: z.number().positive().optional() },
+    inputSchema: { position_id: z.number().int(), take_profit: z.number().positive().optional(), stop_loss: z.number().positive().optional(), reason },
   },
-  safe(async ({ position_id, take_profit, stop_loss }) => {
+  logged("set_triggers", async ({ position_id, take_profit, stop_loss }) => {
     await tx.setTriggers(position_id, { takeProfit: take_profit ? toPrice(take_profit) : null, stopLoss: stop_loss ? toPrice(stop_loss) : null });
     return { set: true, take_profit: take_profit ?? null, stop_loss: stop_loss ?? null };
   }),
@@ -250,8 +288,8 @@ server.registerTool(
 
 server.registerTool(
   "claim_lives",
-  { title: "Claim Extra Lives", description: "Sends the USDC every Extra Life of this account can claim to its wallet.", inputSchema: {} },
-  safe(async () => {
+  { title: "Claim Extra Lives", description: "Sends the USDC every Extra Life of this account can claim to its wallet.", inputSchema: { reason } },
+  logged("claim_lives", async () => {
     const ready = (await o.lives(me)).filter((l) => BigInt(l.claimable) > 0n);
     if (ready.length === 0) return { claimed_usd: 0 };
     await tx.claimLives(ready.map((l) => l.token_id));
@@ -271,6 +309,67 @@ server.registerTool(
       round_ends: new Date((e.started_at + d.epochLengthS) * 1000).toISOString(),
       house_this_round_usd: dollars(BigInt(e.losses) - BigInt(e.payouts)),
     };
+  }),
+);
+
+/** USDC (1e6) per whole $1UP, from the swap: what 100 USDC buys. */
+async function oneupPrice(): Promise<bigint> {
+  const out = BigInt(await o.swapQuote(100n * 1_000_000n));
+  return out > 0n ? (100n * 1_000_000n * 10n ** 18n) / out : 0n;
+}
+/** What a life can still pay: unclaimed USDC, plus what's left to earn while it's live. */
+const lifeWorth = (l: LifeInfo) => (l.expired || l.full_heal ? BigInt(l.claimable) : BigInt(l.owed) - BigInt(l.paid) + BigInt(l.claimable));
+/** A lock's $1UP if left today (after the early-exit penalty), in USDC. */
+const lockWorth = (l: LockInfo, px: bigint) => (l.withdrawn ? 0n : ((BigInt(l.amount) - BigInt(l.exit_penalty)) * px) / 10n ** 18n);
+
+server.registerTool(
+  "market_listings",
+  {
+    title: "Market listings",
+    description:
+      "Extra Lives and $1UP locks for sale: price, what each can still pay or is worth today, and the discount. A Life's worth is its remaining payout limit, which depends on future house profit and may never be reached; a lock's is its $1UP after the early-exit penalty at today's swap price.",
+    inputSchema: {},
+  },
+  safe(async () => {
+    const [ls, px] = await Promise.all([o.listings(), oneupPrice()]);
+    const out = [];
+    for (const l of ls) {
+      const isLife = l.nft_contract === d.contracts.life;
+      const info = isLife ? await o.lifeInfo(l.token_id) : await o.lockInfo(l.token_id);
+      if (!info) continue;
+      const worth = isLife ? lifeWorth(info as LifeInfo) : lockWorth(info as LockInfo, px);
+      const price = BigInt(l.price);
+      out.push({
+        kind: isLife ? "extra_life" : "lock",
+        nft_contract: l.nft_contract,
+        token_id: l.token_id,
+        seller: l.seller,
+        price_usd: dollars(price),
+        worth_usd: dollars(worth),
+        discount_pct: worth > 0n ? Math.round((1 - Number(price) / Number(worth)) * 1000) / 10 : null,
+        mine: l.seller === me,
+      });
+    }
+    return out.sort((a, b) => (b.discount_pct ?? -1e9) - (a.discount_pct ?? -1e9));
+  }),
+);
+
+server.registerTool(
+  "buy_listing",
+  {
+    title: "Buy a listing",
+    description: "Buys an Extra Life or a lock from the market at its listed price, paid from this account's wallet USDC (the seller pays a 2% fee). Check market_listings first.",
+    inputSchema: { nft_contract: z.string(), token_id: z.string(), max_price_usd: z.number().positive().describe("Refuse if the listing now costs more"), reason },
+  },
+  logged("buy_listing", async ({ nft_contract, token_id, max_price_usd }) => {
+    const l = (await o.listings()).find((x) => x.nft_contract === nft_contract && x.token_id === token_id);
+    if (!l) throw new Error("Not listed any more");
+    const price = BigInt(l.price);
+    if (price > usdc(max_price_usd)) throw new Error(`Listed at $${fmtUsdc(price)} now, above your $${max_price_usd}`);
+    if (l.seller === me) throw new Error("That's your own listing");
+    if (price > BigInt(await o.usdcBalance(me))) throw new Error(`Needs $${fmtUsdc(price)} USDC in the wallet (try faucet)`);
+    await tx.buy(nft_contract, token_id, price);
+    return { bought: true, kind: nft_contract === d.contracts.life ? "extra_life" : "lock", token_id, price_usd: dollars(price) };
   }),
 );
 

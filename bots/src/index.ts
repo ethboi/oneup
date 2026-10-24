@@ -9,6 +9,7 @@ import { Account, type KeyPairString } from "near-api-js";
 import {
   ONEUP,
   OneUp,
+  aiAgents,
   USDC,
   accountSender,
   fmtUsdc,
@@ -397,8 +398,10 @@ function lockValue(l: LockInfo, px: bigint): bigint {
   return (keep * px) / ONEUP;
 }
 
-const bots = d.bots.map((b, i) => new Bot(b.id, b.key, STYLES[i % STYLES.length]));
-console.log(`${bots.length} bots on ${d.rpcUrl}: ${bots.map((b) => b.style.name).join(", ")}`);
+// the accounts an AI agent drives through the MCP server (bot12 by default) are left to it
+const ai = aiAgents(process.env.ONEUP_AI_AGENTS);
+const bots = d.bots.map((b, i) => new Bot(b.id, b.key, STYLES[i % STYLES.length])).filter((b) => !ai.includes(b.id.split(".")[0]));
+console.log(`${bots.length} bots on ${d.rpcUrl}: ${bots.map((b) => b.style.name).join(", ")}${ai.length ? ` (left to the AI agent: ${ai.join(", ")})` : ""}`);
 
 setInterval(() => samplePrices().catch(() => {}), 3000);
 await samplePrices();
