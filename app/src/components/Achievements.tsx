@@ -107,11 +107,11 @@ export const openBadges = () => window.dispatchEvent(new Event("oneup-open-badge
 
 /** Applies the chosen console skin (remembered in this browser). */
 export function useSkin(): [string, (s: string) => void] {
-  // the default shell is a Game Boy Color's Atomic Purple; Classic is the original mono screen
-  const [skin, set] = useState("atomic");
+  // the default shell is the dark Night case with a colour screen; Classic is the original mono screen
+  const [skin, set] = useState("night");
   useEffect(() => {
     try {
-      set(localStorage.getItem("oneup.skin") ?? "atomic");
+      set(localStorage.getItem("oneup.skin") ?? "night");
     } catch {}
   }, []);
   useEffect(() => {
@@ -151,7 +151,7 @@ export function BadgesDialog() {
     try {
       preview = sessionStorage.getItem("oneup.shellPreview") === "1";
     } catch {}
-    if (!preview && have && lv && s && !skinUnlocked(s, have, lv.level)) setSkin("atomic");
+    if (!preview && have && lv && s && !skinUnlocked(s, have, lv.level)) setSkin("night");
   }, [have, lv, skin, setSkin]);
   if (!open) return null;
   const n = have?.size ?? 0;

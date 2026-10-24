@@ -2080,8 +2080,7 @@ kbd {
   --lcd-ink: #1e2a16;
 }
 /* the GBC shells; the bright ones print the shell's text in dark ink */
-:root[data-skin="atomic"],
-:root:not([data-skin]) {
+:root[data-skin="atomic"] {
   --case: rgb(118 82 210 / 0.42);
   --bezel: #17142c;
   --stripe-1: #e2257a;
@@ -2157,12 +2156,12 @@ kbd {
   color: var(--case-ink);
 }
 /* the translucent shell: the parts show through */
-:root[data-skin="atomic"] .case,
-:root:not([data-skin]) .case {
+:root[data-skin="atomic"] .case {
   backdrop-filter: blur(2px);
   background-image: radial-gradient(rgb(255 255 255 / 0.07) 1px, transparent 1.4px);
   background-size: 6px 6px;
 }
+[data-swatch="night"] { --sw-case: #262941; --sw-bezel: #13141f; --sw-lcd: #cfe6ff; }
 [data-swatch="atomic"] { --sw-case: #8a64d8; --sw-bezel: #17142c; --sw-lcd: #cfe6ff; }
 [data-swatch="classic"] { --sw-case: #e9ebf1; --sw-bezel: #4a4d63; --sw-lcd: #b7c49a; }
 [data-swatch="berry"] { --sw-case: #b8215d; --sw-bezel: #2a1420; --sw-lcd: #cfe6ff; }

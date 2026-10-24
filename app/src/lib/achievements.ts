@@ -69,6 +69,7 @@ export interface Skin {
 }
 
 export const SKINS: Skin[] = [
+  { id: "night", name: "Night", unlock: null },
   { id: "atomic", name: "Atomic Purple", unlock: null },
   { id: "classic", name: "Classic (mono)", unlock: null },
   { id: "kiwi", name: "Kiwi", unlock: { level: 2 } },
