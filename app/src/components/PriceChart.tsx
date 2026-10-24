@@ -402,12 +402,14 @@ export function PriceChart({
   };
 
   return (
-    <div ref={ref} className="lcd relative" data-busy={marks.some((m) => m.kind === "entry") || undefined}>
-      {/* far behind the price: a Game Boy game's background (clouds, hills, tall plants, a grassy ground), drifting
-          slowly in pale tints */}
+    <div ref={ref} className="lcd relative">
+      {/* far behind the price: a trading town (a far skyline, then the stock exchange, the charging bull, towers and a
+          ticker board, a bank, the bear), and clouds, drifting slowly */}
       <div className="lcd-scenery" aria-hidden style={{ left: PAD.l, right: PAD.r, top: PAD.t, bottom: PAD.b }}>
-        {/* back to front, each a fill and its outline */}
-        {["cloud", "hill", "plant", "ground"].flatMap((n) => [<div key={n} className={`lcd-${n}`} />, <div key={`${n}-edge`} className={`lcd-${n}-edge`} />])}
+        <div className="lcd-clouds" />
+        <div className="lcd-far" />
+        <div className="lcd-near" />
+        <div className="lcd-gold" />
       </div>
       <svg
         width={W}
