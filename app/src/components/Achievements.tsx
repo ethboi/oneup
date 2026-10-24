@@ -147,7 +147,11 @@ export function BadgesDialog() {
   // a skin that isn't unlocked for this account falls back to the default shell (once its level is known)
   useEffect(() => {
     const s = SKINS.find((x) => x.id === skin);
-    if (have && lv && s && !skinUnlocked(s, have, lv.level)) setSkin("atomic");
+    let preview = false;
+    try {
+      preview = sessionStorage.getItem("oneup.shellPreview") === "1";
+    } catch {}
+    if (!preview && have && lv && s && !skinUnlocked(s, have, lv.level)) setSkin("atomic");
   }, [have, lv, skin, setSkin]);
   if (!open) return null;
   const n = have?.size ?? 0;

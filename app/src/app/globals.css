@@ -2526,3 +2526,16 @@ kbd {
     display: none;
   }
 }
+
+/* the Demo menu's shell picker: each dot is the shell's colour around its screen */
+.skin-dot {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px 7px 12px 7px;
+  background: var(--sw-lcd);
+  border: 5px solid var(--sw-case);
+  box-shadow: 0 0 0 1px var(--sw-bezel);
+}
+.skin-dot:hover {
+  transform: translateY(-1px);
+}

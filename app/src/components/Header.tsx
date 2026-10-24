@@ -1,6 +1,7 @@
 "use client";
 
 import { parseTokenAmount } from "@oneup/sdk";
+import { SKINS } from "@/lib/achievements";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { previewTilt } from "@/lib/tilt";
 import { showBoot } from "./Boot";
@@ -191,6 +192,29 @@ function DemoMenu() {
                 >
                   ${usd.toLocaleString("en-US")}
                 </button>
+              ))}
+            </div>
+          </div>
+          {/* try any console shell for this browser session, unlocked or not */}
+          <div className="flex flex-col gap-1">
+            <span className="label">Try a console shell</span>
+            <div className="flex flex-wrap gap-1.5">
+              {SKINS.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  className="skin-dot"
+                  data-swatch={s.id}
+                  title={s.name}
+                  aria-label={`Try the ${s.name} shell`}
+                  onClick={() => {
+                    try {
+                      sessionStorage.setItem("oneup.shellPreview", "1");
+                      localStorage.setItem("oneup.skin", s.id);
+                    } catch {}
+                    document.documentElement.dataset.skin = s.id;
+                  }}
+                />
               ))}
             </div>
           </div>
