@@ -9,7 +9,7 @@ import { useNearWallet } from "./near-wallet";
 import { WalletWelcome } from "@/components/WalletWelcome";
 import { sfx } from "./sound";
 import { pollSerial } from "./poll";
-import { loadSession, sessionSender, type Session } from "./session";
+import { loadSession, saveSession, sessionExists, sessionSender, type Session } from "./session";
 import { OneUp, accountSender, normalizePrice } from "@oneup/sdk";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
@@ -99,11 +99,18 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
   const main = useMemo(() => mainKey ? new Account(me, o.provider, mainKey as KeyPairString) : null, [o, me, mainKey]);
   const [session, setSession] = useState<Session | null>(null);
   useEffect(() => {
-    const read = () => setSession(d.network === "localnet" ? loadSession(me) : null);
+    let live = true;
+    const read = () => {
+      const saved = d.network === "localnet" ? loadSession(me) : null;
+      setSession(saved);
+      if (saved) void sessionExists(o.provider, me, saved).then(exists => {
+        if (live && !exists && loadSession(me)?.publicKey === saved.publicKey) saveSession(me, null);
+      }).catch(() => { /* Keep the saved key on an RPC failure; the sender checks again before signing. */ });
+    };
     read();
     window.addEventListener("oneup-session", read);
-    return () => window.removeEventListener("oneup-session", read);
-  }, [me, d.network]);
+    return () => { live = false; window.removeEventListener("oneup-session", read); };
+  }, [me, d.network, o]);
   const tx = useMemo(() => {
     const send = main ? accountSender(main) : wallet.send;
     return o.calls(session ? sessionSender(me, o.provider, session, d.contracts.house, send) : send);

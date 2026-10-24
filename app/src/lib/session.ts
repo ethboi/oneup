@@ -49,11 +49,11 @@ export function saveSession(account: string, s: Session | null) {
 /** Adds a trade-only key to `main`'s account (one approval with a real wallet). */
 export async function startSession(main: Account, house: string, gasless: boolean): Promise<Session> {
   const kp = KeyPair.fromRandom("ed25519");
-  await main.addFunctionCallAccessKey({
-    publicKey: kp.getPublicKey(),
-    contractId: house,
-    methodNames: SESSION_METHODS,
-    allowance: SESSION_ALLOWANCE,
+  // Do not publish a new session until finalized key-list checks can see it.
+  await main.signAndSendTransaction({
+    receiverId: main.accountId,
+    actions: [actions.addFunctionCallAccessKey(kp.getPublicKey(), house, SESSION_METHODS, SESSION_ALLOWANCE)],
+    waitUntil: "FINAL",
   });
   const s = { secret: kp.toString() as KeyPairString, publicKey: kp.getPublicKey().toString(), gasless };
   saveSession(main.accountId, s);
@@ -70,6 +70,12 @@ export async function endSession(main: Account, s: Session) {
     if (keys.keys.some(k => k.public_key === s.publicKey)) throw error;
   }
   saveSession(main.accountId, null);
+}
+
+/** A finalized key list distinguishes confirmed revocation from a temporary RPC failure. */
+export async function sessionExists(provider: JsonRpcProvider, account: string, s: Session): Promise<boolean> {
+  const keys = await provider.viewAccessKeyList({ accountId: account, finalityQuery: { finality: "final" } });
+  return keys.keys.some(k => k.public_key === s.publicKey);
 }
 
 /** The key's remaining gas budget (yoctoNEAR), or null if the key is gone. */
@@ -93,6 +99,12 @@ export function sessionSender(account: string, provider: JsonRpcProvider, s: Ses
   const signer = new Account(account, provider, s.secret);
   return async <T>(c: Parameters<Send>[0]): Promise<T> => {
     if (c.contractId !== house || !SESSION_METHODS.includes(c.methodName) || (c.deposit ?? 0n) > 0n) return fallback<T>(c);
+    // Check before signing: a local redeployment can remove a key still saved in this browser.
+    // RPC errors propagate; never retry a submitted or uncertain transaction with another signer.
+    if (!await sessionExists(provider, account, s)) {
+      if (loadSession(account)?.publicKey === s.publicKey) saveSession(account, null);
+      return fallback<T>(c);
+    }
     const action = actions.functionCall(c.methodName, c.args, c.gas ?? teraToGas("100"), 0n);
     if (!s.gasless) {
       const out = await signer.signAndSendTransaction({ receiverId: house, actions: [action] });
