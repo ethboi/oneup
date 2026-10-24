@@ -7,8 +7,9 @@
 //   5. the solver signs the other side and executes both (/api/intents/fill).
 
 import { createIntentSignerNEP413, VersionedNonceBuilder } from "@defuse-protocol/intents-sdk";
+import type { AppDeployment } from "./app-config";
 import { KeyPair, teraToGas, type Account, type KeyPairString } from "near-api-js";
-import type { BridgedAsset, Deployment, OneUp, Side } from "@oneup/sdk";
+import type { BridgedAsset, OneUp, Side } from "@oneup/sdk";
 
 export type Then =
   | { kind: "deposit" }
@@ -22,7 +23,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 }
 
 /** Balances held in the Verifier (NEP-245), by token contract. */
-export async function intentsBalances(o: OneUp, d: Deployment, account: string): Promise<Record<string, bigint>> {
+export async function intentsBalances(o: OneUp, d: AppDeployment, account: string): Promise<Record<string, bigint>> {
   const i = d.intents;
   if (!i) return {};
   const tokens = [...i.assets.map((a) => a.token), d.contracts.usdc];
@@ -31,7 +32,7 @@ export async function intentsBalances(o: OneUp, d: Deployment, account: string):
 }
 
 /** Registers the account's key with the Verifier if it isn't yet (named accounts sign with registered keys). */
-async function ensureKey(o: OneUp, d: Deployment, main: Account, key: KeyPair) {
+async function ensureKey(o: OneUp, d: AppDeployment, main: Account, key: KeyPair) {
   const public_key = key.getPublicKey().toString();
   const has = await o.view<boolean>(d.intents!.verifier, "has_public_key", { account_id: main.accountId, public_key });
   if (!has) await main.callFunction({ contractId: d.intents!.verifier, methodName: "add_public_key", args: { public_key }, deposit: 1n, gas: teraToGas("30") });
@@ -43,15 +44,16 @@ async function ensureKey(o: OneUp, d: Deployment, main: Account, key: KeyPair) {
  */
 export async function payFromChain(opts: {
   o: OneUp;
-  d: Deployment;
-  main: Account;
-  keyString: string;
+  d: AppDeployment;
+  main: Account | null;
+  keyString: string | null;
   asset: BridgedAsset;
   usdc: bigint;
   then: Then;
   onStep?: (s: string) => void;
 }) {
   const { o, d, main, asset, usdc, then } = opts;
+  if (d.network !== "localnet" || !main || !opts.keyString) throw new Error("Simulated bridge deposits are available only in the local demo");
   const step = opts.onStep ?? (() => {});
   const i = d.intents!;
   const key = KeyPair.fromString(opts.keyString as KeyPairString);

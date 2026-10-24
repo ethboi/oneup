@@ -1,0 +1,66 @@
+{
+  "source": {
+    "revision": "b188d542d223163d87d16cd2f01099596b882cbf",
+    "dirty": false,
+    "workingChangesSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "finishedSource": {
+    "revision": "b188d542d223163d87d16cd2f01099596b882cbf",
+    "dirty": false,
+    "workingChangesSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "sourceStable": true,
+  "checkedAt": "2026-10-23T20:39:08.004Z",
+  "node": "v24.13.0",
+  "results": [
+    {
+      "name": "Root typecheck",
+      "command": "pnpm exec tsc --noEmit",
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "Workspace typecheck",
+      "command": "pnpm -r typecheck",
+      "exitCode": 0,
+      "logSha256": "e30e7820e178e03f0f23459fbc1a5c3f7327349daba777fb151a60c716d1b3ef"
+    },
+    {
+      "name": "Rust, SDK and model tests",
+      "command": "pnpm test",
+      "exitCode": 0,
+      "logSha256": "e8b03ef86f1871c6d81cec21a641853a2de455c61ab0fe71503584ac83a93510"
+    },
+    {
+      "name": "App and keeper regressions",
+      "command": "pnpm test:ts",
+      "exitCode": 0,
+      "logSha256": "a0002be0d198fe20398ecf9b1a6ed12c3528bb369e0b9f2e75a25493b559466b"
+    },
+    {
+      "name": "Fresh WASM sandbox tests",
+      "command": "pnpm test:sandbox",
+      "exitCode": 0,
+      "logSha256": "1c3af8743cb0ca81ad382c9d831744258c7c789197c806feaf90ee19169a2c8d"
+    },
+    {
+      "name": "Deployment inspection regression",
+      "command": "pnpm exec node --import tsx --test scripts/test/*.ts",
+      "exitCode": 0,
+      "logSha256": "5c1260c4c5dd5aa0e591b1541ceb1e22fc337e2756b9c63e4b212dbcb4313088"
+    },
+    {
+      "name": "Economic sensitivity",
+      "command": "pnpm sim:sensitivity",
+      "exitCode": 0,
+      "logSha256": "9401239fa88d2f67f90bad885acc9a0fa7364c133f55533fa3dead8d9f24d501"
+    },
+    {
+      "name": "Production app build",
+      "command": "pnpm --filter @oneup/app build",
+      "exitCode": 0,
+      "logSha256": "34a832978b78dd3079598f3b0b929d7c3078984ca65e873f7796a17fef3f472c"
+    }
+  ],
+  "passed": true
+}

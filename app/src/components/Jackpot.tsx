@@ -12,8 +12,10 @@ import { useNow } from "./Header";
 
 /** Every jackpot draw so far, newest first (/api/jackpots). */
 function useDraws(): ActivityItem[] | null {
+  const { d } = useOneUp();
   const [items, setItems] = useState<ActivityItem[] | null>(null);
   useEffect(() => {
+    if (d.network !== "localnet") return;
     let live = true;
     const tick = () =>
       fetch("/api/jackpots")
@@ -26,8 +28,8 @@ function useDraws(): ActivityItem[] | null {
       live = false;
       clearInterval(i);
     };
-  }, []);
-  return items;
+  }, [d.network]);
+  return d.network === "localnet" ? items : null;
 }
 
 const money = (x: bigint) => `$${fmtUsdc(x, x < 1_000n * USDC ? 2 : 0)}`;
@@ -88,7 +90,7 @@ export function Jackpot({ compact }: { compact?: boolean }) {
         The demo jackpot is funded by simulated vault interest. Each $1 of eligible net loss adds a ticket. One winning ticket receives the full prize.
         {myTickets === 0n && " You have no tickets for this draw."}
       </p>
-      {compact ? <LastWinner draws={draws} me={me} /> : <PastDraws draws={draws} me={me} />}
+      {d.network !== "localnet" ? <p className="label mt-3">Past jackpot draws are not indexed on testnet. The current prize and ticket counts come from the contracts.</p> : compact ? <LastWinner draws={draws} me={me} /> : <PastDraws draws={draws} me={me} />}
     </div>
   );
 }

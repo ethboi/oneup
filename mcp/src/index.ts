@@ -12,6 +12,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { Account, type KeyPairString } from "near-api-js";
 import { z } from "zod";
+import { describeLife } from "./life-summary.ts";
 import {
   PPM,
   OneUp,
@@ -98,17 +99,23 @@ const server = new McpServer({ name: "oneup", version: "0.1.0" });
 server.registerTool(
   "how_it_works",
   { title: "How OneUp works", description: "The rules in a few lines: read this first.", inputSchema: {} },
-  safe(async () => ({
-    account: me,
-    rules: [
-      "Perpetuals against one USDC house pool, at the oracle price, no fees or funding. Leverage up to 1000x.",
-      "An order fills at the first oracle price after it's placed (a few seconds). A position must be held 60 s before it can close.",
-      "A trade can win at most 9x its margin. Winners pay a cut of their profit (10%, up to 25% for big positions).",
-      "At a 90% loss the position is liquidated: a move of 90/leverage % against you.",
-      "Losing a trade earns an Extra Life (an NFT paying USDC back from house profit, up to 1.2-2x the loss) and $1UP locked for 2 years, when the round ends.",
-      "The house refuses trades it couldn't pay in full, so a refusal means the market is full: try smaller.",
-    ],
-  })),
+  safe(async () => {
+    const params = await o.params();
+    return {
+      account: me,
+      network: "localnet",
+      signing: "Full-access development key. Open-trade calls can deposit wallet USDC automatically; this is not a constrained agent wallet.",
+      rules: [
+        `Perpetuals against a USDC house pool. No entry or funding fee; winners pay 10–25% of profit. Contract leverage limit is ${params.leverage_hard_limit}x; this MCP tool caps orders at 100x and market limits may be lower.`,
+        `A fill requires an oracle price published after placement and inside the allowed window. A trusted keeper chooses when to execute; first-price execution is not proven. Minimum voluntary hold: ${params.min_hold_s} seconds.`,
+        "Maximum profit before the fee is 9x margin. Liquidation at a 90% loss takes the full margin.",
+        `Positive wallet net loss in a profitable round can earn an Extra Life and token locks. Life face value is a share of house profit, not necessarily the full loss; its total payout cap is 1.2–2x face. Trader Lives earn in the mint round and ${params.life_expiry_epochs} subsequent rounds. Recovery may be zero.`,
+        "Claiming withdraws allocated USDC. Selling a Life transfers its unclaimed cash and remaining conditional rights; expiry stops future allocations but preserves allocated cash. Marketplace sellers pay 2%.",
+        "Token rewards can be locked for up to 104 rounds. Two years applies only to weekly rounds; local rounds are accelerated. Tokens and NFTs have no guaranteed resale value.",
+        "Admission reserves capped payout liability, but a refusal may also reflect invalid inputs, a paused market or another contract condition. Read the quote reason; do not automatically retry with smaller trades.",
+      ],
+    };
+  }),
 );
 
 server.registerTool(
@@ -193,7 +200,7 @@ server.registerTool(
   {
     title: "Open a trade",
     description:
-      "Places an order to open a position; it fills at the next oracle price (check `account` a few seconds later). Takes margin from the free balance at the house, depositing from the wallet if needed. Optional take-profit and stop-loss are prices.",
+      "Places an order to open a position; a keeper fills using an eligible later oracle price (check `account` for status). Takes margin from the free balance at the house, depositing from the wallet if needed. Optional take-profit and stop-loss are prices.",
     inputSchema: { ...tradeArgs, take_profit: z.number().positive().optional(), stop_loss: z.number().positive().optional() },
   },
   safe(async ({ market, side, margin_usd, leverage, take_profit, stop_loss }) => {
@@ -206,17 +213,17 @@ server.registerTool(
     if (topUp > 0n) {
       if (topUp > BigInt(await o.usdcBalance(me))) throw new Error(`Needs $${fmtUsdc(topUp)} more USDC in the wallet (try faucet)`);
       await tx.depositAndOpen(topUp, market, side as Side, margin, leverage, triggers);
-      return { placed: true, deposited_usd: dollars(topUp), note: "Fills at the next oracle price; see `account`." };
+      return { placed: true, deposited_usd: dollars(topUp), note: "Awaiting keeper execution at an eligible later oracle price; see `account`." };
     }
     const order = await tx.placeOpen(market, side as Side, margin, leverage, triggers);
-    return { placed: true, order_id: order, note: "Fills at the next oracle price; see `account`." };
+    return { placed: true, order_id: order, note: "Awaiting keeper execution at an eligible later oracle price; see `account`." };
   }),
 );
 
 server.registerTool(
   "close_trade",
-  { title: "Close a trade", description: "Places a close for a position; it settles at the next oracle price. Positions must be held 60 s first.", inputSchema: { position_id: z.number().int() } },
-  safe(async ({ position_id }) => ({ placed: true, order_id: await tx.placeClose(position_id), note: "Settles at the next oracle price." })),
+  { title: "Close a trade", description: "Places a close for a position; a keeper settles it using an eligible later oracle price. Positions must be held 60 s first.", inputSchema: { position_id: z.number().int() } },
+  safe(async ({ position_id }) => ({ placed: true, order_id: await tx.placeClose(position_id), note: "Awaiting keeper execution at an eligible later oracle price." })),
 );
 
 server.registerTool(
@@ -234,17 +241,11 @@ server.registerTool(
 
 server.registerTool(
   "extra_lives",
-  { title: "Extra Lives", description: "This account's Extra Lives: what each is owed, has been paid and can be claimed now.", inputSchema: {} },
-  safe(async () =>
-    (await o.lives(me)).map((l) => ({
-      token_id: l.token_id,
-      backer: l.backer,
-      owed_usd: dollars(l.owed),
-      paid_usd: dollars(l.paid),
-      claimable_usd: dollars(l.claimable),
-      state: l.full_heal ? "paid in full" : l.expired ? "expired" : "earning",
-    })),
-  ),
+  { title: "Extra Lives", description: "This account's Life snapshots: current owner, claimable USDC, lifetime allocations, conditional remaining limit and earning window. Caps are not expected returns.", inputSchema: {} },
+  safe(async () => {
+    const [lives, round, params] = await Promise.all([o.lives(me), o.epoch(), o.params()]);
+    return lives.map((life) => describeLife(life, round.id, params.life_expiry_epochs));
+  }),
 );
 
 server.registerTool(

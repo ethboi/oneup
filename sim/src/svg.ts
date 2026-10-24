@@ -28,8 +28,8 @@ export function fairnessSvg(pts: Point[]): string {
   const out: string[] = [];
   out.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" font-family="system-ui, -apple-system, Segoe UI, sans-serif">`);
   out.push(`<rect width="${W}" height="${H}" fill="#ffffff"/>`);
-  out.push(`<text x="${P.l}" y="26" font-size="17" font-weight="600" fill="#12161b">Late losers get back as much as early ones</text>`);
-  out.push(`<text x="${P.l}" y="46" font-size="12.5" fill="#5d6877">USDC recovered within a year per $1 lost, by week of the loss · median of 20 simulated runs</text>`);
+  out.push(`<text x="${P.l}" y="26" font-size="17" font-weight="600" fill="#12161b">Historical growth scenario — recovery varies by cohort</text>`);
+  out.push(`<text x="${P.l}" y="46" font-size="12.5" fill="#5d6877">Illustrative model; not a fairness or solvency proof · median of 20 simulated runs</text>`);
   for (const t of ticks) {
     out.push(`<line x1="${P.l}" x2="${W - P.r}" y1="${y(t)}" y2="${y(t)}" stroke="#dde2e8"/>`);
     out.push(`<text x="${P.l - 8}" y="${y(t) + 4}" font-size="12" text-anchor="end" fill="#5d6877">${Math.round(t * 100)}¢</text>`);

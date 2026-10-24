@@ -18,7 +18,7 @@ const short = (a: string) => a.replace(/\.test\.near$/, "");
 const signed = (x: bigint) => `${x >= 0n ? "+" : "−"}$${fmtUsdc(x < 0n ? -x : x)}`;
 
 export function EpochResults({ automatic }: { automatic: boolean }) {
-  const { o, me } = useOneUp();
+  const { o, me, d } = useOneUp();
   const epoch = usePoll(() => o.epoch(), []);
   const last = useRef<number | null>(null);
   const [round, setRound] = useState<{ s: EpochSummary; board: Board | null; preview: boolean } | null>(null);
@@ -41,7 +41,7 @@ export function EpochResults({ automatic }: { automatic: boolean }) {
   }, []);
 
   useEffect(() => {
-    if (!epoch) return;
+    if (d.network !== "localnet" || !epoch) return;
     const prev = last.current;
     last.current = epoch.id;
     if (prev === null || epoch.id <= prev || !automatic) return;
@@ -67,10 +67,11 @@ export function EpochResults({ automatic }: { automatic: boolean }) {
       sfx("round");
       setRound({ s, board, preview: false });
     })();
-  }, [epoch, o, automatic]);
+  }, [epoch, o, automatic, d.network]);
 
   // the Demo menu's preview: the last finished round's screen, now
   useEffect(() => {
+    if (d.network !== "localnet") return;
     const show = async () => {
       if (!epoch || epoch.id < 2) return;
       const s = await o.epochSummary(epoch.id - 1).catch(() => null);
@@ -83,7 +84,7 @@ export function EpochResults({ automatic }: { automatic: boolean }) {
     };
     window.addEventListener("oneup-preview-round", show);
     return () => window.removeEventListener("oneup-preview-round", show);
-  }, [epoch, o]);
+  }, [epoch, o, d.network]);
 
   useEffect(() => {
     if (!round) return;

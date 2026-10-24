@@ -8,6 +8,7 @@ import { USDC, fmtUsdc, ONEUP } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { Logo, PixelCoin, PixelHeart } from "./Pixel";
 import { Icon } from "./Icon";
+import { WalletActions } from "./WalletActions";
 import { Popover } from "./Popover";
 import { MuteButton } from "./Sounds";
 import { openBadges } from "./Achievements";
@@ -119,7 +120,8 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
       <div className="hdr-tools flex shrink-0 items-center gap-2">
         <MuteButton />
         <ThemeButton />
-        <DemoMenu />
+        {d.network === "localnet" ? <DemoMenu /> : <span className="chip text-xs">NEAR testnet</span>}
+        {d.network === "localnet" && <a href="/wallet-setup" className="chip hidden sm:inline-flex">Wallet setup</a>}
         <AccountMenu />
       </div>
     </header>
@@ -200,7 +202,7 @@ function DemoMenu() {
                 [
                   ["Loss +1", () => (sfx("lose"), markets.forEach((m, i) => emitFx({ kind: "lose", market: m.id, positionId: -10 - i })))],
                   ["Liquidated", () => (sfx("liquidated"), markets.forEach((m, i) => emitFx({ kind: "liquidated", market: m.id, positionId: -20 - i })))],
-                  ["Revenge", () => (sfx("revenge"), emitFx({ kind: "revenge" }))],
+                  ["Trade review", () => (sfx("revenge"), emitFx({ kind: "revenge" }))],
                   ["Tilt", () => (sfx("tilt"), previewTilt(me))],
                   ["Full Heal", () => emitFx({ kind: "heal", tokenId: "preview", epoch: 1, paid: String(420n * USDC) })],
                   ["Jackpot", () => window.dispatchEvent(new CustomEvent("oneup-preview-jackpot", { detail: jackpotNow }))],
@@ -227,7 +229,7 @@ function DemoMenu() {
 /** Your account: wallet and trading balances, and moving USDC between them. Trades top themselves up, so
  *  depositing first is optional. */
 function AccountMenu() {
-  const { o, me, tx, run } = useOneUp();
+  const { o, d, me, tx, run } = useOneUp();
   const free = usePoll(() => o.balance(me), [me]);
   const wallet = usePoll(() => o.usdcBalance(me), [me]);
   const oneup = usePoll(() => o.oneupBalance(me), [me]);
@@ -273,8 +275,7 @@ function AccountMenu() {
             </button>
           </div>
           <p className="label">You can deposit now, or let your next trade transfer the USDC it needs from your wallet.</p>
-          <ChainDeposit />
-          <FastTrading />
+          {d.network === "localnet" ? <><ChainDeposit /><FastTrading /></> : <WalletActions />}
           <button className="btn btn-ghost justify-start" onClick={() => (close(), openBadges())}>
             <Icon name="trophy" />
             Achievements and console skins
@@ -360,6 +361,7 @@ function FastTrading() {
     [me],
     5000,
   );
+  if (!main) return null;
   const fmtNear = (y?: bigint | string | null) => (y == null ? "…" : (Number(BigInt(y) / 10n ** 18n) / 1e6).toFixed(4));
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-[var(--line)] p-3">

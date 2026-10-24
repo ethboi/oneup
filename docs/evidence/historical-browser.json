@@ -1,0 +1,69 @@
+{
+  "historical": true,
+  "scope": "Actual local browser actions; SDK assertions and contract tests are separately identified.",
+  "sourceArtifact": "recovery-browser-evidence.json",
+  "sourceArtifactSha256": "646b5d00c75d0613fc52c4caf42aea85763409de332f1ebb7fc80156901ef1b2",
+  "curation": "Selected timing, actions and limitations from the original local review record. Screenshots retained below; other original screenshots are omitted.",
+  "browserJourneySource": "da6918b7c5605b296f1c9bb469908d0c4bf627aa",
+  "finalPresentationSmokeSource": "b188d542d223163d87d16cd2f01099596b882cbf",
+  "setup": {
+    "appUrl": "http://127.0.0.1:3022",
+    "rpcUrl": "http://127.0.0.1:3130",
+    "isolated": true,
+    "normalDemoPreserved": "http://127.0.0.1:3020",
+    "fundedTestWallets": true,
+    "roundSeconds": 45,
+    "botsRunning": false,
+    "mocked": [
+      "USDC",
+      "oracle",
+      "swap",
+      "vault",
+      "bridge"
+    ],
+    "deploymentAndPreparedBalancesOutsideTimers": true
+  },
+  "fullBrowserJourney": {
+    "elapsedSeconds": 253.506,
+    "tokenId": "4:demo.test.near",
+    "steps": [
+      "Selected demo.test.near and used Deposit & Long NEAR in browser: 500 test USDC, 50x.",
+      "Used the isolated local price control through CLI to decrease NEAR by 2%; browser showed liquidation and pending eligible loss.",
+      "Followed the recovery guide to the settled Life and inspected token ID, owner, round, cap and expiry.",
+      "Claimed allocated test USDC through browser.",
+      "Entered an asking price of 10 test USDC and listed through browser.",
+      "Selected bot1.test.near through Demo account menu, inspected marketplace and bought through browser.",
+      "Opened the same Life, verified bot1 ownership and claimed as buyer through browser.",
+      "Switched back to demo.test.near and verified no claim or sell controls were available for that Life."
+    ],
+    "contractRejection": "Separate real SDK call for the same token rejected with Not your token; see recovery-former-owner-rejection.json."
+  },
+  "preparedWalkthrough": {
+    "elapsedSeconds": 140.993,
+    "withinThreeMinutes": true,
+    "preparedTokenId": "10:demo.test.near",
+    "excludes": "Fresh deployment, funding, trade/liquidation and settlement preparation. Those were separately exercised in the full browser flow and SDK E2E.",
+    "steps": [
+      "Showed the account-aware guide and prepared recovery NFT.",
+      "Opened the Life and claimed accrued USDC.",
+      "Entered 12 test USDC asking price and listed.",
+      "Switched to bot1, inspected Market and bought.",
+      "Verified current ownership and claimed as buyer.",
+      "Returned to demo and verified former-owner UI denial."
+    ],
+    "observedIssue": "An automatic achievement overlay intercepted navigation; this prompted the final presentation commit, which was separately smoke tested."
+  },
+  "selectedScreenshots": [
+    "recovery-browser-life.png",
+    "recovery-browser-buyer.png",
+    "recovery-browser-former-owner.png",
+    "recovery-expired-life.png"
+  ],
+  "limitations": [
+    "Browser timing includes tool interaction and inspection time, not a human usability benchmark.",
+    "Manual Demo celebration previews were checked only in the final presentation smoke and are not evidence of earnings.",
+    "NFT lifetime totals do not provide reliably attributed per-NFT historical transactions.",
+    "Local mocks and test balances do not validate real demand or external integrations.",
+    "This records prior revisions and does not verify later wallet or economics changes. A scripted test-USDC sale is not evidence of independent buyer demand."
+  ]
+}

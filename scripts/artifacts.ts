@@ -51,22 +51,27 @@ export function verifyBuildManifest() {
   return manifest;
 }
 /** A source snapshot with its own generated Next inputs. Only dependencies are shared read-only. */
-export function copyApp(destination: string) {
+function includeAppEntry(name: string) {
+  const dotenv = name === ".env" || name.startsWith(".env.") || name === ".envrc";
+  const example = [".example", ".sample", ".template"].some(suffix => name.endsWith(suffix));
+  return (!dotenv || example) && name !== "node_modules" && !name.startsWith(".next") && !name.startsWith(".oneup-tsconfig") && name !== "next-env.d.ts" && !name.endsWith(".tsbuildinfo");
+}
+export function copyApp(destination: string, sourceDirectory = resolve(ROOT, "app")) {
   mkdirSync(destination,{recursive:true});
-  cpSync(resolve(ROOT,"app"),destination,{recursive:true,filter:source => {
+  cpSync(sourceDirectory,destination,{recursive:true,filter:source => {
     const name=source.split("/").at(-1)!;
-    return name!=="node_modules" && !name.startsWith(".next") && !name.startsWith(".oneup-tsconfig") && name!=="next-env.d.ts" && !name.endsWith(".tsbuildinfo");
+    return source === sourceDirectory || includeAppEntry(name);
   }});
   const models=resolve(ROOT,"sim/out");
   if(existsSync(models)) cpSync(models,resolve(destination,"../sim/out"),{recursive:true});
-  symlinkSync(resolve(ROOT,"app/node_modules"),resolve(destination,"node_modules"),"dir");
+  symlinkSync(resolve(sourceDirectory,"node_modules"),resolve(destination,"node_modules"),"dir");
   return destination;
 }
 
 export function appInputHash(directory = resolve(ROOT,"app")) {
   const hash = createHash("sha256");
   const walk = (dir:string, prefix="") => { for(const e of readdirSync(dir,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name))) {
-    if(e.name==="node_modules" || e.name.startsWith(".next") || e.name.startsWith(".oneup-tsconfig") || e.name==="next-env.d.ts" || e.name.endsWith(".tsbuildinfo")) continue;
+    if(!includeAppEntry(e.name)) continue;
     const relative=`${prefix}/${e.name}`, path=resolve(dir,e.name);
     if(e.isDirectory()) walk(path,relative); else hash.update(relative).update("\0").update(readFileSync(path));
   }};

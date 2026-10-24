@@ -1,0 +1,115 @@
+{
+  "build": {
+    "source": {
+      "revision": "b188d542d223163d87d16cd2f01099596b882cbf",
+      "dirty": false,
+      "workingChangesSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "contractsInputSha256": "61d1fe579243b8cb7b317dbc2aac845c692a9351d07bf0920d11da9907d24c48",
+    "builtAt": "2026-10-23T20:31:30.573Z",
+    "rust": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+    "wasms": {
+      "oneup_house": "33f8c7bbeb7da15ca8d6f5dd111217ab389c71e904f1b4c1b96755a0861de091",
+      "oneup_extra_life": "f411d712d258657272bb2198dcd27ecb1fe750450c3c86d6b8a5c815b65d50bb",
+      "oneup_token": "34a5b902a8125a62a98ea97c7d7ac9a69e41f174093f3a93cbeba466156731b9",
+      "oneup_ve": "fee71bcc1d79c6687c612421e86e8fde548ce94aeb2f3d16c6bee3af61e0faa2",
+      "oneup_market": "371ea5dce1802cbd90993cbda820cb670ef5b91ad8e5e57fafdb338cf3697be6",
+      "mock_usdc": "ef2b6fa30a3ced97beecf13836a02d83e62bd6715543762dcecdb11827212a37",
+      "mock_oracle": "b658ddbddf2433d350882592b03bcd4e771b181012ec2f2e92a1ae731cbec216",
+      "mock_swap": "4e9aeeae7cf41cf6a2ffdc26c914dbafe2c3d546158cd2b935628351dc4f3ff2",
+      "mock_vault": "2cffb6d46d5a32fee4dc91505dc52e52907c0159fec750411d849f9065afdebd"
+    }
+  },
+  "scope": "SDK/chain/keeper E2E plus app config API; browser inspection is separate",
+  "source": {
+    "revision": "b188d542d223163d87d16cd2f01099596b882cbf",
+    "dirty": false,
+    "workingChangesSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "checkedAt": "2026-10-23T20:31:57.515Z",
+  "elapsedSeconds": 101.808,
+  "assertions": [
+    "orders filled",
+    "isolated app API",
+    "controlled liquidation",
+    "settled NFT",
+    "USDC recovery",
+    "market ownership transfer",
+    "former owner denied",
+    "buyer claim",
+    "reserve admission",
+    "deployed hashes"
+  ],
+  "mocked": [
+    "USDC",
+    "oracle",
+    "swap",
+    "vault",
+    "bridge"
+  ],
+  "contracts": [
+    {
+      "name": "house",
+      "account": "house.test.near",
+      "builtSha256": "33f8c7bbeb7da15ca8d6f5dd111217ab389c71e904f1b4c1b96755a0861de091",
+      "deployedSha256": "33f8c7bbeb7da15ca8d6f5dd111217ab389c71e904f1b4c1b96755a0861de091",
+      "matches": true
+    },
+    {
+      "name": "life",
+      "account": "life.test.near",
+      "builtSha256": "f411d712d258657272bb2198dcd27ecb1fe750450c3c86d6b8a5c815b65d50bb",
+      "deployedSha256": "f411d712d258657272bb2198dcd27ecb1fe750450c3c86d6b8a5c815b65d50bb",
+      "matches": true
+    },
+    {
+      "name": "oneup",
+      "account": "oneup.test.near",
+      "builtSha256": "34a5b902a8125a62a98ea97c7d7ac9a69e41f174093f3a93cbeba466156731b9",
+      "deployedSha256": "34a5b902a8125a62a98ea97c7d7ac9a69e41f174093f3a93cbeba466156731b9",
+      "matches": true
+    },
+    {
+      "name": "ve",
+      "account": "ve.test.near",
+      "builtSha256": "fee71bcc1d79c6687c612421e86e8fde548ce94aeb2f3d16c6bee3af61e0faa2",
+      "deployedSha256": "fee71bcc1d79c6687c612421e86e8fde548ce94aeb2f3d16c6bee3af61e0faa2",
+      "matches": true
+    },
+    {
+      "name": "market",
+      "account": "market.test.near",
+      "builtSha256": "371ea5dce1802cbd90993cbda820cb670ef5b91ad8e5e57fafdb338cf3697be6",
+      "deployedSha256": "371ea5dce1802cbd90993cbda820cb670ef5b91ad8e5e57fafdb338cf3697be6",
+      "matches": true
+    },
+    {
+      "name": "usdc",
+      "account": "usdc.test.near",
+      "builtSha256": "ef2b6fa30a3ced97beecf13836a02d83e62bd6715543762dcecdb11827212a37",
+      "deployedSha256": "ef2b6fa30a3ced97beecf13836a02d83e62bd6715543762dcecdb11827212a37",
+      "matches": true
+    },
+    {
+      "name": "oracle",
+      "account": "oracle.test.near",
+      "builtSha256": "b658ddbddf2433d350882592b03bcd4e771b181012ec2f2e92a1ae731cbec216",
+      "deployedSha256": "b658ddbddf2433d350882592b03bcd4e771b181012ec2f2e92a1ae731cbec216",
+      "matches": true
+    },
+    {
+      "name": "swap",
+      "account": "swap.test.near",
+      "builtSha256": "4e9aeeae7cf41cf6a2ffdc26c914dbafe2c3d546158cd2b935628351dc4f3ff2",
+      "deployedSha256": "4e9aeeae7cf41cf6a2ffdc26c914dbafe2c3d546158cd2b935628351dc4f3ff2",
+      "matches": true
+    },
+    {
+      "name": "vault",
+      "account": "vault.test.near",
+      "builtSha256": "2cffb6d46d5a32fee4dc91505dc52e52907c0159fec750411d849f9065afdebd",
+      "deployedSha256": "2cffb6d46d5a32fee4dc91505dc52e52907c0159fec750411d849f9065afdebd",
+      "matches": true
+    }
+  ]
+}

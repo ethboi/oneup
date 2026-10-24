@@ -24,7 +24,7 @@ import {
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { PriceChart, type Mark } from "./PriceChart";
 import { fmtClock, useNow } from "./Header";
-import { AngryHeart, FallingCandles, PixelCoin, PixelHeart } from "./Pixel";
+import { PixelCoin, PixelHeart } from "./Pixel";
 import { Icon } from "./Icon";
 import { Popover } from "./Popover";
 import { useTilt } from "@/lib/tilt";
@@ -427,6 +427,7 @@ const agoShort = (ms: number) => {
 
 /** The market's trades as they happen, newest first, under how its open max wins split between longs and shorts. */
 function TradesTape({ market, info }: { market: string; info?: Market }) {
+  const { d } = useOneUp();
   const feed = useActivity(300);
   const now = useNow();
   const rows = feed.filter((a) => a.trade?.market === market).slice(0, 40);
@@ -465,7 +466,7 @@ function TradesTape({ market, info }: { market: string; info?: Market }) {
         <span className="text-right">Time</span>
       </div>
       <ol className="num min-h-0 flex-1 overflow-y-auto px-3.5 pb-3 text-[13px]">
-        {rows.length === 0 && <li className="label py-2">No trades on {market} yet.</li>}
+        {rows.length === 0 && <li className="label py-2">{d.network === "localnet" ? <>No trades on {market} yet.</> : "Trade history is not indexed on testnet. Live exposure still comes from the contracts."}</li>}
         {rows.map((a) => {
           const tr = a.trade!;
           return (
@@ -709,7 +710,7 @@ function Console({
       <div className="bezel px-3 pb-5 pt-3 sm:px-5">
         <div className="faceplate mb-3" aria-hidden>
           <span className="stripes" />
-          <span className="faceplate-print hidden sm:inline">LOSE A TRADE, GET A LIFE · NEAR HACKATHON 2026</span>
+          <span className="faceplate-print hidden sm:inline">NEAR · BTC · ETH MARKETS · NEAR HACKATHON 2026</span>
           <span className="stripes" />
         </div>
         <div className="relative">
@@ -746,24 +747,12 @@ function Console({
           {(revenge || tilt > 0) && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center" role="status">
               {revenge ? (
-                // a warning banner slammed across the screen
-                // a fighting game's versus screen: you against the market, round two
-                <span key={revenge} className="versus display" aria-label="Revenge trade">
-                  <span className="versus-side you">
-                    <span className="flex flex-col items-center gap-2.5">
-                      <AngryHeart size={60} />
-                      <span className="versus-name">YOU</span>
-                    </span>
-                  </span>
-                  <span className="versus-side market">
-                    <span className="flex flex-col items-center gap-2.5">
-                      <FallingCandles size={60} />
-                      <span className="versus-name">THE MARKET</span>
-                    </span>
-                  </span>
-                  <span className="versus-vs">VS</span>
-                  <span className="versus-call">
-                    ROUND 2 <span className="versus-fight">FIGHT!</span>
+                // Keep the brief notification focused on the trade and its risk.
+                <span key={revenge} className="versus flex items-center justify-center bg-[var(--lcd)]/95 px-5 py-6 text-center text-[var(--lcd-ink)]" aria-label="Review your trade">
+                  <span className="flex max-w-sm flex-col items-center gap-3">
+                    <span className="display text-sm">{market}</span>
+                    <span className="display text-2xl leading-tight sm:text-3xl">REVIEW YOUR TRADE</span>
+                    <span className="text-sm leading-relaxed sm:text-base">Check the price, position size and risk.</span>
                   </span>
                 </span>
               ) : (

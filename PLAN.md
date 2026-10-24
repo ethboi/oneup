@@ -1,10 +1,10 @@
-> Historical staged plan. Some mechanics and checkboxes are superseded. See [current development plan](docs/HACKATHON_READINESS.md), README and executable code for current status.
+> Archived implementation history, not current requirements or deployment evidence. Checkboxes, test counts, parameter choices and testnet goals below describe earlier stages. See [current development plan](docs/HACKATHON_READINESS.md), [evidence index](docs/evidence/README.md), README and executable code for current status.
 
 # OneUp POC — staged build plan
 
-Spec: The original OneUp spec (source of truth for mechanics and parameters).
+Spec: The original OneUp spec (historical design input; current mechanics and parameters are defined by the checked-in contracts).
 
-**POC = the 2-minute demo script running end to end on NEAR testnet**, with 10-minute epochs and demo bots
+**Original target, not achieved by this historical record: a 2-minute demo on NEAR testnet**, with 10-minute epochs and demo bots
 trading in the background, plus tests for the solvency, Extra Life and emissions maths and one command that
 runs it all. Submission deadline: 14 Nov 2026, 23:59 UTC.
 

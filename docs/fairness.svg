@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 360" font-family="system-ui, -apple-system, Segoe UI, sans-serif">
 <rect width="900" height="360" fill="#ffffff"/>
-<text x="52" y="26" font-size="17" font-weight="600" fill="#12161b">Late losers get back as much as early ones</text>
-<text x="52" y="46" font-size="12.5" fill="#5d6877">USDC recovered within a year per $1 lost, by week of the loss · median of 20 simulated runs</text>
+<text x="52" y="26" font-size="17" font-weight="600" fill="#12161b">Historical growth scenario — recovery varies by cohort</text>
+<text x="52" y="46" font-size="12.5" fill="#5d6877">Illustrative model; not a fairness or solvency proof · median of 20 simulated runs</text>
 <line x1="52" x2="710" y1="320" y2="320" stroke="#dde2e8"/>
 <text x="44" y="324" font-size="12" text-anchor="end" fill="#5d6877">0¢</text>
 <line x1="52" x2="710" y1="256" y2="256" stroke="#dde2e8"/>

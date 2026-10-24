@@ -107,7 +107,7 @@ off-chain code (API routes, keeper, deploy). Every finding below has a test that
 
 ```bash
 pnpm test           # contract unit/property, SDK and simulation tests
-pnpm test:sandbox   # builds the wasm; 11 end-to-end tests on fresh sandbox chains
+pnpm test:sandbox   # builds WASM and runs integration tests on fresh sandbox chains; see run output for count
 pnpm test:ts        # API route, keeper, indexer and UI-helper regressions
 ```
 
@@ -134,3 +134,27 @@ Vault recall and full epoch batches are exercised on fresh sandbox chains.
 These source changes alter House/Closing state layouts and add NFT views. Existing localnet deployments
 are reused on restart and have no access keys for redeployment. Use a separately created fresh sandbox
 to validate new bytes; recreating an existing demo is an explicit operator action, not an automatic reset.
+
+
+## Native wallet and testnet preparation
+
+The opt-in testnet profile uses an allowlisted keyless config and NEAR Connect 0.11.4 for
+wallet-approved transactions. Meteor is recommended; the picker filters for compatible testnet wallets
+and excludes MyNearWallet ahead of its [announced 31 October 2026 deprecation](https://www.mynearwallet.com/sunset).
+No access key is requested at connection. Local demo signing, relay, bridge and indexer APIs are disabled
+under that profile; testnet reads go directly to the configured RPC. The local session-key feature is
+not available in testnet mode. The connector's wallet manifest and adapter origins remain upstream trust
+boundaries; iframe isolation is not an audit guarantee. Wallet connection is not evidence of an external
+deployment or a verified transaction journey.
+
+`scripts/deploy-testnet.ts` defaults to an offline plan. Explicit execution later requires a named testnet
+operator, a matching owner-only credential file, an approved HTTPS RPC and an unused account namespace.
+It checks the network and balance, deploys/initializes atomically, journals transactions and removes
+contract deployment keys after setup. Private operator/recovery files stay in ignored `.testnet/` with
+restricted permissions; only the allowlisted public profile can be passed to the app. Partial setup needs
+manual inspection, not blind replay. See [setup and verification limits](NEAR_WALLET_SETUP.md).
+
+This profile retains a privileged operator and keeper, unrestricted test-token minting and mock economic
+boundaries. It deploys no DAO, Intents bridge or external lending integration. Test-only assets and setup
+budgets must not be confused with customer deposits or fundraising. A real-wallet testnet journey remains
+unverified until an account is supplied and the acceptance sequence is actually completed.

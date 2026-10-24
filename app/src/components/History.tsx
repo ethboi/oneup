@@ -20,8 +20,10 @@ interface History {
 }
 
 export function useHistory(account: string) {
+  const { d } = useOneUp();
   const [h, setH] = useState<History | null>(null);
   useEffect(() => {
+    if (d.network !== "localnet") return;
     let live = true;
     setH(null);
     const tick = () =>
@@ -35,7 +37,7 @@ export function useHistory(account: string) {
       live = false;
       clearInterval(i);
     };
-  }, [account]);
+  }, [account, d.network]);
   return h;
 }
 
@@ -51,8 +53,9 @@ const when = (t: number) => new Date(t).toLocaleString("en-US", { month: "short"
 const short = (a: string) => a.replace(/\.test\.near$/, "");
 
 export function HistoryList() {
-  const { me } = useOneUp();
+  const { me, d } = useOneUp();
   const h = useHistory(me);
+  if (d.network === "testnet") return <p className="label py-2">History indexing is not enabled on testnet. <a className="underline" href={`https://testnet.nearblocks.io/address/${encodeURIComponent(me)}`} target="_blank" rel="noreferrer">View this account on the explorer</a>.</p>;
   if (!h) return <p className="label py-2">Loading…</p>;
   return (
     <div>

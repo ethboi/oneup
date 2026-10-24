@@ -1,0 +1,9 @@
+{
+  "checkedAt": "2026-10-23T20:19:30.350Z",
+  "scope": "Contract call using SDK, complementing browser owner-action denial",
+  "token": "4:demo.test.near",
+  "formerOwner": "demo.test.near",
+  "currentOwner": "bot1.test.near",
+  "rejected": true,
+  "reason": "Smart contract panicked: Not your token"
+}

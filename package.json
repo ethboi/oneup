@@ -25,9 +25,14 @@
     "demo:judge": "tsx scripts/judge-demo.ts",
     "test:judge": "tsx scripts/judge-e2e.ts",
     "verify:deployment": "tsx scripts/deployment-check.ts",
-    "verify": "tsx scripts/verify.ts"
+    "verify": "tsx scripts/verify.ts",
+    "doctor": "tsx scripts/preflight.ts",
+    "test:judge:ci": "tsx scripts/judge-ci.ts",
+    "test:economics": "tsx scripts/economic-report.ts",
+    "deploy:testnet": "tsx scripts/deploy-testnet.ts"
   },
   "devDependencies": {
+    "@playwright/test": "1.64.1",
     "@types/node": "24.19.1",
     "near-sandbox": "0.3.4",
     "tsx": "4.23.15",

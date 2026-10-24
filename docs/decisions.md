@@ -1,3 +1,5 @@
+> Historical design decisions. Some mechanics and deployment intentions were superseded. Current claims, assumptions and executable checks are indexed in [README](../README.md) and [evidence](evidence/README.md).
+
 > Historical decision log. Current implementation/status: [README](../README.md) and [readiness plan](HACKATHON_READINESS.md). Historical counts and plans are not current test evidence.
 
 # Decisions

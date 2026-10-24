@@ -10,6 +10,7 @@ export const configPath = () => resolve(/*turbopackIgnore: true*/ process.env.ON
 export const stateDir = () => resolve(/*turbopackIgnore: true*/ process.env.ONEUP_STATE_DIR ?? resolve(process.cwd(), "../.localnet"));
 
 export function deployment(): Deployment {
+  if (process.env.ONEUP_PUBLIC_CONFIG) throw new Error("Local demo signing is disabled in the public testnet profile");
   const d = JSON.parse(readFileSync(configPath(), "utf8")) as Deployment;
   assertLocalnet(d);
   return d;
@@ -24,6 +25,7 @@ export function assertLocalnet(d: Pick<Deployment, "network" | "rpcUrl">) {
 /** What the browser needs from localnet.json: no root, keeper or solver key. The demo trader's and the
  *  bots' keys stay (the app signs as them: that's the dev wallet). */
 export function publicConfig(d: Deployment) {
+  assertLocalnet(d);
   return {
     network: d.network,
     rpcUrl: d.rpcUrl,
@@ -52,6 +54,7 @@ export function hostOk(host: string | null, lan: string[] = lanIps()): boolean {
 /** null if the request may go on, else the response to send: a foreign Host is refused, and a POST must be
  *  JSON (so a cross-site form or text/plain post, which skips CORS preflight, can't reach a route). */
 export function guard(req: Request): Response | null {
+  if (process.env.ONEUP_PUBLIC_CONFIG) return Response.json({ error: "This local demo service is disabled on testnet" }, { status: 404 });
   if (!hostOk(req.headers.get("host"))) return Response.json({ error: "Unknown host" }, { status: 403 });
   if (req.method === "POST" && !/^application\/json\b/i.test(req.headers.get("content-type") ?? ""))
     return Response.json({ error: "Expected application/json" }, { status: 415 });

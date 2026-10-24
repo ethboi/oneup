@@ -238,7 +238,7 @@ export function accountSender(account: Account): Send {
 export class OneUp {
   readonly provider: JsonRpcProvider;
 
-  constructor(readonly d: Deployment, provider?: JsonRpcProvider) {
+  constructor(readonly d: Pick<Deployment, "network" | "rpcUrl" | "epochLengthS" | "contracts" | "markets">, provider?: JsonRpcProvider) {
     this.provider = provider ?? new JsonRpcProvider({ url: d.rpcUrl });
   }
 

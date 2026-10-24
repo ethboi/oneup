@@ -2,7 +2,7 @@
 
 // The power-on screen, once a browser session: a handheld with trading keys. The power light comes on, the LCD
 // flickers awake, the logo drops in in pixel steps, the tagline types, then a live price line draws itself behind
-// it and the markets scroll along the bottom while PRESS START blinks. Any tap, click or key starts (L and S press
+// it and the markets scroll along the bottom while VIEW MARKETS blinks. Any tap, click or key starts (L and S press
 // the LONG and SHORT keys on the way); with reduced motion it shows already settled.
 
 import { useEffect, useState } from "react";
@@ -22,7 +22,7 @@ export function showBoot() {
   } catch {}
   location.reload();
 }
-const TAGLINE = "LOSE A TRADE, GET A LIFE";
+const TAGLINE = "EXPLORE THE MARKETS";
 
 export function Boot() {
   const { prices, history } = useOneUp();
@@ -93,7 +93,7 @@ export function Boot() {
   const tape = ticker.length ? ticker.join("   ·   ") : "NEAR   ·   BTC   ·   ETH";
 
   return (
-    <div className={`boot ${state === "leaving" ? "boot-leave" : ""}`} role="dialog" aria-modal="true" aria-label="OneUp. Press any key or tap to start.">
+    <div className={`boot ${state === "leaving" ? "boot-leave" : ""}`} role="dialog" aria-modal="true" aria-label="OneUp. Press any key or tap to view the markets.">
       <div className="boot-console case">
         <div className="boot-top" aria-hidden>
           <span className="boot-led" />
@@ -118,7 +118,7 @@ export function Boot() {
               {TAGLINE.slice(0, typed)}
               <span className="boot-caret">{typed < TAGLINE.length ? "▌" : ""}</span>
             </div>
-            <div className={`display boot-start ${typed >= TAGLINE.length ? "on" : ""}`}>PRESS START</div>
+            <div className={`display boot-start ${typed >= TAGLINE.length ? "on" : ""}`}>VIEW MARKETS</div>
             <div className="boot-ticker display" aria-hidden>
               <span>
                 {tape}   ·   {tape}   ·   
@@ -152,7 +152,7 @@ export function Boot() {
           </span>
           <button type="button" data-key="start" className={pressed === "start" ? "down" : ""}>
             <i />
-            START
+            ENTER
           </button>
         </div>
         <div className="boot-grille" aria-hidden>
@@ -161,7 +161,7 @@ export function Boot() {
           ))}
         </div>
       </div>
-      <p className="boot-hint">Tap, click or press any key to start</p>
+      <p className="boot-hint">Tap, click or press any key to view the markets</p>
     </div>
   );
 }

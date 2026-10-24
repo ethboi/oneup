@@ -4,10 +4,13 @@
 // and a `run` helper that shows each transaction's progress.
 
 import { Account, type KeyPairString } from "near-api-js";
+import type { AppDeployment } from "./app-config";
+import { useNearWallet } from "./near-wallet";
+import { WalletWelcome } from "@/components/WalletWelcome";
 import { sfx } from "./sound";
 import { pollSerial } from "./poll";
 import { loadSession, sessionSender, type Session } from "./session";
-import { OneUp, accountSender, normalizePrice, type Deployment } from "@oneup/sdk";
+import { OneUp, accountSender, normalizePrice } from "@oneup/sdk";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 export interface Toast {
@@ -17,16 +20,17 @@ export interface Toast {
 }
 
 interface Ctx {
-  d: Deployment;
+  d: AppDeployment;
   o: OneUp;
   accounts: { id: string; label: string }[];
   me: string;
   setMe: (id: string) => void;
   tx: ReturnType<OneUp["calls"]>;
   /** The signed-in account with its main key (for adding and removing session keys). */
-  main: Account;
+  main: Account | null;
   /** The main key itself (localnet dev wallet), for signing NEAR Intents. */
-  mainKey: string;
+  mainKey: string | null;
+  wallet: ReturnType<typeof useNearWallet>;
   /** The trade-only session key, when one is on. */
   session: Session | null;
   run: (label: string, f: () => Promise<unknown>) => Promise<boolean>;
@@ -47,7 +51,7 @@ export function useOneUp() {
 }
 
 export function OneUpProvider({ children }: { children: ReactNode }) {
-  const [d, setD] = useState<Deployment | null>(null);
+  const [d, setD] = useState<AppDeployment | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -57,23 +61,25 @@ export function OneUpProvider({ children }: { children: ReactNode }) {
   }, []);
 
   if (error) return <Splash text={error} />;
-  if (!d) return <Splash text="Connecting to localnet…" />;
+  if (!d) return <Splash text="Connecting to OneUp…" />;
   return <Loaded d={d}>{children}</Loaded>;
 }
 
 /** Off this machine (a phone on the LAN), the chain's 127.0.0.1 RPC is unreachable: go through /api/rpc. */
-function viaProxy(d: Deployment): Deployment {
+function viaProxy(d: AppDeployment): AppDeployment {
   const local = ["127.0.0.1", "localhost", "[::1]"].includes(location.hostname);
-  return local ? d : { ...d, rpcUrl: `${location.origin}/api/rpc` };
+  return local || d.network !== "localnet" ? d : { ...d, rpcUrl: `${location.origin}/api/rpc` };
 }
 
-function Loaded({ d, children }: { d: Deployment; children: ReactNode }) {
+function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
   const o = useMemo(() => new OneUp(d), [d]);
+  const wallet = useNearWallet(d);
   const accounts = useMemo(
-    () => [{ id: d.demo.id, label: "demo" }, ...d.bots.map((b, i) => ({ id: b.id, label: `bot ${i + 1}` }))],
+    () => d.demo ? [{ id: d.demo.id, label: "demo" }, ...d.bots.map((b, i) => ({ id: b.id, label: `bot ${i + 1}` }))] : [],
     [d],
   );
-  const [me, setMeState] = useState(d.demo.id);
+  const [localMe, setMeState] = useState(d.demo?.id ?? "");
+  const me = d.network === "localnet" ? localMe : wallet.accountId;
   useEffect(() => {
     try {
       const saved = localStorage.getItem("oneup.account");
@@ -81,26 +87,27 @@ function Loaded({ d, children }: { d: Deployment; children: ReactNode }) {
     } catch {}
   }, [accounts]);
   const setMe = useCallback((id: string) => {
+    if (d.network !== "localnet" || !accounts.some(a => a.id === id)) return;
     setMeState(id);
     try {
       localStorage.setItem("oneup.account", id);
     } catch {}
-  }, []);
+  }, [d.network, accounts]);
 
   // the main key (localnet dev wallet), and a session key for trades when one is on (lib/session.ts)
-  const mainKey = useMemo(() => [d.demo, ...d.bots].find((a) => a.id === me)!.key, [d, me]);
-  const main = useMemo(() => new Account(me, o.provider, mainKey as KeyPairString), [o, me, mainKey]);
+  const mainKey = useMemo(() => d.network === "localnet" ? [d.demo, ...d.bots].find(a => a?.id === me)?.key ?? null : null, [d, me]);
+  const main = useMemo(() => mainKey ? new Account(me, o.provider, mainKey as KeyPairString) : null, [o, me, mainKey]);
   const [session, setSession] = useState<Session | null>(null);
   useEffect(() => {
-    const read = () => setSession(loadSession(me));
+    const read = () => setSession(d.network === "localnet" ? loadSession(me) : null);
     read();
     window.addEventListener("oneup-session", read);
     return () => window.removeEventListener("oneup-session", read);
-  }, [me]);
+  }, [me, d.network]);
   const tx = useMemo(() => {
-    const send = accountSender(main);
+    const send = main ? accountSender(main) : wallet.send;
     return o.calls(session ? sessionSender(me, o.provider, session, d.contracts.house, send) : send);
-  }, [d, o, me, main, session]);
+  }, [d, o, me, main, session, wallet.send]);
 
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [version, setVersion] = useState(0);
@@ -132,6 +139,7 @@ function Loaded({ d, children }: { d: Deployment; children: ReactNode }) {
   const [prices, setPrices] = useState<Record<string, bigint>>({});
   const [history, setHistory] = useState<Record<string, { t: number; p: number }[]>>({});
   useEffect(() => {
+    if (d.network === "testnet" && !me) return;
     let live = true;
     const published = new Map<string, number>();
     const tick = async () => {
@@ -162,7 +170,7 @@ function Loaded({ d, children }: { d: Deployment; children: ReactNode }) {
     };
     const stop = pollSerial(tick, () => {}, 1000);
     // the server has been watching too: start the chart from its last 30 minutes rather than empty
-    fetch("/api/prices")
+    if (d.network === "localnet") fetch("/api/prices")
       .then((r) => (r.ok ? r.json() : {}))
       .then((past: Record<string, { t: number; p: number }[]>) => {
         if (!live) return;
@@ -181,10 +189,10 @@ function Loaded({ d, children }: { d: Deployment; children: ReactNode }) {
       live = false;
       stop();
     };
-  }, [o]);
+  }, [o, d.network, me]);
 
-  const value: Ctx = { d, o, accounts, me, setMe, tx, main, mainKey, session, run, toasts, prices, history, version };
-  return <OneUpContext.Provider value={value}>{children}</OneUpContext.Provider>;
+  const value: Ctx = { d, o, accounts, me, setMe, tx, main, mainKey, session, wallet, run, toasts, prices, history, version };
+  return <OneUpContext.Provider value={value}>{d.network === "testnet" && !me ? <WalletWelcome connect={wallet.connect} busy={wallet.busy} error={wallet.error} /> : children}</OneUpContext.Provider>;
 }
 
 /** Polls `f` every `ms` and whenever `deps` or the transaction version change. */

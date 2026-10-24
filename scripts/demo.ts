@@ -5,12 +5,14 @@
 // the localnet's throwaway dev keys, so only use it on a network you trust.
 
 import { CONTRACT_WASMS } from "./artifacts.ts";
+import { localDemoEnv } from "./local-demo-env.ts";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { networkInterfaces } from "node:os";
 import { resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dirname, "..");
+const DEMO_ENV = localDemoEnv(process.env);
 const WASMS = Object.values(CONTRACT_WASMS);
 const APP_URL = "http://127.0.0.1:3020";
 const LAN = process.argv.includes("--lan");
@@ -24,7 +26,7 @@ const COLORS = { chain: 90, keeper: 36, bots: 35, app: 33 } as const;
 type Name = keyof typeof COLORS;
 
 function start(name: Name, cmd: string, args: string[], onLine?: (line: string) => void, env: Record<string, string> = {}): ChildProcess {
-  const c = spawn(cmd, args, { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, FORCE_COLOR: "0", ...env } });
+  const c = spawn(cmd, args, { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"], env: { ...DEMO_ENV, FORCE_COLOR: "0", ...env } });
   const tag = `\x1b[${COLORS[name]}m${name.padEnd(6)}\x1b[0m│ `;
   let buf = "";
   const out = (chunk: Buffer) => {
@@ -58,7 +60,7 @@ process.on("SIGTERM", () => stop(0));
 
 function step(msg: string, cmd: string, args: string[], cwd = ROOT) {
   console.log(`\n▸ ${msg}`);
-  const r = spawnSync(cmd, args, { cwd, stdio: "inherit" });
+  const r = spawnSync(cmd, args, { cwd, env: DEMO_ENV, stdio: "inherit" });
   if (r.status !== 0) {
     console.error(`✕ ${msg} failed`);
     process.exit(1);

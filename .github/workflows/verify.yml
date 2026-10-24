@@ -22,10 +22,22 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libssl-dev clang cmake protobuf-compiler
       - run: cargo install --locked cargo-near --version 0.22.0
       - run: pnpm install --frozen-lockfile
+      - run: pnpm doctor --compile
       - run: pnpm verify
+      - run: pnpm test:economics --built
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:judge:ci
+        timeout-minutes: 25
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: verification-${{ github.sha }}
-          path: .verification/
+          # Explicit allowlist: app snapshots and localnet/browser secrets are never uploaded.
+          path: |
+            .verification/verification.json
+            .verification/economics.json
+            .verification/judge-ci/**/summary.json
+            .verification/judge-ci/**/sdk.json
+            .verification/judge-ci/**/browser.json
+            .verification/judge-ci/**/prepared-fixture.json
           include-hidden-files: true

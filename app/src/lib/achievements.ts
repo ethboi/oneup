@@ -48,7 +48,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: "serialrekt", name: "Serial Rekt", how: "Get liquidated five times", detail: "At this point the liquidation line knows you personally.", group: "Losses", rarity: "rare" },
   { id: "ouch", name: "Ouch", how: "Lose $1,000 or more on one trade", detail: "A loss of at least $1,000 on one trade. A recovery NFT is not guaranteed.", group: "Losses", rarity: "rare" },
   { id: "tilted", name: "Tilted", how: "Lose three trades in ten minutes", detail: "The TILT light came on. Maybe take a breather.", group: "Losses", rarity: "common" },
-  { id: "revengetrader", name: "Revenge Trader", how: "Open a trade within two minutes of a loss", detail: "Straight back in to win it back. The console noticed.", group: "Losses", rarity: "common" },
+  { id: "revengetrader", name: "Back to Market", how: "Opened a trade within two minutes of a loss", detail: "Opened another position soon after a loss. Review risk before placing a new trade.", group: "Losses", rarity: "common" },
   { id: "clutch", name: "Clutch", how: "Close in profit after nearly being liquidated", detail: "Inches from liquidation, and you still came out ahead.", group: "Losses", rarity: "epic" },
   // Lives & locks
   { id: "oneup", name: "1UP", how: "Get your first Extra Life", detail: "You received your first Extra Life, with rights to eligible house-profit payouts. Unlocks the Berry skin.", group: "Lives & locks", rarity: "common" },

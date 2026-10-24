@@ -1,42 +1,45 @@
 // A fresh sibling chain every launch. Never deletes, reconfigures or stops the regular demo.
-import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { ROOT, copyApp, verifyBuildManifest } from "./artifacts.ts";
+import { ROOT, copyApp } from "./artifacts.ts";
+import { checkPorts, judgePorts, preflight, requireChecks, toolEnv } from "./preflight.ts";
+import { OwnedProcesses } from "./owned-processes.ts";
+import { localDemoEnv } from "./local-demo-env.ts";
+
+const ports = judgePorts();
+// Fail before creating snapshots, running simulations or starting any child.
+requireChecks(await preflight({ ports, build: true }));
+const [appPort, rpcPort, networkPort, controlPort] = ports.map(p => p.port);
 const dir = resolve(ROOT, ".judge", new Date().toISOString().replaceAll(":", "-"));
-mkdirSync(dir, {recursive: true});
-const env = {...process.env, ONEUP_STATE_DIR: resolve(dir, "chain"), ONEUP_CONFIG: resolve(dir, "localnet.json"), ONEUP_RPC_PORT: "3130", ONEUP_NETWORK_PORT: "25567", EPOCH_LENGTH_S: "45", ONEUP_NEXT_DIST: ".next-judge"};
-verifyBuildManifest();
-const appPort = Number(process.env.ONEUP_JUDGE_APP_PORT ?? 3021);
-const appDir = copyApp(resolve(dir,"app"));
-// Generate this profile's model data without modifying source SVGs or ordinary demo outputs.
-const simulation=spawnSync("pnpm",["--filter","@oneup/sim","start"],{cwd:ROOT,env:{...env,ONEUP_SIM_OUTPUT:resolve(dir,"sim/out")},stdio:"inherit"});
-if(simulation.status!==0) throw Error("Judge simulation preparation failed");
-writeFileSync(resolve(dir,"judge-profile.json"), JSON.stringify({appUrl:`http://127.0.0.1:${appPort}`}));
-const children: ChildProcess[] = [];
+mkdirSync(dir, { recursive: true, mode: 0o700 });
+const env = localDemoEnv({ ...toolEnv, ONEUP_STATE_DIR: resolve(dir, "chain"), ONEUP_CONFIG: resolve(dir, "localnet.json"), ONEUP_RPC_PORT: String(rpcPort), ONEUP_NETWORK_PORT: String(networkPort), EPOCH_LENGTH_S: "45", ONEUP_NEXT_DIST: ".next-judge", ONEUP_SIM_OUTPUT: resolve(dir, "sim/out") });
+const appUrl = `http://127.0.0.1:${appPort}`;
+writeFileSync(resolve(dir, "judge-profile.json"), JSON.stringify({ appUrl, rpcUrl: `http://127.0.0.1:${rpcPort}`, controlUrl: `http://127.0.0.1:${controlPort}` }));
+const processes = new OwnedProcesses(dir, env);
 let stopping = false;
-function stop(code = 0) { if (stopping) return; stopping = true; for (const c of children) { try { if (c.pid) process.kill(-c.pid, "SIGINT"); } catch {} } setTimeout(() => process.exit(code), 1500); }
-process.on("SIGINT", () => stop()); process.on("SIGTERM", () => stop());
-function start(args: string[], cwd = ROOT) {
-  const c = spawn("pnpm", args, {cwd, env, detached: true, stdio: ["ignore", "pipe", "pipe"]});
-  children.push(c); c.stderr!.pipe(process.stderr);
-  c.on("exit", code => { if (!stopping) stop(code || 1); });
-  return c;
+async function stop(code = 0) {
+  if (stopping) return;
+  stopping = true;
+  await processes.close();
+  process.exit(code);
 }
-// Fail before touching the new chain if any dedicated port is occupied.
-const {createServer} = await import("node:net");
-for (const port of [3130, 25567, 8887, appPort]) await new Promise<void>((ok, no) => {
-  const server = createServer(); server.once("error", no); server.listen(port, "127.0.0.1", () => server.close(e => e ? no(e) : ok()));
-});
-console.log(`Isolated judge config: ${env.ONEUP_CONFIG}`);
-const chain = start(["exec", "tsx", "scripts/localnet.ts"]);
-let ready = false, buffer = "";
-chain.stdout!.on("data", chunk => {
-  process.stdout.write(chunk); buffer += chunk.toString();
-  if (!ready && buffer.includes("Ctrl-C")) {
-    ready = true;
-    start(["exec", "tsx", "keeper/src/index.ts", "--prices", "fixed", "--tick", "1000", "--control", "8887"]).stdout!.pipe(process.stdout);
-    start(["exec", "next", "dev", "-H", "127.0.0.1", "-p", String(appPort)], appDir).stdout!.pipe(process.stdout);
-    console.log(`Judge app: http://127.0.0.1:${appPort} (fixed controllable prices; no bots; 45-second epochs).\nRun: ONEUP_CONFIG='${env.ONEUP_CONFIG}' pnpm test:judge\nPrepared state and mocked bridge/oracle/swap/vault must be disclosed.`);
+process.once("SIGINT", () => void stop());
+process.once("SIGTERM", () => void stop());
+try {
+  const appDir = copyApp(resolve(dir, "app"));
+  await processes.success(processes.start("simulation", "pnpm", ["--filter", "@oneup/sim", "start"], ROOT, text => process.stdout.write(text)), 180000);
+  requireChecks(await checkPorts(ports));
+  console.log(`Isolated judge config: ${env.ONEUP_CONFIG}`);
+  let buffer = "";
+  const chain = processes.start("chain", "pnpm", ["exec", "tsx", "scripts/localnet.ts"], ROOT, text => { process.stdout.write(text); buffer = (buffer + text).slice(-16000); });
+  const deadline = Date.now() + 480000;
+  while (!buffer.includes("Ctrl-C")) {
+    processes.assertRunning([chain]);
+    if (Date.now() > deadline) throw Error("Judge chain deployment exceeded eight minutes; inspect its private chain.log.");
+    await new Promise(resolveWait => setTimeout(resolveWait, 200));
   }
-});
+  const keeper = processes.start("keeper", "pnpm", ["exec", "tsx", "keeper/src/index.ts", "--prices", "fixed", "--tick", "1000", "--control", String(controlPort)], ROOT, text => process.stdout.write(text));
+  const app = processes.start("app", "pnpm", ["exec", "next", "dev", "-H", "127.0.0.1", "-p", String(appPort)], appDir, text => process.stdout.write(text));
+  for (const record of [chain, keeper, app]) void record.done.then(code => { if (!stopping) { console.error(`${record.name} exited (${code}).`); void stop(1); } });
+  console.log(`Judge app: ${appUrl} (fixed controllable prices; no bots; 45-second epochs).\nRun: ONEUP_CONFIG='${env.ONEUP_CONFIG}' pnpm test:judge\nPrepared state and mocked bridge/oracle/swap/vault must be disclosed.`);
+} catch (error) { console.error(error instanceof Error ? error.message : error); await stop(1); }

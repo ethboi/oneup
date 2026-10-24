@@ -9,7 +9,7 @@ const rounded = M_PLUS_Rounded_1c({ subsets: ["latin"], weight: ["400", "500", "
 
 export const metadata: Metadata = {
   title: "OneUp",
-  description: "Perpetual trading with capped profits and Extra Life NFTs for eligible losses. A local NEAR demo using test money; recovery is not guaranteed.",
+  description: "Perpetual trading with capped profits and Extra Life NFTs for eligible losses. A NEAR prototype using test money; recovery is not guaranteed.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

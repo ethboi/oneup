@@ -4,9 +4,15 @@
 
 import { deployment, guard, publicConfig } from "@/lib/server/localnet";
 
+import { hasPublicProfile, publicTestnetConfig } from "@/lib/server/public-config";
+
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
+  if (hasPublicProfile()) {
+    try { return Response.json(publicTestnetConfig(), { headers: { "Cache-Control": "no-store" } }); }
+    catch { return Response.json({ error: "Invalid public testnet configuration. Check ONEUP_PUBLIC_CONFIG and the wallet setup guide." }, { status: 503 }); }
+  }
   const no = guard(req);
   if (no) return no;
   try {

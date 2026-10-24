@@ -270,6 +270,8 @@ const lifeProgress = (i: LifeInfo) => (BigInt(i.owed) > 0n ? Math.max(0.12, Numb
 
 /** Observed sale prices. Historical cap snapshots are not valuations. */
 function Sales({ items }: { items: ActivityItem[] }) {
+  const { d } = useOneUp();
+  if (d.network !== "localnet") return <p className="label px-4 pb-4">Sale history is not indexed on testnet. Current listings still update from the contracts.</p>;
   if (items.length === 0) return <p className="label px-4 pb-4">No sales yet.</p>;
   const now = Date.now();
   return (

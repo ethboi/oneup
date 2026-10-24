@@ -1,50 +1,66 @@
 # Current development and demo plan
 
-This document and executable code supersede the historical staged PLAN.md and obsolete decision notes.
+This document and executable code supersede the archived `PLAN.md` and historical decision notes.
 Existing-code eligibility is resolved per the team. Repository publication and submission are deferred.
+Lead with transferable recovery rights and the behavior of the Extra Life NFT. Native NEAR wallet setup
+is [documented separately](NEAR_WALLET_SETUP.md); a public testnet deployment must be verified before
+calling that integration live.
 
-## Three-minute walkthrough
+## Three-minute prepared walkthrough
 
-Build/install/deploy and warm the app before recording. Disclose local test money, prepared bootstrap
-backing and any already-settled NFTs. Use `pnpm demo:judge`; follow the printed config with `pnpm test:judge`.
+Install, build, deploy and warm the app before recording. Use `pnpm demo:judge`; follow its printed config
+with `pnpm test:judge` for the separate SDK check. Prepare a settled trader Life with claimable test USDC
+and a second funded identity. Disclose local test money, seed/backer balances, mock boundaries and prepared
+settlement at the beginning. Do not imply this short recording creates the loss from a fresh chain.
 
 | Time | Demonstration |
 |---|---|
-| 0:00–0:20 | Target trader and conditional recovery; disclose local chain and test assets |
-| 0:20–1:00 | Deposit, delayed fill, controlled price movement and liquidation |
-| 1:00–1:45 | Epoch settlement, dynamic Extra Life, actual test-USDC claim |
-| 1:45–2:20 | Sell a Life; buyer inherits the unclaimed proceeds and seller loses claim rights |
-| 2:20–2:45 | Payout reserve/admission evidence and one asynchronous failure regression |
-| 2:45–3:00 | Why NEAR, simulated boundaries and honest economic limitations |
+| 0:00–0:35 | Describe the trader and show the prepared eligible loss, Life and originating round |
+| 0:35–1:15 | Explain owner, available USDC, remaining payout limit and expiry; leave the cash attached to the Life |
+| 1:15–2:20 | List that same Life with unclaimed funds, switch to the buyer, inspect the asking price, purchase and claim as new owner |
+| 2:20–3:00 | Return to former owner; show unavailable owner actions, then the separately recorded contract rejection; disclose economic and integration limits |
 
-The fixed-price profile removes external price dependencies, not block/receipt timing. Its script asserts
-logical outcomes and records elapsed time; this is not a promise that cold setup completes in 180 seconds.
-The ordinary live-price/bot demo is separate and remains unchanged in its state and ports.
+The [recovery journey](RECOVERY_JOURNEY.md) is the detailed script. The prior prepared browser rehearsal
+took 140.993 seconds. The full trade/liquidation-to-sale path took 253.506 seconds and used one CLI price
+change. [The historical record](evidence/historical-browser.json) identifies revisions and limitations.
+Neither is a cold-start benchmark or a human usability study. A sale between prepared test identities
+is mechanism evidence; independent bids and demand require [research](USER_RESEARCH.md).
 
 ## Engineering evidence
 
-`pnpm verify` performs all typechecks, unit/property/SDK/model/app/keeper tests, builds the nine WASMs,
-runs fresh sandbox integration tests, generates sensitivity results and builds the production app into
-a separate source snapshot with its own `.next-verify` and generated Next files. Ignored `.verification/verification.json` identifies source revision, dirty changes and log
-hashes; the gate fails if source identity changes during a run. Generated manifests are evidence for the actual working contents, not a claim that uncommitted
-changes are already present on remote main. CI is configured locally and requires a future authorized push.
+Use the [evidence index](evidence/README.md) for claim → code → regression → command → scope. `pnpm verify`
+runs typechecks, unit/property/SDK/model/app/keeper tests, fresh-WASM sandbox checks, sensitivity and a
+production build in a separate source snapshot. Its ignored `.verification/verification.json` binds
+stage exits and log hashes to the source revision and dirty fingerprint; source drift fails the gate.
+Do not quote old test counts as new evidence or claim a CI run before it exists.
 
-`pnpm verify:deployment` checks all nine first-party/mocked on-chain code blobs against built SHA256s. A build manifest binds these files to Rust/build input hashes and the source identity observed during compilation.
-Existing localnet startup warns on mismatch without reset or automatic redeployment. Judge runs create
-fresh sibling state. Never use `localnet:reset` to obtain review evidence from a user's active demo.
+`pnpm verify:deployment` compares nine deployed local code blobs against built SHA-256s. This establishes
+binary identity, not independent build reproducibility. Existing localnet startup warns on mismatches
+without resetting state. Use the isolated launcher rather than resetting an active user's chain.
 
-## Economic interpretation
+Native wallet connection requires separately configured testnet contracts and a human-controlled account.
+A unit-tested signer adapter and successful local browser demo do not establish a signed testnet journey.
+Record the network, account, transaction outcomes and limitations after that journey is actually run.
+The local session-key acceptance sequence—trade succeeds, withdrawal is denied, then revocation blocks
+further use—remains a follow-up. Helper tests do not establish that complete on-chain sequence, and the
+native testnet profile requests no session key.
 
-The historical chart assumes 100× growing loss volume, 15% mean edge, 50% fixed utilisation and a $25K
-1× seed claim. Sensitivity uses $250K owner seed plus $60K/$40K contributions ($350K pool, $426K aggregate
-backer caps), low/declining activity, negative edge and high utilisation. Synthetic flows can produce cash
-deficits because admission and price processes are not modeled. Show those failures with the favorable
-cases. Expiry removes future entitlements; it does not ensure equal recovery or economic sustainability.
-Farming compares same/separate wallets and assumed discounts; it is not a Sybil-resistance proof.
+## Economic and product evidence
 
-## Human validation still needed
+The historical model assumes 100× growing loss volume, 15% mean edge, fixed utilization and a $25K seed.
+Its sensitivity variants include deployment backing, low activity, adverse edge and high utilization.
+Some exogenous paths exceed available cash because they do not execute contract admission. Those paths
+are infeasible model inputs, not proof of a contract exploit. Compare feasible contract experiments with
+these illustrations; separate realized cash from unsold NFT/token marks and cap payment from principal return.
 
-Recruit five prospective traders independently. Ask them to explain where recovery comes from, what
-expires, the winner's cut and why another person would buy a Life. Record actual responses and voluntary
-usage; do not substitute bot activity. No recruiting, messaging, deployment or publication is authorized
-by this checklist. Real Outlayer/Rhea/bridge integration and a constrained agent wallet are future work.
+Use [five independent participant sessions](USER_RESEARCH.md) to test comprehension, seller alternatives,
+buyer evidence requirements and hypothetical bid/ask overlap. [Results](USER_RESEARCH_RESULTS.md) remain
+blank until sessions occur. Do not count bots, prepared backing or scripted sales as customers or traction.
+Real external oracle/swap/vault/bridge deployments remain separate integration work.
+
+## Review and publication
+
+The [official site](https://nearhackathon.com/) confirms AI judges but does not state that they review first
+or publish a current scoring formula. Prepare searchable evidence and a consistent repository rather than
+assuming hidden judge prompts. Follow the [submission draft](SUBMISSION.md) and recheck official instructions
+before publication. The pre-event commit history must remain distinguishable from work done during the event.

@@ -6,8 +6,8 @@ The view polls current ownership and only offers claim or sale to the selected o
 
 ## What the numbers mean
 
-- **Claimable USDC now:** already allocated, unwithdrawn USDC attached to the NFT.
-- **Additional conditional cap:** the unallocated part of its maximum payout while it is eligible.
+- **Available to claim:** already allocated, unwithdrawn USDC attached to the NFT.
+- **Remaining payout limit:** the unallocated part of its maximum payout while it is eligible.
   It can pay zero. Expired or fully allocated Lives have no additional cap.
 - **Allocated / withdrawn:** lifetime NFT totals, including previous owners. These do not measure
   the selected wallet's profit. The existing index cannot reliably attribute every historical
@@ -16,7 +16,7 @@ The view polls current ownership and only offers claim or sale to the selected o
   the configured subsequent rounds. A closing round may still be settling after the counter advances.
   Backer Lives do not expire. Expiry stops allocations, not withdrawal of allocated funds.
 
-The marketplace defaults to asking-price order and displays claimable funds, additional cap,
+The marketplace defaults to asking-price order and displays claimable funds, remaining payout limit,
 earning window and price separately. Sellers enter their own price. Claiming after listing revokes the NFT approval: an old listing
 can remain visible until refreshed, but a purchase against that approval fails and refunds the buyer.
 The seller must list again after claiming. Displayed balances remain snapshots between polls.
@@ -55,9 +55,10 @@ the walkthrough. Use `ONEUP_JUDGE_APP_PORT=3022 pnpm demo:judge` if 3021 is occu
 1. **0:00–0:35:** show the recovery guide and selected wallet; explain an eligible loss must occur in
    a profitable house round. Show the prepared loss and its originating round.
 2. **0:35–1:15:** open that Life; point out token ID, owner, expiry and the two distinct money figures.
-   Claim allocated test USDC and show that the conditional cap does not increase.
-3. **1:15–2:20:** enter an asking price, list a Life with unclaimed funds, switch to a second funded
-   demo account, inspect the price and remaining rights, then buy it. Show its new owner and claim.
+   Leave its allocated test USDC unclaimed so the buyer can receive it.
+3. **1:15–2:20:** enter an asking price, list that same Life with its unclaimed funds, switch to a second
+   funded demo account, inspect the price and remaining rights, then buy it. Show its new owner, claim
+   the allocated cash and confirm that the conditional cap does not increase.
 4. **2:20–3:00:** switch back to the former owner. The detail view removes claim/sale controls.
    Explain that the contract also rejects a former-owner claim. Finish with the simulation label
    and the unvalidated demand and external-integration follow-ups.

@@ -17,14 +17,14 @@ const short = (a: string) => a.replace(/\.test\.near$/, "");
 const usd = (x: bigint) => fmtUsd(x, true);
 
 export function Leaderboard() {
-  const { o, me } = useOneUp();
+  const { o, me, d } = useOneUp();
   const epoch = usePoll(() => o.epoch(), [], 10_000);
   const [period, setPeriod] = useState<Period>("day");
   const [data, setData] = useState<{ rows: Standing[]; synced: boolean } | null>(null);
   const from = period === "round" ? (epoch ? epoch.started_at * 1000 : null) : period === "day" ? Date.now() - 86_400_000 : 0;
 
   useEffect(() => {
-    if (from === null) return;
+    if (from === null || d.network !== "localnet") return;
     let live = true;
     const tick = () =>
       fetch(`/api/standings?from=${from}&to=${Date.now()}`)
@@ -39,8 +39,9 @@ export function Leaderboard() {
     };
     // a new round or period refetches; `from` for "day" moves every render, so key it by period
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period, epoch?.id]);
+  }, [period, epoch?.id, d.network]);
 
+  if (d.network === "testnet") return <div className="panel p-5"><h1 className="page-title">Leaderboard</h1><p className="label mt-3">Rankings require the local demo indexer and are not available in this testnet profile.</p></div>;
   const rows = data?.rows ?? [];
   const winners = rows.filter((r) => BigInt(r.pnl) > 0n);
   const losers = rows.filter((r) => BigInt(r.pnl) < 0n).reverse();

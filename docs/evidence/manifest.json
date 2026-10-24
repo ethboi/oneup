@@ -1,0 +1,43 @@
+{
+  "scope": "Curated historical local review artifacts; no credentials or deployment configs included.",
+  "historical": true,
+  "sourceRevisions": {
+    "verificationAndSdk": "b188d542d223163d87d16cd2f01099596b882cbf",
+    "browserJourney": "da6918b7c5605b296f1c9bb469908d0c4bf627aa",
+    "laterPresentationSmoke": "b188d542d223163d87d16cd2f01099596b882cbf"
+  },
+  "files": [
+    {
+      "file": "historical-browser.json",
+      "sha256": "fa18fbf164c743afdaa63aaba997cc4c602c3f64d141b5145552563a3bef38b9"
+    },
+    {
+      "file": "recovery-browser-buyer.png",
+      "sha256": "fb8690e3c80186fa599f59831a18491acbd1f8255b81073080c3b5665e084e7a"
+    },
+    {
+      "file": "recovery-browser-former-owner.png",
+      "sha256": "ade3506f6ff6d759310fb2b134e1f848f2b6f4e069f4ea1420dac17161f15585"
+    },
+    {
+      "file": "recovery-browser-life.png",
+      "sha256": "3df6e410e10c49074b31752e177b5d577e1c455491a00849becc2110e0c72ed7"
+    },
+    {
+      "file": "recovery-e2e.json",
+      "sha256": "e81df8eba64cebc0189843478d00cbb09c89ab7c64c73d9e134c7c58883c43c1"
+    },
+    {
+      "file": "recovery-expired-life.png",
+      "sha256": "1ecdbc9951a9c09b56410be85e2f078672053983d52be63df1a92b04c97315b7"
+    },
+    {
+      "file": "recovery-former-owner-rejection.json",
+      "sha256": "62062e8cf68d5e07d916ec57200e3ecd554151310bd2ef2b1f0012591aeca79b"
+    },
+    {
+      "file": "recovery-verification.json",
+      "sha256": "4e79de601b5292241910611e1d5aec483fe244fa4597bd8e5efa99e48f017cd1"
+    }
+  ]
+}

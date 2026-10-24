@@ -4,6 +4,7 @@
 // simulation (sim/). OneUp with expiring lives, OneUp as first specified, and Papertrade-style rules.
 
 import { useEffect, useState } from "react";
+import { useOneUp } from "@/lib/oneup";
 import { useWidth } from "@/lib/useWidth";
 
 interface Results {
@@ -24,11 +25,14 @@ const cents = (x: number) => `${(x * 100).toFixed(1)}¢`;
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
 
 export function Fairness() {
+  const { d } = useOneUp();
   const [r, setR] = useState<Results | null>(null);
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
+    if (d.network !== "localnet") return;
     fetch("/api/sim").then(async (x) => (x.ok ? setR(await x.json()) : setErr((await x.json()).error))).catch(() => setErr("Could not load the recovery scenarios. Please try again."));
-  }, []);
+  }, [d.network]);
+  if (d.network !== "localnet") return <p id="fairness" className="label scroll-mt-4">The synthetic recovery report is available in the repository and local demo. Testnet outcomes depend on actual trading and available surplus; future payouts can be zero.</p>;
   if (err) return <p id="fairness" className="label scroll-mt-4">{err}</p>;
   if (!r) return <p className="label">Loading recovery scenarios…</p>;
   const [first, , , last] = r.quarters.oneup;

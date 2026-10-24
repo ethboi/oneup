@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { scrollToAnchorWhenReady } from "@/lib/anchors";
 import { Boot } from "@/components/Boot";
-import { OneUpProvider } from "@/lib/oneup";
+import { OneUpProvider, useOneUp } from "@/lib/oneup";
 import { Header } from "@/components/Header";
 import { Trade } from "@/components/Trade";
 import { Lives } from "@/components/Lives";
@@ -99,7 +99,7 @@ export default function Home() {
         <div className="mx-auto flex max-w-[1280px] items-center justify-center gap-x-2 px-4 py-1.5 text-center text-[12.5px] font-bold">
           <span>
             In development for <span className="font-extrabold">NEAR HACKATHON</span>, November 2026
-            <span className="hidden sm:inline"> · local NEAR demo · test money only</span>
+            <NetworkLabel />
           </span>
           <button type="button" className="underline decoration-dotted underline-offset-2 opacity-80 hover:opacity-100" onClick={() => go("About")}>
             About
@@ -170,7 +170,13 @@ export default function Home() {
 }
 
 /** What OneUp is and where to read more, under every tab. */
+function NetworkLabel() {
+  const { d } = useOneUp();
+  return <span className="hidden sm:inline"> · {d.network === "testnet" ? "NEAR testnet" : "local NEAR demo"} · test money only</span>;
+}
+
 function Footer({ go }: { go: (t: Tab, at?: string) => void }) {
+  const { d } = useOneUp();
   const link = "font-semibold text-[var(--muted)] underline-offset-2 transition-colors hover:text-[var(--text)] hover:underline";
   return (
     <footer className="mt-10 border-t border-[var(--line)] pt-6 text-sm">
@@ -217,7 +223,7 @@ function Footer({ go }: { go: (t: Tab, at?: string) => void }) {
         <div>
           <b className="block">Built on NEAR</b>
           <p className="label mt-1.5">
-            Runs locally on NEAR with Rust contracts, simulated cross-chain deposits through NEAR Intents, Sputnik DAO ownership, sponsored trading, and demo account access through MCP.
+            {d.network === "localnet" ? "Runs locally on NEAR with Rust contracts, simulated cross-chain deposits through NEAR Intents, Sputnik DAO ownership, sponsored trading, and demo account access through MCP." : "NEAR testnet contracts with wallet-approved transactions. Oracle, tokens, swap and vault are test implementations. Historical activity and rankings are available only in the local demo."}
           </p>
           <button
             type="button"
@@ -232,7 +238,7 @@ function Footer({ go }: { go: (t: Tab, at?: string) => void }) {
         </div>
       </div>
       <div className="label mt-6 flex flex-col gap-2 border-t border-[var(--line)] pt-4 sm:flex-row sm:items-baseline sm:justify-between">
-        <p>A local NEAR demo using test money. The contracts have not been independently audited. Do not use real funds.</p>
+        <p>{d.network === "testnet" ? "A NEAR testnet prototype" : "A local NEAR demo"} using test money. The contracts have not been independently audited. Do not use real funds.</p>
         <p className="shrink-0">
           Built by{" "}
           <a className={link} href="https://github.com/ethboi" target="_blank" rel="noreferrer">

@@ -1017,9 +1017,7 @@ body {
   }
 }
 
-/* "REVENGE TRADE DETECTED", stamped on the screen for a few seconds */
-/* REVENGE TRADE as a fighting game's versus screen: the screen splits, you on the left, the market on the
-   right, VS slams in the middle, then ROUND 2, FIGHT! */
+/* Brief trade-review overlay; the legacy versus classes preserve its existing animation. */
 .versus {
   position: absolute;
   inset: 0;
@@ -1027,7 +1025,7 @@ body {
   border-radius: 8px;
   animation: versus-out 3.6s steps(1) both;
 }
-/* one diagonal split across the screen: each side fills its half and centres its fighter there */
+/* Legacy split layout, retained for existing presentation styles. */
 .versus-side {
   position: absolute;
   inset: 0;
@@ -1055,7 +1053,7 @@ body {
 .versus-side > :first-child {
   filter: drop-shadow(0 0 14px rgb(255 255 255 / 0.18));
 }
-/* bigger screens: bigger fighters */
+/* Scale the legacy split layout on larger screens. */
 @media (min-width: 640px) {
   .versus-side {
     --fighter-zoom: 1.6;

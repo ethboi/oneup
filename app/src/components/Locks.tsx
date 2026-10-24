@@ -213,10 +213,11 @@ function LockRow({ l, epoch, px, claimable, listings }: { l: LockInfo; epoch: nu
 
 /** The $1UP price now, how it moved over the last day (sampled by the app's server), and what yours is worth. */
 function OneupPrice({ px, locked }: { px: bigint; locked: bigint }) {
-  const { o, me } = useOneUp();
+  const { o, me, d } = useOneUp();
   const wallet = BigInt(usePoll(() => o.oneupBalance(me), [me]) ?? "0");
   const [samples, setSamples] = useState<[number, number][]>([]);
   useEffect(() => {
+    if (d.network !== "localnet") return;
     let live = true;
     const tick = () =>
       fetch("/api/oneup-price")
@@ -229,7 +230,7 @@ function OneupPrice({ px, locked }: { px: bigint; locked: bigint }) {
       live = false;
       clearInterval(i);
     };
-  }, []);
+  }, [d.network]);
   const now = Number(px);
   const first = samples[0]?.[1];
   const change = first && now ? (now / first - 1) * 100 : null;
@@ -254,7 +255,7 @@ function OneupPrice({ px, locked }: { px: bigint; locked: bigint }) {
           <path d={line} fill="none" stroke={tone} strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
         </svg>
       )}
-      <p className="label mt-1">Quote from the swap pool, sampled every minute. The price can change.</p>
+      <p className="label mt-1">{d.network === "localnet" ? "Quote from the swap pool, sampled every minute. The price can change." : "Current quote from the test swap pool. Historical prices are unavailable on testnet."}</p>
       <dl className="num mt-3 flex flex-col gap-1.5 border-t border-[var(--line)] pt-3 text-sm">
         <div className="ticket-row">
           <dt className="label">In your wallet</dt>
