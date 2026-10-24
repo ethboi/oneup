@@ -23,7 +23,7 @@ export function useLevel(account?: string): Level | null {
     last.current = { who, level: lv.level };
     // the first reading is where you are, not a level-up; a switched account starts over
     if (account === undefined && prev && prev.who === who && lv.level > prev.level) {
-      sfx("badge");
+      sfx("levelup");
       emitFx({ kind: "levelup", level: lv.level });
     }
   }, [lv?.level, who, account]);

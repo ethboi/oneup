@@ -32,12 +32,15 @@ import { reservedMargin } from "@/lib/account";
 import { priceInput as toPrice, triggerValues, editablePrice } from "@/lib/triggers";
 import { payFromChain } from "@/lib/intents";
 import { useRevengeFlash, useStreak } from "./Streaks";
-import { Burst, Gauge, MoodGlow, useCloseFx, useMood, useTensionSound } from "./Mood";
+import { Burst, Gauge, HpBar, MoodGlow, hpOf, useCloseFx, useMood, useTensionSound } from "./Mood";
 import { ActivityList, useActivity } from "./Activity";
 import { HistoryList } from "./History";
 import { ShareButton, type CardData } from "./PnlCard";
 import { Jackpot, fmtDuration } from "./Jackpot";
 import { useHistory } from "./History";
+import { GameFx, GameHud, Quests } from "./Game";
+import { emitFx } from "@/lib/fx";
+import { sfx } from "@/lib/sound";
 
 /** Chart windows: the app keeps up to 30 minutes of prices it has seen. */
 const RANGES = [
@@ -361,6 +364,7 @@ export function Trade() {
       <div ref={formRef} id="order-form" className="order-3 flex flex-col gap-4">
         <OrderForm t={ticket} />
         <Account t={ticket} positions={positions} orders={orders} />
+        <Quests />
         {/* under the form on every screen: on a desktop it fills the column beside the tall chart */}
         <details className="panel p-3">
           <summary className="cursor-pointer text-sm font-semibold">Jackpot and tickets</summary>
@@ -579,7 +583,15 @@ function useTicket(market: string, maxLeverage: number) {
       ? `${topUp > 0n ? "Deposit & " : ""}Limit ${side.toLowerCase()} at ${limitAt ? fmtPrice(limitAt) : "…"}`
       : `${topUp > 0n ? "Deposit & " : ""}${side} ${market.split("-")[0]}`;
   const triggers = { takeProfit: tpAt, stopLoss: slAt };
-  const submit = () =>
+  const submit = () => {
+    // a take-profit or stop-loss set on the way in raises the shield (components/Game.tsx)
+    if (tpAt || slAt) {
+      sfx("shield");
+      emitFx({ kind: "shield" });
+    }
+    return send();
+  };
+  const send = () =>
     viaAsset
       ? run(`${side} ${market} ${leverage}× · $${margin} via NEAR Intents`, () =>
           payFromChain({
@@ -661,6 +673,10 @@ function Console({
           const at = price === null ? null : numberToPrice(price);
           const keep = (x: string | null) => (x ? BigInt(x) : null);
           const name = kind === "tp" ? "take profit" : "stop loss";
+          if (at !== null) {
+            sfx("shield");
+            emitFx({ kind: "shield" });
+          }
           return run(`${at === null ? "Clear" : "Set"} ${name} on #${pos.id}`, () =>
             tx.setTriggers(pos.id, {
               takeProfit: kind === "tp" ? at : keep(pos.triggers.take_profit),
@@ -713,6 +729,7 @@ function Console({
           <span className="faceplate-print hidden sm:inline">NEAR · BTC · ETH MARKETS · NEAR HACKATHON 2026</span>
           <span className="stripes" />
         </div>
+        <GameHud />
         <div className="relative">
           <PriceChart
             fill
@@ -743,6 +760,7 @@ function Console({
             gauge={mood.state !== "none" && mood.gauge ? <Gauge mood={mood} /> : jackpotLine}
           />
           <MoodGlow mood={mood} />
+          <GameFx market={market} pos={pos} mark={mark} pts={pts} />
           {fx && <Burst fx={fx} />}
           {(revenge || tilt > 0) && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center" role="status">
@@ -1143,6 +1161,17 @@ const openCard = (p: Position, mark: bigint | undefined, v: bigint, me: string):
 });
 
 /** `focused`: the position the chart details; `pick` shows another there. */
+/** A position's HP: full at its entry or better, empty at liquidation. */
+function PositionHp({ p, mark }: { p: Position; mark: bigint }) {
+  const entry = BigInt(p.entry_price);
+  const hp = hpOf(priceToNumber(liquidationPrice(p.side, entry, p.leverage)), priceToNumber(entry), priceToNumber(mark));
+  return (
+    <span className="mt-1 flex justify-end">
+      <HpBar hp={hp} small label={`HP ${Math.round(hp * 100)}%`} />
+    </span>
+  );
+}
+
 function Positions({ positions, orders, focused, pick }: { positions: Position[]; orders: Order[]; focused?: number; pick: (p: Position) => void }) {
   const { prices, me } = useOneUp();
   const now = useNow();
@@ -1187,6 +1216,7 @@ function Positions({ positions, orders, focused, pick }: { positions: Position[]
               <dd>
                 {fmtPrice(liquidationPrice(p.side, BigInt(p.entry_price), p.leverage))}
                 {mark && <span className="label block">{away(mark, liquidationPrice(p.side, BigInt(p.entry_price), p.leverage))} away</span>}
+                  {mark && <PositionHp p={p} mark={mark} />}
               </dd>
             </dl>
             <div className="mt-2 flex items-center justify-between gap-2">
@@ -1233,6 +1263,7 @@ function Positions({ positions, orders, focused, pick }: { positions: Position[]
                 <td className="py-2 pr-4 text-right">
                   {fmtPrice(liquidationPrice(p.side, BigInt(p.entry_price), p.leverage))}
                   {mark && <span className="label block">{away(mark, liquidationPrice(p.side, BigInt(p.entry_price), p.leverage))} away</span>}
+                  {mark && <PositionHp p={p} mark={mark} />}
                 </td>
                 <td className="pl-2">
                   <span className="flex items-center gap-1">

@@ -89,35 +89,42 @@ export function useTensionSound(mood: Mood) {
   }, [active]);
 }
 
-/** Distance to liquidation and to the take-profit (or the 9× cap), on a gauge printed on the screen:
- *  liquidation at the left end, the target at the right, a tick at entry and a dot at the price. */
+/** A position's health as a game's HP: full at its entry (or better), empty at liquidation. */
+export const hpOf = (liq: number, entry: number, mark: number) => Math.max(0, Math.min(1, along(liq, entry, mark)));
+
+/** HP in ten segments, green to gold to red as it drains. */
+export function HpBar({ hp, label, small }: { hp: number; label?: string; small?: boolean }) {
+  const lit = Math.ceil(hp * 10);
+  const color = hp > 0.6 ? "var(--hp-good)" : hp > 0.3 ? "var(--hp-mid)" : "var(--hp-low)";
+  return (
+    <span className={`hp-bar ${small ? "small" : ""} ${hp <= 0.3 ? "low" : ""}`} role="meter" aria-label={label ?? "HP"} aria-valuenow={Math.round(hp * 100)} aria-valuemin={0} aria-valuemax={100}>
+      {Array.from({ length: 10 }, (_, i) => (
+        <span key={i} style={i < lit ? { background: color } : undefined} />
+      ))}
+    </span>
+  );
+}
+
+/** The position on the screen as a fighter's HP: how far it is from liquidation, and how far to its take-profit
+ *  (or the 9× cap). */
 export function Gauge({ mood }: { mood: Mood }) {
   const g = mood.gauge;
   if (!g) return null;
   const pct = (to: number) => `${((Math.abs(to - g.mark) / g.mark) * 100).toFixed(1)}%`;
-  const at = (x: number) => `${along(g.liq, g.target, x) * 100}%`;
-  const danger = mood.state === "danger" || mood.state === "critical";
+  const hp = hpOf(g.liq, g.entry, g.mark);
   const hot = mood.state === "hot";
   return (
     <span
       // phones: the bar takes what the two readings leave, so a long one never runs off the screen
       className="display num flex w-full items-center gap-2 text-sm text-[var(--lcd-ink)] sm:w-auto"
       role="img"
-      aria-label={`Liquidation ${pct(g.liq)} away, ${g.capped ? "profit cap" : "take profit"} ${pct(g.target)} away`}
+      aria-label={`HP ${Math.round(hp * 100)}%: liquidation ${pct(g.liq)} away, ${g.capped ? "profit cap" : "take profit"} ${pct(g.target)} away`}
     >
-      <span className="whitespace-nowrap" style={danger ? { color: "#c43636" } : undefined}>
-        Liq {pct(g.liq)}
-        <span className="hidden sm:inline"> away</span>
+      <span className="whitespace-nowrap" title={`Liquidation ${pct(g.liq)} away`}>
+        HP
       </span>
-      <span className="relative h-3 min-w-8 flex-1 sm:w-40 sm:flex-none">
-        <span className="absolute inset-x-0 top-1/2 h-[3px] -translate-y-1/2 bg-[var(--lcd-3)]" />
-        <span className="absolute top-0 h-3 w-[2px] bg-[var(--lcd-3)]" style={{ left: at(g.entry) }} />
-        <span
-          className="absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 border-2 border-[var(--lcd-ink)]"
-          style={{ left: at(g.mark), background: danger ? "#c43636" : hot ? "#f2b705" : "var(--lcd-ink)" }}
-        />
-      </span>
-      <span className="whitespace-nowrap" style={hot ? { color: "#7a5a00" } : undefined}>
+      <HpBar hp={hp} label={`HP, liquidation ${pct(g.liq)} away`} />
+      <span className="whitespace-nowrap" style={hot ? { color: "#b07a00" } : undefined}>
         {g.capped ? "Max win" : "TP"} {pct(g.target)}
         <span className="hidden sm:inline"> away</span>
       </span>

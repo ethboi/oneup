@@ -2275,3 +2275,254 @@ kbd {
 .level-xp {
   color: var(--case-muted);
 }
+
+/* HP bars (components/Mood.tsx): ten segments, blinking when low */
+:root {
+  --hp-good: #2ecc71;
+  --hp-mid: #f2b705;
+  --hp-low: #e5443b;
+}
+:root[data-skin="classic"],
+:root[data-skin="arcade"],
+:root[data-skin="midnight"],
+:root[data-skin="gold"] {
+  --hp-good: var(--lcd-ink);
+  --hp-mid: var(--lcd-ink);
+  --hp-low: var(--lcd-ink);
+}
+.hp-bar {
+  display: inline-flex;
+  flex: 1;
+  gap: 2px;
+  min-width: 70px;
+  max-width: 150px;
+  padding: 2px;
+  border-radius: 3px;
+  border: 2px solid var(--lcd-ink);
+  background: var(--lcd);
+}
+.hp-bar > span {
+  flex: 1;
+  height: 8px;
+  background: color-mix(in srgb, var(--lcd-3) 22%, transparent);
+}
+.hp-bar.small {
+  min-width: 56px;
+  max-width: 80px;
+  border-width: 1.5px;
+  border-color: var(--edge);
+  background: var(--panel-2);
+}
+.hp-bar.small > span {
+  height: 6px;
+  background: color-mix(in srgb, var(--muted) 25%, transparent);
+}
+.hp-bar.low > span[style] {
+  animation: blink 0.6s steps(1) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hp-bar.low > span[style] {
+    animation: none;
+  }
+}
+
+/* the game layer (components/Game.tsx) */
+/* the HUD on the bezel, between the stripes and the screen */
+.game-hud {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin: -4px 0 10px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #d6d7e6;
+}
+.game-hud .level-xp {
+  color: #9ba0b9;
+}
+.game-hud .boss {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.boss-name {
+  font-size: 11px;
+  color: #ff8a8a;
+  white-space: nowrap;
+}
+.game-hud .hp-bar {
+  min-width: 90px;
+  border-color: #000;
+  background: #0b0c14;
+}
+.game-hud .hp-bar > span {
+  height: 6px;
+  background: rgb(255 255 255 / 0.08);
+}
+.combo {
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #fff;
+  background: linear-gradient(90deg, #ff5f6d, #ffc371);
+  box-shadow: 0 0 12px rgb(255 140 80 / 0.55);
+  animation: combo-pulse 0.9s ease-in-out infinite;
+}
+@keyframes combo-pulse {
+  50% {
+    transform: scale(1.08);
+  }
+}
+/* a banner across the screen: drops in, holds, gone */
+.game-banner {
+  position: absolute;
+  left: 50%;
+  top: 34%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 22px 9px;
+  border: 3px solid var(--lcd-ink);
+  border-radius: 6px;
+  background: var(--banner, #fff);
+  box-shadow: 5px 5px 0 var(--lcd-ink);
+  transform: translateX(-50%);
+  animation: banner-in 0.35s steps(4) both;
+  white-space: nowrap;
+}
+.game-banner-big {
+  font-size: clamp(22px, 5vw, 38px);
+  line-height: 1;
+  color: var(--banner-ink, var(--lcd-ink));
+  -webkit-text-stroke: 1.5px var(--lcd-ink);
+  paint-order: stroke fill;
+  text-shadow: 2px 2px 0 var(--lcd-ink);
+}
+.game-banner-small {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--lcd-ink);
+}
+.game-banner.levelup {
+  --banner: linear-gradient(180deg, #fff6c2, #ffd84d);
+  --banner-ink: #e08a00;
+}
+.game-banner.combo {
+  --banner: linear-gradient(180deg, #ffe0d1, #ff9f7a);
+  --banner-ink: #e2453b;
+}
+.game-banner.shield {
+  --banner: linear-gradient(180deg, #e0f2ff, #8fd0ff);
+  --banner-ink: #1f6fd1;
+}
+.game-banner.bigmove {
+  --banner: linear-gradient(180deg, #f3e8ff, #c9a7ff);
+  --banner-ink: #6b3fd6;
+}
+:root[data-skin="classic"] .game-banner,
+:root[data-skin="arcade"] .game-banner,
+:root[data-skin="midnight"] .game-banner,
+:root[data-skin="gold"] .game-banner {
+  --banner: var(--lcd);
+  --banner-ink: var(--lcd);
+}
+@keyframes banner-in {
+  from {
+    transform: translateX(-50%) translateY(-30px) scale(1.3);
+    opacity: 0;
+  }
+}
+/* coins and drops off a moving position */
+.pnl-pop {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  text-shadow:
+    2px 2px 0 var(--lcd),
+    -1px -1px 0 var(--lcd);
+  animation: pnl-rise 1.3s ease-out both;
+}
+.pnl-pop.up {
+  color: var(--lcd-pill-up);
+}
+.pnl-pop.down {
+  color: var(--lcd-pill-down);
+}
+.pnl-coin {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: #f2b705;
+  box-shadow:
+    inset -2px -2px 0 #b07a00,
+    0 0 0 1px var(--lcd-ink);
+  animation: coin-spin 0.5s steps(4) infinite;
+}
+@keyframes pnl-rise {
+  0% {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-46px);
+    opacity: 0;
+  }
+}
+/* daily quests */
+.quest {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.quest-check {
+  display: grid;
+  flex: none;
+  place-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 2px solid var(--input-edge);
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--on-fill);
+}
+.quest.done .quest-check {
+  border-color: var(--long);
+  background: var(--long);
+}
+.quest.done .font-bold {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.quest-track {
+  display: block;
+  height: 4px;
+  margin-top: 4px;
+  border-radius: 2px;
+  background: var(--panel-2);
+  overflow: hidden;
+}
+.quest-track > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #4dd0ff, #2a9ae0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .combo,
+  .game-banner,
+  .pnl-pop,
+  .pnl-coin {
+    animation: none;
+  }
+  .pnl-pop {
+    display: none;
+  }
+}

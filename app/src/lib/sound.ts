@@ -2,7 +2,7 @@
 // files. Browsers only allow sound after the page has been interacted with, so the context is created on
 // first use (always after a click here). Muting is per browser.
 
-export type Sfx = "send" | "fill" | "win" | "jackpot" | "lose" | "liquidated" | "plusOne" | "life" | "claim" | "error" | "tilt" | "badge" | "heal" | "round" | "revenge" | "boot";
+export type Sfx = "send" | "fill" | "win" | "jackpot" | "lose" | "liquidated" | "plusOne" | "life" | "claim" | "error" | "tilt" | "badge" | "heal" | "round" | "revenge" | "boot" | "levelup" | "combo" | "shield" | "coin" | "bigmove";
 
 const KEY = "oneup.muted";
 const VOLUME = 0.12;
@@ -129,6 +129,12 @@ const SOUNDS: Record<Sfx, () => Tone[]> = {
   // round over: a short fanfare
   // the start chime: two quick high notes, then a held one, as a handheld does when it boots
   boot: () => run(["B5", "E6"], 0.07, "square", 0.7).concat({ note: "B6", at: 0.16, len: 0.4, gain: 0.7 }),
+  // the game layer (components/Game.tsx)
+  levelup: () => run(["C5", "E5", "G5", "C6", "E6", "G6"], 0.06).concat({ note: "C7", at: 0.36, len: 0.4 }),
+  combo: () => run(["E6", "G6", "B6"], 0.05, "square", 0.7),
+  shield: () => run(["G4", "D5", "G5"], 0.06, "triangle", 0.9),
+  coin: () => [{ note: "B6", at: 0, len: 0.05, gain: 0.35 }, { note: "E7", at: 0.05, len: 0.12, gain: 0.35 }],
+  bigmove: () => run(["C4", "C5"], 0.08, "sawtooth", 0.5),
   round: () => run(["G4", "C5", "E5", "G5"], 0.09, "square", 0.8).concat({ note: "C6", at: 0.36, len: 0.35, gain: 0.8 }),
 };
 

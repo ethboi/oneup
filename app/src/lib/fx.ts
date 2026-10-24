@@ -11,7 +11,8 @@ export type FxEvent =
   | { kind: "revenge" }
   /** The game layer (components/Level.tsx, Game.tsx). */
   | { kind: "levelup"; level: number }
-  | { kind: "powerup"; leverage: number }
+  /** A take-profit or stop-loss was set. */
+  | { kind: "shield" }
   | { kind: "combo"; n: number }
   | { kind: "bigmove"; market: string; pct: number };
 

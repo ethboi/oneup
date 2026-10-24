@@ -208,6 +208,10 @@ function DemoMenu() {
                   ["Jackpot", () => window.dispatchEvent(new CustomEvent("oneup-preview-jackpot", { detail: jackpotNow }))],
                   ["Round over", () => window.dispatchEvent(new Event("oneup-preview-round"))],
                   ["Badges", () => openBadges()],
+                  ["Level up", () => (sfx("levelup"), emitFx({ kind: "levelup", level: 4 }))],
+                  ["Combo", () => (sfx("combo"), emitFx({ kind: "combo", n: 3 }))],
+                  ["Shield up", () => (sfx("shield"), emitFx({ kind: "shield" }))],
+                  ["Big move", () => (sfx("bigmove"), markets.forEach((m) => emitFx({ kind: "bigmove", market: m.id, pct: 0.24 })))],
                 ] as [string, () => void][]
               ).map(([name, go]) => (
                 <button key={name} type="button" className="chip px-0 text-xs" onClick={() => (close(), go())}>
