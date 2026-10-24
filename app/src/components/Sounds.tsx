@@ -5,7 +5,6 @@
 // win after a near miss earns Clutch. Also the header's sound menu (effects and music).
 
 import { useEffect, useRef, useState } from "react";
-import { setTheme, useTheme } from "@/lib/theme";
 import { PPM, isLiquidatable, pnl } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { isMuted, onMuted, setMuted, sfx } from "@/lib/sound";
@@ -89,7 +88,6 @@ export function SoundEvents() {
 
 /** The header's sound menu: sound effects on or off, and the music (which needs sound on). */
 export function MuteButton() {
-  const theme = useTheme();
   const [muted, setM] = useState(false);
   const [music, setMu] = useState(false);
   useEffect(() => {
@@ -117,10 +115,6 @@ export function MuteButton() {
             }}
           />
           <Toggle label="Music" hint={muted ? "Needs sound on" : undefined} on={music && !muted} disabled={muted} set={setMusic} />
-          {/* phones: the header has no room for its own theme button */}
-          <div className="sm:hidden">
-            <Toggle label="Dark mode" on={theme === "dark"} set={(v) => setTheme(v ? "dark" : "light")} />
-          </div>
         </div>
       )}
     </Popover>

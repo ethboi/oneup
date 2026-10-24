@@ -6,44 +6,46 @@
  * chart is the LCD. Controls stay standard.
  */
 :root {
+  /* dark only: the shell is night plastic */
+  color-scheme: dark;
   --font-display: var(--font-pixel), ui-monospace, monospace;
   --font-body: var(--font-rounded), ui-rounded, system-ui, sans-serif;
 
-  --bg: #d8d7e6; /* console shell: lavender plastic */
-  --grille: rgb(47 44 84 / 0.07); /* the shell's speaker-grille dots */
-  --panel: #fbfbfe;
-  --panel-2: #eeedf5;
-  --edge: #1c1b29; /* outlines */
-  --line: #c9ccd9; /* quiet separators inside panels */
+  --bg: #15162a; /* console shell: night plastic */
+  --grille: rgb(255 255 255 / 0.035); /* the shell's speaker-grille dots */
+  --panel: #212339;
+  --panel-2: #2a2d47;
+  --edge: #474b6c; /* outlines */
+  --line: #363a52; /* quiet separators inside panels */
   /* panels sit raised, not outlined: a light edge, a top highlight and a soft drop */
-  --panel-edge: #cfcedf;
+  --panel-edge: #33375a;
   /* the hard lip a moulded part stands on, like a key's edge */
-  --panel-lip: #bdbcd2;
-  --input-edge: #c3c7d4;
-  --field: #ffffff;
-  --panel-shadow: inset 0 1px 0 rgb(255 255 255 / 0.95), 0 3px 0 var(--panel-lip), 0 14px 24px -18px rgb(28 27 41 / 0.35);
-  --text: #1c1b29;
-  --muted: #5e6178;
-  --accent: #f2b705; /* coin */
-  --jackpot: #b07a00; /* coin gold dark enough for text */
-  --heart: #e2257a;
-  --long: #137a43;
-  --short: #d23a3a;
+  --panel-lip: #0c0d1a;
+  --input-edge: #40445f;
+  --field: #1a1c29;
+  --panel-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 3px 0 var(--panel-lip), 0 16px 28px -18px rgb(0 0 0 / 0.8);
+  --text: #eceef6;
+  --muted: #9ba0b9;
+  --accent: #ffc83d; /* coin */
+  --jackpot: #ffc83d; /* coin gold dark enough for text */
+  --heart: #ff4fa3;
+  --long: #2fb466;
+  --short: #ec5050;
   /* filled Long/Short buttons, white text (≥ 4.5:1 in both themes) */
-  --long-fill: #137a43;
-  --short-fill: #d23a3a;
+  --long-fill: #1b7f47;
+  --short-fill: #c43636;
   /* buttons: the heart's magenta for primary actions (a shade deeper for white text, 5.1:1) */
-  --primary: #d11f70;
+  --primary: #c81e6c;
   --on-fill: #ffffff;
-  --info: #2a6fd6;
+  --info: #5aa9ff;
   --on-color: #1c1b29;
 
   /* the handheld: plastic case and slate screen surround */
-  --case: #ecebf4;
-  --bezel: #3b3d56;
-  --stripe-1: #a3195b;
-  --stripe-2: #2f3c94;
-  --wordmark: #2f3c94;
+  --case: #262941;
+  --bezel: #13141f;
+  --stripe-1: #d6327f;
+  --stripe-2: #5b6bd6;
+  --wordmark: #8f9cf0;
   /* the LCD keeps its colours in both themes */
   --lcd: #b7c49a;
   --lcd-2: #8e9e6e;
@@ -51,87 +53,15 @@
   --lcd-ink: #1e2a16;
 
   /* chart series, validated for colour-blind separation (dataviz validator) */
-  --series-long: #1f6fd1;
-  --series-short: #c8641a;
-  --series-1: #2a78d6;
-  --series-2: #eb6834;
-  --series-3: #1baf7a;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
-    --bg: #15162a;
-    --grille: rgb(255 255 255 / 0.035);
-    --panel: #212339;
-    --panel-2: #2a2d47;
-    --edge: #474b6c;
-    --line: #363a52;
-    --panel-edge: #33375a;
-    --panel-lip: #0c0d1a;
-    --input-edge: #40445f;
-    --field: #1a1c29;
-    --panel-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 3px 0 var(--panel-lip), 0 16px 28px -18px rgb(0 0 0 / 0.8);
-    --text: #eceef6;
-    --muted: #9ba0b9;
-    --accent: #ffc83d;
-    --jackpot: #ffc83d;
-    --heart: #ff4fa3;
-    --long: #2fb466;
-    --short: #ec5050;
-    --long-fill: #1b7f47;
-    --short-fill: #c43636;
-    --primary: #c81e6c;
-    --info: #5aa9ff;
-    --case: #262941;
-    --bezel: #13141f;
-    --stripe-1: #d6327f;
-    --stripe-2: #5b6bd6;
-    --wordmark: #8f9cf0;
-    --series-long: #3a86dc;
-    --series-short: #d6732a;
-    --series-1: #3987e5;
-    --series-2: #d95926;
-    --series-3: #199e70;
-  }
-}
-
-/* the same, when dark is picked in the header (lib/theme.ts) */
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --bg: #15162a;
-  --grille: rgb(255 255 255 / 0.035);
-  --panel: #212339;
-  --panel-2: #2a2d47;
-  --edge: #474b6c;
-  --line: #363a52;
-  --panel-edge: #33375a;
-  --panel-lip: #0c0d1a;
-  --input-edge: #40445f;
-  --field: #1a1c29;
-  --panel-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 3px 0 var(--panel-lip), 0 16px 28px -18px rgb(0 0 0 / 0.8);
-  --text: #eceef6;
-  --muted: #9ba0b9;
-  --accent: #ffc83d;
-  --jackpot: #ffc83d;
-  --heart: #ff4fa3;
-  --long: #2fb466;
-  --short: #ec5050;
-  --long-fill: #1b7f47;
-  --short-fill: #c43636;
-  --primary: #c81e6c;
-  --info: #5aa9ff;
-  --case: #262941;
-  --bezel: #13141f;
-  --stripe-1: #d6327f;
-  --stripe-2: #5b6bd6;
-  --wordmark: #8f9cf0;
   --series-long: #3a86dc;
   --series-short: #d6732a;
   --series-1: #3987e5;
   --series-2: #d95926;
   --series-3: #199e70;
 }
+
+
+/* the same, when dark is picked in the header (lib/theme.ts) */
 
 body {
   background-color: var(--bg);

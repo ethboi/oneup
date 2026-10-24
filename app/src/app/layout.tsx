@@ -14,13 +14,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    // the theme goes on <html> before anything paints: your pick, else dark (lib/theme.ts; the key is spelled out
-    // here because a server component can't read a value from a client module)
+    // dark only; the script marks a session that has already seen the power-on screen, before anything paints
     <html lang="en" className={`${pixel.variable} ${rounded.variable}`} suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem("oneup.theme");document.documentElement.dataset.theme=t==="light"?"light":"dark";if(sessionStorage.getItem("oneup.booted")==="1"&&!new URLSearchParams(location.search).has("boot"))document.documentElement.dataset.booted="1"}catch(e){document.documentElement.dataset.theme="dark"}`,
+            __html: `try{if(sessionStorage.getItem("oneup.booted")==="1"&&!new URLSearchParams(location.search).has("boot"))document.documentElement.dataset.booted="1"}catch(e){}`,
           }}
         />
       </head>
