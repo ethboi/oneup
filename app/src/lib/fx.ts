@@ -8,7 +8,12 @@ export type FxEvent =
    *  `tier`: how big a win is (winTier), which sizes its burst. */
   | { kind: "win" | "lose" | "liquidated"; market: string; positionId: number; pnl?: string; tier?: WinTier }
   | { kind: "heal"; tokenId: string; epoch: number; paid: string }
-  | { kind: "revenge" };
+  | { kind: "revenge" }
+  /** The game layer (components/Level.tsx, Game.tsx). */
+  | { kind: "levelup"; level: number }
+  | { kind: "powerup"; leverage: number }
+  | { kind: "combo"; n: number }
+  | { kind: "bigmove"; market: string; pct: number };
 
 const subs = new Set<(e: FxEvent) => void>();
 

@@ -500,14 +500,15 @@ export function PriceChart({
               const top = y(Math.max(c.o, c.c));
               return (
                 <g key={c.t}>
-                  <line x1={cx} x2={cx} y1={y(c.h)} y2={y(c.l)} stroke="var(--lcd-ink)" strokeWidth="1.5" />
+                  <line x1={cx} x2={cx} y1={y(c.h)} y2={y(c.l)} stroke={up ? "var(--lcd-up)" : "var(--lcd-down)"} strokeWidth="1.5" style={{ filter: "brightness(0.7)" }} />
                   {/* up candles hollow, down candles solid: the monochrome screen's way of telling them apart */}
                   <rect
                     x={cx - cW / 2}
                     y={top}
                     width={cW}
                     height={Math.max(1.5, y(Math.min(c.o, c.c)) - top)}
-                    fill={up ? "var(--lcd)" : "var(--lcd-ink)"}
+                    // colour screens: green and red; the mono screen: up candles hollow, down solid
+                    fill={up ? "var(--lcd-up)" : "var(--lcd-down)"}
                     stroke="var(--lcd-ink)"
                     strokeWidth="1.5"
                   />
@@ -520,7 +521,7 @@ export function PriceChart({
               {!zone && <path d={`${line} L${x(t1)} ${plotB} L${x(points[0].t)} ${plotB} Z`} fill="url(#lcd-fill)" />}
               {/* LCD smear: the slow pixels an old screen leaves just behind the line as it scrolls */}
               <path d={line} fill="none" stroke="var(--lcd-ink)" strokeWidth="3" strokeLinejoin="round" opacity="0.18" transform="translate(4 1)" filter="url(#lcd-smear)" />
-              <path d={line} fill="none" stroke="var(--lcd-ink)" strokeWidth="2.5" strokeLinejoin="round" />
+              <path d={line} fill="none" stroke="var(--lcd-line)" strokeWidth="2.5" strokeLinejoin="round" />
             </>
           )}
         </g>
@@ -542,7 +543,7 @@ export function PriceChart({
         {/* printed in the screen's own ink, like the price tag: the sign carries profit or loss, not a colour */}
         {pills.map((p) => (
           <g key={p.key}>
-            <rect x={plotR - p.w - 6} y={p.y - 19} width={p.w} height="16" rx="2" fill="var(--lcd-ink)" />
+            <rect x={plotR - p.w - 6} y={p.y - 19} width={p.w} height="16" rx="2" fill={p.up ? "var(--lcd-pill-up)" : "var(--lcd-pill-down)"} />
             <text x={plotR - 12} y={p.y - 7} fontSize="12" fontWeight="700" textAnchor="end" fill="var(--lcd)" className="num">
               {p.up ? "▲ " : "▼ "}
               {p.text}
@@ -574,7 +575,7 @@ export function PriceChart({
         {/* the present price, ruled across so it reads against the marks */}
         <line x1={x(t1)} x2={plotR + 2} y1={y(headP)} y2={y(headP)} stroke="var(--lcd-ink)" strokeWidth="1" />
         {/* keyed by the tick, so each new price pops the marker */}
-        <rect key={`pulse-${last.t}`} className="tick-pulse" x={x(t1) - 4} y={y(headP) - 4} width="8" height="8" fill="var(--lcd-ink)" />
+        <rect key={`pulse-${last.t}`} className="tick-pulse" x={x(t1) - 4} y={y(headP) - 4} width="8" height="8" fill="var(--lcd-line)" />
         {labels.map((l, i) => (
           <g key={l.key} className={alarm && l.kind === "liq" ? "blink" : undefined}>
             {/* a leader when the label had to move off its line */}
@@ -593,7 +594,7 @@ export function PriceChart({
                   width={PAD.r - 6}
                   height="18"
                   rx="2"
-                  fill="var(--lcd-ink)"
+                  fill="var(--lcd-tag)"
                 />
                 {fresh && (
                   <text key={`arrow-${last.t}`} className="tick-arrow" x={plotR + 8} y={placed[i] + 3} fontSize="11" fill="var(--lcd)">

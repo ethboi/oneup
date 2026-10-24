@@ -2097,3 +2097,181 @@ kbd {
 :root[data-booted] .boot {
   display: none;
 }
+
+/* ===== Game Boy Color =====
+   The screen has colour: a backlit LCD with a sky behind the chart, green and red candles, a blue price line
+   and coloured scenery. The shell comes in the GBC's colours. Classic (and the badge skins Arcade, Midnight
+   and Gold) keep the original Game Boy's mono screen by setting the colour tokens back to its shades. */
+:root {
+  --lcd: #eef3e4;
+  --lcd-2: #c2cfe6;
+  --lcd-3: #55628f;
+  --lcd-ink: #1a2148;
+  --lcd-up: #23b25d;
+  --lcd-down: #e5443b;
+  --lcd-line: #2a3db0;
+  --lcd-tag: #2a3db0;
+  --lcd-pill-up: #16894a;
+  --lcd-pill-down: #c9302a;
+  --lcd-grid: rgb(42 61 176 / 0.06);
+  --lcd-sky: linear-gradient(180deg, #b9dcff 0%, #ddefff 42%, #f2f6e4 100%);
+  --lcd-glow: 0 0 0 1px rgb(255 255 255 / 0.4), 0 0 26px -6px rgb(150 205 255 / 0.55);
+  --sc-far: #9c8fe3;
+  --sc-near: #5bb65f;
+  --sc-cloud: #ffffff;
+  --sc-opacity: 0.75;
+  /* text printed straight on the shell (the market's numbers above the chart) */
+  --case-ink: var(--text);
+  --case-muted: var(--muted);
+}
+/* the original Game Boy: one green, four shades */
+:root[data-skin="classic"],
+:root[data-skin="arcade"],
+:root[data-skin="midnight"],
+:root[data-skin="gold"] {
+  --lcd-up: var(--lcd);
+  --lcd-down: var(--lcd-ink);
+  --lcd-line: var(--lcd-ink);
+  --lcd-tag: var(--lcd-ink);
+  --lcd-pill-up: var(--lcd-ink);
+  --lcd-pill-down: var(--lcd-ink);
+  --lcd-grid: rgb(30 42 22 / 0.07);
+  --lcd-sky: none;
+  --lcd-glow: 0 0 0 0 transparent;
+  --sc-far: var(--lcd-2);
+  --sc-near: var(--lcd-2);
+  --sc-cloud: var(--lcd-2);
+  --sc-opacity: 0.32;
+}
+:root[data-skin="classic"] {
+  --lcd: #b7c49a;
+  --lcd-2: #8e9e6e;
+  --lcd-3: #4f5d3b;
+  --lcd-ink: #1e2a16;
+}
+/* the GBC shells; the bright ones print the shell's text in dark ink */
+:root[data-skin="atomic"],
+:root:not([data-skin]) {
+  --case: rgb(118 82 210 / 0.42);
+  --bezel: #17142c;
+  --stripe-1: #e2257a;
+  --stripe-2: #4d7cf0;
+}
+:root[data-skin="berry"] {
+  --case: #b8215d;
+  --bezel: #2a1420;
+  --stripe-1: #f2b705;
+  --stripe-2: #4d7cf0;
+  --case-ink: #fff;
+  --case-muted: #f6c9db;
+}
+:root[data-skin="grape"] {
+  --case: #5a2d8c;
+  --bezel: #1b1030;
+  --stripe-1: #e2257a;
+  --stripe-2: #f2b705;
+  --case-ink: #fff;
+  --case-muted: #d8c6f2;
+}
+:root[data-skin="kiwi"] {
+  --case: #a6cf3b;
+  --bezel: #23291b;
+  --stripe-1: #e2257a;
+  --stripe-2: #2a6fd6;
+  --case-ink: #1c2410;
+  --case-muted: #3c4a1f;
+}
+:root[data-skin="teal"] {
+  --case: #1fa6a6;
+  --bezel: #0f2429;
+  --stripe-1: #f2b705;
+  --stripe-2: #e2257a;
+  --case-ink: #062a2a;
+  --case-muted: #0f4a4a;
+}
+:root[data-skin="dandelion"] {
+  --case: #f5c936;
+  --bezel: #2b2414;
+  --stripe-1: #e2257a;
+  --stripe-2: #2a6fd6;
+  --case-ink: #2a2206;
+  --case-muted: #5c4a10;
+}
+/* the screen: sky behind, the pixel grid and glass on top, lit from within on a colour skin */
+.lcd {
+  background-image:
+    linear-gradient(150deg, rgb(255 255 255 / 0.22), rgb(255 255 255 / 0) 38%),
+    repeating-linear-gradient(0deg, var(--lcd-grid) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, var(--lcd-grid) 0 1px, transparent 1px 3px),
+    var(--lcd-sky, none);
+  box-shadow:
+    inset 0 3px 0 rgb(0 0 0 / 0.18),
+    var(--lcd-glow);
+}
+.lcd-scenery {
+  opacity: var(--sc-opacity, 0.32);
+}
+.lcd-scenery > .lcd-far {
+  background: var(--sc-far, var(--lcd-2));
+}
+.lcd-scenery > .lcd-near {
+  background: var(--sc-near, var(--lcd-2));
+}
+.lcd-scenery > .lcd-clouds {
+  background: var(--sc-cloud, var(--lcd-2));
+}
+.case .mkt-stats dt {
+  color: var(--case-muted);
+}
+.case .mkt-stats dd {
+  color: var(--case-ink);
+}
+/* the translucent shell: the parts show through */
+:root[data-skin="atomic"] .case,
+:root:not([data-skin]) .case {
+  backdrop-filter: blur(2px);
+  background-image: radial-gradient(rgb(255 255 255 / 0.07) 1px, transparent 1.4px);
+  background-size: 6px 6px;
+}
+[data-swatch="atomic"] { --sw-case: #8a64d8; --sw-bezel: #17142c; --sw-lcd: #cfe6ff; }
+[data-swatch="classic"] { --sw-case: #e9ebf1; --sw-bezel: #4a4d63; --sw-lcd: #b7c49a; }
+[data-swatch="berry"] { --sw-case: #b8215d; --sw-bezel: #2a1420; --sw-lcd: #cfe6ff; }
+[data-swatch="grape"] { --sw-case: #5a2d8c; --sw-bezel: #1b1030; --sw-lcd: #cfe6ff; }
+[data-swatch="kiwi"] { --sw-case: #a6cf3b; --sw-bezel: #23291b; --sw-lcd: #cfe6ff; }
+[data-swatch="teal"] { --sw-case: #1fa6a6; --sw-bezel: #0f2429; --sw-lcd: #cfe6ff; }
+[data-swatch="dandelion"] { --sw-case: #f5c936; --sw-bezel: #2b2414; --sw-lcd: #cfe6ff; }
+
+/* XP and levels (components/Level.tsx) */
+.level-hud {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 800;
+}
+.level-badge {
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #1a2148;
+  background: linear-gradient(180deg, #ffe066, #f2b705);
+  box-shadow: 0 2px 0 #a07400;
+}
+.level-track {
+  position: relative;
+  width: 84px;
+  height: 8px;
+  border-radius: 2px;
+  background: rgb(0 0 0 / 0.25);
+  box-shadow: inset 0 1px 0 rgb(0 0 0 / 0.3);
+  overflow: hidden;
+}
+.level-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: repeating-linear-gradient(90deg, #4dd0ff 0 5px, #2a9ae0 5px 6px);
+  transition: width 0.6s steps(8);
+}
+.level-xp {
+  color: var(--case-muted);
+}

@@ -136,7 +136,7 @@ export function MoodGlow({ mood }: { mood: Mood }) {
 export function useCloseFx(market: string) {
   const [fx, setFx] = useState<(CloseFx & { id: number }) | null>(null);
   useFx((e) => {
-    if (!("market" in e) || e.market !== market) return;
+    if ((e.kind !== "win" && e.kind !== "lose" && e.kind !== "liquidated") || e.market !== market) return;
     const id = Date.now();
     setFx({ ...e, id });
     // a win holds a little longer so the amount can be read, longer still the bigger it is
@@ -145,7 +145,7 @@ export function useCloseFx(market: string) {
   return fx;
 }
 
-type CloseFx = Extract<FxEvent, { market: string }>;
+type CloseFx = Extract<FxEvent, { kind: "win" | "lose" | "liquidated" }>;
 
 /** Each win tier's burst: coins thrown, how far, the amount's height in px, how long it holds. */
 const WIN = [

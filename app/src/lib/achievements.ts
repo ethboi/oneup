@@ -61,23 +61,32 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: "backer", name: "Backer", how: "Back the house", detail: "You contributed USDC to the pool and received a Backer Life.", group: "Lives & locks", rarity: "rare" },
 ];
 
-/** Console skins, each unlocked by a badge (or by a number of badges). */
+/** Console skins: Game Boy Color shells (unlocked by level) and the original mono screens (by badges). */
 export interface Skin {
   id: string;
   name: string;
-  unlock: { badge: string } | { count: number } | null;
+  unlock: { badge: string } | { count: number } | { level: number } | null;
 }
 
 export const SKINS: Skin[] = [
-  { id: "classic", name: "Classic", unlock: null },
+  { id: "atomic", name: "Atomic Purple", unlock: null },
+  { id: "classic", name: "Classic (mono)", unlock: null },
+  { id: "kiwi", name: "Kiwi", unlock: { level: 2 } },
+  { id: "teal", name: "Teal", unlock: { level: 3 } },
+  { id: "dandelion", name: "Dandelion", unlock: { level: 4 } },
+  { id: "grape", name: "Grape", unlock: { level: 5 } },
   { id: "berry", name: "Berry", unlock: { badge: "oneup" } },
   { id: "arcade", name: "Arcade", unlock: { badge: "sharpshooter" } },
   { id: "midnight", name: "Midnight", unlock: { count: 10 } },
   { id: "gold", name: "Gold", unlock: { badge: "fullheal" } },
 ];
 
-export const skinUnlocked = (s: Skin, have: Set<string>) =>
-  !s.unlock || ("badge" in s.unlock ? have.has(s.unlock.badge) : have.size >= s.unlock.count);
+export const skinUnlocked = (s: Skin, have: Set<string>, level = 1) =>
+  !s.unlock || ("badge" in s.unlock ? have.has(s.unlock.badge) : "level" in s.unlock ? level >= s.unlock.level : have.size >= s.unlock.count);
+
+/** What unlocks a skin, in words. */
+export const skinNeed = (s: Skin) =>
+  !s.unlock ? "" : "badge" in s.unlock ? ACHIEVEMENTS.find((a) => a.id === (s.unlock as { badge: string }).badge)!.name : "level" in s.unlock ? `Level ${s.unlock.level}` : `${s.unlock.count} badges`;
 
 /** One badge for one account: whether it's earned, when (if known), and progress toward it if it counts. */
 export interface BadgeState {

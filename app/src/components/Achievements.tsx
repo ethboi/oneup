@@ -6,7 +6,8 @@
 
 import { useEffect, useState } from "react";
 import { useOneUp, usePoll } from "@/lib/oneup";
-import { ACHIEVEMENTS, GROUPS, SKINS, badgeStates, readFlags, skinUnlocked, type BadgeState, type Rarity } from "@/lib/achievements";
+import { ACHIEVEMENTS, GROUPS, SKINS, badgeStates, readFlags, skinNeed, skinUnlocked, type BadgeState, type Rarity } from "@/lib/achievements";
+import { useLevel } from "./Level";
 import { sfx } from "@/lib/sound";
 import { useHistory } from "./History";
 import { Icon } from "./Icon";
@@ -106,10 +107,11 @@ export const openBadges = () => window.dispatchEvent(new Event("oneup-open-badge
 
 /** Applies the chosen console skin (remembered in this browser). */
 export function useSkin(): [string, (s: string) => void] {
-  const [skin, set] = useState("classic");
+  // the default shell is a Game Boy Color's Atomic Purple; Classic is the original mono screen
+  const [skin, set] = useState("atomic");
   useEffect(() => {
     try {
-      set(localStorage.getItem("oneup.skin") ?? "classic");
+      set(localStorage.getItem("oneup.skin") ?? "atomic");
     } catch {}
   }, []);
   useEffect(() => {
@@ -131,6 +133,7 @@ export function BadgesDialog() {
   const states = useBadgeStates();
   const have = useBadges();
   const [skin, setSkin] = useSkin();
+  const lv = useLevel();
   useEffect(() => {
     const show = () => setOpen(true);
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
@@ -141,11 +144,11 @@ export function BadgesDialog() {
       document.removeEventListener("keydown", onKey);
     };
   }, []);
-  // a skin that isn't unlocked for this account falls back to Classic
+  // a skin that isn't unlocked for this account falls back to the default shell (once its level is known)
   useEffect(() => {
     const s = SKINS.find((x) => x.id === skin);
-    if (have && s && !skinUnlocked(s, have)) setSkin("classic");
-  }, [have, skin, setSkin]);
+    if (have && lv && s && !skinUnlocked(s, have, lv.level)) setSkin("atomic");
+  }, [have, lv, skin, setSkin]);
   if (!open) return null;
   const n = have?.size ?? 0;
   return (
@@ -184,8 +187,8 @@ export function BadgesDialog() {
           <h3 className="font-extrabold">Console skins</h3>
           <div className="mt-2 flex flex-wrap gap-2">
             {SKINS.map((s) => {
-              const ok = !!have && skinUnlocked(s, have);
-              const need = !s.unlock ? "" : "badge" in s.unlock ? ACHIEVEMENTS.find((a) => a.id === (s.unlock as { badge: string }).badge)!.name : `${s.unlock.count} badges`;
+              const ok = !!have && skinUnlocked(s, have, lv?.level ?? 1);
+              const need = skinNeed(s);
               return (
                 <button
                   key={s.id}
