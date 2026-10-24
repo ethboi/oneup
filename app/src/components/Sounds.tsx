@@ -5,6 +5,7 @@
 // win after a near miss earns Clutch. Also the header's sound menu (effects and music).
 
 import { useEffect, useRef, useState } from "react";
+import { canVibrate, hapticsOn, setHaptics } from "@/lib/haptics";
 import { PPM, isLiquidatable, pnl } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { isMuted, onMuted, setMuted, sfx } from "@/lib/sound";
@@ -90,6 +91,12 @@ export function SoundEvents() {
 export function MuteButton() {
   const [muted, setM] = useState(false);
   const [music, setMu] = useState(false);
+  const [haptics, setHap] = useState(true);
+  const [vibrate, setVibrate] = useState(false);
+  useEffect(() => {
+    setHap(hapticsOn());
+    setVibrate(canVibrate());
+  }, []);
   useEffect(() => {
     setM(isMuted());
     setMu(isMusicOn());
@@ -115,6 +122,8 @@ export function MuteButton() {
             }}
           />
           <Toggle label="Music" hint={muted ? "Needs sound on" : undefined} on={music && !muted} disabled={muted} set={setMusic} />
+          {/* phones that can vibrate: a buzz on fills, wins, liquidations and level-ups */}
+          {vibrate && <Toggle label="Vibration" on={haptics} set={(v) => (setHaptics(v), setHap(v))} />}
         </div>
       )}
     </Popover>

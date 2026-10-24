@@ -163,7 +163,14 @@ export function PriceChart({
   fill,
   triggers,
   entryActions,
+  ghost,
+  trades,
 }: {
+  /** The order being set up, drawn faintly before it's placed: where it would enter, be liquidated and hit
+   *  its max win (or take-profit). */
+  ghost?: { entry: number; liq: number; target: number };
+  /** Your own trades on this market: where each opened (▲ long, ▼ short) and closed (✕, green for a win). */
+  trades?: { t: number; price: number; open: boolean; long: boolean; win?: boolean }[];
   /** Drag to set the focused position's take-profit and stop-loss: from its entry line (toward profit makes a
    *  take-profit, toward loss a stop-loss), or by an existing one's line or tag; dropped back on the entry it
    *  clears. `check` says what a price would make or lose, or why it won't work; `set` saves it (null clears). */
@@ -231,10 +238,10 @@ export function PriceChart({
   }
   // within a range of the line, or 0.5% of the price, whichever is wider: entry and triggers usually are
   const reach = Math.max(hi - lo, last.p * NEAR_MARK);
-  for (const m of marks) {
-    if (m.price >= lo - reach && m.price <= hi + reach) {
-      lo = Math.min(lo, m.price);
-      hi = Math.max(hi, m.price);
+  for (const m of [...marks.map((x) => x.price), ...(ghost ? [ghost.entry, ghost.liq, ghost.target] : [])]) {
+    if (m >= lo - reach && m <= hi + reach) {
+      lo = Math.min(lo, m);
+      hi = Math.max(hi, m);
     }
   }
   const pad = (hi - lo) * 0.12;
@@ -555,6 +562,53 @@ export function PriceChart({
           .map((m) => (
             <line key={m.label} x1={PAD.l} x2={plotR} y1={y(m.price)} y2={y(m.price)} stroke="var(--lcd-3)" strokeWidth="1" strokeDasharray={DASH.entry} opacity="0.45" />
           ))}
+        {/* the order being set up, before it's placed */}
+        {ghost &&
+          (
+            [
+              ["liq", ghost.liq, "var(--lcd-down)", "IF OPENED: LIQ"],
+              ["target", ghost.target, "var(--lcd-up)", "IF OPENED: MAX WIN"],
+              ["entry", ghost.entry, "var(--lcd-3)", "ENTRY"],
+            ] as const
+          ).map(([k, price, color, name]) => {
+            // off the scale: the label waits at the top or bottom edge with an arrow, on the left clear of the
+            // labels beside the price axis, and no line is drawn
+            const edge = price > hi ? "up" : price < lo ? "down" : null;
+            const gy = edge === "up" ? PAD.t + 26 : edge === "down" ? plotB - 8 : y(price);
+            return (
+              <g key={`ghost-${k}`} className="ghost-line" pointerEvents="none">
+                {!edge && <line x1={PAD.l} x2={plotR} y1={gy} y2={gy} stroke={color} strokeWidth="2" strokeDasharray="3 4" />}
+                <text x={edge ? PAD.l + 4 : plotR - 6} y={edge ? gy : gy - 5} fontSize="10" fontWeight="800" textAnchor={edge ? "start" : "end"} fill={color} stroke="var(--lcd)" strokeWidth="3" paintOrder="stroke" className="num">
+                  {edge === "up" ? "▲ " : edge === "down" ? "▼ " : ""}
+                  {name} {price.toFixed(digits)}
+                </text>
+              </g>
+            );
+          })}
+        {/* your trades: ▲ opened long, ▼ opened short, ✕ closed */}
+        {trades
+          ?.filter((tr) => tr.t >= t0 && tr.t <= t1 && tr.price >= lo && tr.price <= hi)
+          .map((tr, i) => {
+            const cx = x(tr.t);
+            const cy = y(tr.price);
+            const color = tr.open ? (tr.long ? "var(--lcd-up)" : "var(--lcd-down)") : tr.win ? "var(--lcd-up)" : "var(--lcd-down)";
+            return (
+              <g key={`tr-${i}-${tr.t}`} pointerEvents="none" className="trade-mark">
+                {tr.open ? (
+                  <path
+                    d={tr.long ? `M${cx} ${cy - 2} l6 10 h-12 z` : `M${cx} ${cy + 2} l6 -10 h-12 z`}
+                    transform={tr.long ? "translate(0 3)" : "translate(0 -3)"}
+                    fill={color}
+                    stroke="var(--lcd-ink)"
+                    strokeWidth="1.5"
+                  />
+                ) : (
+                  <path d={`M${cx - 5} ${cy - 5} l10 10 M${cx + 5} ${cy - 5} l-10 10`} stroke="var(--lcd-ink)" strokeWidth="4.5" strokeLinecap="square" />
+                )}
+                {!tr.open && <path d={`M${cx - 5} ${cy - 5} l10 10 M${cx + 5} ${cy - 5} l-10 10`} stroke={color} strokeWidth="2.5" strokeLinecap="square" />}
+              </g>
+            );
+          })}
         {/* mark names, haloed in the screen's colour so they read over the line */}
         {names.map((n, i) => (
           <text

@@ -32,8 +32,8 @@ function useBoss() {
   return { round: epoch.id, hp, left: left < 0n ? 0n : left > max ? max : left, max };
 }
 
-/** The HUD printed on the console's bezel, above the screen. */
-export function GameHud() {
+/** The HUD printed on the console's bezel, above the screen. `score`: the position on screen's PnL. */
+export function GameHud({ score }: { score?: React.ReactNode }) {
   const { me } = useOneUp();
   const lv = useLevel();
   const streak = useStreak(me);
@@ -52,6 +52,7 @@ export function GameHud() {
   return (
     <div className="game-hud num" aria-label="Game">
       <LevelBar lv={lv} />
+      {score}
       {combo >= 2 && (
         <span className="combo display" title={`${combo} wins in a row`}>
           COMBO ×{combo}

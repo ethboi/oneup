@@ -354,6 +354,7 @@ export function Trade() {
             marks={marks}
             mine={focused ? [focused] : []}
             held={new Set(positions.map((p) => p.market_id))}
+            ghost={ticket.ghost}
           />
           <TradesTape market={market} info={markets.find((m) => m.id === market)} />
         </div>
@@ -417,6 +418,46 @@ function Account({ t, positions, orders }: { t: Ticket; positions: Position[]; o
         </div>
       </dl>
     </section>
+  );
+}
+
+/** The position's PnL as the game's score, in the HUD above the screen: big, in the pixel face, rolling to each
+ *  new value. */
+function PnlHero({ value, margin }: { value: bigint; margin: bigint }) {
+  const target = Number(value) / 1e6;
+  const [shown, setShown] = useState(target);
+  const from = useRef(target);
+  useEffect(() => {
+    const start = performance.now();
+    const a = from.current;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      from.current = target;
+      setShown(target);
+      return;
+    }
+    let raf = 0;
+    const step = (t: number) => {
+      const k = Math.min(1, (t - start) / 450);
+      const v = a + (target - a) * (1 - (1 - k) ** 3);
+      from.current = v;
+      setShown(v);
+      if (k < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [target]);
+  const up = shown >= 0;
+  const pct = margin > 0n ? (target / (Number(margin) / 1e6)) * 100 : 0;
+  const abs = Math.abs(shown);
+  return (
+    <div className={`pnl-hero display num ${up ? "up" : "down"}`} aria-label={`Profit or loss ${up ? "" : "minus "}$${abs.toFixed(2)}`} role="status">
+      <span className="pnl-hero-value">
+        {up ? "+" : "−"}${abs.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      </span>
+      <span className="pnl-hero-pct">
+        {pct >= 0 ? "▲" : "▼"} {Math.abs(pct).toFixed(1)}%
+      </span>
+    </div>
   );
 }
 
@@ -612,7 +653,32 @@ function useTicket(market: string, maxLeverage: number) {
         : run(`${side} ${market} ${leverage}× · $${margin}`, () =>
             topUp > 0n ? tx.depositAndOpen(topUp, market, side, m, leverage, triggers) : tx.placeOpen(market, side, m, leverage, triggers),
           );
-  return { market, maxLeverage, side, setSide, orderType, setOrderType, limitPrice, setLimitPrice, limitAt, margin, setMargin, leverage, setLeverage, tp, setTp, sl, setSl, price, m, quote, free, wallet, pool, topUp, blocked, label, submit, payWith, setPayWith, viaAsset, intentStep };
+  // the chart previews the order while you're setting it up: while the ticket is hovered or focused, and for a
+  // few seconds after any change to it
+  const [previewHeld, setPreviewHeld] = useState(false);
+  const [previewUntil, setPreviewUntil] = useState(0);
+  const changed = useRef(false);
+  useEffect(() => {
+    if (!changed.current) {
+      changed.current = true;
+      return;
+    }
+    setPreviewUntil(Date.now() + 5000);
+    const t = setTimeout(() => setPreviewUntil(0), 5000);
+    return () => clearTimeout(t);
+  }, [side, margin, leverage, orderType, limitPrice]);
+  const previewing = previewHeld || previewUntil > 0;
+  const liqAt = quote?.liquidation_price ? BigInt(quote.liquidation_price) : null;
+  const ghost =
+    previewing && at && liqAt && m > 0n
+      ? {
+          entry: priceToNumber(at),
+          liq: priceToNumber(liqAt),
+          // the 9× cap: a move of 9 ÷ leverage, or the take-profit if one is set
+          target: tpAt ? priceToNumber(tpAt) : priceToNumber(at) * (1 + ((side === "Long" ? 1 : -1) * 9) / leverage),
+        }
+      : undefined;
+  return { ghost, setPreviewHeld, market, maxLeverage, side, setSide, orderType, setOrderType, limitPrice, setLimitPrice, limitAt, margin, setMargin, leverage, setLeverage, tp, setTp, sl, setSl, price, m, quote, free, wallet, pool, topUp, blocked, label, submit, payWith, setPayWith, viaAsset, intentStep };
 }
 
 /** The handheld: plastic case, slate surround with stripes, the LCD with its readout, and the market buttons. */
@@ -623,7 +689,10 @@ function Console({
   marks,
   mine,
   held: positionsHere,
+  ghost,
 }: {
+  /** The order being set up, previewed on the chart. */
+  ghost?: { entry: number; liq: number; target: number };
   market: string;
   setMarket: (m: string) => void;
   markets: Market[];
@@ -687,6 +756,19 @@ function Console({
       }
     : undefined;
   const hold = pos ? Math.max(0, pos.opened_at + MIN_HOLD_S - now) : 0;
+  // your trades on this market for the chart: opens and closes from your history, and the open positions' entries
+  const myHistory = useHistory(me);
+  const tradeMarks = [
+    ...(myHistory?.items ?? []).flatMap((i) =>
+      i.kind === "trade" && i.trade.market_id === market
+        ? [
+            { t: i.trade.opened_t, price: priceToNumber(BigInt(i.trade.entry_price)), open: true, long: i.trade.side === "Long" },
+            { t: i.trade.closed_t, price: priceToNumber(BigInt(i.trade.exit_price)), open: false, long: i.trade.side === "Long", win: BigInt(i.trade.pnl) > 0n },
+          ]
+        : [],
+    ),
+    ...mine.map((p) => ({ t: p.opened_at * 1000, price: priceToNumber(BigInt(p.entry_price)), open: true, long: p.side === "Long" })),
+  ];
   const reverse = () => {
     if (!pos) return;
     const other: Side = pos.side === "Long" ? "Short" : "Long";
@@ -729,12 +811,14 @@ function Console({
           <span className="faceplate-print hidden sm:inline">NEAR · BTC · ETH MARKETS · NEAR HACKATHON 2026</span>
           <span className="stripes" />
         </div>
-        <GameHud />
+        <GameHud score={pos && mark ? <PnlHero value={afterCut(pnl(pos.side, BigInt(pos.margin), pos.leverage, BigInt(pos.entry_price), mark), pos.cut_ppm)} margin={BigInt(pos.margin)} /> : undefined} />
         <div className="relative">
           <PriceChart
             fill
             triggers={triggers}
             entryActions={entryActions}
+            ghost={ghost}
+            trades={tradeMarks}
             points={pts}
             span={range}
             candles={style === "candles"}
@@ -847,7 +931,13 @@ function OrderForm({ t }: { t: Ticket }) {
   }, [leverage, maxLeverage, setSide, setLeverage]);
 
   return (
-    <div className="panel ticket flex flex-col gap-3.5 p-4">
+    <div
+      className="panel ticket flex flex-col gap-3.5 p-4"
+      onPointerEnter={() => t.setPreviewHeld(true)}
+      onPointerLeave={() => t.setPreviewHeld(false)}
+      onFocus={() => t.setPreviewHeld(true)}
+      onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && t.setPreviewHeld(false)}
+    >
       <div className="segmented" role="radiogroup" aria-label="Side">
         {(["Long", "Short"] as const).map((s) => (
           <button

@@ -4,6 +4,8 @@
 
 export type Sfx = "send" | "fill" | "win" | "jackpot" | "lose" | "liquidated" | "plusOne" | "life" | "claim" | "error" | "tilt" | "badge" | "heal" | "round" | "revenge" | "boot" | "levelup" | "combo" | "shield" | "coin" | "bigmove";
 
+import { buzz } from "./haptics";
+
 const KEY = "oneup.muted";
 const VOLUME = 0.12;
 
@@ -141,6 +143,8 @@ const SOUNDS: Record<Sfx, () => Tone[]> = {
 export function sfx(name: Sfx) {
   // tests read which effects played (headless browsers can't listen)
   (globalThis as { __sfx?: string[] }).__sfx?.push(name);
+  // phones also buzz, sound or not (lib/haptics.ts)
+  buzz(name);
   try {
     play(SOUNDS[name]());
   } catch {

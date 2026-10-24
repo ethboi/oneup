@@ -2468,3 +2468,37 @@ kbd {
 .skin-dot:hover {
   transform: translateY(-1px);
 }
+
+/* the position's PnL as the game's score, in the HUD (components/Trade.tsx PnlHero) */
+.pnl-hero {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  line-height: 1;
+}
+.pnl-hero-value {
+  font-size: clamp(18px, 3.2vw, 26px);
+  -webkit-text-stroke: 1px #000;
+  paint-order: stroke fill;
+  text-shadow: 2px 2px 0 #000;
+}
+.pnl-hero.up .pnl-hero-value {
+  color: var(--hp-good);
+}
+.pnl-hero.down .pnl-hero-value {
+  color: #ff5a4f;
+}
+.pnl-hero-pct {
+  font-size: 11px;
+  color: #d6d7e6;
+}
+/* the order's preview lines fade in */
+.ghost-line {
+  animation: ghost-in 0.25s ease-out both;
+  opacity: 0.85;
+}
+@keyframes ghost-in {
+  from {
+    opacity: 0;
+  }
+}
