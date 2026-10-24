@@ -97,7 +97,7 @@ export function HpBar({ hp, label, small }: { hp: number; label?: string; small?
   const lit = Math.ceil(hp * 10);
   const color = hp > 0.6 ? "var(--hp-good)" : hp > 0.3 ? "var(--hp-mid)" : "var(--hp-low)";
   return (
-    <span className={`hp-bar ${small ? "small" : ""} ${hp <= 0.3 ? "low" : ""}`} role="meter" aria-label={label ?? "HP"} aria-valuenow={Math.round(hp * 100)} aria-valuemin={0} aria-valuemax={100}>
+    <span className={`hp-bar ${small ? "small" : ""} ${hp <= 0.3 ? "low" : ""}`} role="meter" aria-label={label ?? "Margin health"} aria-valuenow={Math.round(hp * 100)} aria-valuemin={0} aria-valuemax={100}>
       {Array.from({ length: 10 }, (_, i) => (
         <span key={i} style={i < lit ? { background: color } : undefined} />
       ))}
@@ -118,12 +118,12 @@ export function Gauge({ mood }: { mood: Mood }) {
       // phones: the bar takes what the two readings leave, so a long one never runs off the screen
       className="display num flex w-full items-center gap-2 text-sm text-[var(--lcd-ink)] sm:w-auto"
       role="img"
-      aria-label={`HP ${Math.round(hp * 100)}%: liquidation ${pct(g.liq)} away, ${g.capped ? "profit cap" : "take profit"} ${pct(g.target)} away`}
+      aria-label={`Margin health ${Math.round(hp * 100)}%: liquidation ${pct(g.liq)} away, ${g.capped ? "profit cap" : "take profit"} ${pct(g.target)} away`}
     >
       <span className="whitespace-nowrap" title={`Liquidation ${pct(g.liq)} away`}>
-        HP
+        Margin
       </span>
-      <HpBar hp={hp} label={`HP, liquidation ${pct(g.liq)} away`} />
+      <HpBar hp={hp} label={`Margin health, liquidation ${pct(g.liq)} away`} />
       <span className="whitespace-nowrap" style={hot ? { color: "#b07a00" } : undefined}>
         {g.capped ? "Max win" : "TP"} {pct(g.target)}
         <span className="hidden sm:inline"> away</span>

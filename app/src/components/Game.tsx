@@ -1,9 +1,9 @@
 "use client";
 
-// The trading screen's game layer, on a Game Boy Color: a HUD on the bezel (your level, your combo, and the
-// round's boss, the house, with its HP), banners on the screen for a level-up, a combo, a shield (a
-// take-profit or stop-loss set) and a big move, coins popping off your position as it gains, and daily quests.
-// It rewards playing and playing well, never risk: see lib/xp.ts.
+// The trading screen's progress layer, on a Game Boy Color, in trading terms: a strip on the bezel (your trader
+// tier and points, your win streak, and the house's P&L this round), banners on the screen for a tier-up, a win
+// streak, a take-profit or stop-loss set and a big move, profit popping off your position as it gains, and daily
+// goals. It rewards trading and planned exits, never risk: see lib/xp.ts.
 
 import { useEffect, useRef, useState } from "react";
 import { USDC, fmtUsdc, pnl, type Position } from "@oneup/sdk";
@@ -12,24 +12,18 @@ import { emitFx, useFx, type FxEvent } from "@/lib/fx";
 import { sfx } from "@/lib/sound";
 import { SKINS } from "@/lib/achievements";
 import { questsOn, today } from "@/lib/xp";
-import { HpBar } from "./Mood";
 import { LevelBar, useLevel } from "./Level";
 import { useStreak } from "./Streaks";
 import { useHistory } from "./History";
 import { fmtDuration } from "./Jackpot";
 import { useNow } from "./Header";
 
-/** The round's boss: the house, at full HP when the round starts. Winners' payouts hit it, losers' losses heal
- *  it, and it can't go above full. Its HP is a share of the pool, so a big house takes a lot of beating. */
-function useBoss() {
+/** The house's P&L this round: what traders lost to it less what it paid winners. */
+function useHouseRound() {
   const { o } = useOneUp();
   const epoch = usePoll(() => o.epoch(), [], 5000);
-  const pool = BigInt(usePoll(() => o.pool(), [], 15_000) ?? "0");
   if (!epoch) return null;
-  const max = pool / 200n > 1_000n * USDC ? pool / 200n : 1_000n * USDC;
-  const left = max + BigInt(epoch.losses) - BigInt(epoch.payouts);
-  const hp = left <= 0n ? 0 : left >= max ? 1 : Number((left * 1000n) / max) / 1000;
-  return { round: epoch.id, hp, left: left < 0n ? 0n : left > max ? max : left, max };
+  return { round: epoch.id, net: BigInt(epoch.losses) - BigInt(epoch.payouts) };
 }
 
 /** The HUD printed on the console's bezel, above the screen. `score`: the position on screen's PnL. */
@@ -38,7 +32,7 @@ export function GameHud({ score }: { score?: React.ReactNode }) {
   const lv = useLevel();
   const streak = useStreak(me);
   const combo = streak?.win && streak.n >= 2 ? streak.n : 0;
-  const boss = useBoss();
+  const house = useHouseRound();
   // a combo that grows while you watch gets its banner
   const last = useRef<{ me: string; combo: number } | null>(null);
   useEffect(() => {
@@ -54,16 +48,18 @@ export function GameHud({ score }: { score?: React.ReactNode }) {
       <LevelBar lv={lv} />
       {score}
       {combo >= 2 && (
-        <span className="combo display" title={`${combo} wins in a row`}>
-          COMBO ×{combo}
+        <span className="combo display" title={`${combo} winning trades in a row`}>
+          WIN STREAK ×{combo}
         </span>
       )}
-      {boss && (
-        <span className="boss" title={`The house: $${fmtUsdc(boss.left, 0)} of $${fmtUsdc(boss.max, 0)} HP. Winners' payouts hit it, losses heal it.`}>
-          <span className="display boss-name">
-            <span className="hidden sm:inline">ROUND {boss.round} BOSS: </span>THE HOUSE
+      {house && (
+        <span className="house-pnl" title="What traders lost to the house this round, less what it paid winners">
+          <span className="display house-name">
+            <span className="hidden sm:inline">ROUND {house.round} · </span>HOUSE P&amp;L
           </span>
-          <HpBar hp={boss.hp} label={`The house's HP, ${Math.round(boss.hp * 100)}%`} />
+          <b className="num" style={{ color: house.net > 0n ? "var(--hp-good)" : house.net < 0n ? "#ff5a4f" : "#d6d7e6" }}>
+            {house.net > 0n ? "+" : house.net < 0n ? "−" : ""}${fmtUsdc(house.net < 0n ? -house.net : house.net, (house.net < 0n ? -house.net : house.net) < 1_000n * USDC ? 2 : 0)}
+          </b>
         </span>
       )}
     </div>
@@ -76,12 +72,12 @@ const bannerFor = (e: FxEvent): Omit<Banner, "id"> | null => {
   switch (e.kind) {
     case "levelup": {
       const shell = SKINS.find((s) => s.unlock && "level" in s.unlock && s.unlock.level === e.level);
-      return { kind: "levelup", big: "LEVEL UP!", small: `LV ${e.level}${shell ? ` · ${shell.name} shell unlocked` : ""}` };
+      return { kind: "levelup", big: "TIER UP!", small: `Tier ${e.level}${shell ? ` · ${shell.name} shell unlocked` : ""}` };
     }
     case "combo":
-      return { kind: "combo", big: `COMBO ×${e.n}!`, small: `${e.n} wins in a row` };
+      return { kind: "combo", big: `WIN STREAK ×${e.n}`, small: `${e.n} winning trades in a row` };
     case "shield":
-      return { kind: "shield", big: "SHIELD UP!", small: "Take-profit / stop-loss set" };
+      return { kind: "shield", big: "TP/SL SET", small: "Your exit is planned" };
     case "bigmove":
       return { kind: "bigmove", big: e.pct > 0 ? "BIG MOVE ▲" : "BIG MOVE ▼", small: `${e.market} ${e.pct > 0 ? "+" : "−"}${Math.abs(e.pct).toFixed(2)}% in one tick` };
     default:
@@ -157,7 +153,7 @@ export function GameFx({ market, pos, mark, pts }: { market: string; pos?: Posit
   );
 }
 
-/** Four small quests a day, done by trading: +50 XP each. */
+/** Four daily trading goals: +50 points each. */
 export function Quests() {
   const { me } = useOneUp();
   const h = useHistory(me);
@@ -167,9 +163,9 @@ export function Quests() {
   const done = qs.filter((q) => q.n >= q.of).length;
   const resetIn = (today() + 1) * 86_400 - now;
   return (
-    <section className="panel p-4" aria-label="Daily quests">
+    <section className="panel p-4" aria-label="Daily goals">
       <div className="ticket-row">
-        <h3 className="display text-sm">Daily quests</h3>
+        <h3 className="display text-sm">Daily goals</h3>
         <span className="label num">
           {done}/{qs.length} · new in {fmtDuration(Math.max(0, resetIn))}
         </span>
@@ -189,7 +185,7 @@ export function Quests() {
                 </span>
               </span>
               <span className="num shrink-0 text-xs font-extrabold" style={{ color: ok ? "var(--long)" : "var(--muted)" }}>
-                {ok ? "+50 XP" : `${q.n}/${q.of}`}
+                {ok ? "+50 pts" : `${q.n}/${q.of}`}
               </span>
             </li>
           );

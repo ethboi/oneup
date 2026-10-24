@@ -1251,13 +1251,13 @@ const openCard = (p: Position, mark: bigint | undefined, v: bigint, me: string):
 });
 
 /** `focused`: the position the chart details; `pick` shows another there. */
-/** A position's HP: full at its entry or better, empty at liquidation. */
+/** A position's margin health: full at its entry or better, empty at liquidation. */
 function PositionHp({ p, mark }: { p: Position; mark: bigint }) {
   const entry = BigInt(p.entry_price);
   const hp = hpOf(priceToNumber(liquidationPrice(p.side, entry, p.leverage)), priceToNumber(entry), priceToNumber(mark));
   return (
     <span className="mt-1 flex justify-end">
-      <HpBar hp={hp} small label={`HP ${Math.round(hp * 100)}%`} />
+      <HpBar hp={hp} small label={`Margin health ${Math.round(hp * 100)}%`} />
     </span>
   );
 }

@@ -87,7 +87,7 @@ export const skinUnlocked = (s: Skin, have: Set<string>, level = 1) =>
 
 /** What unlocks a skin, in words. */
 export const skinNeed = (s: Skin) =>
-  !s.unlock ? "" : "badge" in s.unlock ? ACHIEVEMENTS.find((a) => a.id === (s.unlock as { badge: string }).badge)!.name : "level" in s.unlock ? `Level ${s.unlock.level}` : `${s.unlock.count} badges`;
+  !s.unlock ? "" : "badge" in s.unlock ? ACHIEVEMENTS.find((a) => a.id === (s.unlock as { badge: string }).badge)!.name : "level" in s.unlock ? `Tier ${s.unlock.level}` : `${s.unlock.count} badges`;
 
 /** One badge for one account: whether it's earned, when (if known), and progress toward it if it counts. */
 export interface BadgeState {

@@ -2270,15 +2270,16 @@ kbd {
 .game-hud .level-xp {
   color: #9ba0b9;
 }
-.game-hud .boss {
+.house-pnl {
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   gap: 8px;
   margin-left: auto;
+  font-size: 13px;
 }
-.boss-name {
+.house-name {
   font-size: 11px;
-  color: #ff8a8a;
+  color: #9ba0b9;
   white-space: nowrap;
 }
 .game-hud .hp-bar {

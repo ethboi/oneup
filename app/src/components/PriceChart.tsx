@@ -304,6 +304,8 @@ export function PriceChart({
   const placed = spread(labels.map((l) => l.y), GAP, PAD.t + 4, plotB - 9);
   // each mark's name sits inside the plot on the left, just above its line (the price is on its tag)
   const names = shown
+    // phones: the entry line's Close and Reverse buttons sit where its name would, and the price tag names it
+    .filter(({ m, edge }) => !(narrow && entryActions && !edge && m.kind === "entry"))
     .map(({ m, edge }) => ({
       key: m.label,
       y: edge === "up" ? PAD.t + 12 : edge === "down" ? plotB - 6 : y(m.price) - 5,

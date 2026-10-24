@@ -35,14 +35,14 @@ export function LevelBar({ lv, compact }: { lv: Level | null; compact?: boolean 
   if (!lv) return null;
   const pct = Math.min(100, (lv.into / lv.span) * 100);
   return (
-    <span className="level-hud num" title={`${lv.xp.toLocaleString("en-US")} XP: ${lv.span - lv.into} to level ${lv.level + 1}`}>
-      <span className="level-badge display">LV {lv.level}</span>
+    <span className="level-hud num" title={`${lv.xp.toLocaleString("en-US")} trader points: ${lv.span - lv.into} to tier ${lv.level + 1}`}>
+      <span className="level-badge display">TIER {lv.level}</span>
       {!compact && (
-        <span className="level-track" role="progressbar" aria-label={`Level ${lv.level}, ${Math.round(pct)}% to the next`} aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
+        <span className="level-track" role="progressbar" aria-label={`Tier ${lv.level}, ${Math.round(pct)}% to the next`} aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
           <span className="level-fill" style={{ width: `${pct}%` }} />
         </span>
       )}
-      {!compact && <span className="level-xp">{lv.into}/{lv.span} XP</span>}
+      {!compact && <span className="level-xp">{lv.into}/{lv.span} pts</span>}
     </span>
   );
 }
