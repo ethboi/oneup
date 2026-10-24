@@ -1,6 +1,6 @@
 "use client";
 
-// The bootstrap round in full (D-22, D-26): what backing gets you, the form and the curve, when it pays back,
+// Initial pool funding in full (D-22, D-26): what backing gets you, the form and the curve, when it pays back,
 // your Backer Lives, the exit, and the risks in plain words.
 
 import { USDC, fmtUsdc, lifeCapPpm, ppmToNumber } from "@oneup/sdk";
@@ -51,12 +51,12 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
       <section className="case relative overflow-hidden p-5 sm:p-8">
         <div className="flex items-center gap-8">
           <div className="min-w-0 flex-1">
-          <p className="label">The bootstrap round</p>
+          <p className="label">Initial pool funding</p>
           <h1 className="display mt-2 text-3xl leading-tight sm:text-4xl">Back the house</h1>
           <p className="mt-3 max-w-2xl text-[var(--muted)]">
-            Trade admission reserves capped maximum wins against the pool. Back it with USDC and you get a Backer Life
-            that can receive future house profit up to a cap, plus $1UP locked for 104 rounds that earns the
-            house&apos;s buybacks.
+            The house reserves pool funds to cover the maximum payout on accepted trades. Contribute USDC to this pool
+            and receive a Backer Life, which can share in future house profit up to a limit. You also receive $1UP
+            locked for 104 rounds, with a share of buyback rewards.
           </p>
           <div className="mt-5 max-w-2xl">
             <div className="num flex items-baseline justify-between text-sm">
@@ -71,7 +71,7 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
           </div>
           <dl className="num mt-5 grid max-w-2xl grid-cols-3 gap-4">
             <div>
-              <dt className="label">Payout cap per $1 now</dt>
+              <dt className="label">Current payout multiplier</dt>
               <dd className="text-xl font-extrabold">{capNow === null ? "…" : `${capNow.toFixed(2)}×`}</dd>
             </div>
             <div>
@@ -96,16 +96,16 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card icon={<PixelHeart size={26} />} title="A Backer Life">
-          An Extra Life that never expires, with a cap determined by pool size. It shares a third of each round&apos;s Extra Life
-          payout, with unused shares passed across. Future profit may never repay the full cap.
+          A Backer Life has no expiry date, and its payout limit depends on the pool size when it is created. Backer Lives
+          share one third of the Extra Life payout pool each round; unused funds can move between the backer and trader shares. The full payout limit may never be reached.
         </Card>
         <Card icon={<PixelLock size={24} />} title="$1UP, locked">
-          10 $1UP per $1, locked for 104 rounds like a loser&apos;s lock. It earns a share of every buyback, so you share in the
-          house&apos;s upside, not just your capped claim.
+          Receive 10 $1UP for each $1 contributed, locked for 104 rounds. The lock receives a weighted share of buyback rewards,
+          separately from your Backer Life payouts.
         </Card>
-        <Card icon={<Icon name="store" size={22} />} title="An exit">
-          Backing can&apos;t be withdrawn: the USDC is the pool traders trade against. To get out early, sell the Backer Life (or the
-          lock) on the Market if a buyer is willing. A listing does not guarantee a sale.
+        <Card icon={<Icon name="store" size={22} />} title="Selling your NFTs">
+          Your contribution stays in the trading pool and cannot be withdrawn. You can offer your Backer Life or lock for sale
+          on the Market. The price and timing depend on finding a buyer.
         </Card>
       </div>
 
@@ -114,15 +114,16 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
       <section className="panel p-5">
         <h2 className="text-lg font-extrabold">Illustrative payout times</h2>
         <p className="label mt-1 max-w-3xl">
-          It depends on how much traders lose: a Backer Life is paid only from house profit. For a full $1M round, with weekly rounds and
-          the house keeping 15% of traders&apos; losses on average (median of 200 simulated runs, <code>pnpm --filter @oneup/sim backers</code>). These scenarios are not forecasts; less profit can leave caps unpaid indefinitely:
+          Backer Life payouts depend on house profit. These examples assume $1M in initial funding, weekly rounds and
+          house profit averaging 15% of trader losses. Results are medians from 200 simulations. They are illustrations, not forecasts:
+          lower profits can leave payout limits unreached indefinitely.
         </p>
         <table className="num mt-3 w-full max-w-xl text-sm">
           <thead>
             <tr className="label text-left">
-              <th className="pb-1.5 font-normal">Traders lose a week</th>
-              <th className="pb-1.5 font-normal">Half paid back</th>
-              <th className="pb-1.5 font-normal">All of it</th>
+              <th className="pb-1.5 font-normal">Weekly trader losses</th>
+              <th className="pb-1.5 font-normal">50% of payout limit</th>
+              <th className="pb-1.5 font-normal">Full payout limit</th>
             </tr>
           </thead>
           <tbody>
@@ -137,8 +138,8 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
         </table>
         {recent && recent.length > 0 && (
           <p className="label num mt-3">
-            Here, over the last {recent.length} round{recent.length === 1 ? "" : "s"}: the house made ${fmtUsdc(houseNet > 0n ? houseNet : 0n, 0)}, and
-            Backer Lives&apos; third of the payouts came to about ${fmtUsdc(backerPot, 2)}.
+            In this demo, the house made ${fmtUsdc(houseNet > 0n ? houseNet : 0n, 0)} over the last {recent.length} round{recent.length === 1 ? "" : "s"}.
+            One third of the Extra Life payout pool for those rounds was approximately ${fmtUsdc(backerPot, 2)}.
           </p>
         )}
       </section>
@@ -147,7 +148,7 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
         <section className="panel p-5">
           <h2 className="text-lg font-extrabold">Your Backer Lives</h2>
           {mine.length === 0 ? (
-            <p className="label mt-2">None yet. Back the house above and it appears here, and on the Extra Lives tab.</p>
+            <p className="label mt-2">You have no Backer Lives yet. Any you receive will appear here and under Extra Lives.</p>
           ) : (
             <ul className="mt-3 flex flex-col gap-3">
               {mine.map((l) => {
@@ -173,7 +174,7 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
         </section>
         <section className="panel p-5">
           <h2 className="text-lg font-extrabold">Backer Lives for sale</h2>
-          <p className="label mt-1">Listings for someone else&apos;s Backer Life. A transfer requires a buyer willing to pay the listed price.</p>
+          <p className="label mt-1">Browse Backer Lives offered for sale by other owners.</p>
           {listings.length === 0 ? (
             <p className="label mt-3">None listed right now.</p>
           ) : (
@@ -189,21 +190,21 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
       </div>
 
       <section className="panel p-5">
-        <h2 className="text-lg font-extrabold">The risks, plainly</h2>
+        <h2 className="text-lg font-extrabold">What to consider</h2>
         <ul className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
           <li>
             <b>Permanent contribution.</b> <span className="text-[var(--muted)]">Backing can&apos;t be withdrawn: the USDC stays in the pool. Repayment depends on future profit; an early sale needs a buyer and may recover less than the contribution.</span>
           </li>
           <li>
-            <b>No date.</b> <span className="text-[var(--muted)]">If traders win more than they lose, the house makes nothing and Backer Lives aren&apos;t paid.</span>
+            <b>No repayment deadline.</b> <span className="text-[var(--muted)]">If traders win more than they lose, the house makes nothing and Backer Lives aren&apos;t paid.</span>
           </li>
           <li>
-            <b>Capped.</b> <span className="text-[var(--muted)]">A Backer Life never pays more than it&apos;s owed (2.0× at best); the $1UP lock is the only open-ended part.</span>
+            <b>Capped.</b> <span className="text-[var(--muted)]">A Backer Life cannot pay more than its original limit, which is at most 2× its face value. Rewards from the separate $1UP lock have no fixed payout cap.</span>
           </li>
           <li>
             <b>If OneUp winds down.</b>{" "}
             <span className="text-[var(--muted)]">
-              Backer Lives and losers&apos; lives are paid first, from the whole pool; $1UP lockers get only what&apos;s left (D-29, a plan, not yet built).
+              The proposed shutdown process would pay Backer Lives and trader Lives from the pool before distributing any remainder to lock holders. This process is not implemented yet.
             </span>
           </li>
           <li>

@@ -88,7 +88,7 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
       {/* the round's clock and your result in it, one strip like the chart's market bar */}
       <div className="flex min-w-0 flex-1 justify-end lg:flex-none">
         <div className="hdr-strip bar-strip num text-sm">
-          <span className="bar-cell" title={`Round ${epoch?.id ?? ""} ends in ${fmtClock(left)}. Eligible net losses can receive Extra Lives and $1UP locks if the house profits`}>
+          <span className="bar-cell" title={`Round ${epoch?.id ?? ""} ends in ${fmtClock(left)}. Eligible losses may earn Extra Lives and $1UP locks if the house makes a profit.`}>
             {/* the label goes on narrow desktops too, where the tabs need the room */}
             <span className="label hidden sm:inline lg:hidden 2xl:inline">Round {epoch?.id ?? "…"}</span>
             <b>{fmtClock(left)}</b>
@@ -98,8 +98,8 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
               className="bar-cell"
               title={
                 round.net < 0n
-                  ? "Your net loss this round. If the house ends in profit, eligible net losses can receive an Extra Life and a $1UP lock. Recovery can be zero."
-                  : "Your net profit this round, after the winner's cut."
+                  ? "Your net loss this round. If the house makes a profit, eligible losses may earn an Extra Life and a $1UP lock. Recovery is not guaranteed."
+                  : "Your net profit this round, after the fee on profits."
               }
             >
               <span className="label hidden sm:inline">You</span>
@@ -107,7 +107,7 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
                 {round.net < 0n ? "−" : "+"}${fmtUsdc(round.net < 0n ? -round.net : round.net, (round.net < 0n ? -round.net : round.net) < 100n * USDC ? 2 : 0)}
               </b>
               {round.net < 0n && (
-                <span aria-label="Potential Extra Life if this round ends in house profit">
+                <span aria-label="An Extra Life may be issued if the house makes a profit this round">
                   <PixelHeart size={14} />
                 </span>
               )}
@@ -151,7 +151,7 @@ function DemoMenu() {
         <div className="flex flex-col gap-3">
           <div className="label">Local demo: switch accounts and get test USDC.</div>
           <label className="flex flex-col gap-1">
-            <span className="label">Act as</span>
+            <span className="label">Demo account</span>
             <select className="input" value={me} onChange={(e) => (setMe(e.target.value), close())} aria-label="Account">
               {accounts.map((a) => (
                 <option key={a.id} value={a.id}>
@@ -162,16 +162,16 @@ function DemoMenu() {
           </label>
           <div className="flex gap-2">
             <span className="field flex-1">
-              <input className="input num" value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="Faucet amount" inputMode="decimal" />
+              <input className="input num" value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="Test USDC amount" inputMode="decimal" />
               <span className="field-unit">USDC</span>
             </span>
-            <button className="btn btn-ghost" disabled={amt === 0n} onClick={() => run(`Faucet ${amount} USDC`, () => tx.faucet(amt))}>
+            <button className="btn btn-ghost" disabled={amt === 0n} onClick={() => run(`Get ${amount} test USDC`, () => tx.faucet(amt))}>
               <Icon name="faucet" />
-              Faucet
+              Get test USDC
             </button>
           </div>
           <div className="flex flex-col gap-1">
-            <span className="label">Preview a win on the chart (nothing is traded)</span>
+            <span className="label">Preview a win animation (no trade is placed)</span>
             <div className="flex gap-1.5">
               {PREVIEW_WINS.map((usd) => (
                 <button
@@ -194,7 +194,7 @@ function DemoMenu() {
           </div>
           {/* every on-screen moment, on demand: nothing is traded or changed */}
           <div className="flex flex-col gap-1">
-            <span className="label">Preview the screen&apos;s moments</span>
+            <span className="label">Preview other animations</span>
             <div className="grid grid-cols-3 gap-1.5">
               {(
                 [
@@ -216,7 +216,7 @@ function DemoMenu() {
           </div>
           {/* the power-on screen shows once a session; this brings it back */}
           <button type="button" className="chip self-start" onClick={() => (close(), showBoot())}>
-            Show the intro again
+            Replay the intro
           </button>
         </div>
       )}
@@ -272,7 +272,7 @@ function AccountMenu() {
               Withdraw
             </button>
           </div>
-          <p className="label">Optional: placing a trade moves what it needs from your wallet in the same step.</p>
+          <p className="label">You can deposit now, or let your next trade transfer the USDC it needs from your wallet.</p>
           <ChainDeposit />
           <FastTrading />
           <button className="btn btn-ghost justify-start" onClick={() => (close(), openBadges())}>
@@ -331,7 +331,7 @@ function ChainDeposit() {
           "Simulate deposit via NEAR Intents"
         )}
       </button>
-      <p className="label">Bridge credits are simulated. Signed intents execute on the official Verifier deployed locally; no funds arrive from another chain. First-use setup can require an additional signature.</p>
+      <p className="label">This simulates a bridge deposit using the official NEAR Intents contract on a local chain. No funds move from another chain. The first use may need an extra signature.</p>
       {leftovers.length > 0 && (
         <p className="label num">
           Held in NEAR Intents:{" "}
@@ -376,7 +376,7 @@ function FastTrading() {
         />
       </label>
       <p className="label">
-        A key on this device that can only open, close and set TP/SL. It can&apos;t deposit or withdraw.
+        A key stored on this device lets you open and close trades and set take-profit or stop-loss prices. It cannot deposit or withdraw funds.
       </p>
       {session && (
         <>
@@ -385,7 +385,7 @@ function FastTrading() {
             <input type="checkbox" checked={session.gasless} onChange={(e) => saveSession(me, { ...session, gasless: e.target.checked })} />
           </label>
           <dl className="num grid grid-cols-2 gap-y-0.5 text-xs">
-            <dt className="label">Key gas budget</dt>
+            <dt className="label">Session gas budget</dt>
             <dd className="text-right">{allowance === null ? "key removed" : `${fmtNear(allowance)} NEAR`}</dd>
             <dt className="label">Your NEAR</dt>
             <dd className="text-right">{fmtNear(near)}</dd>

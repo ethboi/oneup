@@ -16,7 +16,7 @@ test("fresh Life exposes a conditional cap separately from spendable funds and u
   assert.equal(e.lastEarningEpoch, 10);
   assert.equal(e.remainingEarningRounds, 4);
   assert.equal(e.status, "earning");
-  assert.equal(lifeEarningLabel(life(), 10, 3), "1 earning round remaining, including the current round · through round 10");
+  assert.equal(lifeEarningLabel(life(), 10, 3), "1 round left to receive payouts, including this round · ends after round 10");
 });
 
 test("allocations and claims never get double counted as additional future cap", () => {
@@ -62,7 +62,7 @@ test("Backer Lives have no expiry even after the usual loss-Life earning window"
 test("missing parameters do not assume a fourteen-round earning window", () => {
   assert.equal(lifeEconomics(life(), 9).remainingEarningRounds, null);
   assert.equal(lifeEconomics(life(), undefined, 3).remainingEarningRounds, null);
-  assert.equal(lifeEarningLabel(life(), 9), "Loading earning window…");
+  assert.equal(lifeEarningLabel(life(), 9), "Loading earning period…");
 });
 
 test("round boundary preserves a possibly pending final settlement without inventing another earning round", () => {
@@ -70,5 +70,5 @@ test("round boundary preserves a possibly pending final settlement without inven
   assert.equal(e.remainingEarningRounds, 0);
   assert.equal(e.status, "awaiting-settlement");
   assert.equal(e.additionalCap, 20_000_000n);
-  assert.equal(lifeEarningLabel(life(), 11, 3), "No earning rounds remain · final settlement may be pending");
+  assert.equal(lifeEarningLabel(life(), 11, 3), "Earning period ended · final payout may still be processing");
 });

@@ -71,7 +71,7 @@ export function Jackpot({ compact }: { compact?: boolean }) {
         </div>
         <dl className="num grid flex-1 basis-full grid-cols-3 gap-4 sm:basis-auto sm:min-w-[320px]">
           <div>
-            <dt className="label">Draws in</dt>
+            <dt className="label">Next draw</dt>
             <dd className="text-xl font-extrabold">{left === null ? "…" : fmtDuration(left)}</dd>
           </div>
           <div>
@@ -79,14 +79,14 @@ export function Jackpot({ compact }: { compact?: boolean }) {
             <dd className="text-xl font-extrabold">{fmtUsdc(myTickets, 0)}</dd>
           </div>
           <div>
-            <dt className="label">Your chance</dt>
+            <dt className="label">Current odds</dt>
             <dd className="text-xl font-extrabold">{myTickets > 0n ? `${odds.toFixed(odds < 1 ? 2 : 1)}%` : "–"}</dd>
           </div>
         </dl>
       </div>
       <p className="label mt-3">
-        The house&apos;s idle USDC earns interest; all of it goes here. Each $1 you lose is a ticket, and one ticket takes the lot.
-        {myTickets === 0n && " Lose a trade to get some."}
+        The demo jackpot is funded by simulated vault interest. Each $1 of eligible net loss adds a ticket. One winning ticket receives the full prize.
+        {myTickets === 0n && " You have no tickets for this draw."}
       </p>
       {compact ? <LastWinner draws={draws} me={me} /> : <PastDraws draws={draws} me={me} />}
     </div>
@@ -120,7 +120,7 @@ function PastDraws({ draws, me }: { draws: ActivityItem[] | null; me: string }) 
     <div className="mt-4 border-t border-[var(--line)] pt-3">
       <h3 className="font-extrabold">Past draws</h3>
       {draws.length === 0 ? (
-        <p className="label mt-1">No draws yet. The first one is at the close of the round above.</p>
+        <p className="label mt-1">No draws yet. The countdown shows when the first draw is due.</p>
       ) : (
         <table className="num mt-2 w-full text-sm">
           <thead>
@@ -128,7 +128,7 @@ function PastDraws({ draws, me }: { draws: ActivityItem[] | null; me: string }) 
               <th className="pb-1.5 font-normal">Round</th>
               <th className="pb-1.5 font-normal">Winner</th>
               <th className="pb-1.5 text-right font-normal">Pot</th>
-              <th className="hidden pb-1.5 text-right font-normal sm:table-cell">Their tickets</th>
+              <th className="hidden pb-1.5 text-right font-normal sm:table-cell">Winning account’s tickets</th>
               <th className="pb-1.5 text-right font-normal">Odds</th>
             </tr>
           </thead>

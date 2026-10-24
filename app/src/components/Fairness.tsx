@@ -27,31 +27,31 @@ export function Fairness() {
   const [r, setR] = useState<Results | null>(null);
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
-    fetch("/api/sim").then(async (x) => (x.ok ? setR(await x.json()) : setErr((await x.json()).error))).catch(() => setErr("Recovery scenarios could not load. Please try again."));
+    fetch("/api/sim").then(async (x) => (x.ok ? setR(await x.json()) : setErr((await x.json()).error))).catch(() => setErr("Could not load the recovery scenarios. Please try again."));
   }, []);
   if (err) return <p id="fairness" className="label scroll-mt-4">{err}</p>;
-  if (!r) return <p className="label">Loading the simulation…</p>;
+  if (!r) return <p className="label">Loading recovery scenarios…</p>;
   const [first, , , last] = r.quarters.oneup;
 
   return (
     // a section of the House tab (Solvency.tsx); the footer's "Fair to late players" opens it here
     <div id="fairness" className="panel scroll-mt-4 p-5">
       <h2 className="text-lg font-extrabold">Recovery under one growth scenario</h2>
-      <p className="label mt-1 mb-3">An aggregate-flow illustration, not a forecast or fairness proof.</p>
+      <p className="label mt-1 mb-3">This simplified model illustrates possible outcomes. It does not predict returns or prove that recovery is equal.</p>
       <p className="text-lg">
-        In this scenario, a dollar lost in year 3 gets back <span className="num font-bold">{cents(last)}</span> within a year, compared with what a
-        dollar lost early gets (<span className="num font-bold">{cents(first)}</span>). Year-1 losers take{" "}
-        <span className="num font-bold">{pct(r.y1ShareOfY3.oneup)}</span> of year-3 payouts, against{" "}
+        In this scenario, each $1 lost in weeks 118–156 recovers <span className="num font-bold">{cents(last)}</span> within a year.
+        For losses in weeks 1–39, the figure is <span className="num font-bold">{cents(first)}</span>. Losses from year 1 receive{" "}
+        <span className="num font-bold">{pct(r.y1ShareOfY3.oneup)}</span> of year 3’s payouts, compared with{" "}
         <span className="num font-bold">{pct(r.y1ShareOfY3.papertrade)}</span> under Papertrade-style rules.
       </p>
       <p className="label mt-1">
-        Extra Lives earn for {r.params.lifeExpiryEpochs} rounds after the one they&apos;re minted in, so old claims
-        stop receiving future allocations; this does not ensure equal recovery. Simulation: the same trader flows under each set of rules, {r.params.seeds} seeds,
-        each loss followed for {r.params.window} weeks. Assumed weekly losses grow from ${r.params.start?.toLocaleString()} to ${r.params.peak?.toLocaleString()}, average house edge {r.params.edge * 100}%, utilisation {r.params.utilisation * 100}%, seed ${r.params.seed?.toLocaleString()} at a 1× backer claim. The separate sensitivity report uses deployment bootstrap amounts and adverse scenarios; synthetic flows can exceed modeled cash because this is not an order-admission simulation.
+        In this model, Extra Lives can receive payouts for {r.params.lifeExpiryEpochs} rounds after their minting round.
+        Expired Lives receive no new allocations, but recovery can still differ between traders. Each set of rules uses the same trading activity across {r.params.seeds} randomly generated runs,
+        and each loss is tracked for {r.params.window} weeks. Weekly losses are assumed to grow from ${r.params.start?.toLocaleString()} to ${r.params.peak?.toLocaleString()}, with a {r.params.edge * 100}% average house edge, {r.params.utilisation * 100}% pool usage and a ${r.params.seed?.toLocaleString()} initial pool backed by a 1× claim. The separate sensitivity report also tests less favorable scenarios using the deployment’s funding amounts. This model does not check whether each trade could actually be accepted, so simulated trading flows can exceed available cash.
       </p>
       <Chart r={r} />
 
-      <h2 className="-mx-5 mt-5 border-t border-[var(--line)] px-5 pt-5 text-lg font-extrabold">USDC back within a year per $1 lost, by when the loss happened</h2>
+      <h2 className="-mx-5 mt-5 border-t border-[var(--line)] px-5 pt-5 text-lg font-extrabold">USDC recovered within a year per $1 lost</h2>
       {/* phones: periods down, rules across, so it fits without scrolling */}
       <table className="num mt-3 w-full text-sm md:hidden">
         <thead>
@@ -147,7 +147,7 @@ function Chart({ r }: { r: Results }) {
         height={H}
         className="block touch-pan-y select-none"
         role="img"
-        aria-label="Cents back within a year per dollar lost, by week of the loss"
+        aria-label="Cents recovered within a year per dollar lost, grouped by the week of the loss"
         onPointerMove={onPointer}
         onPointerDown={onPointer}
         onPointerLeave={() => setHover(null)}

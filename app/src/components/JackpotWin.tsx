@@ -83,9 +83,9 @@ export function JackpotWin({ automatic }: { automatic: boolean }) {
             <PixelAmount text={`$${fmtUsdc(win.amount, win.amount < 1_000n * USDC ? 2 : 0)}`} height={52} />
           </div>
         </div>
-        <p className="text-lg font-extrabold">{mine ? "That's you! It's in your balance." : `${win.who} won it`}</p>
+        <p className="text-lg font-extrabold">{mine ? "You won! The prize has been added to your balance." : `${win.who} won the jackpot`}</p>
         <p className="label">
-          {mine ? "The house's interest, all of it, on one of your tickets." : "Every $1 you lose is a ticket for the next one."}
+          {mine ? "This demo jackpot is funded by simulated vault interest." : "Each $1 of eligible net loss adds a ticket to a future draw."}
         </p>
       </div>
     </div>

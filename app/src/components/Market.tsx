@@ -72,21 +72,20 @@ export function Market() {
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_360px] lg:items-start">
       <div className="flex min-w-0 flex-col gap-5">
-        <Explainer title="Market" line={<>List or buy Extra Lives and $1UP locks for USDC. Compare the asking price with claimable funds and conditional future caps separately. You have <b className="num text-[var(--text)]">{usd(wallet)}</b> in your wallet.</>}>
-          An Extra Life transfers its unclaimed USDC and eligibility for future payouts to its buyer. Its additional cap is a limit, not promised income; future payouts depend on profitable rounds before expiry. Buy a lock and you get its $1UP when it ends, and its share
-          of buybacks until then. You pay from your wallet&apos;s USDC and the NFT moves to you in the same step; if it was
-          sold elsewhere first, your USDC comes straight back. Sellers pay 2% of the price, which goes into the house pool
-          as profit (and so back to Extra Lives and buybacks). Displayed balances refresh periodically. If a seller claims before purchase, the claim revokes the listing approval: a stale purchase is refunded, and the seller must relist.
+        <Explainer title="Market" line={<>Buy or list Extra Lives and $1UP locks for USDC. Your wallet balance: <b className="num text-[var(--text)]">{usd(wallet)}</b>.</>}>
+          Buying an Extra Life transfers its unclaimed USDC and remaining payout rights to you. Compare the asking price with both the USDC available to claim and the remaining payout limit. That limit is the maximum additional USDC it could receive; future payouts may be zero and depend on house profit during its earning period.
+          Buying a lock transfers its locked $1UP and its share of eligible buybacks. You can unlock its tokens when the lock ends. Estimated withdrawal values use the current $1UP price, after any early exit penalty; they are not USDC payouts.
+          Payment and NFT transfer are handled together. If the NFT has already been sold, your USDC is refunded. Sellers pay a 2% fee into the house pool. Balances refresh periodically. If a seller claims before a purchase, the listing becomes invalid. Any purchase using that listing is refunded, and the seller must list it again.
         </Explainer>
 
         <div className="panel">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--line)] p-3">
-            <div className="chip-track" role="group" aria-label="Show">
+            <div className="chip-track" role="group" aria-label="Filter listings">
               {(
                 [
-                  ["all", `All ${all.length}`],
-                  ["life", `Extra Lives ${lives}`],
-                  ["lock", `Locks ${locks}`],
+                  ["all", `All (${all.length})`],
+                  ["life", `Extra Lives (${lives})`],
+                  ["lock", `Locks (${locks})`],
                 ] as const
               ).map(([k, name]) => (
                 <button key={k} type="button" className="chip num" aria-pressed={filter === k} onClick={() => setFilter(k)}>
@@ -102,7 +101,7 @@ export function Market() {
               </select>
             </label>
           </div>
-          <p className="label border-b border-[var(--line)] px-4 py-2">Future payouts are conditional. A seller claim invalidates the listing; a purchase against that stale listing is refunded.</p>
+          <p className="label border-b border-[var(--line)] px-4 py-2">Future payouts may be zero. If the seller claims first, the listing becomes invalid and any purchase using it is refunded.</p>
           {items === undefined ? (
             <p className="label p-4">Loading…</p>
           ) : shown.length === 0 ? (
@@ -119,7 +118,7 @@ export function Market() {
 
       <div className="flex flex-col gap-5">
         <div id="sell" className="panel scroll-mt-4">
-          <PanelHead title="Sell" />
+          <PanelHead title="List an NFT" />
           <YourItems px={px} listings={listings} epoch={epoch?.id} expiryEpochs={params?.life_expiry_epochs} />
         </div>
         <div className="panel">
@@ -139,7 +138,7 @@ function EmptyMarket({ filter }: { filter: Filter }) {
         {filter === "lock" ? <PixelLock size={28} /> : <PixelHeart size={28} />}
         <span>
           <b className="block">No {what} for sale right now.</b>
-          <span className="label">Own an Extra Life or $1UP lock? List it here to seek a buyer.</span>
+          <span className="label">You can list your Extra Lives and $1UP locks here.</span>
         </span>
       </span>
       <a href="#sell" className="btn btn-ghost">
@@ -161,12 +160,12 @@ function YourItems({ px, listings, epoch, expiryEpochs }: { px: bigint; listings
   const shownLives = all ? lives : lives.slice(0, 3);
   const shownLocks = all ? locks : locks.slice(0, Math.max(0, 3 - shownLives.length));
   if (total === 0) {
-    return <p className="label px-4 pb-4">Nothing to sell yet. Eligible net losses in profitable rounds can receive Extra Lives and $1UP locks.</p>;
+    return <p className="label px-4 pb-4">You have no Lives or locks to list yet. Eligible net losses in profitable rounds can earn you Extra Lives and $1UP locks.</p>;
   }
   return (
     <div className="divide-y divide-[var(--line)]">
       <p className="label px-4 pb-3">
-        Choose your asking price. A conditional payout cap or spot exit estimate is not a market valuation. A willing buyer is required; sellers receive the price less the 2% fee.
+        Choose your asking price. Payout limits and estimated withdrawal values are not sale prices. A sale needs a buyer; you receive the sale price minus a 2% fee.
       </p>
       {shownLives.map((l) => (
         <div key={l.token_id} className="flex flex-col gap-2 p-3">
@@ -174,7 +173,7 @@ function YourItems({ px, listings, epoch, expiryEpochs }: { px: bigint; listings
             <PixelHeart size={24} />
             <span className="min-w-0">
               <b className="block">{l.backer ? "Backer Life" : `Extra Life from round ${l.epoch}`}</b>
-              <span className="label num block">{usd(lifeEconomics(l).claimable)} claimable now · up to {usd(lifeEconomics(l).additionalCap)} additional, conditional</span>
+              <span className="label num block">{usd(lifeEconomics(l).claimable)} available to claim · up to {usd(lifeEconomics(l).additionalCap)} in future payouts</span>
               <span className="label block">{lifeEarningLabel(l, epoch, expiryEpochs)}</span>
             </span>
           </span>
@@ -187,7 +186,7 @@ function YourItems({ px, listings, epoch, expiryEpochs }: { px: bigint; listings
             <PixelLock size={22} />
             <span className="min-w-0">
               <b className="block num">{fmtOneup(l.amount)} $1UP lock</b>
-              <span className="label num">{px > 0n ? `${usd(lockValue(l, px))} if left today` : `unlocks in round ${l.end}`}</span>
+              <span className="label num">{px > 0n ? `Estimated value after exit penalty: ${usd(lockValue(l, px))}` : `unlocks in round ${l.end}`}</span>
             </span>
           </span>
           <Sell nft={d.contracts.ve} tokenId={l.token_id} listings={listings} compact />
@@ -220,8 +219,8 @@ function Row({ x, wallet, epoch, expiryEpochs, totalPower }: { x: Item; wallet: 
     title = `${fmtOneup(i.amount)} $1UP lock`;
     const left = epoch === undefined ? null : Math.max(0, i.end - epoch);
     const share = totalPower > 0n ? (Number(BigInt(i.power)) / Number(totalPower)) * 100 : null;
-    const cut = share === null ? "" : ` · earns about ${share < 0.1 ? share.toFixed(2) : share.toFixed(1)}% of each buyback`;
-    detail = left === 0 ? "Unlocked: its $1UP can be claimed now" : `Back in ${left ?? "…"} round${left === 1 ? "" : "s"}${cut}`;
+    const cut = share === null ? "" : ` · current buyback share: about ${share < 0.1 ? share.toFixed(2) : share.toFixed(1)}%`;
+    detail = left === 0 ? "Ready to unlock: its $1UP can be withdrawn now" : `Unlocks in ${left ?? "…"} round${left === 1 ? "" : "s"}${cut}`;
   }
 
   return (
@@ -236,10 +235,10 @@ function Row({ x, wallet, epoch, expiryEpochs, totalPower }: { x: Item; wallet: 
         </div>
         {x.kind === "life" ? (
           <div className="mt-1 grid gap-x-5 gap-y-1 text-sm sm:grid-cols-2">
-            <span><span className="label block">Claimable now</span><b className="num">{usd(lifeEconomics(x.info).claimable)}</b></span>
-            <span><span className="label block">Additional conditional cap</span><b className="num">Up to {usd(lifeEconomics(x.info).additionalCap)}</b></span>
+            <span><span className="label block">Available to claim</span><b className="num">{usd(lifeEconomics(x.info).claimable)}</b></span>
+            <span><span className="label block">Remaining payout limit</span><b className="num">Up to {usd(lifeEconomics(x.info).additionalCap)}</b></span>
           </div>
-        ) : <div className="label num">Spot exit estimate {usd(x.value)} if left today</div>}
+        ) : <div className="label num">Estimated value after exit penalty: {usd(x.value)}</div>}
         <div className="label mt-1">{detail}</div>
         <div className="label num break-all">Token {x.l.token_id}</div>
         {x.kind === "life" && <a className="mt-1 inline-block text-sm font-bold underline decoration-dotted underline-offset-2" href={lifeHref(x.l.token_id)}>View Life details</a>}
@@ -247,14 +246,14 @@ function Row({ x, wallet, epoch, expiryEpochs, totalPower }: { x: Item; wallet: 
       <div className="flex w-full shrink-0 items-center justify-between gap-2 pl-14 sm:w-auto sm:flex-col sm:items-end sm:gap-1 sm:pl-0">
         <span className="text-right"><span className="label block">Asking price</span><span className="display num text-lg">{askingPrice}</span></span>
         {mine ? (
-          <button className="btn btn-ghost px-3 py-1" onClick={() => run("Take down listing", () => tx.delist(x.l.nft_contract, x.l.token_id))}>
-            Take down
+          <button className="btn btn-ghost px-3 py-1" onClick={() => run("Remove listing", () => tx.delist(x.l.nft_contract, x.l.token_id))}>
+            Remove listing
           </button>
         ) : (
           <button
             className="btn btn-accent px-3 py-1"
             disabled={short}
-            title={short ? `You need ${usd(price - wallet)} more USDC. Get test USDC from the Demo menu.` : undefined}
+            title={short ? `You need ${usd(price - wallet)} more USDC. Add test USDC from the Demo menu.` : undefined}
             onClick={() => run(`Buy for ${askingPrice}`, () => tx.buy(x.l.nft_contract, x.l.token_id, price))}
           >
             <Icon name="cart" size={15} />

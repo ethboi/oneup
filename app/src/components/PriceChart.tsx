@@ -406,7 +406,7 @@ export function PriceChart({
         height={H}
         className="display relative block touch-pan-y select-none"
         role="img"
-        aria-label={`Price chart, last ${last.p.toFixed(digits)}`}
+        aria-label={`Price chart. Latest price: ${last.p.toFixed(digits)}`}
         onPointerMove={onPointer}
         onPointerDown={onPointer}
         onPointerUp={endDrag}
@@ -627,7 +627,7 @@ export function PriceChart({
             .filter(({ m, edge }) => !edge && m.pos === focus.pos && (m.kind === "entry" || m.kind === "tp" || m.kind === "sl"))
             .map(({ m }) => (
               <g key={`grab-${m.label}`} className="chart-grab" onPointerDown={startDrag(m.kind as "entry" | "tp" | "sl")}>
-                <title>{m.kind === "entry" ? "Drag toward profit for a take-profit, toward loss for a stop-loss" : "Drag to move; drop on the entry to clear"}</title>
+                <title>{m.kind === "entry" ? "Drag toward profit to set take profit, or toward loss to set stop loss" : "Drag to adjust, or drop on the entry line to remove"}</title>
                 <line x1={PAD.l} x2={plotR} y1={y(m.price)} y2={y(m.price)} stroke="transparent" strokeWidth="12" />
                 <rect x={plotR + 4} y={y(m.price) - 9} width={PAD.r - 6} height="18" fill="transparent" />
               </g>

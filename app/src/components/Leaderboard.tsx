@@ -52,7 +52,7 @@ export function Leaderboard() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="page-title">Leaderboard</h1>
-          <p className="label">Profit after the winner&apos;s cut, from every closed trade.</p>
+          <p className="label">Profit and loss from closed trades, after fees on winning trades.</p>
         </div>
         <div className="chip-track" role="group" aria-label="Period">
           {(
@@ -77,44 +77,44 @@ export function Leaderboard() {
           <span>
             {BigInt(mine.pnl) > 0n ? (
               <>
-                <b>#{winners.findIndex((r) => r.account === me) + 1}</b> in Top profit
+                <b>#{winners.findIndex((r) => r.account === me) + 1}</b> for highest profit
               </>
             ) : BigInt(mine.pnl) < 0n ? (
               <>
-                <b>#{losers.findIndex((r) => r.account === me) + 1}</b> in Most lost
+                <b>#{losers.findIndex((r) => r.account === me) + 1}</b> for largest loss
               </>
             ) : (
-              "Even"
+              "Break-even"
             )}{" "}
-            <span className="label">of {rows.length} traders</span>
+            <span className="label">· {rows.length} traders overall</span>
           </span>
           <span style={{ color: BigInt(mine.pnl) >= 0n ? "var(--long)" : "var(--short)" }}>
             <b>{usd(BigInt(mine.pnl))}</b>
           </span>
           <span>
-            {mine.trades} trade{mine.trades === 1 ? "" : "s"} <span className="label">· {Math.round((mine.wins / mine.trades) * 100)}% won</span>
+            {mine.trades} trade{mine.trades === 1 ? "" : "s"} <span className="label">· {Math.round((mine.wins / mine.trades) * 100)}% win rate</span>
           </span>
         </div>
       )}
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Board
-          title="Top profit"
+          title="Highest profits"
           icon={<PixelCoin size={20} />}
           rows={winners}
           me={me}
-          empty={data === null ? "Loading…" : "Nobody's in profit over this period yet."}
+          empty={data === null ? "Loading…" : "No traders are in profit for this period."}
         />
         <Board
-          title="Most lost"
-          note="The biggest losers get the biggest Extra Lives."
+          title="Largest losses"
+          note="Eligible net losses can earn Extra Lives, with payouts based on house profits."
           icon={<PixelHeart size={20} />}
           rows={losers}
           me={me}
-          empty={data === null ? "Loading…" : "Nobody's down over this period."}
+          empty={data === null ? "Loading…" : "No traders have a net loss for this period."}
         />
       </div>
-      {data && !data.synced && <p className="label">Still reading the chain&apos;s history; older trades are on their way.</p>}
+      {data && !data.synced && <p className="label">Loading older trades from the chain. Rankings may change as they appear.</p>}
     </div>
   );
 }
@@ -135,9 +135,9 @@ function Board({ title, note, icon, rows, me, empty }: { title: string; note?: s
             <tr className="label text-left">
               <th className="w-8 pb-1.5 pl-1.5 font-normal">#</th>
               <th className="pb-1.5 font-normal">Trader</th>
-              <th className="pb-1.5 text-right font-normal">PnL</th>
+              <th className="pb-1.5 text-right font-normal">Profit/loss</th>
               <th className="hidden pb-1.5 text-right font-normal sm:table-cell">Trades</th>
-              <th className="pb-1.5 text-right font-normal">Won</th>
+              <th className="pb-1.5 text-right font-normal">Win rate</th>
               <th className="hidden pb-1.5 text-right font-normal sm:table-cell">Volume</th>
             </tr>
           </thead>
@@ -154,7 +154,7 @@ function Board({ title, note, icon, rows, me, empty }: { title: string; note?: s
                   <td className="py-2">
                     <span className={you ? "font-extrabold" : undefined}>{short(r.account)}</span>
                     {you && <span className="you-tag">you</span>}
-                    {r.liquidations > 0 && <span className="label" title={`${r.liquidations} liquidated`}> · {r.liquidations}× rekt</span>}
+                    {r.liquidations > 0 && <span className="label" title={`${r.liquidations} liquidations`}> · {r.liquidations}× liquidated</span>}
                   </td>
                   <td className="py-2 text-right font-bold" style={{ color: pnl >= 0n ? "var(--long)" : "var(--short)" }}>
                     {usd(pnl)}

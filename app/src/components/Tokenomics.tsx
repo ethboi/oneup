@@ -15,10 +15,10 @@ const M = 1_000_000n * ONEUP;
 
 /** The fixed supply, minted once (contracts/oneup-token). Backers' 7.5M comes out of the treasury (D-26). */
 const SPLIT = [
-  { name: "Losers, by house profit", amount: 900n * M, color: "var(--heart)", note: "Released over 208 rounds as house profit allows, only to losing wallets, always locked for 104 rounds" },
-  { name: "Liquidity seed", amount: 50n * M, color: "var(--info)", note: "Pairs with USDC for the buyback pool (Rhea on mainnet)" },
+  { name: "Trader loss rewards", amount: 900n * M, color: "var(--heart)", note: "Released under a 208-round schedule as house profit allows, to wallets with eligible net losses. Each reward is locked for 104 rounds." },
+  { name: "Liquidity seed", amount: 50n * M, color: "var(--info)", note: "Paired with USDC in the buyback pool. A real Rhea integration is planned." },
   { name: "Treasury", amount: 42_500_000n * ONEUP, color: "var(--muted)", note: "Run by the DAO that owns the house" },
-  { name: "Backers", amount: 7_500_000n * ONEUP, color: "var(--accent)", note: "10 per $1 backed in the bootstrap round, locked for 104 rounds" },
+  { name: "Backers", amount: 7_500_000n * ONEUP, color: "var(--accent)", note: "10 $1UP per $1 contributed during initial funding, locked for 104 rounds" },
 ];
 
 export function Tokenomics() {
@@ -44,16 +44,17 @@ export function Tokenomics() {
         <div className="flex items-center gap-8">
           <div className="min-w-0 flex-1">
           <p className="label">Tokenomics</p>
-          <h1 className="display mt-2 text-3xl leading-tight sm:text-4xl">$1UP: earned by losing</h1>
+          <h1 className="display mt-2 text-3xl leading-tight sm:text-4xl">$1UP: rewards tied to house profit</h1>
           <p className="mt-3 max-w-2xl text-[var(--muted)]">
-            A fixed billion, minted once. Nine in ten go to the people who lose trades, released only as fast as the house actually
-            makes money, and always locked for 104 rounds. Locks earn the house&apos;s buybacks. No team or investor allocation.
+            The fixed supply is one billion tokens. Of these, 90% are reserved for traders with eligible net losses.
+            House profit determines how many tokens are released, and every reward is locked for 104 rounds.
+            Locks share in buyback rewards. There is no separate team or investor allocation.
           </p>
           <dl className="num mt-5 grid max-w-3xl grid-cols-2 gap-4 sm:grid-cols-4">
             <Stat label="Price" value={px > 0n ? `$${(Number(px) / 1e6).toFixed(4)}` : "…"} />
             <Stat label="Supply" value="1,000,000,000" />
-            <Stat label="Released to losers" value={history ? fmtOneup(released.toString()) : "…"} />
-            <Stat label="Bought back" value={buybacks === undefined ? "…" : `$${fmtUsdc(buybacks, 0)}`} />
+            <Stat label="Trader rewards released" value={history ? fmtOneup(released.toString()) : "…"} />
+            <Stat label="USDC spent on buybacks" value={buybacks === undefined ? "…" : `$${fmtUsdc(buybacks, 0)}`} />
           </dl>
           </div>
           {/* the console's screen, as on About */}
@@ -67,8 +68,8 @@ export function Tokenomics() {
       </section>
 
       <section className="panel p-5">
-        <h2 className="text-lg font-extrabold">Where the billion goes</h2>
-        <div className="mt-4 flex h-5 overflow-hidden rounded-full border border-[var(--line)]" role="img" aria-label="90% losers, 5% liquidity, 4.25% treasury, 0.75% backers">
+        <h2 className="text-lg font-extrabold">Token allocation</h2>
+        <div className="mt-4 flex h-5 overflow-hidden rounded-full border border-[var(--line)]" role="img" aria-label="90% trader loss rewards, 5% liquidity, 4.25% treasury, 0.75% backers">
           {SPLIT.map((s) => (
             <span key={s.name} style={{ width: `${(Number(s.amount) / Number(SUPPLY)) * 100}%`, background: s.color }} title={s.name} />
           ))}
@@ -86,42 +87,43 @@ export function Tokenomics() {
         </ul>
         {round && (
           <p className="label num mt-3">
-            Backers have had {fmtOneup(backersUsed.toString())} of their {fmtOneup((7_500_000n * ONEUP).toString())} so far.
+            Backer rewards issued: {fmtOneup(backersUsed.toString())} of the {fmtOneup((7_500_000n * ONEUP).toString())} $1UP allocation.
           </p>
         )}
       </section>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card icon={<PixelHeart size={24} />} title="Released by profit">
+        <Card icon={<PixelHeart size={24} />} title="Released as the house profits">
           Each round can release up to {fmtOneup(perRound.toString())} $1UP (900M over 208 rounds), but only {ONEUP_PER_USDC.toString()} per $1 the
           house actually made. What isn&apos;t released carries to later rounds{carry ? `: ${fmtOneup(carry)} now` : ""}.
         </Card>
-        <Card icon={<PixelLock size={22} />} title="Only to losers, locked">
-          A round&apos;s $1UP is shared by its losers in proportion to their net loss, as 104-round locks. Winners are paid in USDC
-          instead. Farming costs and rewards depend on same/separate wallets, future recovery and lock discounts. The model is not a proof of Sybil resistance.
+        <Card icon={<PixelLock size={22} />} title="Locked rewards for eligible losses">
+          Each round&apos;s $1UP rewards are split among wallets with eligible net losses, in proportion to those losses. Rewards
+          arrive as 104-round locks. Profitable trades pay out in USDC. Using several wallets can change reward-farming economics;
+          the model does not establish protection against this behavior.
         </Card>
         <Card icon={<Icon name="claim" size={22} />} title="Value from buybacks">
-          30% of every round&apos;s payout buys $1UP on the market and shares it across locks by weight (amount × time left). Leaving a lock
-          early costs up to half, paid to those who stay.
+          30% of the round&apos;s distribution buys $1UP for lock holders. Rewards are weighted by the amount locked and time remaining.
+          Unlocking early incurs a penalty of up to 50%, distributed to the remaining lock holders.
         </Card>
       </div>
 
       <section className="panel p-5">
-        <h2 className="text-lg font-extrabold">If OneUp winds down</h2>
+        <h2 className="text-lg font-extrabold">Proposed shutdown process</h2>
         <ol className="mt-2 flex list-decimal flex-col gap-1 pl-5 text-sm">
-          <li>Traders take back their own money: positions close at the oracle price and balances can be withdrawn.</li>
-          <li>Extra Lives and Backer Lives are paid from the whole pool, by what each is still owed. They&apos;re the house&apos;s debts.</li>
+          <li>Positions would close at the oracle price, and traders could withdraw their remaining balances.</li>
+          <li>The pool would pay Extra Lives and Backer Lives in proportion to their remaining payout limits.</li>
           <li>
-            Whatever&apos;s left goes to $1UP lockers by lock weight. Lockers are the owners: last in line, but everything left is theirs.
+            Any funds left would go to $1UP lock holders in proportion to their lock weight.
           </li>
         </ol>
-        <p className="label mt-2">Only the DAO can start it. A plan for now (D-29); the shutdown mode isn&apos;t in the contracts yet.</p>
+        <p className="label mt-2">This is a proposed DAO-controlled process. It is not implemented in the contracts.</p>
       </section>
 
       <section className="panel p-5">
         <h2 className="text-lg font-extrabold">Released, round by round</h2>
         <p className="label mt-1">
-          What house profit released to each round&apos;s losers. The schedule allows up to {fmtOneup(perRound.toString())} a round; the rest
+          Tokens released as trader loss rewards each round. The schedule adds up to {fmtOneup(perRound.toString())} a round; the rest
           carries forward.
         </p>
         {last.length === 0 ? (

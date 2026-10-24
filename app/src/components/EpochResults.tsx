@@ -107,7 +107,7 @@ export function EpochResults({ automatic }: { automatic: boolean }) {
             <div className="display text-sm">ROUND {s.epoch}</div>
             <div className="display text-4xl leading-tight">ROUND OVER</div>
             <div className="display num mt-1 text-base">
-              {net > 0n ? `HOUSE +$${fmtUsdc(net, 0)} · ${s.lives_minted} EXTRA LIVES` : "HOUSE DIDN'T PROFIT · NO LIVES"}
+              {net > 0n ? `HOUSE +$${fmtUsdc(net, 0)} · ${s.lives_minted} EXTRA LIVES` : "NO HOUSE PROFIT · NO NEW LIVES"}
             </div>
           </div>
         </div>
@@ -115,12 +115,12 @@ export function EpochResults({ automatic }: { automatic: boolean }) {
         <section className="flex items-center gap-3">
           {lost ? <PixelHeart size={36} /> : <Icon name={mine.length ? "up" : "chart"} size={28} />}
           <div className="min-w-0 flex-1">
-            <div className="label">You this round</div>
+            <div className="label">Your round result</div>
             <div className="num text-xl font-extrabold" style={{ color: mine.length ? (lost ? "var(--short)" : "var(--long)") : undefined }}>
-              {mine.length ? `${signed(myPnl)} on ${mine.length} trade${mine.length === 1 ? "" : "s"}` : "Sat this one out"}
+              {mine.length ? `${signed(myPnl)} on ${mine.length} trade${mine.length === 1 ? "" : "s"}` : "No completed trades"}
             </div>
-            {lost && net > 0n && <div className="label">This round was profitable. Check Extra Lives for any NFT allocated to your eligible net loss.</div>}
-            {lost && net === 0n && <div className="label">The house didn&apos;t profit, so no lives this time.</div>}
+            {lost && net > 0n && <div className="label">The house made a profit this round. Check Extra Lives to see whether your net loss qualified for a recovery NFT.</div>}
+            {lost && net === 0n && <div className="label">The house made no profit this round, so no new Extra Lives were issued.</div>}
           </div>
         </section>
 
@@ -130,7 +130,7 @@ export function EpochResults({ automatic }: { automatic: boolean }) {
             <div className="num font-extrabold">${fmtUsdc(BigInt(s.losses), 0)}</div>
           </div>
           <div>
-            <div className="label">Paid to lives</div>
+            <div className="label">Extra Life payouts</div>
             <div className="num font-extrabold">${fmtUsdc(BigInt(s.lives_pot), 0)}</div>
           </div>
           <div>
@@ -189,7 +189,7 @@ export function EpochResults({ automatic }: { automatic: boolean }) {
             Don&apos;t show round results
           </button>
           <button className="btn btn-accent" onClick={() => setRound(null)}>
-            Next round
+            Continue
           </button>
         </div>
       </div>

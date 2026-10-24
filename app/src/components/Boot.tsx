@@ -161,7 +161,7 @@ export function Boot() {
           ))}
         </div>
       </div>
-      <p className="boot-hint">Tap, click or press any key · L and S press LONG and SHORT</p>
+      <p className="boot-hint">Tap, click or press any key to start</p>
     </div>
   );
 }

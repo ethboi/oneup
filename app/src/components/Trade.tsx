@@ -158,7 +158,7 @@ function MarketBar(props: {
           <dt>Change, {windowName}</dt>
           <dd style={{ color: tone(me.ch) }}>{pct(me.ch)}</dd>
         </div>
-        <div title="How the market's open max wins split between longs and shorts">
+        <div title="Share of the market's maximum profit payouts reserved for longs and shorts">
           <dt>Longs / shorts</dt>
           <dd>
             <span style={{ color: "var(--long)" }}>{longPct === null ? "–" : `${longPct.toFixed(0)}%`}</span>
@@ -166,8 +166,8 @@ function MarketBar(props: {
             <span style={{ color: "var(--short)" }}>{longPct === null ? "–" : `${(100 - longPct).toFixed(0)}%`}</span>
           </dd>
         </div>
-        <div title="How much more max win this market can take before new trades are refused">
-          <dt>Room</dt>
+        <div title="Additional profit payouts this market can reserve for new trades">
+          <dt>Capacity left</dt>
           <dd>{room === null ? "…" : `$${fmtCompact(room)}`}</dd>
         </div>
         <div className="hidden sm:block">
@@ -192,7 +192,7 @@ function MarketBar(props: {
             </button>
           ))}
         </span>
-        <span className="bar-cell" title={live ? "Prices are updating" : "No new price for a few seconds"}>
+        <span className="bar-cell" title={live ? "Prices are updating" : "No recent price updates"}>
           <span className={`h-1.5 w-1.5 rounded-full ${live ? "live-dot" : ""}`} style={{ background: live ? "var(--long)" : "var(--muted)" }} />
           <b className="hidden text-xs sm:inline" style={{ color: live ? "var(--long)" : "var(--muted)" }}>
             {live ? "Live" : "Paused"}
@@ -363,7 +363,7 @@ export function Trade() {
         <Account t={ticket} positions={positions} orders={orders} />
         {/* under the form on every screen: on a desktop it fills the column beside the tall chart */}
         <details className="panel p-3">
-          <summary className="cursor-pointer text-sm font-semibold">Optional: jackpot and tickets</summary>
+          <summary className="cursor-pointer text-sm font-semibold">Jackpot and tickets</summary>
           <div className="mt-3"><Jackpot compact /></div>
         </details>
       </div>
@@ -387,7 +387,7 @@ function Account({ t, positions, orders }: { t: Ticket; positions: Position[]; o
     <section className="panel p-4" aria-label="Account">
       <div className="ticket-row">
         <h3 className="font-extrabold">Account</h3>
-        <span className="num text-lg font-extrabold" title="Wallet, balance in OneUp, reserved order margin, and positions at the current mark">
+        <span className="num text-lg font-extrabold" title="Wallet and trading balances, reserved margin, and unrealized profit or loss after fees">
           {usd(equity)}
         </span>
       </div>
@@ -397,7 +397,7 @@ function Account({ t, positions, orders }: { t: Ticket; positions: Position[]; o
           <dd className="font-bold">{usd(t.wallet)}</dd>
         </div>
         <div className="ticket-row">
-          <dt className="label">In OneUp</dt>
+          <dt className="label">Trading balance</dt>
           <dd className="font-bold">{usd(t.free)}</dd>
         </div>
         <div className="ticket-row">
@@ -446,14 +446,14 @@ function TradesTape({ market, info }: { market: string; info?: Market }) {
       <div className="flex items-baseline justify-between px-3.5 pt-3">
         <h3 className="flex items-center gap-1.5 font-extrabold">
           Trades
-          <span className="text-[var(--muted)]" title="Green is a long, red a short; × marks a close." aria-label="Green is a long, red a short; × marks a close.">
+          <span className="text-[var(--muted)]" title="Green means long, red means short; × marks a closed trade." aria-label="Green means long, red means short; × marks a closed trade.">
             <Icon name="info" size={14} />
           </span>
         </h3>
         <span className="label">{market}</span>
       </div>
       {/* the house's book on this market: whose max wins it holds more of */}
-      <div className="px-3.5 pt-2.5" title="How the market's open max wins split between longs and shorts">
+      <div className="px-3.5 pt-2.5" title="Share of the market's maximum profit payouts reserved for longs and shorts">
         <div className="tape-split num">
           <span style={{ width: `${longPct}%` }}>L {longPct.toFixed(0)}%</span>
           <span style={{ width: `${100 - longPct}%` }}>{(100 - longPct).toFixed(0)}% S</span>
@@ -513,7 +513,7 @@ function Below({ positions: all, orders, focused, pick, market }: { positions: P
         </div>
         {view === "activity" && (
           <span className="flex items-center gap-1.5 text-xs font-bold text-[var(--long)]">
-            <span className="h-2 w-2 rounded-full bg-[var(--long)]" aria-hidden /> on chain
+            <span className="h-2 w-2 rounded-full bg-[var(--long)]" aria-hidden /> On-chain
           </span>
         )}
         {view === "positions" && all.length > 0 && (
@@ -686,8 +686,8 @@ function Console({
   const entryActions =
     pos && pos.close_order === null ? (
       <>
-        <button type="button" disabled={hold > 0} onClick={() => run(`Close #${pos.id}`, () => tx.placeClose(pos.id))} title={hold > 0 ? "Positions are held at least a minute" : "Request a close using a later valid oracle price"}>
-          {hold > 0 ? `Close ${hold}s` : "Close"}
+        <button type="button" disabled={hold > 0} onClick={() => run(`Close #${pos.id}`, () => tx.placeClose(pos.id))} title={hold > 0 ? "You can close a position after holding it for 60 seconds" : "Request a close at a later valid oracle price"}>
+          {hold > 0 ? `Close in ${hold}s` : "Close"}
         </button>
         <button type="button" disabled={hold > 0} onClick={reverse} title={`Close, then open a ${pos.side === "Long" ? "short" : "long"} of the same size`}>
           Reverse
@@ -901,15 +901,15 @@ function OrderForm({ t }: { t: Ticket }) {
           <span className="label flex justify-between">
             <span>
               {side === "Long" ? "Fills at this price or lower" : "Fills at this price or higher"}
-              {t.limitAt && price ? ` · ${away(price, t.limitAt)} from the price` : ""}
+              {t.limitAt && price ? ` · ${away(price, t.limitAt)} from the current price` : ""}
             </span>
             {price && (
               <button type="button" className="underline decoration-dotted underline-offset-2 hover:text-[var(--text)]" onClick={() => t.setLimitPrice(String(priceToNumber(price)))}>
-                Use price
+                Use current price
               </button>
             )}
           </span>
-          {t.viaAsset && <span className="text-sm text-[var(--short)]">A limit is paid from your USDC on NEAR, not another chain.</span>}
+          {t.viaAsset && <span className="text-sm text-[var(--short)]">Limit orders require USDC in your NEAR wallet or trading balance.</span>}
         </div>
       )}
 
@@ -949,7 +949,7 @@ function OrderForm({ t }: { t: Ticket }) {
         </span>
         {t.viaAsset && (
           <span className="label">
-            Paid from {t.viaAsset.symbol} on {t.viaAsset.chain}: bridged, swapped and deposited in one intent
+            Simulated deposit from {t.viaAsset.symbol} on {t.viaAsset.chain}, converted to USDC through NEAR Intents.
           </span>
         )}
       </div>
@@ -1014,7 +1014,7 @@ function OrderForm({ t }: { t: Ticket }) {
       <TriggerFields side={side} entry={price} margin={m} leverage={leverage} liq={liq} tp={t.tp} setTp={t.setTp} sl={t.sl} setSl={t.setSl} />
 
       {quote && !quote.allowed && <p className="text-sm text-[var(--short)]">{quote.reason}</p>}
-      {topUp > wallet && <p className="text-sm text-[var(--short)]">Not enough USDC in your wallet. Get some from the faucet in the Demo menu.</p>}
+      {topUp > wallet && <p className="text-sm text-[var(--short)]">Not enough USDC. Open Demo and select Get test USDC to add funds.</p>}
 
       <button
         className="btn btn-big"
@@ -1054,17 +1054,17 @@ function OrderForm({ t }: { t: Ticket }) {
           <dd className="font-bold">${fmtUsdc(m, 0)}</dd>
         </div>
         <div className="ticket-row">
-          <dt className="label">Max win</dt>
+          <dt className="label">Max profit before fee</dt>
           <dd className="font-bold" style={{ color: "var(--long)" }}>
             ${fmtUsdc(maxLiability(m), 0)}
           </dd>
         </div>
         <div className="ticket-row">
-          <dt className="label">Winner&apos;s cut</dt>
+          <dt className="label">Fee on profits</dt>
           <dd className="font-bold">{quote ? `${(Number(quote.cut_ppm) / 1e4).toFixed(1)}%` : "…"}</dd>
         </div>
         <div className="ticket-row">
-          <dt className="label">Entry / funding fee</dt>
+          <dt className="label">Entry / funding fees</dt>
           <dd className="font-bold">None</dd>
         </div>
       </dl>
@@ -1075,17 +1075,18 @@ function OrderForm({ t }: { t: Ticket }) {
           <div className="flex items-center gap-2">
             <PixelHeart size={18} className="shrink-0" />
             <span className="min-w-0 flex-1">
-              Potential recovery cap up to <b className="num">${fmtUsdc(lifeUpTo, 0)}</b> plus <b className="num">{oneupUpTo.toLocaleString("en-US")} $1UP</b>
+              Potential recovery: up to <b className="num">${fmtUsdc(lifeUpTo, 0)}</b> and up to <b className="num">{oneupUpTo.toLocaleString("en-US")} $1UP</b>
             </span>
             <button type="button" className="label shrink-0 underline decoration-dotted underline-offset-2" aria-expanded={why} onClick={() => setWhy(!why)}>
-              {why ? "Hide" : "How"}
+              {why ? "Hide" : "Details"}
             </button>
           </div>
           {why && (
             <p className="label mt-1.5">
-              If the round is profitable, eligible net losses can create an Extra Life with a maximum payout of ${fmtUsdc(lifeUpTo, 0)} from house profit, plus up to{" "}
-              {oneupUpTo.toLocaleString("en-US")} $1UP locked for 104 rounds, both sized from what the house makes this round, and a jackpot
-              ticket for each $1 lost. These are conditional caps, not guaranteed proceeds; trader Lives expire after their mint round and 13 more.
+              If the house makes a profit this round, eligible net losses may earn an Extra Life with a payout limit of up to ${fmtUsdc(lifeUpTo, 0)}, plus up to{" "}
+              {oneupUpTo.toLocaleString("en-US")} $1UP locked for 104 rounds. The round&apos;s profit determines how much is issued.
+              Net losses also earn one jackpot ticket per $1 lost, whether or not the house makes a profit.
+              Life payouts depend on future house profits and may be zero. Trader Lives can earn payouts in their first round and the next 13 rounds.
             </p>
           )}
         </div>
@@ -1094,14 +1095,14 @@ function OrderForm({ t }: { t: Ticket }) {
       <div className="label flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <span>
           {t.viaAsset
-            ? `Via NEAR Intents: a solver swaps your ${t.viaAsset.symbol} for USDC. Simulated on this local chain.`
+            ? `NEAR Intents converts your ${t.viaAsset.symbol} to USDC in this local simulation.`
             : t.orderType === "limit"
-              ? "Rests until the price reaches it, for up to 24 hours. Cancel any time."
-              : "Fills using a later oracle price within the execution window."}
+              ? "Waits for your limit price for up to 24 hours. You can cancel at any time."
+              : "Fills at a later valid oracle price before the order expires."}
         </span>
         {/* the keys, where a keyboard is */}
         <span className="hidden w-full lg:block" aria-hidden>
-          Keys: <kbd>L</kbd> <kbd>S</kbd> side · <kbd>[</kbd> <kbd>]</kbd> leverage · <kbd>M</kbd> margin, then <kbd>Enter</kbd>
+          Keys: <kbd>L</kbd>/<kbd>S</kbd> side · <kbd>[</kbd>/<kbd>]</kbd> leverage · <kbd>M</kbd> margin · <kbd>Enter</kbd> submit
         </span>
         {d.intents && !showPayWith && (
           <button type="button" className="underline decoration-dotted underline-offset-2 hover:text-[var(--text)]" onClick={() => setPayWith(true)}>
@@ -1281,7 +1282,7 @@ function PendingOpen({ x }: { x: Order }) {
     return (
       <p className="mt-2 flex items-center gap-2 text-sm text-[var(--muted)]">
         <Icon name="spinner" />
-        {what}: waiting for a later valid oracle price
+        {what}: waiting for the next eligible price update
       </p>
     );
   const mark = prices[x.market_id];
@@ -1290,7 +1291,7 @@ function PendingOpen({ x }: { x: Order }) {
       <span className="font-bold">Limit {what}</span>
       <span className="label">
         at {fmtPrice(BigInt(limit))}
-        {mark ? ` · ${away(mark, BigInt(limit))} away` : ""} · resting
+        {mark ? ` · ${away(mark, BigInt(limit))} away` : ""} · waiting to fill
       </span>
       <button type="button" className="chip ml-auto !py-0.5 text-xs" onClick={() => run(`Cancel limit #${x.id}`, () => tx.cancelOrder(x.id))}>
         Cancel
@@ -1306,10 +1307,10 @@ function NoPositions() {
   const trades = (h?.items ?? []).filter((i) => i.kind === "trade").slice(0, 3);
   return (
     <div className="py-2">
-      <p className="label">No open positions. Pick a side and a size to open one.</p>
+      <p className="label">No open positions. Choose Long or Short, then set your margin and leverage.</p>
       {trades.length > 0 && (
         <>
-          <p className="label mt-3">Your last trades</p>
+          <p className="label mt-3">Recent trades</p>
           <ul className="num mt-1 flex flex-col text-sm">
             {trades.map((i) => {
               if (i.kind !== "trade") return null;
@@ -1391,7 +1392,7 @@ function CloseAll({ positions }: { positions: Position[] }) {
 
 function CloseButton({ p, hold, wide }: { p: Position; hold: number; wide?: boolean }) {
   const { tx, run } = useOneUp();
-  if (p.close_order !== null) return <div className={`label ${wide ? "py-2 text-center" : ""}`}>closing…</div>;
+  if (p.close_order !== null) return <div className={`label ${wide ? "py-2 text-center" : ""}`}>Closing…</div>;
   return (
     <button
       className={`btn btn-ghost ${wide ? "w-full" : "py-1"}`}
@@ -1449,7 +1450,7 @@ function TriggerFields(props: {
         <TriggerInput label="Take profit" value={tp} set={setTp} hint={hint(side, entry, margin, leverage, tp, "tp", liq)} slider={{ side, entry, leverage, kind: "tp" }} />
         <TriggerInput label="Stop loss" value={sl} set={setSl} hint={hint(side, entry, margin, leverage, sl, "sl", liq)} slider={{ side, entry, leverage, kind: "sl" }} />
       </div>
-      <p className="label">Slide to a gain or loss on your margin, or type a price. A valid price crossing the trigger after the 60 s minimum hold requests a close; it fills using a later valid price.</p>
+      <p className="label">Use the sliders to set a gain or loss as a percentage of your margin, or enter a price. After the 60-second minimum hold, a valid price crossing your trigger requests a close. The trade closes at a later valid price, which may differ from the trigger price.</p>
     </div>
   );
 }
@@ -1528,9 +1529,9 @@ function TriggerInput(props: { label: string; value: string; set: (x: string) =>
 function hint(side: Side, entry: bigint | undefined, margin: bigint, leverage: number, x: string, kind: "tp" | "sl", liq: bigint | null) {
   const at = toPrice(x);
   if (!at || !entry || margin === 0n) return null;
-  if (kind === "tp" && targetHit(side, entry, at)) return { text: `Must be ${side === "Long" ? "above" : "below"} the price`, bad: true };
-  if (kind === "sl" && stopHit(side, entry, at)) return { text: `Must be ${side === "Long" ? "below" : "above"} the price`, bad: true };
-  if (kind === "sl" && liq && stopHit(side, at, liq)) return { text: "Past liquidation", bad: true };
+  if (kind === "tp" && targetHit(side, entry, at)) return { text: `Must be ${side === "Long" ? "above" : "below"} the current price`, bad: true };
+  if (kind === "sl" && stopHit(side, entry, at)) return { text: `Must be ${side === "Long" ? "below" : "above"} the current price`, bad: true };
+  if (kind === "sl" && liq && stopHit(side, at, liq)) return { text: "Beyond the liquidation price", bad: true };
   const v = pnl(side, margin, leverage, entry, at);
   const capped = v > maxLiability(margin) ? maxLiability(margin) : v;
   const sign = capped >= 0n ? "+" : "−";
@@ -1588,7 +1589,7 @@ function EditTriggers({ p }: { p: Position }) {
             <TriggerInput label="Take profit" value={tp} set={setTp} hint={hint(p.side, mark, margin, p.leverage, tp, "tp", liq)} slider={{ side: p.side, entry: mark, leverage: p.leverage, kind: "tp" }} />
             <TriggerInput label="Stop loss" value={sl} set={setSl} hint={hint(p.side, mark, margin, p.leverage, sl, "sl", liq)} slider={{ side: p.side, entry: mark, leverage: p.leverage, kind: "sl" }} />
           </div>
-          <p className="label">Gains and losses shown from the current price. A valid crossing requests a close after the minimum hold; it fills using a later valid price. Blank clears.</p>
+          <p className="label">Estimated gains and losses are measured from the current price. After the minimum hold, crossing a trigger requests a close at a later valid price. Leave a field blank to remove that trigger.</p>
           <button
             className="btn btn-accent"
             disabled={!edited}
@@ -1636,10 +1637,10 @@ function LossBanner() {
         <PixelHeart size={44} className="heart-pop" />
       </span>
       <div className="flex-1">
-        <div className="text-lg font-extrabold leading-tight">Recovery eligibility pending</div>
+        <div className="text-lg font-extrabold leading-tight">Waiting for the round to end</div>
         <div className="label num mt-1">
-          Your net loss rose by ${fmtUsdc(loss.amount)} to ${fmtUsdc(loss.total)} this round. The round ends in {fmtClock(left)}.
-          If it ends in profit, eligible net losses can receive an Extra Life and a $1UP lock. Amounts are finalized at settlement; recovery can be zero.
+          Your net loss this round increased by ${fmtUsdc(loss.amount)} to ${fmtUsdc(loss.total)}. The round ends in {fmtClock(left)}.
+          If the house makes a profit, eligible losses may earn an Extra Life and a $1UP lock. The amounts are confirmed when the round settles. Recovery is not guaranteed.
         </div>
       </div>
       <button className="btn btn-ghost px-2.5" onClick={() => setLoss(null)} aria-label="Dismiss">

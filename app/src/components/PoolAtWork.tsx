@@ -20,9 +20,9 @@ const money = (n: number, dp = 0) => `$${n.toLocaleString("en-US", { minimumFrac
 const ROUNDS_A_YEAR = 52;
 
 const TAG = {
-  live: { label: "Live here", bg: "color-mix(in srgb, var(--long) 15%, transparent)", fg: "var(--long)" },
+  live: { label: "Working in this demo", bg: "color-mix(in srgb, var(--long) 15%, transparent)", fg: "var(--long)" },
   simulated: { label: "Simulated locally", bg: "color-mix(in srgb, var(--info) 15%, transparent)", fg: "var(--info)" },
-  mainnet: { label: "Mainnet plan", bg: "var(--panel)", fg: "var(--muted)" },
+  mainnet: { label: "Planned integration", bg: "var(--panel)", fg: "var(--muted)" },
 };
 
 function Tag({ kind }: { kind: keyof typeof TAG }) {
@@ -102,12 +102,12 @@ export function PoolAtWork({ pool, liability }: { pool: bigint; liability: bigin
             <b className="num" style={{ color: "var(--long)" }}>
               ${fmtUsdc(deployed, 0)}
             </b>{" "}
-            of the pool is in the mock vault, simulating <b className="num">{(rate * 100).toFixed(rate * 100 < 10 ? 1 : 0).replace(/\.0$/, "")}%</b> a year.
+            of the pool is in a mock vault with a simulated annual rate of <b className="num">{(rate * 100).toFixed(rate * 100 < 10 ? 1 : 0).replace(/\.0$/, "")}%</b>.
           </p>
           <p className="label mt-1 max-w-2xl">
-            That&apos;s <b className="num text-[var(--text)]">{earningPct.toFixed(0)}%</b> of the pool, making about{" "}
-            <b className="num text-[var(--text)]">{money(perRound, perRound < 100 ? 2 : 0)}</b> a round ({money(perYear)} a year). Every cent
-            of simulated interest goes to the test-money jackpot.
+            This is <b className="num text-[var(--text)]">{earningPct.toFixed(0)}%</b> of the pool, generating approximately{" "}
+            <b className="num text-[var(--text)]">{money(perRound, perRound < 100 ? 2 : 0)}</b> per round ({money(perYear)} per simulated year). All simulated interest
+            funds the demo jackpot.
           </p>
         </div>
         <div className="shrink-0">
@@ -124,10 +124,10 @@ export function PoolAtWork({ pool, liability }: { pool: bigint; liability: bigin
       <div className="mt-5 grid grid-cols-1 gap-2 lg:grid-cols-[minmax(0,0.8fr)_auto_minmax(0,1.1fr)_auto_minmax(0,1.5fr)_auto_minmax(0,0.9fr)] lg:items-stretch">
         <Step n={1} title="The pool">
           <div className="num text-2xl font-bold">${fmtUsdc(pool, 0)}</div>
-          <p className="label mt-1 text-xs">The house&apos;s USDC, there to pay winners in the worst case.</p>
+          <p className="label mt-1 text-xs">The house&apos;s USDC pool covers the maximum profit payouts reserved for accepted trades.</p>
         </Step>
         <Arrow label="split" />
-        <Step n={2} title="On hand · at work">
+        <Step n={2} title="Reserve and vault">
           <div className="flex flex-col gap-2.5">
             <div>
               <div className="flex items-baseline justify-between gap-2">
@@ -135,24 +135,24 @@ export function PoolAtWork({ pool, liability }: { pool: bigint; liability: bigin
                 <span className="num font-bold">${fmtUsdc(onHand, 0)}</span>
               </div>
               <p className="label text-xs">
-                At least 1.2× worst case (${fmtUsdc(keep, 0)}) + 10% float (${fmtUsdc(float, 0)})
+                Reserve target: 1.2× maximum payout (${fmtUsdc(keep, 0)}) + a 10% cash buffer (${fmtUsdc(float, 0)})
               </p>
             </div>
             <div className="border-t border-[var(--line)] pt-2.5">
               <div className="flex items-baseline justify-between gap-2">
                 <span className="text-sm font-semibold" style={{ color: "var(--long)" }}>
-                  Sent to work
+                  In the mock vault
                 </span>
                 <span className="num font-bold" style={{ color: "var(--long)" }}>
                   ${fmtUsdc(deployed, 0)}
                 </span>
               </div>
-              <p className="label text-xs">Everything above that, up to ${fmtUsdc(big(t.deployable), 0)} now</p>
+              <p className="label text-xs">Maximum total allowed in the vault: ${fmtUsdc(big(t.deployable), 0)} now</p>
             </div>
           </div>
         </Step>
         <Arrow label="lend" />
-        <Step n={3} title="Earning" accent="var(--long)">
+        <Step n={3} title="Yield source" accent="var(--long)">
           <div className="flex flex-col gap-2.5">
             <div>
               <div className="flex items-start justify-between gap-2">
@@ -166,16 +166,16 @@ export function PoolAtWork({ pool, liability }: { pool: bigint; liability: bigin
                 <Tag kind="mainnet" />
               </div>
               <p className="label mt-1 text-xs">
-                Reached through NEAR Intents and held by the house&apos;s own Chain Signatures Ethereum address. No person holds the keys;
-                the DAO picks the market (Aave v3 or a conservative Morpho vault, about 4.5–5%).
+                The proposed integration would use NEAR Intents and a Chain Signatures address to lend USDC on Ethereum.
+                The DAO would choose the lending market. This external lending path is not implemented yet.
               </p>
             </div>
             <div className="border-t border-[var(--line)] pt-2.5">
               <div className="flex items-start justify-between gap-2">
-                <span className="text-sm font-semibold">Mock vault, {(rate * 100).toFixed(0)}% a year</span>
+                <span className="text-sm font-semibold">Mock vault · {(rate * 100).toFixed(0)}% simulated annual rate</span>
                 <Tag kind="simulated" />
               </div>
-              <p className="label mt-1 text-xs">Stands in on this local chain. Its year is 52 rounds, so the interest shows.</p>
+              <p className="label mt-1 text-xs">This local simulation treats 52 rounds as one year, so interest accrues at the demo&apos;s accelerated pace.</p>
             </div>
           </div>
         </Step>
@@ -187,7 +187,7 @@ export function PoolAtWork({ pool, liability }: { pool: bigint; liability: bigin
               ${fmtUsdc(jackpot, jackpot < 1_000_000_000n ? 2 : 0)}
             </span>
           </div>
-          <p className="label mt-1 text-xs">All of the interest. Drawn when round {t.draw_epoch} closes; each $1 lost is a ticket.</p>
+          <p className="label mt-1 text-xs">Funded by simulated interest. The draw takes place after round {t.draw_epoch}; each $1 of eligible net loss adds a ticket.</p>
         </Step>
       </div>
 
@@ -199,18 +199,18 @@ export function PoolAtWork({ pool, liability }: { pool: bigint; liability: bigin
             <b className="num">${fmtUsdc(onHand, 0)}</b>
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="inline-block h-3 w-3 rounded-sm" style={{ background: "var(--long)" }} /> Earning{" "}
+            <span className="inline-block h-3 w-3 rounded-sm" style={{ background: "var(--long)" }} /> In the mock vault{" "}
             <b className="num">${fmtUsdc(deployed, 0)}</b>
             <span className="label num">({earningPct.toFixed(0)}%)</span>
           </span>
         </div>
-        <svg viewBox="0 0 1000 32" preserveAspectRatio="none" className="h-8 w-full" role="img" aria-label={`${earningPct.toFixed(0)}% of the pool is earning`}>
+        <svg viewBox="0 0 1000 32" preserveAspectRatio="none" className="h-8 w-full" role="img" aria-label={`${earningPct.toFixed(0)}% of the pool is in the mock vault`}>
           <rect x="0" y="6" width="1000" height="20" rx="4" fill="var(--panel-2)" stroke="var(--line)" vectorEffect="non-scaling-stroke">
             <title>On hand ${fmtUsdc(onHand, 0)}</title>
           </rect>
           {deployed > 0n && (
             <rect x={1000 - Math.min(1000, earningPct * 10)} y="6" width={Math.min(1000, earningPct * 10)} height="20" rx="4" fill="var(--long)">
-              <title>Earning ${fmtUsdc(deployed, 0)}</title>
+              <title>In the mock vault: ${fmtUsdc(deployed, 0)}</title>
             </rect>
           )}
           <line x1={pct(mustStay, pool) * 10} x2={pct(mustStay, pool) * 10} y1="0" y2="32" stroke="var(--text)" strokeWidth="2" vectorEffect="non-scaling-stroke">

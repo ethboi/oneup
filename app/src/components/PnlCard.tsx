@@ -182,10 +182,10 @@ export async function drawCard(canvas: HTMLCanvasElement, d: CardData) {
     ctx.fillStyle = C.ink;
     ctx.textAlign = "center";
     ctx.font = `700 30px ${f.pixel}`;
-    ctx.fillText("+1 EXTRA LIFE", cx, ly + 270);
+    ctx.fillText("EXTRA LIFE?", cx, ly + 270);
     ctx.font = `500 21px ${f.body}`;
     ctx.fillStyle = C.inkSoft;
-    ctx.fillText("paid back from the house's profit", cx, ly + 302);
+    ctx.fillText("recovery is not guaranteed", cx, ly + 302);
     ctx.textAlign = "left";
   }
 
@@ -210,23 +210,23 @@ function drawHeal(
   ctx.fillStyle = C.ink;
   ctx.textAlign = "left";
   ctx.font = `700 34px ${f.pixel}`;
-  ctx.fillText(`EXTRA LIFE · EPOCH ${heal.epoch}`, px, ly + 64);
+  ctx.fillText(`EXTRA LIFE · ROUND ${heal.epoch}`, px, ly + 64);
   ctx.font = `700 96px ${f.pixel}`;
   ctx.fillText("FULL HEAL", px - 4, ly + 180);
   ctx.font = `800 54px ${f.body}`;
   ctx.fillText(`+$${fmtUsdc(heal.paid)} back`, px, ly + 258);
   ctx.font = `500 24px ${f.body}`;
   ctx.fillStyle = C.inkSoft;
-  ctx.fillText("A losing trade, paid back in full from the house's profit.", px, ly + 318);
+  ctx.fillText("This Extra Life reached its full payout limit.", px, ly + 318);
   sprite(ctx, HEART, { "#": C.heart, "*": "#fff" }, lx + lw - 290, ly + 40, 21);
 }
 
 export function shareText(d: CardData) {
-  if (d.heal) return `Full Heal: a losing trade paid me back $${fmtUsdc(d.heal.paid, 0)} on OneUp. Lose a trade, get a life.`;
+  if (d.heal) return `Full Heal: my Extra Life reached its $${fmtUsdc(d.heal.paid, 0)} payout limit on OneUp.`;
   const r = roe(d);
   return d.pnl >= 0n
     ? `+${r.toFixed(1)}% on ${d.market} ${d.side.toLowerCase()} ${d.leverage}× on OneUp.`
-    : `Lost $${fmtUsdc(-d.pnl, 0)} on ${d.market} and got an Extra Life for it. OneUp: lose a trade, get a life.`;
+    : `−$${fmtUsdc(-d.pnl, 0)} on ${d.market} ${d.side.toLowerCase()} ${d.leverage}× on OneUp. Eligible losses may earn an Extra Life; recovery is not guaranteed.`;
 }
 
 /** A Share button that opens the card dialog. */
@@ -234,7 +234,7 @@ export function ShareButton({ data, compact }: { data: () => CardData; compact?:
   const [open, setOpen] = useState<CardData | null>(null);
   return (
     <>
-      <button className={`btn btn-ghost ${compact ? "px-2.5 py-1" : ""}`} onClick={() => setOpen(data())} aria-label="Share PnL card" title="Share PnL card">
+      <button className={`btn btn-ghost ${compact ? "px-2.5 py-1" : ""}`} onClick={() => setOpen(data())} aria-label="Share trade result" title="Share trade result">
         <Icon name="share" />
         {!compact && "Share"}
       </button>
@@ -274,13 +274,13 @@ export function ShareDialog({ data, onClose }: { data: CardData; onClose: () => 
       await navigator.clipboard.write([new ClipboardItem({ "image/png": blob! })]);
       setNote("Image copied");
     } catch {
-      setNote("This browser can't copy images: use Download");
+      setNote("This browser cannot copy images. Download the image instead.");
     }
   };
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div role="dialog" aria-label="Share PnL card" className="panel flex w-full max-w-[720px] flex-col gap-3 p-4">
+      <div role="dialog" aria-label="Share trade result" className="panel flex w-full max-w-[720px] flex-col gap-3 p-4">
         <div className="flex items-center justify-between">
           <h2 className="font-extrabold">Share</h2>
           <button className="btn btn-ghost px-2.5" onClick={onClose} aria-label="Close">
@@ -307,7 +307,7 @@ export function ShareDialog({ data, onClose }: { data: CardData; onClose: () => 
             href={`https://x.com/intent/post?text=${encodeURIComponent(shareText(data))}`}
             target="_blank"
             rel="noreferrer"
-            title="Opens X with the text; attach the downloaded image"
+            title="Open X with this text, then attach your downloaded image"
           >
             Post on X
           </a>

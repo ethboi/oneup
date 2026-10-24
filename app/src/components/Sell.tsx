@@ -31,13 +31,13 @@ export function Sell({ nft, tokenId, listings, compact }: { nft: string; tokenId
     return (
       // wraps rather than overflows in narrow columns (a lock's row)
       <div className={`${mt} flex flex-wrap items-center justify-between gap-x-2 gap-y-1 rounded-lg border border-dashed border-[var(--line)] px-2.5 py-1.5 text-sm`}>
-        <span className="num whitespace-nowrap">For sale at ${listingPriceInput(listing)}</span>
-        <span className="flex gap-1">
+        <span className="num whitespace-nowrap">Listed for ${listingPriceInput(listing)}</span>
+        <span className="flex flex-wrap gap-1">
           <button className="btn btn-ghost whitespace-nowrap px-2 py-0.5 text-xs" onClick={beginListing}>
-            Re-price
+            Update price
           </button>
-          <button className="btn btn-ghost whitespace-nowrap px-2 py-0.5 text-xs" onClick={() => run("Take down listing", () => tx.delist(nft, tokenId))}>
-            Take down
+          <button className="btn btn-ghost whitespace-nowrap px-2 py-0.5 text-xs" onClick={() => run("Remove listing", () => tx.delist(nft, tokenId))}>
+            Remove listing
           </button>
         </span>
       </div>
@@ -48,24 +48,24 @@ export function Sell({ nft, tokenId, listings, compact }: { nft: string; tokenId
       // compact (in a row): a smaller button, so the life or lock it sells stays the focus
       <button className={`btn btn-ghost ${mt} w-full ${compact ? "py-1.5 text-sm" : ""}`} onClick={beginListing}>
         <Icon name="tag" />
-        Sell
+        List for sale
       </button>
     );
   }
   // The seller chooses the price; a payout cap is not a price recommendation.
   const raw = parseTokenAmount(price, 6);
   return (
-    <div className={`${mt} flex items-center gap-2`}>
-      <span className="field flex-1">
+    <div className={`${mt} flex flex-wrap items-center gap-2`}>
+      <span className="field min-w-24 flex-1">
         <input className="input num" value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal" placeholder="Your asking price" aria-label="Price in USDC" />
         <span className="field-unit">USDC</span>
       </span>
       <button
         className="btn btn-accent shrink-0"
         disabled={raw === 0n}
-        onClick={() => run(`List for $${price}`, () => tx.list(nft, tokenId, raw)).then((ok) => ok && setOpen(false))}
+        onClick={() => run(`List for sale at $${price}`, () => tx.list(nft, tokenId, raw)).then((ok) => ok && setOpen(false))}
       >
-        {listing ? "Update" : "List"}
+        {listing ? "Update price" : "List"}
       </button>
       <button className="btn btn-ghost shrink-0 px-2.5" onClick={() => setOpen(false)} aria-label="Cancel">
         <Icon name="x" />

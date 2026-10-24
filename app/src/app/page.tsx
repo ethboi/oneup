@@ -98,8 +98,8 @@ export default function Home() {
       <div className="bg-[var(--primary)] text-white">
         <div className="mx-auto flex max-w-[1280px] items-center justify-center gap-x-2 px-4 py-1.5 text-center text-[12.5px] font-bold">
           <span>
-            Building toward <span className="font-extrabold">NEAR HACKATHON</span>, November 2026
-            <span className="hidden sm:inline"> · a proof of concept on a local NEAR chain, with test money only</span>
+            In development for <span className="font-extrabold">NEAR HACKATHON</span>, November 2026
+            <span className="hidden sm:inline"> · local NEAR demo · test money only</span>
           </span>
           <button type="button" className="underline decoration-dotted underline-offset-2 opacity-80 hover:opacity-100" onClick={() => go("About")}>
             About
@@ -180,7 +180,7 @@ function Footer({ go }: { go: (t: Tab, at?: string) => void }) {
           <div>
             <b className="display text-base">OneUp</b>
             <p className="label mt-0.5 max-w-sm">
-              Eligible loss → recovery NFT → claim earned USDC or transfer ownership. Capped-payout perps in development for NEAR HACKATHON, November 2026.
+              Trade perpetual futures with capped profits. Eligible losses may earn an Extra Life NFT: claim its available USDC or sell it. Recovery depends on house profits and is not guaranteed.
             </p>
           </div>
         </div>
@@ -217,8 +217,7 @@ function Footer({ go }: { go: (t: Tab, at?: string) => void }) {
         <div>
           <b className="block">Built on NEAR</b>
           <p className="label mt-1.5">
-            Local Rust contracts, signed NEAR Intents with simulated bridge credits, Sputnik DAO ownership, sponsored trading, and an MCP server
-            using demo account keys.
+            Runs locally on NEAR with Rust contracts, simulated cross-chain deposits through NEAR Intents, Sputnik DAO ownership, sponsored trading, and demo account access through MCP.
           </p>
           <button
             type="button"
@@ -228,12 +227,12 @@ function Footer({ go }: { go: (t: Tab, at?: string) => void }) {
               setTimeout(() => document.getElementById("built")?.scrollIntoView({ behavior: "smooth" }), 50);
             }}
           >
-            Every NEAR tool we use
+            Explore the NEAR integrations
           </button>
         </div>
       </div>
       <div className="label mt-6 flex flex-col gap-2 border-t border-[var(--line)] pt-4 sm:flex-row sm:items-baseline sm:justify-between">
-        <p>A proof of concept running on a local NEAR chain with test money. The contracts haven&apos;t been audited: don&apos;t use real funds.</p>
+        <p>A local NEAR demo using test money. The contracts have not been independently audited. Do not use real funds.</p>
         <p className="shrink-0">
           Built by{" "}
           <a className={link} href="https://github.com/ethboi" target="_blank" rel="noreferrer">

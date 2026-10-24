@@ -20,23 +20,23 @@ export function Onboarding() {
   useEffect(() => {
     try { setExpanded(localStorage.getItem(KEY) !== "1"); } catch { setExpanded(true); }
   }, []);
-  const status = next.phase === "loading" ? "Checking your recovery state…"
-    : next.phase === "claim" ? `$${fmtUsdc(next.claimable)} ready to claim from ${next.count} ${next.count === 1 ? "Life" : "Lives"}`
-    : next.phase === "earning" ? `${next.count} ${next.count === 1 ? "Life has" : "Lives have"} remaining earning rights; future payouts may be zero`
-    : next.phase === "pending" ? `$${fmtUsdc(BigInt(pending!))} net loss this round; NFT eligibility is decided at settlement`
-    : next.phase === "finished" ? "Your Lives have finished; no USDC remains unclaimed"
-    : "No recovery NFT or unsettled loss in this wallet yet";
-  const action = next.phase === "claim" ? "Review and claim your Life" : next.phase === "earning" ? "Inspect your latest Life" : next.phase === "pending" ? "Follow round settlement" : next.phase === "finished" ? "Review your finished Lives" : "Explore Extra Lives";
+  const status = next.phase === "loading" ? "Checking your Lives…"
+    : next.phase === "claim" ? `$${fmtUsdc(next.claimable)} available to claim from ${next.count} ${next.count === 1 ? "Life" : "Lives"}`
+    : next.phase === "earning" ? `${next.count} ${next.count === 1 ? "Life can" : "Lives can"} still receive payouts. Future payouts may be zero.`
+    : next.phase === "pending" ? `$${fmtUsdc(BigInt(pending!))} net loss this round. Eligibility for an Extra Life is confirmed when the round settles.`
+    : next.phase === "finished" ? "Your Lives have reached their payout limits or ended their earning periods. No USDC remains to claim."
+    : "You do not have an Extra Life or an unsettled net loss yet.";
+  const action = next.phase === "claim" ? "View USDC to claim" : next.phase === "earning" ? "View your latest Life" : next.phase === "pending" ? "View this round" : next.phase === "finished" ? "View your finished Lives" : "Explore Extra Lives";
   const steps = [
-    { icon: <Icon name="chart" size={20} />, title: "Trade", line: "Winners pay a 10–25% cut; no entry or funding fee. A loss can still be permanent.", href: "/about", action: "Read the rules" },
-    { icon: <PixelHeart size={20} />, title: "Receive a recovery NFT", line: `Eligible net losses in profitable rounds create Extra Lives.${expiry === undefined ? " Their earning window follows the contract's expiry settings." : ` Each earns in its mint round plus up to ${expiry} more rounds.`}`, href: "/extra-lives", action: lives ? `Your Lives (${lives.length})` : "Find your Lives" },
-    { icon: <Icon name="claim" size={20} />, title: "Claim earned USDC", line: "Claim USDC already allocated to your NFT. Its additional cap depends on future house profit and can pay zero; it is not a forecast.", href: next.phase === "claim" && next.tokenId ? lifeHref(next.tokenId) : "/extra-lives", action: next.claimable > 0n ? `$${fmtUsdc(next.claimable)} claimable now` : "Check claimable USDC" },
-    { icon: <Icon name="store" size={20} />, title: "Transfer ownership", line: "Choose an asking price for your Life. A buyer inherits its remaining rights and unclaimed USDC. An exit requires a buyer.", href: next.tokenId ? lifeHref(next.tokenId) : "/market", action: next.tokenId ? "Review claim or sale" : "Explore the market" },
+    { icon: <Icon name="chart" size={20} />, title: "Trade", line: "OneUp takes 10–25% of winning trade profits. There are no entry or funding fees. Losses can be permanent.", href: "/about", action: "Read the rules" },
+    { icon: <PixelHeart size={20} />, title: "Receive an Extra Life", line: `An eligible net loss in a profitable round can earn you an Extra Life.${expiry === undefined ? " The contract sets its earning period." : ` It is eligible for payouts in the round it is created and up to ${expiry} more rounds.`}`, href: "/extra-lives", action: lives ? `Your Lives (${lives.length})` : "Find your Lives" },
+    { icon: <Icon name="claim" size={20} />, title: "Claim USDC", line: "USDC already allocated to your Life is available to claim. Its remaining payout limit is a maximum, not a forecast. Future payouts depend on house profit and may be zero.", href: next.phase === "claim" && next.tokenId ? lifeHref(next.tokenId) : "/extra-lives", action: next.claimable > 0n ? `$${fmtUsdc(next.claimable)} available to claim` : "Check available USDC" },
+    { icon: <Icon name="store" size={20} />, title: "List your Life for sale", line: "Set your asking price. If someone buys your Life, its unclaimed USDC and remaining payout rights transfer to them. Listing it does not guarantee a sale.", href: next.tokenId ? lifeHref(next.tokenId) : "/market", action: next.tokenId ? "View your Life" : "Explore the market" },
   ];
   return (
     <details className="panel mb-4 p-4" open={expanded} onToggle={event => { const open = event.currentTarget.open; setExpanded(open); try { localStorage.setItem(KEY, open ? "0" : "1"); } catch {} }}>
       <summary className="cursor-pointer text-sm font-bold marker:text-[var(--primary)]">
-        How recovery works
+        How recovery works{" "}
         <span className="mt-1 block font-normal text-[var(--muted)] sm:ml-3 sm:mt-0 sm:inline">{status}</span>
       </summary>
       <div className="mt-4 flex flex-col justify-between gap-3 rounded-lg bg-[var(--panel-2)] p-3 text-sm sm:flex-row sm:items-center">

@@ -32,11 +32,11 @@ export function lifeEconomics(life: LifeInfo, currentEpoch?: number, expiryEpoch
 
 export function lifeEarningLabel(life: LifeInfo, currentEpoch?: number, expiryEpochs?: number): string {
   const economics = lifeEconomics(life, currentEpoch, expiryEpochs);
-  if (economics.status === "expired") return "Expired · no further earning rounds";
-  if (economics.status === "fully-allocated") return "Cap fully allocated · no further earnings";
+  if (economics.status === "expired") return "Expired · no further payouts can accrue";
+  if (economics.status === "fully-allocated") return "Payout limit reached · no further payouts can accrue";
   if (life.backer) return "No expiry · future payouts depend on house profit";
-  if (economics.status === "awaiting-settlement") return "No earning rounds remain · final settlement may be pending";
+  if (economics.status === "awaiting-settlement") return "Earning period ended · final payout may still be processing";
   const rounds = economics.remainingEarningRounds;
-  if (rounds === null) return "Loading earning window…";
-  return `${rounds} earning round${rounds === 1 ? "" : "s"} remaining, including the current round · through round ${economics.lastEarningEpoch}`;
+  if (rounds === null) return "Loading earning period…";
+  return `${rounds} round${rounds === 1 ? "" : "s"} left to receive payouts, including this round · ends after round ${economics.lastEarningEpoch}`;
 }

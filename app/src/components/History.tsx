@@ -42,7 +42,7 @@ export function useHistory(account: string) {
 const REASON: Record<string, string> = {
   Close: "Closed",
   Liquidation: "Liquidated",
-  TakeProfit: "Took profit at the cap",
+  TakeProfit: "Profit cap reached",
   Target: "Take-profit hit",
   Stop: "Stop-loss hit",
 };
@@ -58,10 +58,10 @@ export function HistoryList() {
     <div>
       {!h.synced && (
         <p className="label flex items-center gap-2 py-2">
-          <Icon name="spinner" /> Reading the chain… {Math.round(h.progress * 100)}%
+          <Icon name="spinner" /> Loading transaction history… {Math.round(h.progress * 100)}%
         </p>
       )}
-      {h.items.length === 0 && h.synced && <p className="label py-2">Nothing yet. Your trades, deposits and claims show up here.</p>}
+      {h.items.length === 0 && h.synced && <p className="label py-2">No activity yet. Your trades, deposits and claims will appear here.</p>}
       <ul className="flex flex-col">
         {h.items.slice(0, 100).map((i) => (
           <Row key={i.seq} i={i} me={me} />
@@ -129,7 +129,7 @@ function Row({ i, me }: { i: HistoryItem; me: string }) {
     case "backed":
       icon = "deposit";
       title = "Backed the house";
-      detail = `Backer Life owed ${(Number(i.cap_ppm) / 1e6).toFixed(2)}×`;
+      detail = `Backer Life payout limit: ${(Number(i.cap_ppm) / 1e6).toFixed(2)}× backing amount`;
       amount = <span className="font-extrabold">${fmtUsdc(BigInt(i.amount))}</span>;
       break;
     case "jackpot":
@@ -149,26 +149,26 @@ function Row({ i, me }: { i: HistoryItem; me: string }) {
       icon = "claim";
       color = "var(--info)";
       title = "$1UP from your locks";
-      detail = "A claim, an unlock or leaving early";
+      detail = "Claim, unlock or early withdrawal";
       amount = <span className="font-extrabold">+{fmtOneup(i.amount, 2)} $1UP</span>;
       break;
     case "life":
       icon = "heart";
       color = "var(--heart)";
-      title = "Got an Extra Life";
+      title = "Received an Extra Life";
       detail = `#${i.token_id}`;
       break;
     case "lock":
       icon = "lock";
       color = "var(--info)";
-      title = "Got a $1UP lock";
+      title = "Received a $1UP lock";
       detail = `#${i.token_id}`;
       break;
     case "bought":
     case "sold":
       icon = i.kind === "bought" ? "cart" : "tag";
       color = "var(--primary)";
-      title = i.kind === "bought" ? `Bought an ${i.what === "Extra Life" ? "Extra Life" : "$1UP lock"}` : `Sold an ${i.what === "Extra Life" ? "Extra Life" : "$1UP lock"}`;
+      title = `${i.kind === "bought" ? "Bought" : "Sold"} ${i.what === "Extra Life" ? "an Extra Life" : "a $1UP lock"}`;
       detail = `${i.kind === "bought" ? "from" : "to"} ${short(i.other)}`;
       amount = <span className="font-extrabold">{i.kind === "bought" ? "−" : "+"}${fmtUsdc(BigInt(i.price))}</span>;
       break;

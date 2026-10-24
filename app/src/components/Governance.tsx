@@ -38,20 +38,20 @@ export function Governance() {
     const h = d.contracts.house;
     if (preset === "list") {
       const m = NEW_MARKETS.find((x) => x.id === target);
-      return m ? { description: `List ${m.id} at up to 1000×`, kind: houseProposal(h, "add_market", { market_id: m.id, feed_id: m.feedId, max_leverage: 1000 }) } : null;
+      return m ? { description: `List ${m.id} with up to 1000× leverage`, kind: houseProposal(h, "add_market", { market_id: m.id, feed_id: m.feedId, max_leverage: 1000 }) } : null;
     }
     const m = markets.find((x) => x.id === target);
     if (!m) return null;
     if (preset === "leverage") {
       const lev = Math.max(1, Math.min(1000, Math.round(Number(capacity) || 0)));
-      return { description: `Set ${m.id}'s max leverage to ${lev}×`, kind: houseProposal(h, "set_max_leverage", { market_id: m.id, max_leverage: lev }) };
+      return { description: `Set maximum leverage for ${m.id} to ${lev}×`, kind: houseProposal(h, "set_max_leverage", { market_id: m.id, max_leverage: lev }) };
     }
     if (preset === "pause") {
       return { description: `${m.live ? "Pause" : "Resume"} ${m.id}`, kind: houseProposal(h, "set_market_live", { market_id: m.id, live: !m.live }) };
     }
     const pct = Math.max(1, Math.min(100, Number(capacity) || 0));
     return {
-      description: `Give ${m.id} ${pct}% of the pool`,
+      description: `Set ${m.id} capacity to ${pct}% of the pool`,
       kind: houseProposal(h, "set_capacity", { market_id: m.id, capacity_ppm: String(pct * 10_000) }),
     };
   };
@@ -63,12 +63,12 @@ export function Governance() {
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-lg font-extrabold">Who runs the house</h2>
         <span className="label num">
-          Owner {short(owner?.[0] ?? "…")} · Sputnik DAO
+          Owner: {short(owner?.[0] ?? "…")} · Sputnik DAO
         </span>
       </div>
       <p className="label mt-1 max-w-3xl">
-        A Sputnik DAO (the same code as mainnet Sputnik v2 DAOs) owns the house: listing markets, pausing them and their share of the
-        pool all go through a council vote. Routine buybacks run without a vote.
+        A Sputnik DAO owns the house, using the same contract code as mainnet Sputnik v2 DAOs. Council members vote to
+        list or pause markets and change each market’s share of the pool. Routine buybacks do not require a vote.
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-1.5 text-sm">
         <span className="label mr-1">Council</span>
@@ -83,12 +83,12 @@ export function Governance() {
       {isCouncil && (
         <div className="mt-4 flex flex-wrap items-end gap-2">
           <label className="flex flex-col gap-1">
-            <span className="label">Propose</span>
+            <span className="label">Proposal type</span>
             <select className="input" value={preset} onChange={(e) => (setPreset(e.target.value), setMarket(""), setCapacity(e.target.value === "leverage" ? "1000" : "40"))}>
               <option value="list">List a market</option>
               <option value="pause">Pause or resume a market</option>
               <option value="capacity">Change a market&apos;s share of the pool</option>
-              <option value="leverage">Change a market&apos;s max leverage</option>
+              <option value="leverage">Change maximum leverage</option>
             </select>
           </label>
           <label className="flex flex-col gap-1">
@@ -101,7 +101,7 @@ export function Governance() {
           </label>
           {preset === "leverage" && (
             <label className="flex flex-col gap-1">
-              <span className="label">Max leverage</span>
+              <span className="label">Maximum leverage</span>
               <span className="field w-24">
                 <input className="input num" value={capacity} onChange={(e) => setCapacity(e.target.value)} inputMode="numeric" />
                 <span className="field-unit">×</span>
@@ -110,7 +110,7 @@ export function Governance() {
           )}
           {preset === "capacity" && (
             <label className="flex flex-col gap-1">
-              <span className="label">Share</span>
+              <span className="label">Pool share</span>
               <span className="field w-24">
                 <input className="input num" value={capacity} onChange={(e) => setCapacity(e.target.value)} inputMode="decimal" />
                 <span className="field-unit">%</span>
@@ -153,7 +153,7 @@ function ProposalRow({ p, canVote, seats }: { p: DaoProposal; canVote: boolean; 
         <span className="label flex items-center gap-2">
           by {short(p.proposer)}
           {/* one square per council seat: for, against, not yet voted */}
-          <span className="inline-flex gap-0.5" aria-label={`${yes} for, ${no} against, of ${seats}`} title={`${yes} for, ${no} against`}>
+          <span className="inline-flex gap-0.5" aria-label={`${yes} votes for, ${no} against, with ${seats} council seats`} title={`${yes} for, ${no} against`}>
             {Array.from({ length: Math.max(seats, yes + no) }, (_, i) => (
               <span
                 key={i}
@@ -183,7 +183,7 @@ function ProposalRow({ p, canVote, seats }: { p: DaoProposal; canVote: boolean; 
           </button>
         </span>
       )}
-      {voted && <span className="label">You voted {voted.toLowerCase()}</span>}
+      {voted && <span className="label">Your vote: {voted.toLowerCase()}</span>}
     </li>
   );
 }

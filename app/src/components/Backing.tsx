@@ -33,15 +33,15 @@ export function Backing() {
   return (
     <div className="panel p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-lg font-extrabold">Back with USDC</h2>
+        <h2 className="text-lg font-extrabold">Contribute USDC</h2>
         <span className="label num">
           ${fmtUsdc(backed, 0)} of ${fmtUsdc(target, 0)} raised
         </span>
       </div>
       <p className="label mt-1 max-w-3xl">
-        Your USDC joins the pool for good and gives traders room to trade. In return you get a Backer Life: an Extra Life that never
-        expires and can share future house profit up to its cap. Repayment can be partial or zero. You also get $1UP,
-        locked for 104 rounds, earning the house&apos;s buybacks. An early exit requires a willing buyer on the Market; sale proceeds are not guaranteed.
+        Your USDC stays in the trading pool. In return, you receive a Backer Life with no expiry date. It can receive payouts
+        from future house profit, up to a limit; you may recover only part of your contribution, or none of it. You also receive $1UP
+        locked for 104 rounds, with a share of buyback rewards. You can list either NFT for sale, but finding a buyer is not guaranteed.
       </p>
 
       <div className="mt-4 grid gap-5 lg:grid-cols-[1.4fr_1fr]">
@@ -61,9 +61,9 @@ export function Backing() {
                 <dd className="text-right font-bold">{ppmToNumber(BigInt(round.cap_ppm)).toFixed(3)}×</dd>
                 <dt className="label">Maximum Backer Life payout</dt>
                 <dd className="text-right font-bold">${fmtUsdc(BigInt(round.owed), 0)}</dd>
-                <dt className="label">Plus $1UP, locked 104 rounds</dt>
+                <dt className="label">$1UP reward · locked for 104 rounds</dt>
                 <dd className="text-right font-bold">{fmtOneup(round.oneup)}</dd>
-                <dt className="label">Room left in the round</dt>
+                <dt className="label">Remaining funding capacity</dt>
                 <dd className="text-right">${fmtUsdc(left, 0)}</dd>
               </dl>
               <button
@@ -71,15 +71,15 @@ export function Backing() {
                 disabled={amt < min || tooBig || short}
                 onClick={() => run(`Back the house with $${fmtUsdc(amt, 0)}`, () => tx.back(amt))}
               >
-                {amt < min ? `Back at least $${fmtUsdc(min, 0)}` : tooBig ? "More than the round has left" : short ? "Not enough USDC in your wallet" : `Back $${fmtUsdc(amt, 0)}`}
+                {amt < min ? `Back at least $${fmtUsdc(min, 0)}` : tooBig ? "Amount exceeds remaining capacity" : short ? "Not enough USDC in your wallet" : `Back $${fmtUsdc(amt, 0)}`}
               </button>
             </>
           ) : (
-            <p className="text-sm font-bold">The bootstrap round is full. Backer Lives still trade on the Market.</p>
+            <p className="text-sm font-bold">The initial funding round is closed. You can check the Market for Backer Lives offered for sale.</p>
           )}
           {mine.length > 0 && (
             <p className="label num">
-              Your {mine.length === 1 ? "Backer Life has" : `${mine.length} Backer Lives have`} been paid ${fmtUsdc(paidMine)} of $
+              Your {mine.length === 1 ? "Backer Life has" : `${mine.length} Backer Lives have`} received ${fmtUsdc(paidMine)} toward a total payout limit of $
               {fmtUsdc(owedMine, 0)}.
             </p>
           )}
@@ -102,7 +102,7 @@ function Curve({ pool, amount }: { pool: bigint; amount: bigint }) {
     `M${x(a)},${H - 18} L${x(a)},${y(lifeCapPpm(a))} L${x(clamp(b))},${y(lifeCapPpm(clamp(b)))} L${x(clamp(b))},${H - 18} Z`;
   const here = clamp(pool);
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label={`Owed ${ppmToNumber(lifeCapPpm(pool)).toFixed(2)}× at today's pool`}>
+    <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label={`Maximum payout multiplier: ${ppmToNumber(lifeCapPpm(pool)).toFixed(2)}× at the current pool size`}>
       <path d={area(0n, here)} fill="var(--panel-2)" />
       {amount > 0n && <path d={area(here, pool + amount)} fill="var(--accent)" opacity="0.35" />}
       <polyline points={pts} fill="none" stroke="var(--accent)" strokeWidth="2" />

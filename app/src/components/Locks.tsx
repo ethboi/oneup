@@ -53,11 +53,9 @@ export function Locks() {
       {/* phones: the left column dissolves so the title, then the price and form, then the locks run in order */}
       <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-5">
         <div className="order-1">
-          <Explainer title="Locks" line="Locked $1UP earns the house's buybacks, shared by weight: the amount × the rounds left ÷ 104.">
-            Each round, 30% of the house&apos;s payout buys back $1UP for everyone locked. A lock&apos;s weight counts from the
-            round after it&apos;s made and shrinks as it runs down. Leaving early costs up to half, less as the lock runs down,
-            and the penalty goes to everyone still locked. Losers&apos; $1UP arrives already locked for {MAX} rounds. A lock is an
-            NFT: sell it on the market instead of leaving early.
+          <Explainer title="Locks" line="Lock $1UP to share in buyback rewards. Your share depends on how much you lock and how long it remains locked.">
+            Each round, 30% of the house&apos;s payout budget is used to buy back $1UP. These rewards are shared by weight: the locked amount × remaining rounds ÷ {MAX}. A new lock starts earning from the next round, and its weight decreases each round.
+            Early withdrawal costs up to 50% of the locked amount; the penalty decreases over time and is shared among the remaining locks. $1UP awarded for eligible trading losses is locked for {MAX} rounds. Each lock is an NFT that you can list for sale.
           </Explainer>
         </div>
         <div className="panel order-3 min-w-0 divide-y divide-[var(--line)]">
@@ -66,37 +64,38 @@ export function Locks() {
               <button
                 className="btn btn-accent w-full sm:w-auto"
                 disabled={claimSum === 0n}
-                onClick={() => run(`Claim ${fmtOneup(claimSum.toString(), 2)} $1UP`, () => tx.claimVeMany(toClaim.slice(0, 30).map(([k]) => k), past))}
+                title="Claim available rewards from up to 30 locks."
+                onClick={() => run("Claim rewards from up to 30 locks", () => tx.claimVeMany(toClaim.slice(0, 30).map(([k]) => k), past))}
               >
                 <Icon name="claim" />
-                {claimSum > 0n ? `Claim all ${fmtOneup(claimSum.toString(), 2)}` : "Nothing to claim yet"}
+                {claimSum > 0n ? "Claim rewards" : "No rewards to claim"}
               </button>
             }
           >
             <Stat label="Locked" value={`${fmtOneup(locked.toString())} $1UP`} sub={px > 0n ? `≈ ${fmtUsd((locked * px) / ONEUP)}` : undefined} />
             <Stat label="Your weight next round" value={fmtOneup(mine.toString())} />
-            <Stat label="Your share" value={`${share.toFixed(2)}%`} />
+            <Stat label="Your share next round" value={`${share.toFixed(2)}%`} />
             <Stat label="Recent buybacks" value={`${fmtOneup((recent ?? 0n).toString())} $1UP`} />
           </SummaryBar>
 
           <div className="divide-y divide-[var(--line)]">
             <PanelHead
-              title={`Running (${running.length})`}
+              title={`Active locks (${running.length})`}
               action={
                 rewardLocks.length >= 2 && (
                   <button
                     className="chip inline-flex items-center gap-1.5"
-                    onClick={() => run(`Merge ${rewardLocks.length} reward locks`, () => tx.mergeLocks(rewardLocks.slice(0, 30).map((l) => l.token_id)))}
-                    title="One lock with the total amount, ending at the latest end. Claim first: it counts from next round."
+                    onClick={() => run("Merge up to 30 reward locks", () => tx.mergeLocks(rewardLocks.slice(0, 30).map((l) => l.token_id)))}
+                    title="Combine up to 30 reward locks. The new lock holds their total amount and ends at the latest unlock round. Claim rewards first; the merged lock starts earning next round."
                   >
                     <Icon name="merge" />
-                    Merge {rewardLocks.length} reward locks
+                    Merge {Math.min(rewardLocks.length, 30)} reward locks
                   </button>
                 )
               }
             />
             {running.length === 0 ? (
-              <Empty icon="lock">No locks yet. Lock $1UP here, or lose a trade: losers get their $1UP as a 104-round lock.</Empty>
+              <Empty icon="lock">No locks yet. Lock $1UP from your wallet or buy a lock on the market. Eligible net trading losses can also earn you $1UP in a {MAX}-round reward lock.</Empty>
             ) : (
               running
                 .sort((a, b) => Number(BigInt(b.amount) - BigInt(a.amount)))
@@ -107,7 +106,7 @@ export function Locks() {
           {closed.length > 0 && (
             <div className="divide-y divide-[var(--line)]">
               <PanelHead
-                title={`Closed (${closed.length})`}
+                title={`Closed locks (${closed.length})`}
                 action={
                   <button className="chip" onClick={() => setShowClosed(!showClosed)} aria-expanded={showClosed}>
                     {showClosed ? "Hide" : "Show"}
@@ -149,7 +148,7 @@ function LockRow({ l, epoch, px, claimable, listings }: { l: LockInfo; epoch: nu
           <div className="label truncate">{origin}</div>
         </div>
         <div className="col-span-2 row-start-2 sm:col-span-1 sm:row-start-1 sm:col-start-2">
-          <div className="h-2 overflow-hidden rounded-full bg-[var(--panel-2)]" role="progressbar" aria-label="Lock time left" aria-valuenow={left} aria-valuemin={0} aria-valuemax={MAX}>
+          <div className="h-2 overflow-hidden rounded-full bg-[var(--panel-2)]" role="progressbar" aria-label="Rounds until unlock" aria-valuenow={left} aria-valuemin={0} aria-valuemax={MAX}>
             <div className="h-full rounded-full bg-[var(--info)]" style={{ width: `${(l.withdrawn ? 0 : left / MAX) * 100}%` }} />
           </div>
           <div className="label num mt-1">
@@ -171,7 +170,7 @@ function LockRow({ l, epoch, px, claimable, listings }: { l: LockInfo; epoch: nu
           <div className="num font-extrabold" style={claimable > 0n ? { color: "var(--long)" } : undefined}>
             {claimable > 0n ? fmtOneup(claimable.toString(), 2) : worth !== null ? fmtUsd(worth) : "–"}
           </div>
-          <div className="label">{claimable > 0n ? "$1UP to claim" : worth !== null ? "if left today" : ""}</div>
+          <div className="label">{claimable > 0n ? "$1UP to claim" : worth !== null ? "Est. value after penalty" : ""}</div>
         </div>
         {!l.withdrawn && (
           <div className="col-span-2 flex gap-2 sm:col-span-1 sm:col-start-4">
@@ -185,7 +184,7 @@ function LockRow({ l, epoch, px, claimable, listings }: { l: LockInfo; epoch: nu
                 <div className="min-w-0 flex-1">
                   <Sell nft={d.contracts.ve} tokenId={l.token_id} listings={listings} compact />
                 </div>
-                <button className="btn btn-ghost px-2.5" onClick={() => setLeaving(!leaving)} aria-expanded={leaving} aria-label="Leave early" title="Leave early">
+                <button className="btn btn-ghost px-2.5" onClick={() => setLeaving(!leaving)} aria-expanded={leaving} aria-label="Withdraw early" title="Withdraw early">
                   <Icon name="leave" />
                 </button>
               </>
@@ -196,16 +195,15 @@ function LockRow({ l, epoch, px, claimable, listings }: { l: LockInfo; epoch: nu
       {leaving && !l.withdrawn && (
         <div className="mt-3 flex flex-col gap-2 rounded-lg border border-[var(--short)] p-3 text-sm sm:flex-row sm:items-center">
           <p className="flex-1">
-            Leave now: you get <b className="num">{fmtOneup((BigInt(l.amount) - penalty).toString())} $1UP</b>; the other{" "}
-            <b className="num">{fmtOneup(penalty.toString())}</b> ({((Number(penalty) / Number(l.amount)) * 100).toFixed(1)}%) goes to
-            everyone still locked. Selling may get you more.
+            Withdraw now to receive <b className="num">{fmtOneup((BigInt(l.amount) - penalty).toString())} $1UP</b>. A penalty of{" "}
+            <b className="num">{fmtOneup(penalty.toString())} $1UP</b> ({((Number(penalty) / Number(l.amount)) * 100).toFixed(1)}%) is shared among the remaining locks. You can also list this lock for sale, but a sale requires a buyer.
           </p>
           <button
             className="btn shrink-0"
             style={{ "--btn-bg": "var(--short-fill)", color: "var(--on-fill)" } as React.CSSProperties}
-            onClick={() => run(`Leave lock #${l.token_id} early`, () => tx.exitEarly(l.token_id)).then(() => setLeaving(false))}
+            onClick={() => run(`Withdraw from lock #${l.token_id} early`, () => tx.exitEarly(l.token_id)).then(() => setLeaving(false))}
           >
-            Leave and pay {fmtOneup(penalty.toString())}
+            Confirm early withdrawal
           </button>
         </div>
       )}
@@ -256,7 +254,7 @@ function OneupPrice({ px, locked }: { px: bigint; locked: bigint }) {
           <path d={line} fill="none" stroke={tone} strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
         </svg>
       )}
-      <p className="label mt-1">From the swap pool; buybacks push it up. Sampled every minute.</p>
+      <p className="label mt-1">Quote from the swap pool, sampled every minute. The price can change.</p>
       <dl className="num mt-3 flex flex-col gap-1.5 border-t border-[var(--line)] pt-3 text-sm">
         <div className="ticket-row">
           <dt className="label">In your wallet</dt>
@@ -283,7 +281,6 @@ function LockForm({ px }: { px: bigint }) {
   const [epochs, setEpochs] = useState(MAX);
   const raw = parseTokenAmount(amount, 18);
   const over = raw > wallet;
-  const years = epochs / 52;
   return (
     <div className="panel flex flex-col gap-3 p-4">
       <h2 className="text-lg font-extrabold">Lock $1UP</h2>
@@ -307,18 +304,18 @@ function LockForm({ px }: { px: bigint }) {
           })}
         </span>
       )}
-      {raw > 0n && px > 0n && !over && <span className="label num -mt-1">≈ {fmtUsd((raw * px) / ONEUP)} at today&apos;s price</span>}
-      {over && <span className="text-sm text-[var(--short)]">That&apos;s more than your wallet holds.</span>}
+      {raw > 0n && px > 0n && !over && <span className="label num -mt-1">≈ {fmtUsd((raw * px) / ONEUP)} at the current price</span>}
+      {over && <span className="text-sm text-[var(--short)]">This amount exceeds your wallet balance.</span>}
       {wallet === 0n && (
         <p className="label">
-          Your wallet has no $1UP to lock. Losers&apos; $1UP arrives already locked, and locks can be bought on the Market.
+          Your wallet has no unlocked $1UP. Trading rewards arrive in locks, and you can buy locks on the market.
         </p>
       )}
       <label className="flex flex-col gap-1">
         <span className="label flex justify-between">
           <span>Lock for</span>
           <span className="num font-bold text-[var(--text)]">
-            {epochs} rounds{epochs >= 13 ? ` (about ${years >= 1 ? `${years.toFixed(1)} years` : `${Math.round(epochs / 4.33)} months`})` : ""}
+            {epochs} {epochs === 1 ? "round" : "rounds"}
           </span>
         </span>
         <input
@@ -332,8 +329,7 @@ function LockForm({ px }: { px: bigint }) {
         />
       </label>
       <p className="label num">
-        Weight {((Number(amount) || 0) * epochs / MAX).toLocaleString("en-US", { maximumFractionDigits: 0 })}, shrinking each round.
-        Leaving early costs up to half, less as the lock runs down.
+        Starting weight: {((Number(amount) || 0) * epochs / MAX).toLocaleString("en-US", { maximumFractionDigits: 0 })}. Weight decreases each round. Early withdrawal costs up to 50% of the locked amount; the penalty decreases over time.
       </p>
       <button className="btn btn-accent" disabled={raw === 0n || over} onClick={() => run(`Lock ${amount} $1UP`, () => tx.lock(raw, epochs)).then((ok) => ok && setAmount(""))}>
         <Icon name="lock" />

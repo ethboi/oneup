@@ -25,7 +25,7 @@ export function Solvency() {
     return (await Promise.all(ids.map((e) => o.epochSummary(e)))).filter(Boolean) as EpochSummary[];
   }, [epoch?.id], 10_000);
 
-  if (!s) return <p className="label">Loading…</p>;
+  if (!s) return <p className="label">Loading house reserves…</p>;
   const pool = big(s.pool);
   const liability = big(s.liability);
   const reserve = big(s.reserve);
@@ -37,21 +37,21 @@ export function Solvency() {
     <div className="flex flex-col gap-4">
       <div>
         <PageTitle>The house</PageTitle>
-        <p className="label mt-1.5">Payout reserves from the chain and recovery scenarios from a simplified model. Oracle, custody and implementation risks remain.</p>
+        <p className="label mt-1.5">View the house’s on-chain reserves and explore modeled recovery scenarios. Reserves do not remove oracle, custody or contract risks.</p>
       </div>
       <div className="panel p-5">
         <p className="text-lg">
-          If every open position hit its max win at once, the house would pay{" "}
-          <span className="num font-bold">${fmtUsdc(liability, 0)}</span>:{" "}
-          <span className="num font-bold">{used.toFixed(1)}%</span> of the pool.
+          Accepted trades reserve up to{" "}
+          <span className="num font-bold">${fmtUsdc(liability, 0)}</span> in profit before fees, or{" "}
+          <span className="num font-bold">{used.toFixed(1)}%</span> of the pool. This excludes returned margin.
         </p>
         <p className="label mt-1">
-          Admission refuses trades whose reserved maximum wins would exceed pool capacity. Both sides of each market
-          and pending opens are counted. This accounting check does not guarantee withdrawal timing or eliminate custody, oracle or contract risk.
+          The house rejects new trades if their maximum profit payouts would exceed the pool’s capacity. This check includes long and short positions
+          and orders waiting to open. It does not guarantee immediate withdrawals or remove custody, oracle or contract risks.
         </p>
         {epoch && (
           <p className="mt-3 text-sm">
-            This round so far, traders lost <b className="num">{fmtUsd(big(epoch.losses))}</b> to the house and it paid winners{" "}
+            So far this round, traders have lost <b className="num">{fmtUsd(big(epoch.losses))}</b> to the house, which has paid winners{" "}
             <b className="num">{fmtUsd(big(epoch.payouts))}</b>: the house is{" "}
             <b className="num" style={{ color: houseNet >= 0n ? "var(--long)" : "var(--short)" }}>
               {houseNet >= 0n ? "up" : "down"} {fmtUsd(houseNet < 0n ? -houseNet : houseNet)}
@@ -63,32 +63,32 @@ export function Solvency() {
           <p className="mt-3 flex items-center gap-2 text-sm">
             <Icon name="info" />
             <span>
-              No surplus distributions until the pool is back above its <b className="num">${fmtUsdc(big(s.seed), 0)}</b> seed. It&apos;s{" "}
-              <b className="num">${fmtUsdc(big(s.seed) - pool, 0)}</b> short, so Extra Life payouts and buybacks need further surplus.
+              The pool must recover its initial <b className="num">${fmtUsdc(big(s.seed), 0)}</b> before it can distribute any surplus. It is currently{" "}
+              <b className="num">${fmtUsdc(big(s.seed) - pool, 0)}</b> below that level. New Life payouts and buybacks depend on further surplus.
             </span>
           </p>
         )}
 
         <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <Tile label="Pool" value={pool} />
-          <Tile label="Worst-case payout" value={liability} />
-          <Tile label="Reserve (1.2× worst case, min the seed)" value={reserve} />
+          <Tile label="Maximum profit liability" value={liability} />
+          <Tile label="Reserve (1.2× maximum profit payouts; at least the initial pool)" value={reserve} />
           <Tile label="Surplus above reserve" value={big(s.surplus)} />
         </div>
 
-        <svg viewBox="0 0 1000 44" preserveAspectRatio="none" className="mt-5 h-11 w-full" role="img" aria-label={`Worst case is ${used.toFixed(1)}% of the pool`}>
+        <svg viewBox="0 0 1000 44" preserveAspectRatio="none" className="mt-5 h-11 w-full" role="img" aria-label={`Maximum profit payouts equal ${used.toFixed(1)}% of the pool`}>
           <rect x="0" y="12" width="1000" height="20" rx="4" fill="var(--panel-2)" stroke="var(--line)">
             <title>Pool ${fmtUsdc(pool, 0)}</title>
           </rect>
           <rect x="0" y="12" width={Math.max(4, Math.min(1000, used * 10))} height="20" rx="4" fill="var(--series-long)">
-            <title>Worst-case payout ${fmtUsdc(liability, 0)} ({used.toFixed(1)}%)</title>
+            <title>Maximum profit liability ${fmtUsdc(liability, 0)} ({used.toFixed(1)}%)</title>
           </rect>
           <line x1={Math.min(1000, pct(reserve, pool) * 10)} x2={Math.min(1000, pct(reserve, pool) * 10)} y1="4" y2="40" stroke="var(--text)" strokeWidth="2" vectorEffect="non-scaling-stroke">
             <title>Reserve ${fmtUsdc(reserve, 0)}</title>
           </line>
         </svg>
         <div className="mt-2 flex flex-wrap gap-4 text-sm">
-          <Legend color="var(--series-long)" label="Worst-case payout" />
+          <Legend color="var(--series-long)" label="Maximum profit liability" />
           <span className="flex items-center gap-1.5">
             <span className="inline-block h-3 w-0.5 bg-[var(--text)]" /> Reserve
           </span>
@@ -98,7 +98,7 @@ export function Solvency() {
         </div>
 
         <div className="-mx-5 mt-5 flex flex-wrap items-baseline justify-between gap-2 border-t border-[var(--line)] px-5 pt-5">
-          <h2 className="text-lg font-extrabold">Per market: max wins against its cap (half the pool)</h2>
+          <h2 className="text-lg font-extrabold">Maximum profit payouts and capacity by market</h2>
           <div className="flex gap-4 text-sm">
             <Legend color="var(--series-long)" label="Longs" />
             <Legend color="var(--series-short)" label="Shorts" />
@@ -122,7 +122,7 @@ export function Solvency() {
                     {fmtUsdc(big(m.capacity), 0)}
                   </span>
                 </div>
-                <svg viewBox="0 0 1000 24" preserveAspectRatio="none" className="mt-1 h-6 w-full" role="img" aria-label={`${m.id} liability against capacity`}>
+                <svg viewBox="0 0 1000 24" preserveAspectRatio="none" className="mt-1 h-6 w-full" role="img" aria-label={`${m.id} maximum profit payouts compared with capacity`}>
                   <rect x="0" y="4" width="1000" height="16" rx="4" fill="var(--panel-2)" />
                   {lw > 0 && (
                     <rect x="0" y="4" width={Math.max(4, lw)} height="16" rx="4" fill="var(--series-long)">
@@ -153,15 +153,15 @@ export function Solvency() {
               <thead>
                 <tr className="label text-left">
                   <th className="pb-2 font-normal">Round</th>
-                  <th className="pb-2 text-right font-normal">Traders lost</th>
-                  <th className="hidden pb-2 text-right font-normal sm:table-cell">Winners took</th>
+                  <th className="pb-2 text-right font-normal">Trader losses</th>
+                  <th className="hidden pb-2 text-right font-normal sm:table-cell">Winner payouts</th>
                   <th className="hidden pb-2 text-right font-normal md:table-cell">Market fees</th>
-                  <th className="pb-2 text-right font-normal">House net</th>
-                  <th className="hidden pb-2 text-right font-normal md:table-cell">Extra Lives</th>
-                  <th className="hidden pb-2 text-right font-normal lg:table-cell">Life cap</th>
-                  <th className="pb-2 text-right font-normal">Paid to lives</th>
+                  <th className="pb-2 text-right font-normal">House profit/loss</th>
+                  <th className="hidden pb-2 text-right font-normal md:table-cell">Lives issued</th>
+                  <th className="hidden pb-2 text-right font-normal lg:table-cell">Payout multiplier</th>
+                  <th className="pb-2 text-right font-normal">Allocated to Lives</th>
                   <th className="hidden pb-2 text-right font-normal sm:table-cell">Buyback</th>
-                  <th className="hidden pb-2 text-right font-normal sm:table-cell">Pool after</th>
+                  <th className="hidden pb-2 text-right font-normal sm:table-cell">Closing pool</th>
                 </tr>
               </thead>
               <tbody>
@@ -187,8 +187,8 @@ export function Solvency() {
       <PoolAtWork pool={pool} liability={liability} />
 
       <div className="panel p-5 text-sm">
-        <b>Where the pool comes from:</b> the house&apos;s seed and the bootstrap round. Backing has its own tab: the round, the
-        curve, when it pays back, and the $1UP backers get.
+        <b>How the pool is funded:</b> initial house funding and contributions from backers. Open the Backing tab to see
+        the funding round, pricing curve, repayment rules and $1UP rewards.
       </div>
       <Fairness />
       <Governance />
