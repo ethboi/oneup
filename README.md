@@ -71,6 +71,7 @@ warns about mismatched hashes or missing build provenance and preserves state. `
 | `pnpm demo:judge` / `pnpm test:judge` | Isolated controlled demonstration / asserted core-loop check |
 | `pnpm verify:deployment` | Compare nine deployed contracts with local WASM; honors `ONEUP_CONFIG` |
 | `pnpm demo` | Persistent ordinary demo, live prices and twelve synthetic trading bots |
+| `pnpm mcp` / `pnpm agent` | MCP server for AI agents over stdio / one autonomous Claude session over its tools |
 | `pnpm test` | Rust unit/property, SDK and model tests; excludes sandbox and app/keeper Node tests |
 | `pnpm test:ts` / `pnpm test:sandbox` | App/keeper regressions / built-WASM integration tests |
 | `pnpm sim` / `pnpm sim:sensitivity` | Historical growth illustration / adverse economic scenarios |
@@ -89,6 +90,26 @@ Ordinary demo price steering:
 ```bash
 curl -XPOST localhost:8787/price -H 'content-type: application/json' -d '{"market":"NEAR-USD","movePct":-2}'
 ```
+
+## AI agents
+
+OneUp is built to be traded by AI agents as well as people. The MCP server (`mcp/`) gives any MCP client
+the trader's tools: markets, quotes, open and close, take-profit and stop-loss, Life claims, and the
+market for Lives and locks (`market_listings`, `buy_listing` with a maximum price). An agent can treat an
+Extra Life as an asset: buy one listed below the USDC it can still pay, then claim from it or hold it
+against its own losses. Every action takes the agent's stated reason and goes into a journal
+(`.localnet/agent-journal.jsonl`) that the app's **Agents** tab shows beside the agent's results.
+
+```bash
+pnpm mcp                      # stdio; Claude Code in this repo picks it up from .mcp.json
+ONEUP_ACCOUNT=bot3 pnpm mcp   # trade as another bot
+pnpm agent                    # one autonomous Claude session: the Claude API with ANTHROPIC_API_KEY, else the claude CLI
+```
+
+By default the agent trades as `bot12`, which the rule-based bots leave alone (`ONEUP_AI_AGENTS` names
+others). The session's instructions cap margin per trade, leverage and new trades, and require a
+stop-loss; the contracts enforce only their own limits. Locally the agent signs with a full-access test
+key; a production agent would need a constrained key and its own treasury limits, which are not built.
 
 ## Rules and limits
 
@@ -136,10 +157,16 @@ support this story; they do not make this an autonomous business or a proven AI 
 | Ethereum/Solana funding, 1Click | No real bridge deposit or 1Click integration demonstrated; first-use setup can require an additional signature |
 | Sputnik DAO | Local ownership and voting; disclosed demo council keys, not independent production governance |
 | Function-call keys / NEP-366 | Local sponsored trade calls; a trade-only key can still lose the trading balance |
-| MCP / bots | Full-key demo tooling and synthetic activity; no constrained autonomous-agent treasury |
+| MCP, AI agent, bots | MCP tools for AI agents, including buying Lives on the market; an action journal with each stated reason; `pnpm agent` for one Claude session; twelve rule-based bots for synthetic activity. Full-access local keys; no constrained autonomous-agent treasury |
 | Oracle | Mock oracle with live, simulated or fixed inputs; Outlayer-compatible call interface, real deployment unverified |
 | Buyback swap | Local constant-product mock with custom payload; real Rhea adapter remains to be implemented |
 | Vault / Chain Signatures | Mock vault; external lending and Chain Signatures are future work |
+
+NEAR Intents is the intended money layer: traders and agents fund from other chains into Intents balances,
+and idle pool USDC would be put to work through Intents and Chain Signatures. Locally the Intents
+contracts are the official ones, while bridge credits, the vault and the swap are simulated. House profit
+funds Extra Life payouts and $1UP buybacks for lockers, the same fee-funded buyback shape NEAR Intents
+uses for NEAR.
 
 ## Economic evidence
 
@@ -179,7 +206,7 @@ explicit about prepared state, mock integrations and work still requiring real u
 
 - `contracts/`: five product contracts, four mocks, shared integer maths and fresh-WASM sandbox tests.
 - `packages/sdk/`: typed calls and formula vectors. `keeper/`: prices, execution, epoch and retry loops.
-- `app/`: Next.js interface. `bots/` and `mcp/`: synthetic demo activity and agent tools.
+- `app/`: Next.js interface. `bots/`: synthetic demo activity. `mcp/`: the MCP server and `pnpm agent`.
 - `sim/`: floating-point economic illustrations. `contracts/vendor/`: unchanged third-party binaries.
 - [Current demo and readiness plan](docs/HACKATHON_READINESS.md), [maths](docs/maths.md),
   [interfaces](docs/interfaces.md), [security limits](docs/SECURITY.md), [historical decisions](docs/decisions.md).

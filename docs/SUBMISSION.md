@@ -3,7 +3,7 @@
 Existing code is permitted per the team's clarification. The repository is private while building;
 publication, public X posting and submission are deferred. Preserve the pre-event baseline and accurately
 describe subsequent work. Lead with **NFTs That Do Something** (`nfts`), with **Unstoppable DeFi** (`defi`)
-as the related application. This is positioning, not a prediction of track competition or prize odds.
+as the related application, and the AI-agent venue (MCP tools, journal, `pnpm agent`) as the supporting story. This is positioning, not a prediction of track competition or prize odds.
 
 Recheck the [official site](https://nearhackathon.com/) and [submission instructions](https://nearhackathon.com/HACKATHON.md)
 before submitting. As checked on 24 October 2026, the deadline is 14 November 2026 at 23:59 UTC.
@@ -17,9 +17,11 @@ OneUp turns eligible trading losses into transferable recovery rights on NEAR. A
 
 The prototype combines capped perpetuals with recovery that is conditional, limited and time-bound. Trader Lives earn in their mint round and 13 subsequent rounds. Expiry ends future allocations but preserves earned cash. No entry or funding fee is charged; winners pay 10–25% of profit and marketplace sellers pay 2%. Recovery and resale liquidity are never guaranteed.
 
+OneUp is also a venue AI agents trade on. Its MCP server gives an agent the trader's tools, including buying Lives listed below what they can still pay, and records each action with the agent's stated reason on an Agents tab.
+
 The core demonstration follows one Life through inspection, sale with unclaimed USDC and buyer claim. NEAR's token standards and asynchronous receipts make ownership and payout behavior independently testable. A durable issuance queue preserves original entitlements through failed receipts and retries without duplicating rewards or reverting a buyer's ownership.
 
-The repository maps claims to code, regressions and replay commands, with revision-labelled historical evidence. The repeatable demo uses local test money and mock USDC, oracle, swap, vault and bridge boundaries. Native NEAR testnet wallet setup is available; no live deployment is claimed without a recorded transaction journey. Official Intents contracts run locally with simulated bridge credits.
+The repository maps claims to code, regressions and replay commands, with revision-labelled historical evidence. The repeatable demo uses local test money and mock USDC, oracle, swap, vault and bridge boundaries. Native NEAR testnet wallet setup is available; no live deployment is claimed without a recorded transaction journey. NEAR Intents is the intended money layer; official Intents contracts run locally with simulated bridge credits.
 
 Contract tests and economic experiments address mechanism behavior, not proven demand or sustainability. Five-person research is prepared; no participant results or organic purchases are claimed. OneUp is a prototype, not a production-audited exchange.
 ```

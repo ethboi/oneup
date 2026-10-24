@@ -178,8 +178,11 @@ const NEAR: { title: string; status: Status; body: string; points: string[]; mar
     title: "AI agents (MCP)",
     marks: [{ name: "near", label: "NEAR" }],
     status: "demo",
-    body: "An MCP server lets AI agents read markets, request quotes, open and close positions, set exit orders and claim Life payouts.",
-    points: ["Configured in .mcp.json. It uses a demo or bot account’s full-access key, without a separate spending limit"],
+    body: "OneUp is built to be traded by AI agents as well as people. An MCP server gives an agent the trader’s tools: markets, quotes, open and close, exit orders, Life claims, and buying Extra Lives and locks on the market. Each action carries the agent’s reason, shown on the Agents tab.",
+    points: [
+      "pnpm agent runs one autonomous Claude session over these tools; the bots leave its account (bot12) to it",
+      "Configured in .mcp.json. On the local demo it signs with a bot account’s full-access key, without a separate spending limit",
+    ],
   },
 ];
 
