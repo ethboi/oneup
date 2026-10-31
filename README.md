@@ -3,7 +3,7 @@
 **Perpetuals on NEAR where a losing trade can leave you an Extra Life: an NFT that holds USDC and a share of
 the house's future profit, which you can claim or sell.**
 
-![A trade is liquidated, the round closes, and the loss becomes an Extra Life that is claimed and sold](docs/media/oneup.gif)
+![A 50× long is liquidated; when the round closes the loss becomes an Extra Life, whose USDC is claimed; then another trader's Life is bought on the market for its future payouts](docs/media/oneup.gif)
 
 A NEAR HACKATHON entry for **NFTs That Do Something**, **Unstoppable DeFi** and **Agent Economy**. It runs on
 a local NEAR chain with test USDC; nothing is deployed to testnet or mainnet. All of it was written in the
@@ -50,7 +50,7 @@ cargo-near 0.22.0, the versions CI uses.
 | 4 | `pnpm demo:judge`, and leave it running | After about five minutes `Judge app: http://127.0.0.1:3021`; about a minute later `Ready.`, naming a prepared Life and a listing |
 | 5 | Open http://127.0.0.1:3021 | The Trade screen, as the `demo` trader: the NEAR-USD chart, the order ticket with its potential recovery, and How recovery works |
 | 6 | Open the **Extra Lives** tab | A Life from a prepared loss, with USDC available to claim and a remaining payout limit. **Claim** sends the USDC to the wallet |
-| 7 | Open the **Market** tab | bot3's Life, listed below the USDC it holds. **Buy** moves it to your Extra Lives; claim it there |
+| 7 | Open the **Market** tab | bot3's Life: bot3 claimed its USDC and lists the rest, its future payouts, for a fifth of its remaining payout limit. **Buy** moves it to your Extra Lives, and what later rounds pay it is yours to claim |
 | 8 | In a second terminal: `ONEUP_CONFIG=<path printed in step 4> pnpm test:judge` | Eleven assertions pass in about 70 seconds: fills, liquidation, Life minted, USDC claimed, sale, former owner refused, buyer claims, reserve admission, deployed hashes, DAO ownership. `e2e.json` is written beside the config |
 | 9 | On the Trade screen, open a 50× long on NEAR-USD; then `curl -XPOST 127.0.0.1:8887/price -H 'content-type: application/json' -d '{"market":"NEAR-USD","movePct":-2}'` | The keeper liquidates the position; when the 45-second round closes, a new Life appears on the Extra Lives tab |
 | 10 | `pnpm agent` (needs `ANTHROPIC_API_KEY` or the `claude` CLI) | An AI agent trades as bot12; the **Agents** tab lists each action and the reason it gave |

@@ -56,9 +56,9 @@ try {
       // public fields only: the config holds local throwaway keys
       writeFileSync(resolve(dir, "prepared.json"), JSON.stringify({
         source: sourceIdentity(), appUrl, demoLife: p.demoLife, listing: p.listing,
-        preparedState: "Scripted: the demo trader and bot3 were liquidated by a controlled 2% price drop, and bot3 listed its Extra Life at 90% of the USDC it holds. The price is set by this script and says nothing about demand.",
+        preparedState: "Scripted: the demo trader and bot3 were liquidated by a controlled 2% price drop; bot3 claimed its Extra Life's USDC and listed the Life for a fifth of its remaining payout limit. The price is set by this script and says nothing about demand.",
       }, null, 2));
-      console.log(`Ready. The demo trader owns Extra Life ${p.demoLife.token_id} with $${fmtUsdc(BigInt(p.demoLife.claimable))} to claim (Extra Lives tab),\nand ${p.listing.seller} lists Extra Life ${p.listing.tokenId} for $${fmtUsdc(BigInt(p.listing.priceAtomic))} on the Market tab. Prepared state: ${resolve(dir, "prepared.json")}`);
+      console.log(`Ready. The demo trader owns Extra Life ${p.demoLife.token_id} with $${fmtUsdc(BigInt(p.demoLife.claimable))} to claim (Extra Lives tab),\nand ${p.listing.seller}, having claimed its USDC, lists Extra Life ${p.listing.tokenId} for $${fmtUsdc(BigInt(p.listing.priceAtomic))}: up to $${fmtUsdc(BigInt(p.listing.remainingLimitAtomic))} of future payouts (Market tab).\nPrepared state: ${resolve(dir, "prepared.json")}`);
     } catch (error) { console.error(`The sample wasn't prepared (${error instanceof Error ? error.message : error}). The app runs on the empty chain.`); }
   }
   console.log(`\nEnd-to-end check: ONEUP_CONFIG='${env.ONEUP_CONFIG}' pnpm test:judge\nAI agents: ONEUP_CONFIG='${env.ONEUP_CONFIG}' pnpm mcp (an MCP server on stdio). Without ONEUP_CONFIG it uses the newest judge chain when there's no regular demo, so Claude Code in this folder (.mcp.json) finds it. Actions show on the Agents tab.\nCtrl-C stops everything.`);

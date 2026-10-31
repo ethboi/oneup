@@ -1,7 +1,8 @@
 // Gives a fresh judge chain something to show on the first screen: the demo trader and bot3 each lose a trade (a
-// controlled price drop liquidates both), the round closes, both get an Extra Life with USDC to claim, and bot3
-// lists its Life on the Market for the demo trader to buy. Prepared, scripted state: judge-demo.ts discloses it in
-// prepared.json. bot3 because test:judge trades as bot1, bot2 and demo, and the AI agent is bot12.
+// controlled price drop liquidates both), the round closes, and both get an Extra Life with USDC to claim. bot3
+// claims its USDC and lists the Life on the Market for what's left, its future payouts, for the demo trader to
+// buy. Prepared, scripted state: judge-demo.ts discloses it in prepared.json. bot3 because test:judge trades as
+// bot1, bot2 and demo, and the AI agent is bot12.
 import { Account, type KeyPairString } from "near-api-js";
 import { OneUp, USDC, accountSender, type Deployment, type LifeInfo } from "@oneup/sdk";
 
@@ -11,7 +12,7 @@ const LEVERAGE = 50;
 
 export type Prepared = {
   demoLife: LifeInfo;
-  listing: { seller: string; tokenId: string; priceAtomic: string; claimableAtomic: string };
+  listing: { seller: string; tokenId: string; priceAtomic: string; claimedAtomic: string; remainingLimitAtomic: string };
 };
 
 export async function prepareJudgeChain(d: Deployment, controlUrl: string, say: (line: string) => void): Promise<Prepared> {
@@ -63,9 +64,20 @@ export async function prepareJudgeChain(d: Deployment, controlUrl: string, say: 
   const demoLife = await life(d.demo.id);
   const sellerLife = await life(seller.id);
 
-  // a scripted asking price: 10% under the USDC the Life holds now, in whole cents
-  const price = ((BigInt(sellerLife.claimable) * 9n) / 10n / 10_000n) * 10_000n;
+  // bot3 takes the cash and sells the rest: a buyer pays for future payouts, which may be zero. A scripted
+  // asking price of a fifth of the remaining payout limit, in whole dollars.
+  say(`  · ${seller.id} claims its Life's USDC and lists the Life for its future payouts`);
+  await send(seller).claimLives([sellerLife.token_id]);
+  const claimed = await until("the claim", async () => {
+    const l = await o.lifeInfo(sellerLife.token_id);
+    return l && BigInt(l.claimable) === 0n ? l : undefined;
+  });
+  const remaining = BigInt(claimed.owed) - BigInt(claimed.paid);
+  const price = (remaining / 5n / USDC) * USDC;
   await send(seller).list(d.contracts.life, sellerLife.token_id, price);
   await until("the listing", async () => (await o.listings()).some((l) => l.token_id === sellerLife.token_id));
-  return { demoLife, listing: { seller: seller.id, tokenId: sellerLife.token_id, priceAtomic: price.toString(), claimableAtomic: sellerLife.claimable } };
+  return {
+    demoLife,
+    listing: { seller: seller.id, tokenId: sellerLife.token_id, priceAtomic: price.toString(), claimedAtomic: sellerLife.claimable, remainingLimitAtomic: remaining.toString() },
+  };
 }
