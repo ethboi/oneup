@@ -1,219 +1,189 @@
 # OneUp
 
-**Trading losses can become transferable recovery rights on NEAR.**
+**Perpetuals on NEAR where a losing trade can leave you an Extra Life: an NFT that holds USDC and a share of
+the house's future profit, which you can claim or sell.**
 
-OneUp is a perpetuals prototype for traders interested in partial recovery after losses. An **Extra Life**
-is an NFT holding unclaimed USDC and a conditional right to further house-profit payouts. Selling it
-transfers those rights to the buyer. Recovery can be zero; the payout limit is neither a valuation nor a
-promise. Trader Lives earn during their mint round and 13 subsequent rounds; expiry preserves allocated
-cash. Demand for buying these rights and sustainable recovery economics remain unvalidated.
+![A trade is liquidated, the round closes, and the loss becomes an Extra Life that is claimed and sold](docs/media/oneup.gif)
 
-Built by ethboi for continued development toward [NEAR HACKATHON](https://nearhackathon.com/).
-Existing code is permitted per the team's clarification. The repository stays private while building;
-publication and submission are later human decisions. The repeatable demo uses local NEAR and test money.
-An opt-in native NEAR testnet wallet path is described in [wallet setup](docs/NEAR_WALLET_SETUP.md);
-no public testnet deployment or real-wallet transaction is established by the historical evidence below.
+A NEAR HACKATHON entry for **NFTs That Do Something**, **Unstoppable DeFi** and **Agent Economy**. It runs on
+a local NEAR chain with test USDC; nothing is deployed to testnet or mainnet. All of it was written in the
+hackathon window: the first commit is 20 October 2026, the day after the announcement
+(`git log --reverse --format=%ad | head -1`).
 
-## Review the core claim
+## The problem
 
-| Claim | Code and regression | Run → observable result |
+On a perpetuals venue that trades against its users, a trader's loss is the venue's profit, and a liquidated
+position leaves the trader nothing to hold, sell or claim.
+
+OneUp gives losers part of the house's profit back, as an asset they own. When a round closes with the house
+in profit, each wallet with a net loss in that round gets an **Extra Life**: USDC to claim now, and a share of
+the house's profit for the next 13 rounds, up to a payout limit of 1.2–2× its face value. Losers also get
+$1UP tokens, locked for two years; lockers share the house's buybacks. A Life is an NFT: claim it, keep it or
+sell it, and the buyer gets its unclaimed USDC and its future payouts. Recovery depends on future house profit
+and can be zero.
+
+## What NEAR does here
+
+- **NFTs that hold money.** Each Extra Life is a NEP-171 NFT (with NEP-177 metadata and NEP-178 approvals)
+  whose owner can claim the USDC (NEP-141) allocated to it; transferring it moves the claim. Its SVG art is
+  generated on chain from its state. Events follow NEP-297.
+- **NEAR Intents.** Deposits go through the official Intents Verifier (v0.4.2, unchanged): one signed intent
+  swaps a bridged token for USDC, deposits it and opens a trade, and the house checks that an intent can trade
+  only the deposit it brings. Locally, PoA tokens stand in for bridged assets and OneUp runs its own solver.
+- **Sputnik DAO.** A DAO running unchanged mainnet Sputnik v2 code owns the house, the Extra Lives and the
+  oracle: markets, parameters and the keeper change by council vote.
+- **Function-call keys and NEP-366.** One-tap trading uses a session key that can only call the house's
+  trading methods, and a relayer pays the gas.
+- **AI agents.** An MCP server gives an agent the trader's tools, including buying Lives on the market; every
+  action is journalled with the agent's stated reason and shown on the app's Agents tab.
+
+## Try it
+
+Tested on Linux with Node 24.13.0, pnpm 10.18.3, Rust 1.99.1 (with the `wasm32-unknown-unknown` target) and
+cargo-near 0.22.0, the versions CI uses.
+
+| Step | Do | See |
 |---|---|---|
-| Selling a Life transfers payout rights | [Life](contracts/extra-life/src/lib.rs), [market regression](contracts/tests/tests/market.rs), [judge journey](scripts/judge-e2e.ts) | `pnpm demo:judge`, then `ONEUP_CONFIG=<printed-config> pnpm test:judge` → buyer owns and claims; former owner is rejected |
-| Failed issuance preserves the obligation | [Recovery queue](contracts/house/src/recovery.rs), [receipt regression](contracts/tests/tests/recovery.rs) | `pnpm test:sandbox` → failure/retry preserves recipient, terms and transferred ownership without duplicate rewards |
-| Expiry removes future rights, not allocated cash | [Life regressions](contracts/extra-life/src/tests.rs), [UI accounting](app/test/life-economics.ts) | `pnpm test` and `pnpm test:ts` → expired cash remains claimable; remaining payout limit is zero |
-| Admission reserves capped profit liability | [House property tests](contracts/house/src/tests.rs), [judge journey](scripts/judge-e2e.ts) | `pnpm test` and `pnpm test:judge` → over-capacity orders are rejected under the contract's accounting assumptions |
+| 1 | `pnpm install --frozen-lockfile` | Dependencies installed |
+| 2 | `pnpm preflight --compile` | Every line ✓. Without cargo-near it also checks the tools needed to build it |
+| 3 | `pnpm build:contracts` | Nine WASM files under `contracts/target/near/` |
+| 4 | `pnpm demo:judge`, and leave it running | After about five minutes `Judge app: http://127.0.0.1:3021`; about a minute later `Ready.`, naming a prepared Life and a listing |
+| 5 | Open http://127.0.0.1:3021 | The Trade screen, as the `demo` trader: the NEAR-USD chart, the order ticket with its potential recovery, and How recovery works |
+| 6 | Open the **Extra Lives** tab | A Life from a prepared loss, with USDC available to claim and a remaining payout limit. **Claim** sends the USDC to the wallet |
+| 7 | Open the **Market** tab | bot3's Life, listed below the USDC it holds. **Buy** moves it to your Extra Lives; claim it there |
+| 8 | In a second terminal: `ONEUP_CONFIG=<path printed in step 4> pnpm test:judge` | Eleven assertions pass in about 70 seconds: fills, liquidation, Life minted, USDC claimed, sale, former owner refused, buyer claims, reserve admission, deployed hashes, DAO ownership. `e2e.json` is written beside the config |
+| 9 | On the Trade screen, open a 50× long on NEAR-USD; then `curl -XPOST 127.0.0.1:8887/price -H 'content-type: application/json' -d '{"market":"NEAR-USD","movePct":-2}'` | The keeper liquidates the position; when the 45-second round closes, a new Life appears on the Extra Lives tab |
+| 10 | `pnpm agent` (needs `ANTHROPIC_API_KEY` or the `claude` CLI) | An AI agent trades as bot12; the **Agents** tab lists each action and the reason it gave |
+| 11 | `pnpm verify` | About seven minutes: typechecks, Rust unit, property and sandbox tests, TypeScript tests and a production build, ending `Complete verification passed` |
 
-[Evidence and exact historical revisions](docs/evidence/README.md) distinguish contract tests, SDK checks
-and browser observations. The retained clean `b188d54` record passed eight verification stages; its SDK
-journey passed ten named assertions. Those are historical results, not proof of the current branch.
-The prepared browser walkthrough took 140.993 seconds; the full trade-to-sale flow took 253.506 seconds
-and included one CLI price-control step. Setup, mocks and timing boundaries are [recorded explicitly](docs/evidence/historical-browser.json).
+`pnpm demo:judge` starts a fresh chain under `.judge/<time>/` on every run and never touches the regular demo.
+It uses ports 3021 (app), 3130 (RPC), 8887 (price control) and 25567, and refuses to start if one is taken
+(`ONEUP_JUDGE_APP_PORT=3022` and the like move them). Prices stay fixed until you steer them and no bots run.
+The prepared sample is scripted and recorded in `prepared.json`; `pnpm demo:judge --empty` skips it. Ctrl-C
+stops everything.
 
-## Try the core loop
+`pnpm demo` runs the ordinary demo instead: live prices, twelve bots and ten-minute rounds at
+http://127.0.0.1:3020, with state kept in `.localnet/`.
 
-Verified development toolchain: Node 24.13.0, pnpm 10.18.3, Rust 1.99.1 with
-`wasm32-unknown-unknown`, cargo-near 0.22.0. CI uses the same versions. Install dependencies with
-`pnpm install --frozen-lockfile`, then `pnpm doctor --compile` and `pnpm build:contracts`.
-Use `pnpm doctor --judge` after building to check the isolated demo ports and WASM manifest.
+## Check the claims
 
-```bash
-pnpm demo:judge
-# Open http://127.0.0.1:3021
-# In another terminal, use the absolute ONEUP_CONFIG printed by the launcher:
-ONEUP_CONFIG=/absolute/path/printed/by/launcher/localnet.json pnpm test:judge
-```
+| Claim | Code and regression | Run and see |
+|---|---|---|
+| Selling a Life transfers its payout rights | [Extra Life](contracts/extra-life/src/lib.rs), [market test](contracts/tests/tests/market.rs), [judge journey](scripts/judge-e2e.ts) | `pnpm test:judge`: the buyer owns and claims it; the former owner is refused |
+| A purchase can't land on a changed listing | [Market](contracts/market/src/lib.rs), sandbox `a_life_claimed_and_listed_again_is_not_sold_to_the_earlier_buyer` | `pnpm test:sandbox`: a Life claimed and listed again at the same price refunds the earlier buyer |
+| A Life is never sized above its loss | [Maths](contracts/math/src/lib.rs), house `a_quiet_rounds_fees_dont_inflate_its_lives` | `pnpm test`: a quiet round's marketplace fees don't inflate the round's Lives or $1UP |
+| Failed issuance keeps the obligation | [Recovery queue](contracts/house/src/recovery.rs), [receipt test](contracts/tests/tests/recovery.rs) | `pnpm test:sandbox`: a failure and retry keep the recipient and terms without duplicating rewards |
+| Expiry stops future payouts, not allocated cash | [Life tests](contracts/extra-life/src/tests.rs), [UI accounting](app/test/life-economics.ts) | `pnpm test` and `pnpm test:ts`: expired cash stays claimable; the remaining payout limit is zero |
+| Admission reserves the worst case | [House property tests](contracts/house/src/tests.rs) | `pnpm test`: random sequences of trades never let liability exceed the pool |
 
-The judge launcher creates fresh state under `.judge/<timestamp>/`, binds RPC 3130, app 3021,
-control 8887 and peer port 25567, runs fixed controllable prices, and starts no bots. It refuses occupied
-ports and never resets the ordinary demo. If app port 3021 is occupied, use `ONEUP_JUDGE_APP_PORT=3022 pnpm demo:judge`. Setup/build time is separate from the three-minute walkthrough.
-The test deposits for two traders, fills and liquidates positions, waits for NFT settlement, claims test
-USDC, sells another NFT, verifies the former owner cannot claim, and verifies the buyer can claim.
-Its `e2e.json` records source identity, assertions and nine deployed WASM hashes beside the isolated config.
-All pre-existing bootstrap backing is prepared demo state, not external fundraising.
-On the Trade screen, **How recovery works** stays available after trading or dismissal. Expand it
-for the four-step loop and a next action based on the selected wallet. Open any Life to inspect its
-current owner, token ID, originating round, available USDC, remaining payout limit and expiry.
-Expired Lives with unclaimed USDC remain visible and sellable. Marketplace prices are seller-entered;
-no cap discount is presented as expected value. NFT totals span all owners, not personal profit.
-See [the recovery journey and retry protocol](docs/RECOVERY_JOURNEY.md) for limits and a walkthrough.
+[The evidence index](docs/evidence/README.md) keeps earlier recorded runs, with the exact revisions they ran on.
 
-For the animated live-price demo use `pnpm demo` at http://127.0.0.1:3020. It runs twelve bots and
-10-minute epochs; state persists in `.localnet/`. It deploys five product contracts and four mocks,
-plus unchanged third-party contracts. Rebuilding WASM does not redeploy an existing chain: startup
-warns about mismatched hashes or missing build provenance and preserves state. `pnpm verify:deployment` fails on a mismatch.
+## What is real and what is mocked
 
-| Command | Purpose |
+| Component | State |
 |---|---|
-| `pnpm doctor --compile` / `pnpm doctor --judge` | Check build prerequisites / built WASM and isolated-demo ports without starting services |
-| `pnpm verify` | Full gate: all typechecks, Rust/property/SDK/model tests, app/keeper regressions, fresh sandbox tests, sensitivity and production app build |
-| `pnpm test:economics` | Four funded contract experiments with reconciled cash and a source-bound report; [scope](docs/ECONOMIC_EXPERIMENTS.md) |
-| `pnpm test:judge:ci` | Fresh isolated deployment, SDK journey and prepared Chromium ownership/claim acceptance |
-| `pnpm demo:judge` / `pnpm test:judge` | Isolated controlled demonstration / asserted core-loop check |
-| `pnpm verify:deployment` | Compare nine deployed contracts with local WASM; honors `ONEUP_CONFIG` |
-| `pnpm demo` | Persistent ordinary demo, live prices and twelve synthetic trading bots |
-| `pnpm mcp` / `pnpm agent` | MCP server for AI agents over stdio / one autonomous Claude session over its tools |
-| `pnpm test` | Rust unit/property, SDK and model tests; excludes sandbox and app/keeper Node tests |
-| `pnpm test:ts` / `pnpm test:sandbox` | App/keeper regressions / built-WASM integration tests |
-| `pnpm sim` / `pnpm sim:sensitivity` | Historical growth illustration / adverse economic scenarios |
-| `pnpm farm` | Historical and same-wallet token farming comparison |
-| `pnpm localnet:reset` | Destructively reset the ordinary chain; unnecessary for the isolated judge demo |
-
-`pnpm verify` writes ignored `.verification/` logs and a manifest with the source commit, dirty-state
-fingerprint, commands, runtime and log hashes, and fails on source drift. A build manifest binds WASM hashes to Rust/build inputs. Next builds run in a source snapshot so their generated files cannot overwrite the ordinary demo. Use that manifest for current counts; historical reports
-retain their original dates and stages. CI artifacts become available only after a future authorized push.
-
-For `pnpm test:judge:ci`, install Chromium first with `pnpm exec playwright install --with-deps chromium`.
-The new automated browser check has not been executed locally yet; the historical browser observations
-above are separate evidence. `pnpm test:judge:ci --sdk-only` explicitly skips browser acceptance.
-
-Ordinary demo price steering:
-```bash
-curl -XPOST localhost:8787/price -H 'content-type: application/json' -d '{"market":"NEAR-USD","movePct":-2}'
-```
-
-## AI agents
-
-OneUp is built to be traded by AI agents as well as people. The MCP server (`mcp/`) gives any MCP client
-the trader's tools: markets, quotes, open and close, take-profit and stop-loss, Life claims, and the
-market for Lives and locks (`market_listings`, `buy_listing` with a maximum price). An agent can treat an
-Extra Life as an asset: buy one listed below the USDC it can still pay, then claim from it or hold it
-against its own losses. Every action takes the agent's stated reason and goes into a journal
-(`.localnet/agent-journal.jsonl`) that the app's **Agents** tab shows beside the agent's results.
-
-```bash
-pnpm mcp                      # stdio; Claude Code in this repo picks it up from .mcp.json
-ONEUP_ACCOUNT=bot3 pnpm mcp   # trade as another bot
-pnpm agent                    # one autonomous Claude session: the Claude API with ANTHROPIC_API_KEY, else the claude CLI
-```
-
-By default the agent trades as `bot12`, which the rule-based bots leave alone (`ONEUP_AI_AGENTS` names
-others). The session's instructions cap margin per trade, leverage and new trades, and require a
-stop-loss; the contracts enforce only their own limits. Locally the agent signs with a full-access test
-key; a production agent would need a constrained key and its own treasury limits, which are not built.
+| House, Extra Life, $1UP token, locks, marketplace | OneUp's own contracts, on the local chain |
+| NEAR Intents | The official Verifier and PoA token factory (v0.4.2, unchanged binaries); intents signed with the official SDK. OneUp's own solver fills them with `execute_intents`. Bridge deposits are simulated; there is no real Ethereum or Solana deposit and no 1Click integration |
+| Sputnik DAO | Unchanged mainnet Sputnik DAO v2 code; owns the house, the Extra Lives and the oracle. The council (the demo trader, bot4 and bot6) votes with disclosed test keys |
+| Function-call keys, NEP-366 | Session keys limited to the house's trading methods; a local relayer. A trade-only key can still lose the trading balance |
+| NEAR wallet | Opt-in NEAR Connect 0.11.4 for testnet, described in [wallet setup](docs/NEAR_WALLET_SETUP.md). OneUp isn't deployed to testnet, so the local demo signs with its test accounts |
+| AI agents | The MCP server and `pnpm agent`. The agent signs with a full-access local test key; its limits on margin, leverage and stop-losses are instructions, not enforced in code |
+| Oracle | A mock with Pyth's interface. The keeper feeds it Binance prices (ordinary demo) or fixed prices (judge demo). Pyth through OutLayer is the plan and hasn't been tested on a real network |
+| Swap, vault, USDC | Mocks: a constant-product swap for buybacks (Rhea is the plan), a vault paying 5% on idle pool USDC (lending through Chain Signatures is the plan), and test USDC with a faucet |
+| Randomness | The jackpot draw uses NEAR's block random seed |
 
 ## Rules and limits
 
-- **Trading:** USDC margin, oracle execution, up to 1000× leverage; max profit 9× margin. No entry or
-  funding fee. Winners pay 10–25% of profit; marketplace sellers pay 2%. Liquidation at 90% loss takes
-  the full margin. Minimum voluntary hold is 60 seconds.
-- **Admission:** maximum wins of both longs and shorts count against pool capacity, including pending
-  opens. This reserve invariant prevents over-admission under its accounting assumptions; it does not
-  eliminate oracle, owner/operator, vault, implementation or availability risks.
-- **Oracle:** a fill needs a price published after placement and within the permitted window. The trusted
-  keeper is expected to fill promptly; the contract does not prove it chose the first later price or that
-  nobody had advance knowledge. Limit orders can rest up to 24 hours.
-- **Recovery:** profitable rounds allocate claim face value and emissions by positive wallet net loss.
-  The face is a share of house profit, not necessarily the trader's full loss. Maximum claim is 1.2–2×
-  face. Lives share 60% of half the surplus: two thirds to trader Lives and one third to Backer Lives,
-  with unused slices passed across. Future profits, caps and expiry limit recovery.
-- **Ownership:** Extra Lives and locks are NFTs. Listings require willing USDC buyers; neither immediate
-  liquidity nor a sale price is guaranteed. Unclaimed Life proceeds transfer with ownership.
-- **Backing:** contributions permanently join the pool. Backer Lives never expire but still depend on
-  house profit. The local deployment starts with $250K house seed and $100K synthetic bot backing,
-  creating $426K of aggregate Backer Life caps. These are not users or traction.
-- **$1UP:** 1B minted once: 900M emissions, 50M spot-liquidity allocation, 42.5M treasury and 7.5M
-  reserved for backing incentives. The token constructor initially assigns 50M to treasury; deployment
-  moves 7.5M to the house backing allocation. Emissions release with house profit and arrive as locks.
-- **Locks:** up to 104 epochs (two years at weekly cadence; accelerated in demos), rewards by amount × time left. Early exit costs up to half the tokens;
-  market prices and discounts are assumptions in models, not observed liquidity.
-- **Yield/jackpot:** local mock vault and accelerated interest. Cross-chain lending and Chain Signatures
-  remain plans. Wind-down distributions in D-29 are also planned, not implemented.
+- **Trading.** USDC margin, up to 1000× leverage, and a maximum profit of 9× margin. No entry or funding fee;
+  winners pay 10–25% of their profit. A 90% loss liquidates the position and takes its whole margin. A
+  position can be closed after 60 seconds. Orders fill at an oracle price published after they were placed,
+  by a trusted keeper. A limit order rests up to 24 hours, and can be cancelled after its first 30 seconds.
+- **Admission.** The pool must cover the maximum win of every open position and pending open, longs and shorts
+  together, so it can always pay; this doesn't remove oracle, owner, vault or implementation risk.
+- **Extra Lives.** Sized from the round's house profit, up to the round's net losses, by each wallet's share
+  of those losses: a Life's face value is never more than its loss. Lives share 60% of half the surplus above
+  the reserve each round, two thirds to trader Lives and one third to Backer Lives.
+- **$1UP.** 1B minted once: 900M released to losers over four years, 20 per USDC of the house profit behind
+  their Lives, as two-year locks; 50M for liquidity, 42.5M treasury and 7.5M for backers. Lockers earn
+  buybacks by amount × time left; leaving early costs up to half.
+- **Backing.** The local deployment starts with a $250K house seed and $100K of bot backing, which earn Backer
+  Lives that never expire. These are prepared state, not users or traction.
+- **Market.** Lives and locks are NFTs listed for USDC; sellers pay a 2% fee to the house. No price or buyer
+  is guaranteed.
 
-The mechanism combines ideas from Papertrade (loss-linked claims) and Aerodrome (revenue-linked NFT
-locks), with capped expiring recovery and reserve admission. These references acknowledge design
-lineage, not a claim to have invented every component.
+The design borrows from Papertrade (loss-linked claims) and Aerodrome (revenue-sharing locks). The maths is in
+[docs/maths.md](docs/maths.md) and every decision in [docs/decisions.md](docs/decisions.md).
 
-## NEAR and implementation status
+## AI agents
 
-Lead product story: **NFTs That Do Something**; also relevant to **Unstoppable DeFi**. The NFT carries payout rights,
-changes claim ownership when transferred and has on-chain dynamic art. DAO ownership and key restrictions
-support this story; they do not make this an autonomous business or a proven AI security product.
+The MCP server (`mcp/`) gives any MCP client thirteen tools: `how_it_works`, `markets`, `account`,
+`quote_trade`, `open_trade`, `close_trade`, `set_triggers`, `extra_lives`, `claim_lives`, `house`,
+`market_listings`, `buy_listing` and `faucet`. An agent can treat a Life as an asset: buy one listed below the
+USDC it can still pay, then claim it. Every action takes the agent's reason, and goes into a journal beside
+the chain's state that the Agents tab shows.
 
-| Component | Current state |
+```bash
+pnpm mcp                      # stdio. Claude Code in this folder loads it from .mcp.json
+ONEUP_ACCOUNT=bot3 pnpm mcp   # trade as another bot
+pnpm agent                    # one autonomous session: the Claude API with ANTHROPIC_API_KEY, else the claude CLI
+```
+
+The server uses `ONEUP_CONFIG` if set, else the ordinary demo's `localnet.json`, else the newest judge chain.
+By default the agent trades as bot12, which the rule-based bots leave alone.
+
+## Economics
+
+`pnpm test:economics` runs funded experiments against the real contracts: admission, inactive rounds and
+expiry, an adverse house result, and two wallets farming each other; its report reconciles cash, fees and
+remaining rights ([scope and results](docs/ECONOMIC_EXPERIMENTS.md)). `pnpm sim:sensitivity` models flat and
+falling activity, negative edge and high utilisation across random seeds. These show how the mechanism
+behaves; they don't prove demand or that recovery is sustainable. A [five-person research protocol](docs/USER_RESEARCH.md)
+is prepared, with no results yet.
+
+## Commands
+
+| Command | Purpose |
 |---|---|
-| House, Extra Life, token, locks, marketplace | Implemented locally; NEP-141/171/178 and NEP-297 events |
-| Native NEAR wallet | Opt-in testnet NEAR Connect 0.11.4; Meteor recommended, with a picker for compatible alternatives. MyNearWallet is excluded. See [setup and verification limits](docs/NEAR_WALLET_SETUP.md). Local demo keeps its test identities; no Rabby/Phantom signing path. |
-| Intents verifier, PoA and solver | Official vendored contracts and signed local execution; bridge credits simulated |
-| Ethereum/Solana funding, 1Click | No real bridge deposit or 1Click integration demonstrated; first-use setup can require an additional signature |
-| Sputnik DAO | Local ownership and voting; disclosed demo council keys, not independent production governance |
-| Function-call keys / NEP-366 | Local sponsored trade calls; a trade-only key can still lose the trading balance |
-| MCP, AI agent, bots | MCP tools for AI agents, including buying Lives on the market; an action journal with each stated reason; `pnpm agent` for one Claude session; twelve rule-based bots for synthetic activity. Full-access local keys; no constrained autonomous-agent treasury |
-| Oracle | Mock oracle with live, simulated or fixed inputs; Outlayer-compatible call interface, real deployment unverified |
-| Buyback swap | Local constant-product mock with custom payload; real Rhea adapter remains to be implemented |
-| Vault / Chain Signatures | Mock vault; external lending and Chain Signatures are future work |
+| `pnpm preflight --compile` / `--judge` | Check build prerequisites / the built WASM and the judge demo's ports |
+| `pnpm demo:judge` / `pnpm test:judge` | Isolated, controlled demo / its end-to-end check |
+| `pnpm test:judge:ci` | A fresh isolated deployment, the end-to-end check and a Chromium test of listing, buying and claiming (run `pnpm exec playwright install --with-deps chromium` first) |
+| `pnpm verify` | The full gate; writes source-bound logs to `.verification/` |
+| `pnpm test` / `pnpm test:sandbox` / `pnpm test:ts` | Rust unit, property, SDK and model tests / integration tests on fresh WASM / app and keeper tests |
+| `pnpm test:economics`, `pnpm sim:sensitivity`, `pnpm farm` | Funded experiments, adverse scenarios, farming comparison |
+| `pnpm demo` | The ordinary demo: live prices and twelve bots |
+| `pnpm mcp` / `pnpm agent` | The MCP server / one autonomous AI agent session |
+| `pnpm verify:deployment` | Compare the deployed contracts with the local WASM |
+| `pnpm localnet:reset` | Delete the ordinary demo's chain (the judge demo doesn't need it) |
 
-NEAR Intents is the intended money layer: traders and agents fund from other chains into Intents balances,
-and idle pool USDC would be put to work through Intents and Chain Signatures. Locally the Intents
-contracts are the official ones, while bridge credits, the vault and the swap are simulated. House profit
-funds Extra Life payouts and $1UP buybacks for lockers, the same fee-funded buyback shape NEAR Intents
-uses for NEAR.
+## Built with
 
-## Economic evidence
+- **AI-written code.** OneUp was written with Claude Code (Anthropic's coding agent), directed and reviewed by
+  the author. Commits it co-wrote carry a `Co-Authored-By: Claude` trailer, which is nearly all of them:
+  `git log --grep='^Co-Authored-By: Claude' --oneline | wc -l`. No starter template or boilerplate was used.
+- **Contracts.** near-sdk and near-contract-standards 5.29.1; tests use near-workspaces 0.23.0, proptest and
+  tokio.
+- **Third-party contracts, deployed unchanged.** NEAR Intents Verifier and PoA token factory v0.4.2, wNEAR, and
+  Sputnik DAO v2; sources and hashes in [contracts/vendor](contracts/vendor/README.md).
+- **App.** Next.js 16.4.3, React 19.2.9, Tailwind CSS 4.3.3, near-api-js 7.3.1, NEAR Connect
+  (`@hot-labs/near-connect` 0.11.4), the NEAR Intents SDK (`@defuse-protocol/intents-sdk` 0.92.0), borsh 2.0.0,
+  and the Pixelify Sans and M PLUS Rounded 1c fonts from Google Fonts.
+- **SDK, keeper and bots.** near-api-js 7.3.1. Live prices come from Binance's and Coinbase's public APIs.
+- **MCP server and agent.** `@modelcontextprotocol/sdk` 1.30.1, zod 4.6.5, `@anthropic-ai/sdk` 1.3.0.
+- **Tooling.** TypeScript 6.0.3, tsx, Vitest, Playwright 1.64.1, near-sandbox 0.3.4, cargo-near 0.22.0.
 
-Start with the [executable economic experiments](docs/ECONOMIC_EXPERIMENTS.md): `pnpm test:economics`
-runs funded orders against actual contracts for admission, inactivity/expiry, adverse house outcomes and
-two controlled wallets. Its `.verification/economics.json` reconciles cash, fees and remaining rights,
-keeping unsold NFTs and tokens separate from realized USDC. These bounded cases do not prove sustainability.
+Licences for these are in [third-party notices](THIRD_PARTY_NOTICES.md).
 
-`pnpm sim` reproduces the historical growth illustration: weekly losses $20K→$2M, assumed mean 15%
-house edge, fixed 50% utilisation, $25K seed at a 1× backer claim, 20 random seeds. This is an aggregate-flow
-model, not an executable market/admission model. Some synthetic paths exceed available cash; even its
-historical headline must not be presented as a solvency or general fairness proof.
+## Repository
 
-`pnpm sim:sensitivity` writes `sim/out/sensitivity.json`: flat/declining activity, low/negative edge,
-high utilisation, actual deployment backing and a larger bootstrap. It reports recovery, expired/unpaid
-caps, backer repayment, early/late ratios and cash deficits with ranges across seeds. Negative cash flags
-infeasible exogenous flows, not a demonstrated contract exploit. High utilisation can leave recovery at
-zero; low activity can leave backing substantially unpaid.
+- `contracts/`: five product contracts, four mocks, shared integer maths and sandbox tests on built WASM.
+- `packages/sdk/`: typed calls and the maths mirrored for previews. `keeper/`: prices, fills, rounds, retries.
+- `app/`: the Next.js app. `bots/`: synthetic demo traders. `mcp/`: the MCP server and `pnpm agent`.
+- `sim/`: economic models. `scripts/`: chain, deploy, judge demo and verification.
+- Docs: [security](docs/SECURITY.md), [maths](docs/maths.md), [interfaces](docs/interfaces.md),
+  [decisions](docs/decisions.md), [the recovery journey](docs/RECOVERY_JOURNEY.md),
+  [hackathon readiness](docs/HACKATHON_READINESS.md), [submission draft](docs/SUBMISSION.md).
 
-The report also compares same-wallet and separate-wallet farming with different assumed lock discounts.
-Wallet netting is not Sybil resistance. Extra Life recovery, trade admission, capital timing and real
-liquidity can further change profitability. Read assumptions and adverse results before quoting FDVs.
+## Licence
 
-## Product validation
-
-The marketplace proves transfer behavior, not organic demand. A prepared sale below the NFT's available
-cash does not explain why an independent seller would accept it. Use the [five-person research protocol](docs/USER_RESEARCH.md)
-and [blank results template](docs/USER_RESEARCH_RESULTS.md) to test cash-only, future-only and mixed Lives,
-independent bids/asks, fees, expiry and backer principal. No participants or findings are invented.
-
-The [official hackathon site](https://nearhackathon.com/) lists Claude Code and Codex among its judges;
-it does not publish their review order, scoring weights or execution budget. The evidence index is intended
-to make the same factual claims checkable by people and tools. [Submission draft](docs/SUBMISSION.md) stays
-explicit about prepared state, mock integrations and work still requiring real users.
-
-## Repository and evidence
-
-- `contracts/`: five product contracts, four mocks, shared integer maths and fresh-WASM sandbox tests.
-- `packages/sdk/`: typed calls and formula vectors. `keeper/`: prices, execution, epoch and retry loops.
-- `app/`: Next.js interface. `bots/`: synthetic demo activity. `mcp/`: the MCP server and `pnpm agent`.
-- `sim/`: floating-point economic illustrations. `contracts/vendor/`: unchanged third-party binaries.
-- [Current demo and readiness plan](docs/HACKATHON_READINESS.md), [maths](docs/maths.md),
-  [interfaces](docs/interfaces.md), [security limits](docs/SECURITY.md), [historical decisions](docs/decisions.md).
-
-## Licensing
-
-Original OneUp source code and accompanying documentation are **AGPL-3.0-only**; see [LICENSE](LICENSE)
-and [NOTICE](NOTICE). Commercial use is permitted under those terms. Covered modified network-served
-versions must offer corresponding source to their users. Third-party binaries, dependencies and marks
-retain their own terms; see [third-party notices](THIRD_PARTY_NOTICES.md) and [vendor provenance](contracts/vendor/README.md).
+Original OneUp code and documentation are **AGPL-3.0-only**: see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+Third-party binaries, dependencies and marks keep their own terms; see [third-party notices](THIRD_PARTY_NOTICES.md).

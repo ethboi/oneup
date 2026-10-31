@@ -139,14 +139,14 @@ const NEAR: { title: string; status: Status; body: string; points: string[]; mar
     ],
   },
   {
-    title: "Pyth prices via Outlayer",
+    title: "Oracle prices",
     marks: [{ name: "pyth", label: "Pyth" }, { name: "outlayer", label: "Outlayer" }],
     status: "simulated",
-    body: "Orders fill using a price published after the order was placed. Liquidations use the latest valid price. Timely execution still depends on the keeper.",
+    body: "Orders fill using a price published after the order was placed, and liquidations use the latest valid price. Locally the prices come from a mock oracle; Pyth through Outlayer is the planned source.",
     points: [
-      "In local live-price mode, the keeper sends Binance prices to a mock oracle with a Pyth-compatible interface",
-      "An Outlayer-compatible interface is implemented, but deployment and price feeds on a real network remain unverified",
-      "The house checks price age and confidence, and rejects future timestamps",
+      "In local live-price mode, the keeper sends Binance prices to a mock oracle with Pyth’s interface",
+      "The house calls the methods Outlayer’s Pyth oracle exposes, but hasn’t been tested against a real deployment or price feed",
+      "The house checks price age and confidence, and rejects future timestamps. Timely execution still depends on the keeper",
     ],
   },
   {

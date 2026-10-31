@@ -1,17 +1,20 @@
 # Current development and demo plan
 
 This document and executable code supersede the archived `PLAN.md` and historical decision notes.
-Existing-code eligibility is resolved per the team. Repository publication and submission are deferred.
-Lead with transferable recovery rights and the behavior of the Extra Life NFT. Native NEAR wallet setup
+All code is in the hackathon window (first commit 20 October 2026, after the 19 October announcement; Q-001),
+so no baseline tag is needed. Making the repository public, posting on X and submitting are the author's
+decisions, still to come. Lead with transferable recovery rights and the behavior of the Extra Life NFT. Native NEAR wallet setup
 is [documented separately](NEAR_WALLET_SETUP.md); a public testnet deployment must be verified before
 calling that integration live.
 
-## Three-minute prepared walkthrough
+## Three-minute walkthrough
 
-Install, build, deploy and warm the app before recording. Use `pnpm demo:judge`; follow its printed config
-with `pnpm test:judge` for the separate SDK check. Prepare a settled trader Life with claimable test USDC
-and a second funded identity. Disclose local test money, seed/backer balances, mock boundaries and prepared
-settlement at the beginning. Do not imply this short recording creates the loss from a fresh chain.
+Install, build, deploy and warm the app before recording. `pnpm demo:judge` prepares a settled Life with
+claimable test USDC for the demo trader and a listed Life from bot3 (recorded in its `prepared.json`); follow
+its printed config with `pnpm test:judge` for the separate SDK check. Disclose local test money, seed/backer
+balances, mock boundaries and prepared settlement at the beginning. Do not imply this short recording creates
+the loss from a fresh chain, unless it shows step 9 of the README's walkthrough (a trade liquidated by a
+steered price).
 
 | Time | Demonstration |
 |---|---|
@@ -60,7 +63,9 @@ Real external oracle/swap/vault/bridge deployments remain separate integration w
 
 ## Review and publication
 
-The [official site](https://nearhackathon.com/) confirms AI judges but does not state that they review first
-or publish a current scoring formula. Prepare searchable evidence and a consistent repository rather than
-assuming hidden judge prompts. Follow the [submission draft](SUBMISSION.md) and recheck official instructions
-before publication. The pre-event commit history must remain distinguishable from work done during the event.
+The official rules (Q-017) say Claude Code and Codex screen every entry first: a reproducibility check,
+feature verification, a structured report and a preliminary score; humans decide. The README is written for
+that reader: the problem, what's built, and numbered do-and-see steps. A local-only demo needs a public
+repository, a reproducible README and an X post with a video (Q-012); the README lists libraries and
+AI-written code (Q-005). Follow the [submission draft](SUBMISSION.md) and recheck the official instructions
+before publishing.
