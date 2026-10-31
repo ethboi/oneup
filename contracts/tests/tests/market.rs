@@ -23,9 +23,21 @@ async fn list(e: &Env, seller: &Account, nft: &near_workspaces::Contract, token_
     Ok(())
 }
 
-/// Buys at the listing `price` the buyer saw, sending `pay` (any extra comes back as change).
+/// The approval id of a token's listing now: what a buyer who looks at it sees.
+async fn approval(e: &Env, nft: &near_workspaces::Contract, token_id: &str) -> anyhow::Result<u64> {
+    let l = view(&e.market, "get_listing", json!({"nft_contract": nft.id(), "token_id": token_id})).await?;
+    Ok(l["approval_id"].as_u64().unwrap_or(0))
+}
+
+/// Buys at the listing `price` the buyer sees now, sending `pay` (any extra comes back as change).
 async fn buy(e: &Env, buyer: &Account, nft: &near_workspaces::Contract, token_id: &str, price: u128, pay: u128) -> anyhow::Result<()> {
-    let msg = json!({"buy": {"nft_contract": nft.id(), "token_id": token_id, "price": usd(price).to_string()}}).to_string();
+    let seen = approval(e, nft, token_id).await?;
+    buy_seen(e, buyer, nft, token_id, price, seen, pay).await
+}
+
+/// Buys the listing the buyer saw earlier: its `price` and `approval_id`.
+async fn buy_seen(e: &Env, buyer: &Account, nft: &near_workspaces::Contract, token_id: &str, price: u128, approval_id: u64, pay: u128) -> anyhow::Result<()> {
+    let msg = json!({"buy": {"nft_contract": nft.id(), "token_id": token_id, "price": usd(price), "approval_id": approval_id}}).to_string();
     transfer_call(buyer, &e.usdc, e.market.id().as_str(), usd(pay), &msg).await
 }
 
@@ -119,10 +131,48 @@ async fn a_listing_cannot_change_under_the_buyer() -> anyhow::Result<()> {
     // A re-price after the buyer looked: the buy carries the price it saw, so it's refused
     let lock2 = lock(1).await?;
     list(&e, &bob, &e.ve, &lock2, 50).await?;
+    let seen = approval(&e, &e.ve, &lock2).await?;
     list(&e, &bob, &e.ve, &lock2, 90).await?; // re-approve at a higher price
-    buy(&e, &dave, &e.ve, &lock2, 50, 90).await?;
+    buy_seen(&e, &dave, &e.ve, &lock2, 50, seen, 90).await?;
     assert_eq!(owner_of(&e.ve, &lock2).await?, bob.id().to_string());
     assert_eq!(usdc(&e, &dave).await?, 1_000 * USDC);
+    Ok(())
+}
+
+/// A claim drops a Life's approvals and a buy names the approval it saw, so a seller can't take a listed Life's
+/// USDC and list it again at the same price under a buyer's purchase.
+#[tokio::test]
+async fn a_life_claimed_and_listed_again_is_not_sold_to_the_earlier_buyer() -> anyhow::Result<()> {
+    let e = setup(5).await?;
+    // Bob loses 500 and the epoch closes: an Extra Life with 100 USDC to claim
+    let bob = trader(&e, "bob", 500).await?;
+    let (pos, placed_at) = open(&e, &bob, "Long", 500, 50, 500).await?;
+    push(&e, 490, placed_at + 2).await?;
+    let ok: bool = e.keeper.call(e.house.id(), "liquidate").args_json(json!({"position_id": pos})).max_gas().transact().await?.json()?;
+    assert!(ok);
+    e.worker.fast_forward(10).await?;
+    close_epoch(&e).await?;
+    let life_id = format!("1:{}", bob.id());
+    assert_eq!(view(&e.life, "life_info", json!({"token_id": life_id})).await?["claimable"], json!(usd(100)));
+    let dave = e.owner.create_subaccount("dave").initial_balance(NearToken::from_near(5)).transact().await?.into_result()?;
+    dave.call(e.usdc.id(), "faucet").args_json(json!({"amount": usd(1_000)})).transact().await?.into_result()?;
+
+    // Bob lists the Life for 90 and Dave looks at the listing
+    list(&e, &bob, &e.life, &life_id, 90).await?;
+    let seen = approval(&e, &e.life, &life_id).await?;
+    // Before Dave's purchase lands, Bob claims the 100 USDC and lists the emptied Life again at the same price
+    bob.call(e.life.id(), "claim").args_json(json!({"token_ids": [life_id]})).max_gas().transact().await?.into_result()?;
+    assert_eq!(view(&e.life, "life_info", json!({"token_id": life_id})).await?["claimable"], json!("0"));
+    list(&e, &bob, &e.life, &life_id, 90).await?;
+    assert_ne!(approval(&e, &e.life, &life_id).await?, seen);
+
+    // Dave's purchase names the listing he saw: refused, and his USDC comes back in full
+    buy_seen(&e, &dave, &e.life, &life_id, 90, seen, 90).await?;
+    assert_eq!(owner_of(&e.life, &life_id).await?, bob.id().to_string());
+    assert_eq!(usdc(&e, &dave).await?, 1_000 * USDC);
+    // Seen afresh, the emptied Life can still be bought knowingly
+    buy(&e, &dave, &e.life, &life_id, 90, 90).await?;
+    assert_eq!(owner_of(&e.life, &life_id).await?, dave.id().to_string());
     Ok(())
 }
 
@@ -144,7 +194,7 @@ async fn buyer_gas_cannot_separate_nft_delivery_from_payment() -> anyhow::Result
         let before_buyer = usdc(&e, &buyer).await?;
         let before_seller = usdc(&e, &seller).await?;
         let before_pool: u128 = view(&e.house, "get_pool", json!({})).await?.as_str().unwrap().parse()?;
-        let msg = json!({"buy":{"nft_contract":e.ve.id(),"token_id":id,"price":usd(100)}}).to_string();
+        let msg = json!({"buy":{"nft_contract":e.ve.id(),"token_id":id,"price":usd(100),"approval_id":approval(&e, &e.ve, &id).await?}}).to_string();
         let _ = buyer.call(e.usdc.id(), "ft_transfer_call").args_json(json!({"receiver_id":e.market.id(),"amount":usd(120),"msg":msg})).deposit(NearToken::from_yoctonear(1)).gas(near_workspaces::types::Gas::from_tgas(gas)).transact().await?;
         let owner = owner_of(&e.ve, &id).await?;
         if owner == buyer.id().as_str() {

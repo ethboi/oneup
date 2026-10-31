@@ -51,6 +51,8 @@ const RANGES = [
 ] as const;
 
 const MIN_HOLD_S = 60;
+/** A limit order rests this long before it can be cancelled, so one priced through the market fills like a market order. */
+const FILL_WINDOW_S = 30;
 
 /**
  * The bar above the chart: the market (a pill that opens the list of markets), a strip of what the house knows
@@ -1388,6 +1390,7 @@ function Positions({ positions, orders, focused, pick }: { positions: Position[]
 /** An open waiting for its fill: a market order for the next price, or a resting limit you can take down. */
 function PendingOpen({ x }: { x: Order }) {
   const { tx, run, prices } = useOneUp();
+  const now = useNow();
   if (!("Open" in x.kind)) return null;
   const { side, leverage, margin, limit } = x.kind.Open;
   const what = `${side} ${x.market_id} ${leverage}× · $${fmtUsdc(BigInt(margin), 0)}`;
@@ -1399,6 +1402,7 @@ function PendingOpen({ x }: { x: Order }) {
       </p>
     );
   const mark = prices[x.market_id];
+  const wait = Math.max(0, x.placed_at + FILL_WINDOW_S + 1 - now);
   return (
     <div className="num mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-dashed border-[var(--line)] px-3 py-2 text-sm">
       <span className="font-bold">Limit {what}</span>
@@ -1406,8 +1410,14 @@ function PendingOpen({ x }: { x: Order }) {
         at {fmtPrice(BigInt(limit))}
         {mark ? ` · ${away(mark, BigInt(limit))} away` : ""} · waiting to fill
       </span>
-      <button type="button" className="chip ml-auto !py-0.5 text-xs" onClick={() => run(`Cancel limit #${x.id}`, () => tx.cancelOrder(x.id))}>
-        Cancel
+      <button
+        type="button"
+        className="chip ml-auto !py-0.5 text-xs"
+        disabled={wait > 0}
+        title={wait > 0 ? "A limit order can be cancelled 30 seconds after you place it" : undefined}
+        onClick={() => run(`Cancel limit #${x.id}`, () => tx.cancelOrder(x.id))}
+      >
+        {wait > 0 ? `Cancel in ${wait}s` : "Cancel"}
       </button>
     </div>
   );

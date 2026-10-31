@@ -102,8 +102,12 @@ export function settle(margin: bigint, p: bigint, ppm: bigint): Settlement {
 
 // §5 Extra Lives
 
+/** What a round's Lives and $1UP are sized from: house profit, never more than the round's net losses. */
+export const recoveryBase = (houseNet: bigint, netLosses: bigint) => min(houseNet > 0n ? houseNet : 0n, netLosses);
+
+/** A loser's share of the recovery base, by net loss: never more than the loss itself. */
 export const faceValue = (houseNet: bigint, loss: bigint, losses: bigint) =>
-  losses === 0n ? 0n : (houseNet * loss) / losses;
+  losses === 0n ? 0n : (recoveryBase(houseNet, losses) * loss) / losses;
 
 export const lifeCapPpm = (pool: bigint) =>
   LIFE_CAP_MAX_PPM - ((LIFE_CAP_MAX_PPM - LIFE_CAP_MIN_PPM) * min(pool, LIFE_CAP_POOL)) / LIFE_CAP_POOL;
@@ -155,14 +159,14 @@ export const exitPenalty = (amount: bigint, epochsLeft: bigint) => {
   return (n + d - 1n) / d;
 };
 
-/** $1UP released to an epoch's losers: 20 per USDC of house profit, at most what's available. */
+/** $1UP released to an epoch's losers: 20 per USDC of `houseNet` (pass the recovery base), at most what's available. */
 export const releasedEmissions = (available: bigint, houseNet: bigint, rate = ONEUP_PER_USDC) =>
   min((houseNet > 0n ? houseNet : 0n) * rate * (ONEUP / USDC), available);
 
 /** Current epoch's loser allocation, using the same positive wallet-net-loss denominator as close. */
 export function previewLossEmission(epoch: { id: number; losses: string; payouts: string; net_losses: string; fees: string }, carry: bigint, loss: bigint, rate = ONEUP_PER_USDC): bigint {
   const denominator = BigInt(epoch.net_losses);
-  const net = BigInt(epoch.losses) + BigInt(epoch.fees) - BigInt(epoch.payouts);
+  const net = recoveryBase(BigInt(epoch.losses) + BigInt(epoch.fees) - BigInt(epoch.payouts), denominator);
   const release = releasedEmissions(carry + emissionsForEpoch(BigInt(epoch.id)), net, rate);
   return denominator > 0n ? release * loss / denominator : 0n;
 }

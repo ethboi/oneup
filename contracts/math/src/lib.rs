@@ -177,11 +177,19 @@ pub fn settle_liquidation(margin: u128) -> Settlement {
 
 // §5 Extra Lives
 
+/// What a round's Extra Lives and $1UP are sized from: the house's net result, but never more than the round's
+/// net losses. Marketplace fees count as house profit (D-28); in a quiet round they could otherwise make a Life
+/// worth more than the loss behind it. Anything above stays in the pool.
+pub fn recovery_base(house_net: u128, net_losses: u128) -> u128 {
+    house_net.min(net_losses)
+}
+
+/// A loser's share of the round's recovery base, by net loss: never more than the loss itself.
 pub fn face_value(house_net: u128, loss: u128, losses: u128) -> u128 {
     if losses == 0 {
         return 0;
     }
-    house_net * loss / losses
+    recovery_base(house_net, losses) * loss / losses
 }
 
 /// 2.0× at an empty pool, falling linearly to 1.2× at $1M and flat after.
@@ -374,6 +382,20 @@ mod tests {
         assert_eq!(owed(face, cap), usd(1_840));
         assert_eq!(life_cap_ppm(0), 2_000_000);
         assert_eq!(life_cap_ppm(usd(5_000_000)), 1_200_000);
+    }
+
+    #[test]
+    fn fees_cannot_make_a_life_worth_more_than_its_loss() {
+        // a quiet round: 1 USDC of net loss and 1_000 USDC of marketplace fees
+        assert_eq!(face_value(usd(1_001), usd(1), usd(1)), usd(1));
+        // two losers share a base capped at their losses
+        assert_eq!(face_value(usd(5_000), usd(300), usd(400)), usd(300));
+        assert_eq!(face_value(usd(5_000), usd(100), usd(400)), usd(100));
+        // the $1UP release uses the same base
+        assert_eq!(recovery_base(usd(1_001), usd(1)), usd(1));
+        assert_eq!(released_emissions(EMISSIONS_TOTAL, recovery_base(usd(1_001), usd(1)), 20), 20 * ONEUP);
+        // below the net losses nothing changes
+        assert_eq!(recovery_base(usd(100_000), usd(300_000)), usd(100_000));
     }
 
     #[test]

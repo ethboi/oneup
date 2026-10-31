@@ -62,6 +62,10 @@ impl Oracle {
         self.pusher = pusher;
     }
 
+    pub fn get_owner(&self) -> AccountId {
+        self.owner.clone()
+    }
+
     pub fn get_price_unsafe(&self, price_identifier: String) -> Option<Price> {
         self.prices.get(&price_identifier).cloned()
     }

@@ -284,7 +284,8 @@ impl House {
         let finished = std::mem::replace(&mut self.epoch, Epoch { id: next, started_at: now, ..Default::default() });
         // trading's result plus the marketplace's cut (D-28)
         let house_net = (finished.losses.0 + finished.fees.0).saturating_sub(finished.payouts.0);
-        let oneup_release = self.release_emissions(&finished, house_net);
+        // $1UP goes by the same base as the Lives' faces: house profit, at most the round's net losses
+        let oneup_release = self.release_emissions(&finished, math::recovery_base(house_net, finished.net_losses.0));
         self.checkpoint_ve(next);
         self.closing = Some(Closing {
             house_net,

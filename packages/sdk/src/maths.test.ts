@@ -13,6 +13,14 @@ describe("maths vectors", () => {
     expect(m.owed(face, 1_840_000n)).toBe(usd(1_840));
   });
 
+  it("fees can't make a Life worth more than its loss", () => {
+    expect(m.faceValue(usd(1_001), usd(1), usd(1))).toBe(usd(1));
+    expect(m.faceValue(usd(5_000), usd(300), usd(400))).toBe(usd(300));
+    expect(m.recoveryBase(usd(100_000), usd(300_000))).toBe(usd(100_000));
+    const quiet = { id: 1, losses: String(usd(1)), payouts: "0", net_losses: String(usd(1)), fees: String(usd(1_000)) };
+    expect(m.previewLossEmission(quiet, 0n, usd(1), 20n)).toBe(20n * m.ONEUP);
+  });
+
   it("V2 pnl and liquidation", () => {
     expect(m.pnl("Long", usd(1_000), 50, px(500), px(540))).toBe(usd(4_000));
     expect(m.pnl("Long", usd(1_000), 50, px(500), px(600))).toBe(usd(9_000));
@@ -65,11 +73,14 @@ describe("maths vectors", () => {
 });
 
 
-it("loser previews use wallet net losses, market fees and the configured rate", () => {
+it("loser previews use wallet net losses, market fees up to those losses, and the configured rate", () => {
   const epoch = { id: 1, losses: usd(200).toString(), payouts: usd(90).toString(), net_losses: usd(110).toString(), fees: "0" };
   expect(m.previewLossEmission(epoch, 0n, usd(10))).toBe(200n * m.ONEUP);
   expect(m.previewLossEmission(epoch, 0n, usd(100))).toBe(2000n * m.ONEUP);
-  expect(m.previewLossEmission({ ...epoch, fees: usd(11).toString() }, 0n, usd(10), 10n)).toBe(110n * m.ONEUP);
+  // fees count as house profit: 200 + 5 − 100 = 105 of the 110 net losses
+  expect(m.previewLossEmission({ ...epoch, payouts: usd(100).toString(), fees: usd(5).toString() }, 0n, usd(11), 10n)).toBe(105n * m.ONEUP);
+  // but never past the net losses: 200 + 11 − 90 = 121 is sized as 110
+  expect(m.previewLossEmission({ ...epoch, fees: usd(11).toString() }, 0n, usd(10), 10n)).toBe(100n * m.ONEUP);
   expect(m.releasedEmissions(100n * m.ONEUP, -usd(1))).toBe(0n);
 });
 

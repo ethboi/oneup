@@ -323,9 +323,14 @@ impl ExtraLife {
         false
     }
 
+    /// The owner only (the DAO, in the local deployment): points the Lives at another house.
     pub fn set_house(&mut self, house: AccountId) {
         require!(env::predecessor_account_id() == self.owner, "Only the owner");
         self.house = house;
+    }
+
+    pub fn get_owner(&self) -> AccountId {
+        self.owner.clone()
     }
 
     // Views

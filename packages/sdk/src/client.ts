@@ -403,8 +403,9 @@ export class OneUp {
         }),
       delist: (nft: string, token_id: string) =>
         send<void>({ contractId: c.market, methodName: "delist", args: { nft_contract: nft, token_id } }),
-      buy: (nft: string, token_id: string, price: bigint) =>
-        ftCall(c.usdc, c.market, price, JSON.stringify({ buy: { nft_contract: nft, token_id, price: price.toString() } })),
+      /** Buys the listing as the buyer saw it: a re-price or a new listing (after a claim, say) refunds the USDC. */
+      buy: (l: Pick<Listing, "nft_contract" | "token_id" | "price" | "approval_id">) =>
+        ftCall(c.usdc, c.market, BigInt(l.price), JSON.stringify({ buy: { nft_contract: l.nft_contract, token_id: l.token_id, price: String(l.price), approval_id: l.approval_id } })),
       /** Backs the house pool during the bootstrap round for a Backer Life (D-22). */
       back: (amount: bigint) => ftCall(c.usdc, c.house, amount, JSON.stringify({ back: {} })),
       /** D-27: the keeper puts pool USDC to work, brings it home, and brings the interest into the jackpot. */

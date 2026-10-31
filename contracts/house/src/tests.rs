@@ -1334,6 +1334,32 @@ fn a_market_fee_is_house_profit() {
     assert_eq!((s.fees.0, s.house_net.0), (usd(20), usd(20)));
 }
 
+/// Fees count as house profit, but a quiet round's fees can't make a small loss mint a Life worth more than the
+/// loss, or hand it the round's whole $1UP release.
+#[test]
+fn a_quiet_rounds_fees_dont_inflate_its_lives() {
+    let mut h = setup(usd(25_000));
+    ctx("owner", T0);
+    h.set_marketplace(acc("market"));
+    deposit(&mut h, "bob", usd(100));
+    let b = open(&mut h, "bob", Side::Short, usd(100), 10, 500, T0);
+    close(&mut h, "bob", b, 505, T0 + 100); // −10
+    ctx("usdc", T0 + 200);
+    let _ = h.ft_on_transfer(acc("market"), U128(usd(1_000)), r#"{"market_fee":{}}"#.into());
+    ctx("keeper", T0 + 600);
+    assert_eq!(h.close_epoch(None), "begun");
+    assert_eq!(h.close_epoch(None), "minting");
+    let batch = h.recovery_batches.iter().next().map(|(_, b)| b.clone()).unwrap();
+    // the house made 1_010, but Bob's Life is sized from his 10 loss, and so is his $1UP
+    assert_eq!(batch.lives.iter().map(|(o, face, _)| (o.clone(), *face)).collect::<Vec<_>>(), vec![(acc("bob"), usd(10))]);
+    assert_eq!(batch.locks, vec![(acc("bob"), 10 * 20 * ONEUP)]);
+    close_epoch_fully(&mut h);
+    let s = h.get_epoch_summary(1).unwrap();
+    assert_eq!((s.fees.0, s.house_net.0, s.lives_minted), (usd(1_000), usd(1_010), 1));
+    // the rest of the round's $1UP waits for later rounds
+    assert_eq!(h.get_emission_carry().0, oneup_math::emissions_for_epoch(1) - 10 * 20 * ONEUP);
+}
+
 #[test]
 #[should_panic(expected = "Only the marketplace pays fees")]
 fn only_the_marketplace_pays_fees() {
@@ -1395,11 +1421,35 @@ fn cancelled_limit_returns_margin_and_room() {
     let mut h = setup(usd(100_000));
     deposit(&mut h, "alice", usd(1_000));
     let order = limit(&mut h, "alice", Side::Long, usd(1_000), 10, 490, T0);
-    ctx("alice", T0 + 10);
+    ctx("alice", T0 + 31);
     h.cancel_order(order);
     assert_eq!(h.get_balance(acc("alice")).0, usd(1_000));
     assert_eq!(h.get_solvency().liability.0, 0);
     assert!(h.orders.get(&order).is_none());
+}
+
+/// A limit priced through the market is a market order with a cancel button: it rests for the fill window, so
+/// it can't be taken back once the next price can be seen coming.
+#[test]
+#[should_panic(expected = "A limit order can be cancelled once it has rested for the fill window")]
+fn limit_cannot_be_cancelled_inside_the_fill_window() {
+    let mut h = setup(usd(100_000));
+    deposit(&mut h, "alice", usd(1_000));
+    // a long limit at 5.20 with the price at 5.00: it fills at the next price
+    let order = limit(&mut h, "alice", Side::Long, usd(1_000), 10, 520, T0);
+    ctx("alice", T0 + 30);
+    h.cancel_order(order);
+}
+
+#[test]
+fn a_marketable_limit_fills_before_it_can_be_cancelled() {
+    let mut h = setup(usd(100_000));
+    deposit(&mut h, "alice", usd(1_000));
+    let order = limit(&mut h, "alice", Side::Long, usd(1_000), 10, 520, T0);
+    ctx("keeper", T0 + 5);
+    h.internal_fill(order, px(500, T0 + 5), T0 + 5).unwrap();
+    assert!(h.orders.get(&order).is_none());
+    assert_eq!(h.get_positions(acc("alice"))[0].entry_price.0, 500 * 1_000_000);
 }
 
 #[test]

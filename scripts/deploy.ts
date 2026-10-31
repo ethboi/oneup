@@ -73,8 +73,12 @@ export async function deploy(opts: { home: string; rpcUrl: string; epochLengthS:
 
   step("init");
   const id = (n: (typeof names)[number]) => c[n].accountId;
+  // D-20: the Sputnik DAO set up below owns every OneUp contract that has an owner: the house, the Extra Lives
+  // (which house mints and pays them), the locks and the oracle (who pushes prices). The mocks standing in for
+  // outside services (USDC, the swap, the vault) stay with the root account.
+  const daoId = sub("dao");
   await call(root, id("usdc"), "new", { owner: rootId });
-  await call(root, id("oracle"), "new", { owner: rootId, pusher: keeper.accountId });
+  await call(root, id("oracle"), "new", { owner: daoId, pusher: keeper.accountId });
   await call(root, id("house"), "new", {
     owner: rootId,
     usdc: id("usdc"),
@@ -93,10 +97,10 @@ export async function deploy(opts: { home: string; rpcUrl: string; epochLengthS:
       oneup_per_usdc: 20,
     },
   });
-  await call(root, id("life"), "new", { owner: rootId, house: id("house"), usdc: id("usdc") });
+  await call(root, id("life"), "new", { owner: daoId, house: id("house"), usdc: id("usdc") });
   // the root account stands in for the Rhea seed and the treasury
   await call(root, id("oneup"), "new", { house: id("house"), rhea_seed: rootId, treasury: rootId });
-  await call(root, id("ve"), "new", { owner: rootId, house: id("house"), oneup: id("oneup") });
+  await call(root, id("ve"), "new", { owner: daoId, house: id("house"), oneup: id("oneup") });
   await call(root, id("swap"), "new", { owner: rootId, usdc: id("usdc"), oneup: id("oneup") });
   // D-28: 2% of each sale goes to the house pool as profit
   await call(root, id("market"), "new", { usdc: id("usdc"), nft_contracts: [id("life"), id("ve")], house: id("house"), fee_ppm: "20000" });
@@ -180,11 +184,13 @@ export async function deploy(opts: { home: string; rpcUrl: string; epochLengthS:
   }
   await call(root, id("house"), "set_intents", { intents: intents.accountId });
 
-  // D-20: a Sputnik DAO (the exact code mainnet DAOs run, contracts/vendor) owns the house; the demo
-  // trader and two bots are its council. Routine buybacks stay with an operator (the root account the
-  // keeper uses), so the DAO only votes on markets and parameters.
+  // D-20: a Sputnik DAO (the exact code mainnet DAOs run, contracts/vendor) owns the house, and has owned the
+  // Extra Lives, the locks and the oracle since their init; the demo trader and two bots are its council.
+  // Routine buybacks stay with an operator (the root account the keeper uses), so the DAO only votes on
+  // markets and parameters.
   step("Sputnik DAO takes over the house");
   const dao = await create("dao", "30");
+  if (dao.accountId !== daoId) throw new Error(`The DAO is ${dao.accountId}, not ${daoId}`);
   await dao.deployContract(readFileSync(resolve(ROOT, "contracts/vendor/sputnikdao2.wasm")));
   const council = [demo.accountId, bots[3].accountId, bots[5].accountId];
   await call(root, dao.accountId, "new", {

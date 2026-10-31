@@ -408,3 +408,23 @@ fn retrying_a_mint_after_sale_and_payout_keeps_the_current_owner_and_terms() {
     assert_eq!(c.total_owed_remaining().0, owed);
     assert_eq!(c.tokens.owner_by_id.len(), 1);
 }
+
+/// The owner (the DAO, in the local deployment) is the only one who can point the Lives at another house.
+#[test]
+#[should_panic(expected = "Only the owner")]
+fn only_the_owner_repoints_the_house() {
+    let mut c = setup();
+    ctx("house", 0);
+    c.set_house(acc("mallory"));
+}
+
+#[test]
+#[should_panic(expected = "Only the house")]
+fn once_repointed_the_old_house_cannot_mint() {
+    let mut c = setup();
+    assert_eq!(c.get_owner(), acc("owner"));
+    ctx("owner", 0);
+    c.set_house(acc("house2"));
+    ctx("house", 0);
+    c.mint_backer(acc("seed"), U128(USDC), U128(1_000_000));
+}

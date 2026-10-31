@@ -362,7 +362,7 @@ class Bot {
     const price = BigInt(best.x.price);
     const wallet = BigInt(await o.usdcBalance(this.id));
     if (wallet < price) await this.tx.faucet(10_000n * USDC);
-    await this.tx.buy(best.x.nft_contract, best.x.token_id, price).then(
+    await this.tx.buy(best.x).then(
       () => log(this.style.name, `bought ${label(best.x)} for $${fmtUsdc(price)} (worth ~$${fmtUsdc(best.value)})`),
       (e) => log(this.style.name, `buy failed: ${short(e)}`),
     );

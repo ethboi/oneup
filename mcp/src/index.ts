@@ -368,7 +368,7 @@ server.registerTool(
     if (price > usdc(max_price_usd)) throw new Error(`Listed at $${fmtUsdc(price)} now, above your $${max_price_usd}`);
     if (l.seller === me) throw new Error("That's your own listing");
     if (price > BigInt(await o.usdcBalance(me))) throw new Error(`Needs $${fmtUsdc(price)} USDC in the wallet (try faucet)`);
-    await tx.buy(nft_contract, token_id, price);
+    await tx.buy(l);
     return { bought: true, kind: nft_contract === d.contracts.life ? "extra_life" : "lock", token_id, price_usd: dollars(price) };
   }),
 );

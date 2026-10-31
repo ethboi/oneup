@@ -1,7 +1,7 @@
 # Security
 
-What OneUp trusts, what each key can do, what a review of the code found on 21 Oct 2026 and what changed,
-and what is still open. Decisions are in [decisions.md](decisions.md); the maths in [maths.md](maths.md).
+What OneUp trusts, what each key can do, what reviews of the code found (21 Oct 2026, 23 Oct 2026 and
+31 Oct 2026) and what changed, and what is still open. Decisions are in [decisions.md](decisions.md); the maths in [maths.md](maths.md).
 
 This is a hackathon proof of concept running on a local chain. It hasn't been audited. Don't put real money
 in it.
@@ -29,7 +29,7 @@ received and no life claims more than it was paid.
 
 | Role | Account on localnet | Can | Can't |
 |---|---|---|---|
-| Owner | Sputnik DAO (D-20) | List, pause and size markets; set the oracle, swap, params, keeper, operator, Intents Verifier; hand over ownership | Touch traders' balances or positions directly |
+| Owner | Sputnik DAO (D-20) | House: list, pause and size markets; set the oracle, swap, params, keeper, operator, Intents Verifier; hand over ownership. Extra Lives: point them at another house (`set_house`). Oracle: choose who pushes prices (`set_pusher`). The DAO is also the locks contract's owner, which has no owner-only methods | Touch traders' balances or positions directly |
 | Operator | root | Run buybacks and retry delivery; fill, take profit at cap, and deploy pool capital through the shared keeper gate | Owner-only configuration |
 | Keeper | `keeper.test.near` | Fill orders, take profit at the 9× cap (D-23); push prices through a separate key that can only call the oracle; deploy pool USDC to the vault up to the contract's limit (D-27) | Pick a fill price older than the order or outside the window; move funds anywhere but the vault |
 | Anyone | – | Liquidate, place a close for a crossed trigger, expire a stale order, close an epoch, back the pool | Fill an order or take profit while a keeper is set |
@@ -52,7 +52,8 @@ trader's and the bots' keys (`/api/config`); the root, keeper and solver keys st
 - **The jackpot draw** uses NEAR's block random seed, which a validator could bias slightly.
 - **The keeper** is trusted to fill promptly (D-23). The contract requires a price published after the order and within its window; it does not establish that the first valid price was used. The keeper can delay within that window or let an order expire. Older prices are rejected.
 - **The owner** can change the oracle, the swap contract and the params, so it can take funds. That's why
-  a DAO owns the house; on mainnet the DAO's council and voting period are the protection.
+  a DAO owns the house, the Extra Lives and the oracle; on mainnet the DAO's council and voting period are the
+  protection. The mocks of outside services (USDC, the swap, the vault) stay with the root account locally.
 
 ## Review findings (21 Oct 2026) and what changed
 
@@ -68,7 +69,7 @@ off-chain code (API routes, keeper, deploy). Every finding below has a test that
 | 5 | High | `/api/config` served the root, keeper and solver keys | As above | `app/test/config.ts` |
 | 6 | Medium | Anyone could fill an order with any price in the 30 s window, and let it expire for free | Keeper-only fills (D-23) | `only_the_keeper_fills_once_set`, `only_the_keeper_takes_profit_at_the_cap` |
 | 7 | Medium | Lives and $1UP went by gross loss: a long and a short on yourself took most of an epoch's lives | Net loss per wallet (D-24) | `wash_trading_counts_only_the_net_loss` |
-| 8 | Medium | A seller could claim a listed NFT's earnings or re-price it before a buy landed | Claims drop the listing; a buy carries the price it saw and is refunded if it changed | `claim_drops_the_approvals`, `claiming_drops_the_approvals`, `a_reprice_under_the_buyer_fails` |
+| 8 | Medium | A seller could claim a listed NFT's earnings or re-price it before a buy landed | Claims drop the listing; a buy carries the price it saw and is refunded if it changed. *Only half fixed: a claim followed by a new listing at the same price still passed; closed on 31 Oct, row A below* | `claim_drops_the_approvals`, `claiming_drops_the_approvals`, `a_reprice_under_the_buyer_fails` |
 | 9 | Medium | 1-yocto locks drained ve's storage balance | User locks need at least 1 $1UP | `dust_locks_are_refused` |
 | 10 | Medium | The RPC proxy forwarded any method, including the sandbox's `sandbox_patch_state` | Method allowlist, 64 KB cap | `app/test/rpc.ts` |
 | 11 | Medium | The price control server took cross-site requests from any web page | JSON only, no `Origin`, prices bounded | `keeper/test/prices.ts` |
@@ -82,6 +83,24 @@ off-chain code (API routes, keeper, deploy). Every finding below has a test that
 | 19 | Low | A second seed from the owner was silently not owed | Backer Lives have their own ids | `the_owner_can_seed_twice`, `one_owner_can_back_twice` |
 | 20 | Low | The solver's fill check allowed a free 1% and odd payloads; the relay had no gas cap or rate limit | Exact checks, one fill at a time; 100 Tgas cap, 10 per 10 s | `app/test/fill.ts`, `app/test/relay.ts` |
 | 21 | Low | The keeper stamped prices after fetching, and one missing market stopped every push | Stamp before the fetch; skip bad markets; drop NaN, zero and isolated >20% jumps (sustained jumps accepted after ten rejected ticks) | `keeper/test/prices.ts` |
+
+## Review findings (31 Oct 2026) and what changed
+
+A review of a fresh clone, done the way the hackathon's AI screeners and a judge would read it, found four
+medium-severity issues. None changes a contract's state layout.
+
+| # | Severity | Finding | Fix | Test |
+|---|---|---|---|---|
+| A | Medium | A buy was bound only to the price: a seller could claim a listed Life's USDC (which drops its approvals) and list it again at the same price, and a purchase already in flight paid for the emptied Life | A buy names the listing's `approval_id` too; a new listing has a new one, so the buyer is refunded | `a_relist_at_the_same_price_under_the_buyer_fails`, `buy_needs_the_approval_id`, sandbox `a_life_claimed_and_listed_again_is_not_sold_to_the_earlier_buyer` |
+| B | Medium | Marketplace fees count as house profit and Lives are sized by share of it, so in a quiet round a $1 loss minted a Life worth all the round's fees, plus the round's whole $1UP release | Lives and $1UP are sized from house profit up to the round's net losses (`recovery_base`); a face is never more than its loss. The rest stays in the pool and the unreleased $1UP carries | `fees_cannot_make_a_life_worth_more_than_its_loss`, `a_quiet_rounds_fees_dont_inflate_its_lives`, SDK previews |
+| C | Medium | A limit order priced through the market could be cancelled at once: a market order with a cancel button, the free option D-30 refuses market orders | A limit order rests for one fill window (30 s) before it can be cancelled, so a marketable one fills first | `limit_cannot_be_cancelled_inside_the_fill_window`, `a_marketable_limit_fills_before_it_can_be_cancelled` |
+| D | Medium | The DAO owned only the house: the root account kept the Extra Lives (`set_house`, which decides who mints and pays them) and the oracle (`set_pusher`) | The local deployment makes the DAO their owner at init, and `test:judge` checks it | `only_the_owner_repoints_the_house`, `once_repointed_the_old_house_cannot_mint`, `pnpm test:judge` (DAO ownership) |
+
+Still open from that review: a resting limit order can be pulled once its first 30 seconds are up, so a trader
+who sees the market moving toward it can cancel before the oracle catches up (a cancel that takes effect a fill
+window later would close this); resting limits hold margin and pool room for up to 24 hours at no cost; the
+locks' and Lives' value-moving methods don't require a 1-yoctoNEAR deposit; no sandbox test yet covers a DAO
+proposal, a jackpot draw, limit orders or 1000× leverage.
 
 ## Known and accepted
 

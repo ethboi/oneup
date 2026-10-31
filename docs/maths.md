@@ -107,7 +107,8 @@ net_losses_e  = Σ loss_i
 If `house_net_e > 0`, each wallet with positive net loss across all markets gets one Extra Life (D-24):
 
 ```
-face_i = floor(house_net_e × loss_i / net_losses_e)
+base_e = min(house_net_e, net_losses_e)        # fees never make a Life worth more than its loss
+face_i = floor(base_e × loss_i / net_losses_e)    # so face_i ≤ loss_i
 cap    = 2.0 − 0.8 × min(pool, 1_000_000) / 1_000_000      # pool = pool at epoch close, before payouts
 owed_i = floor(face_i × cap)
 ```
@@ -170,7 +171,7 @@ EMISSIONS     = 900_000_000 over 208 epochs
 per_epoch     = floor(EMISSIONS / 208)          # = 4_326_923.076923076923076923 $1UP in base units
                                                 # epoch 208 also gets the remainder
 available_e   = carry_{e−1} + per_epoch
-release_e     = min(available_e, RATE × house_net_e)      # RATE = 20 $1UP per USDC
+release_e     = min(available_e, RATE × base_e)           # RATE = 20 $1UP per USDC; base_e as in §5
 carry_e       = available_e − release_e (+ unassigned rounding)
 loser i gets  release_e × loss_i / net_losses_e, as a 104-epoch lock (§9)
 ```

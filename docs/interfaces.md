@@ -41,7 +41,7 @@ buyer  ──ft_transfer_call──▶ usdc ──▶ market ──▶ life|ve.n
 | `withdraw(amount)` | trader | sends free balance; refunds on failed transfer |
 | `place_open(market_id, side, margin, leverage, take_profit?, stop_loss?) → order_id` | trader | moves margin from free balance into the order; pre-checks solvency and capacity with the order counted; optional trigger prices go with the position (D-19) |
 | `place_limit_open(market_id, side, margin, leverage, limit_price, take_profit?, stop_loss?) → order_id` | trader | as `place_open`, but rests until a newer price is at or past `limit_price` (≤ for a long, ≥ for a short) and fills at that price; expires after `limit_expiry_s` (D-30) |
-| `cancel_order(order_id)` | owner of the order | a resting limit only; returns its margin and room (D-30) |
+| `cancel_order(order_id)` | owner of the order | a resting limit only, once it has rested for `fill_window_s`; returns its margin and room (D-30) |
 | `set_triggers(position_id, take_profit?, stop_loss?)` | owner of the position | sets or clears them; they fire only on prices published after this call |
 | `place_close(position_id) → order_id` | owner | only after the 60 s minimum hold |
 | `fill(order_id)` | keeper, owner or operator once `set_keeper` is called (D-23) | reads oracle; applies the fill rules in maths §2; opens or closes the position |
@@ -157,7 +157,7 @@ Views: `lock_info(token_id)` → `{amount, created, end, from_loss, power, exit_
 | Method | Caller | Does |
 |---|---|---|
 | `nft_on_approve(token_id, owner_id, approval_id, msg)` | the life or ve contract, from `nft_approve` | lists the NFT; `msg = {"price":"<USDC>"}`; approving again re-prices |
-| `ft_on_transfer` from USDC, `{"buy":{"nft_contract","token_id","price"}}` | buyer | `price` must equal the listing (else a full refund); moves the NFT to the buyer through the approval, pays the seller, refunds change; refunds everything if the NFT can't move |
+| `ft_on_transfer` from USDC, `{"buy":{"nft_contract","token_id","price","approval_id"}}` | buyer | `price` and `approval_id` must equal the listing's (else a full refund), so a claim and a new listing at the same price can't land under the buyer; moves the NFT to the buyer through the approval, pays the seller, refunds change; refunds everything if the NFT can't move |
 | `delist(nft_contract, token_id)` | seller | |
 | `withdraw_owed()` | seller | USDC whose payout failed |
 

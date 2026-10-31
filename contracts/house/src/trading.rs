@@ -188,13 +188,15 @@ impl House {
 
     /// D-30: the trader takes a resting limit order down; its margin and the house's room come back. A market
     /// order can't be cancelled: it fills at the next price, and taking it back after seeing that price
-    /// coming would be a free option on the house.
+    /// coming would be a free option on the house. For the same reason a limit order rests for one fill window
+    /// before it can be cancelled: one priced through the market fills at the next price, like a market order.
     pub fn cancel_order(&mut self, order_id: u64) {
         let order = self.orders.get(&order_id).unwrap_or_else(|| env::panic_str("No such order")).clone();
         require!(order.owner == env::predecessor_account_id(), "Not your order");
         let OrderKind::Open { side, margin, limit: Some(_), .. } = order.kind else {
             env::panic_str("Only a limit order can be cancelled")
         };
+        require!(now_s() > order.placed_at + self.params.fill_window_s, "A limit order can be cancelled once it has rested for the fill window");
         self.orders.remove(&order_id);
         self.change_liability(&order.market_id, side, math::max_liability(margin.0), false);
         self.credit(&order.owner, margin.0);

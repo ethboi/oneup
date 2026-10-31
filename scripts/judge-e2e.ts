@@ -49,7 +49,9 @@ const balance = BigInt(await o.usdcBalance(buyer.id));
 await b.claimLives([buyerLife.token_id]);
 assert.ok(BigInt(await o.usdcBalance(buyer.id)) > balance, "loss NFT pays actual test USDC");
 await a.list(d.contracts.life, sellerLife.token_id, 10n * USDC);
-await b.buy(d.contracts.life, sellerLife.token_id, 10n * USDC);
+const listing = (await o.listings()).find(l => l.nft_contract === d.contracts.life && l.token_id === sellerLife.token_id);
+assert.ok(listing && BigInt(listing.price) === 10n * USDC, "listed at the asking price");
+await b.buy(listing);
 assert.ok(!(await o.lives(seller.id)).some(l => l.token_id === sellerLife.token_id));
 assert.ok((await o.lives(buyer.id)).some(l => l.token_id === sellerLife.token_id));
 await assert.rejects(a.claimLives([sellerLife.token_id]), /Smart contract panicked: Not your token/);
@@ -59,7 +61,12 @@ assert.ok(BigInt(await o.usdcBalance(buyer.id)) > beforeClaim, "buyer inherits c
 const s = await o.solvency(); assert.ok(BigInt(s.pool) >= BigInt(s.liability));
 assert.equal((await o.quoteOpen("NEAR-USD", "Long", 1000000n * USDC, 50)).allowed, false, "oversized risk refused");
 const hashes = await inspectDeployment(d); assert.ok(hashes.every(h => h.matches));
-const report = {build:verifyBuildManifest(), scope:"SDK/chain/keeper E2E plus app config API; browser inspection is separate", source:sourceIdentity(), checkedAt:new Date().toISOString(), elapsedSeconds:(Date.now()-start)/1000, assertions:["orders filled", "isolated app API", "controlled liquidation", "settled NFT", "USDC recovery", "market ownership transfer", "former owner denied", "buyer claim", "reserve admission", "deployed hashes"], mocked:["USDC", "oracle", "swap", "vault", "bridge"], contracts:hashes};
+// D-20: the Sputnik DAO owns the house, the Extra Lives (which house mints and pays them) and the oracle (who pushes prices)
+assert.ok(d.contracts.dao, "the local deployment has a DAO");
+assert.equal((await o.view<[string, string | null]>(d.contracts.house, "get_owner"))[0], d.contracts.dao);
+assert.equal(await o.view<string>(d.contracts.life, "get_owner"), d.contracts.dao);
+assert.equal(await o.view<string>(d.contracts.oracle, "get_owner"), d.contracts.dao);
+const report = {build:verifyBuildManifest(), scope:"SDK/chain/keeper E2E plus app config API; browser inspection is separate", source:sourceIdentity(), checkedAt:new Date().toISOString(), elapsedSeconds:(Date.now()-start)/1000, assertions:["orders filled", "isolated app API", "controlled liquidation", "settled NFT", "USDC recovery", "market ownership transfer", "former owner denied", "buyer claim", "reserve admission", "deployed hashes", "DAO ownership"], mocked:["USDC", "oracle", "swap", "vault", "bridge"], contracts:hashes};
 if (browserSeller) {
   const browserLife = await until("prepared browser Life with allocated USDC", async () => (await o.lives(browserSeller.id)).find(l => !priorBrowserLives.has(l.token_id) && !l.backer && BigInt(l.claimable) > 0n));
   // Public fields only. Never serialize d: it includes local throwaway private keys.

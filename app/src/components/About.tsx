@@ -107,7 +107,7 @@ const NEAR: { title: string; status: Status; body: string; points: string[]; mar
     title: "Sputnik DAO",
     marks: [{ name: "dao", label: "Sputnik DAO" }],
     status: "demo",
-    body: "A DAO owns the house: the same Sputnik DAO v2 code mainnet DAOs run.",
+    body: "A DAO owns the house, the Extra Lives and the oracle: the same Sputnik DAO v2 code mainnet DAOs run.",
     points: [
       "Changes to market listings, pauses, parameters, the keeper and the yield vault require council votes",
       "View proposals and vote on the House tab",

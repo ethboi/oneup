@@ -202,6 +202,10 @@ which calls the house. Routine buybacks (D-10) go through an `operator` role ins
 vote every epoch, and order fills go through a `keeper` role (D-23). The owner can still change the
 oracle, the swap and the params, so whoever owns the house is trusted; the DAO is how that trust is spread.
 
+*Amended 31 Oct 2026 (review):* the DAO also owns the Extra Life contract (whose owner decides which house
+mints and pays Lives), the locks contract and the oracle (whose owner decides who pushes prices), from their
+init. Only the mocks of outside services stay with the root account.
+
 ## D-21 · NEAR Intents deposits · **Decided (21 Oct 2026)**
 
 Supersedes D-7. The official Verifier and PoA token factory (`defuse/v0.4.2`, sha256-checked; mainnet runs
@@ -358,6 +362,11 @@ round's house result (`fees` in the epoch summary), so it flows to Extra Lives a
 profit. Only the marketplace the owner set can pay it in, and a fee the house refuses is owed
 to it like a failed seller payout. Buyers pay the listed price as before.
 
+*Amended 31 Oct 2026 (review):* fees still count as house profit, but a round's Lives and $1UP are sized from
+house profit up to the round's net losses (`recovery_base`). Without that, a quiet round's fees made a $1 loss
+mint a Life worth all of them, plus the round's whole $1UP release. What's above stays in the pool, and the
+unreleased $1UP carries.
+
 ## D-29 · If OneUp winds down: lives first, then lockers · **Decided (22 Oct 2026), not built**
 
 What happens to the house's money if the protocol shuts down. A plan, written now so every promise made before
@@ -392,7 +401,9 @@ or above it for a short, and fills *at that price*, so never worse than the limi
 - **Bounded.** That reservation can't last forever: after `limit_expiry_s` (24 hours) anyone can expire it, which
   returns the margin and the room, as for a market order past its 30-second window.
 - **Only limits can be cancelled** (`cancel_order`). A market order fills at the next price; taking it back once
-  that price could be seen coming would be a free option against the house.
+  that price could be seen coming would be a free option against the house. *Amended 31 Oct 2026 (review):* a
+  limit order rests for one fill window (30 s) before it can be cancelled, so one priced through the market
+  fills at the next price like a market order instead of being a market order with a cancel button.
 - **The keeper** calls `fill` only when its latest price has reached the limit, so a resting order costs nothing
   until then; the house checks the limit again on the fill's own price.
 

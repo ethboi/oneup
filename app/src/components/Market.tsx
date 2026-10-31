@@ -254,7 +254,7 @@ function Row({ x, wallet, epoch, expiryEpochs, totalPower }: { x: Item; wallet: 
             className="btn btn-accent px-3 py-1"
             disabled={short}
             title={short ? `You need ${usd(price - wallet)} more USDC. Add test USDC from the Demo menu.` : undefined}
-            onClick={() => run(`Buy for ${askingPrice}`, () => tx.buy(x.l.nft_contract, x.l.token_id, price))}
+            onClick={() => run(`Buy for ${askingPrice}`, () => tx.buy(x.l))}
           >
             <Icon name="cart" size={15} />
             {short ? "Not enough USDC" : "Buy"}
