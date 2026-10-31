@@ -1,11 +1,17 @@
 // A fresh sibling chain every launch. Never deletes, reconfigures or stops the regular demo.
-import { mkdirSync, writeFileSync } from "node:fs";
+// Unless --empty is given, it then prepares a sample (judge-prepare.ts): an Extra Life for the demo trader and a
+// listed one to buy, disclosed in prepared.json.
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { ROOT, copyApp } from "./artifacts.ts";
+import { fmtUsdc, type Deployment } from "@oneup/sdk";
+import { ROOT, copyApp, sourceIdentity } from "./artifacts.ts";
+import { prepareJudgeChain } from "./judge-prepare.ts";
 import { checkPorts, judgePorts, preflight, requireChecks, toolEnv } from "./preflight.ts";
 import { OwnedProcesses } from "./owned-processes.ts";
 import { localDemoEnv } from "./local-demo-env.ts";
 
+for (const arg of process.argv.slice(2)) if (arg !== "--empty") throw Error(`Unknown option ${arg}; the only one is --empty (skip the prepared sample)`);
+const empty = process.argv.includes("--empty");
 const ports = judgePorts();
 // Fail before creating snapshots, running simulations or starting any child.
 requireChecks(await preflight({ ports, build: true }));
@@ -41,5 +47,19 @@ try {
   const keeper = processes.start("keeper", "pnpm", ["exec", "tsx", "keeper/src/index.ts", "--prices", "fixed", "--tick", "1000", "--control", String(controlPort)], ROOT, text => process.stdout.write(text));
   const app = processes.start("app", "pnpm", ["exec", "next", "dev", "-H", "127.0.0.1", "-p", String(appPort)], appDir, text => process.stdout.write(text));
   for (const record of [chain, keeper, app]) void record.done.then(code => { if (!stopping) { console.error(`${record.name} exited (${code}).`); void stop(1); } });
-  console.log(`Judge app: ${appUrl} (fixed controllable prices; no bots; 45-second epochs).\nRun: ONEUP_CONFIG='${env.ONEUP_CONFIG}' pnpm test:judge\nPrepared state and mocked bridge/oracle/swap/vault must be disclosed.`);
+  console.log(`\nJudge app: ${appUrl} (fixed controllable prices; no bots; 45-second rounds). The bridge, oracle, swap and vault are mocks.`);
+  if (!empty) {
+    console.log("Preparing a sample, about a minute:");
+    try {
+      const d: Deployment = JSON.parse(readFileSync(env.ONEUP_CONFIG!, "utf8"));
+      const p = await prepareJudgeChain(d, `http://127.0.0.1:${controlPort}`, line => console.log(line));
+      // public fields only: the config holds local throwaway keys
+      writeFileSync(resolve(dir, "prepared.json"), JSON.stringify({
+        source: sourceIdentity(), appUrl, demoLife: p.demoLife, listing: p.listing,
+        preparedState: "Scripted: the demo trader and bot3 were liquidated by a controlled 2% price drop, and bot3 listed its Extra Life at 90% of the USDC it holds. The price is set by this script and says nothing about demand.",
+      }, null, 2));
+      console.log(`Ready. The demo trader owns Extra Life ${p.demoLife.token_id} with $${fmtUsdc(BigInt(p.demoLife.claimable))} to claim (Extra Lives tab),\nand ${p.listing.seller} lists Extra Life ${p.listing.tokenId} for $${fmtUsdc(BigInt(p.listing.priceAtomic))} on the Market tab. Prepared state: ${resolve(dir, "prepared.json")}`);
+    } catch (error) { console.error(`The sample wasn't prepared (${error instanceof Error ? error.message : error}). The app runs on the empty chain.`); }
+  }
+  console.log(`\nEnd-to-end check: ONEUP_CONFIG='${env.ONEUP_CONFIG}' pnpm test:judge\nAI agents: ONEUP_CONFIG='${env.ONEUP_CONFIG}' pnpm mcp (an MCP server on stdio). Without ONEUP_CONFIG it uses the newest judge chain when there's no regular demo, so Claude Code in this folder (.mcp.json) finds it. Actions show on the Agents tab.\nCtrl-C stops everything.`);
 } catch (error) { console.error(error instanceof Error ? error.message : error); await stop(1); }

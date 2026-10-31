@@ -2,10 +2,11 @@
 
 // "Round over": when an epoch closes, a results screen: the house's result, the Extra Lives it minted, how
 // you did, and the epoch's leaderboard (top traders, the best trade, the biggest loss). Shown once per epoch
-// while the app is open; it can be turned off from the screen itself.
+// while the app is open, but not to automated browsers; it can be turned off from the screen itself.
 
 import { useEffect, useRef, useState } from "react";
 import { fmtUsdc, type EpochSummary } from "@oneup/sdk";
+import { automated } from "@/lib/automation";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { sfx } from "@/lib/sound";
 import type { Board } from "@/lib/server/activity";
@@ -44,7 +45,7 @@ export function EpochResults({ automatic }: { automatic: boolean }) {
     if (d.network !== "localnet" || !epoch) return;
     const prev = last.current;
     last.current = epoch.id;
-    if (prev === null || epoch.id <= prev || !automatic) return;
+    if (prev === null || epoch.id <= prev || !automatic || automated()) return;
     try {
       if (localStorage.getItem(OFF) === "1") return;
     } catch {}

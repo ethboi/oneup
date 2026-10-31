@@ -1,15 +1,18 @@
 // OneUp as an MCP server: an AI agent can read the markets, open and close trades, set take-profit and
 // stop-loss, see its Extra Lives and claim them, and buy Extra Lives and locks on the market, on the local
-// chain. It signs as one account from localnet.json: the AI agent's (bot12, which the bots leave alone) by
-// default, or another (ONEUP_ACCOUNT=bot3, or demo). Every action, with the reason the agent gives for it, goes
-// into a journal the app shows (.localnet/agent-journal.jsonl). Localnet only: the keys it uses are the demo's
-// throwaway ones.
+// chain. It signs as one account from the chain's localnet.json: the AI agent's (bot12, which the bots leave
+// alone) by default, or another (ONEUP_ACCOUNT=bot3, or demo). Every action, with the reason the agent gives for
+// it, goes into a journal the app shows (agent-journal.jsonl beside the chain's state). Localnet only: the keys
+// it uses are the demo's throwaway ones.
+//
+// The chain: ONEUP_CONFIG if set, else the regular demo's localnet.json (pnpm demo), else the newest judge chain
+// (pnpm demo:judge).
 //
 //   pnpm mcp                                  (stdio; .mcp.json at the repo root registers it for Claude Code)
 //   ONEUP_ACCOUNT=bot3 pnpm mcp
 
-import { appendFileSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { appendFileSync, existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { Account, type KeyPairString } from "near-api-js";
@@ -34,7 +37,24 @@ import {
 } from "@oneup/sdk";
 
 const ROOT = resolve(import.meta.dirname, "../..");
-const d: Deployment = JSON.parse(readFileSync(process.env.ONEUP_CONFIG ?? resolve(ROOT, "localnet.json"), "utf8"));
+const DEMO_CONFIG = resolve(ROOT, "localnet.json");
+
+/** ONEUP_CONFIG, else the regular demo's chain, else the newest judge chain (CI runs excluded). */
+function chainConfig(): string {
+  if (process.env.ONEUP_CONFIG) return resolve(process.env.ONEUP_CONFIG);
+  if (existsSync(DEMO_CONFIG)) return DEMO_CONFIG;
+  const judge = resolve(ROOT, ".judge");
+  const runs = existsSync(judge)
+    ? readdirSync(judge)
+        .filter((n) => !n.startsWith("ci-") && existsSync(resolve(judge, n, "localnet.json")))
+        .map((n) => resolve(judge, n, "localnet.json"))
+        .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)
+    : [];
+  if (runs[0]) return runs[0];
+  throw new Error("No local chain: start one with pnpm demo or pnpm demo:judge, or set ONEUP_CONFIG");
+}
+const CONFIG = chainConfig();
+const d: Deployment = JSON.parse(readFileSync(CONFIG, "utf8"));
 if (d.network !== "localnet" || !["127.0.0.1", "localhost"].includes(new URL(d.rpcUrl).hostname)) throw new Error("Localnet only");
 
 // the account it trades as: the AI agent's by default, or the demo trader or a bot by name ("bot3") or full id
@@ -47,7 +67,9 @@ const tx = o.calls(accountSender(new Account(signer.id, o.provider, signer.key a
 const me = signer.id;
 
 // the journal: every action this agent takes, with the reason it gives, for the app's Agents tab
-const JOURNAL = resolve(process.env.ONEUP_STATE_DIR ?? resolve(ROOT, ".localnet"), "agent-journal.jsonl");
+// beside the chain's state, where the app reads it: .localnet for the demo, .judge/<run>/chain for a judge chain
+const STATE_DIR = process.env.ONEUP_STATE_DIR ?? (CONFIG === DEMO_CONFIG ? resolve(ROOT, ".localnet") : resolve(dirname(CONFIG), "chain"));
+const JOURNAL = resolve(STATE_DIR, "agent-journal.jsonl");
 function record(tool: string, args: Record<string, unknown>, ok: boolean, result: unknown) {
   const { reason, ...rest } = args as { reason?: string };
   const entry: JournalEntry = { t: Date.now(), account: me, tool, args: rest, reason, ok, result: typeof result === "string" ? result : JSON.stringify(result, (_, v) => (typeof v === "bigint" ? v.toString() : v)).slice(0, 400) };
@@ -102,7 +124,8 @@ function describe(p: Position, mark?: bigint) {
 
 const json = (x: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(x, (_, v) => (typeof v === "bigint" ? v.toString() : v), 2) }] });
 const fail = (e: unknown) => {
-  const msg = (e instanceof Error ? e.message : String(e)).match(/panicked: ([^"\n]+)/)?.[1] ?? String(e).slice(0, 300);
+  const text = e instanceof Error ? e.message : String(e);
+  const msg = text.match(/panicked: ([^"\n]+)/)?.[1] ?? text.slice(0, 300);
   return { content: [{ type: "text" as const, text: `Failed: ${msg}` }], isError: true };
 };
 const safe =
@@ -143,7 +166,7 @@ server.registerTool(
       signing: "Full-access development key. Open-trade calls can deposit wallet USDC automatically; this is not a constrained agent wallet.",
       journal: "Every action you take (open, close, set_triggers, claim_lives, buy_listing) is recorded with the `reason` you give and shown publicly in the app's Agents tab. Give a short, honest reason each time.",
       rules: [
-        `Perpetuals against a USDC house pool. No entry or funding fee; winners pay 10–25% of profit. Contract leverage limit is ${params.leverage_hard_limit}x; this MCP tool caps orders at 100x and market limits may be lower.`,
+        `Perpetuals against a USDC house pool. No entry or funding fee; winners pay 10–25% of profit. Each market has its own leverage cap (see markets), at most ${params.leverage_hard_limit}x.`,
         `A fill requires an oracle price published after placement and inside the allowed window. A trusted keeper chooses when to execute; first-price execution is not proven. Minimum voluntary hold: ${params.min_hold_s} seconds.`,
         "Maximum profit before the fee is 9x margin. Liquidation at a 90% loss takes the full margin.",
         `Positive wallet net loss in a profitable round can earn an Extra Life and token locks. Life face value is a share of house profit, not necessarily the full loss; its total payout cap is 1.2–2x face. Trader Lives earn in the mint round and ${params.life_expiry_epochs} subsequent rounds. Recovery may be zero.`,
@@ -210,7 +233,7 @@ const tradeArgs = {
   market: z.string().describe('Market id, e.g. "BTC-USD"'),
   side: z.enum(["Long", "Short"]),
   margin_usd: z.number().positive().describe("Margin in USDC"),
-  leverage: z.number().int().min(1).max(100),
+  leverage: z.number().int().min(1).max(1000).describe("Up to the market's max_leverage (see markets)"),
 };
 
 server.registerTool(
@@ -383,4 +406,4 @@ server.registerTool(
 );
 
 await server.connect(new StdioServerTransport());
-console.error(`oneup MCP server on ${d.rpcUrl}, trading as ${me}`);
+console.error(`oneup MCP server on ${d.rpcUrl} (${CONFIG}), trading as ${me}`);

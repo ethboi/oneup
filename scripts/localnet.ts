@@ -103,7 +103,7 @@ async function main() {
   console.log("\nContracts:");
   for (const [k, v] of Object.entries(d.contracts)) console.log(`  ${k.padEnd(7)} ${v}`);
   console.log(`\nEpochs: ${d.epochLengthS}s · demo trader: ${d.demo.id} · bots: ${d.bots.length}`);
-  console.log("Ctrl-C to stop. State persists in .localnet/.");
+  console.log(`Ctrl-C to stop. State persists in ${HOME}.`);
 }
 
 main().catch((e) => {

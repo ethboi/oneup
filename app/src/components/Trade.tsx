@@ -1199,7 +1199,7 @@ function OrderForm({ t }: { t: Ticket }) {
           {t.viaAsset
             ? `NEAR Intents converts your ${t.viaAsset.symbol} to USDC in this local simulation.`
             : t.orderType === "limit"
-              ? "Waits for your limit price for up to 24 hours. You can cancel at any time."
+              ? "Waits for your limit price for up to 24 hours. You can cancel it after 30 seconds."
               : "Fills at a later valid oracle price before the order expires."}
         </span>
         {/* the keys, where a keyboard is */}

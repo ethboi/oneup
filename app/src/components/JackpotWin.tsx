@@ -2,9 +2,11 @@
 
 // The draw (D-27): celebrate on the trading screen without interrupting recovery or purchases.
 // Quiet screens still consume feed events; the Demo menu can explicitly preview the celebration anywhere.
+// Automated browsers don't get it unasked.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { USDC, fmtUsdc } from "@oneup/sdk";
+import { automated } from "@/lib/automation";
 import { useOneUp } from "@/lib/oneup";
 import { latestJackpotWin } from "@/lib/jackpot";
 import { sfx } from "@/lib/sound";
@@ -29,7 +31,7 @@ export function JackpotWin({ automatic }: { automatic: boolean }) {
     }
     if (!latest || latest.seq <= seen.current || !latest.amount) return;
     seen.current = latest.seq;
-    if (!automatic) return;
+    if (!automatic || automated()) return;
     const mine = latest.who === short(me);
     sfx(mine ? "jackpot" : "win");
     setWin({ who: latest.who, amount: BigInt(latest.amount), preview: false });

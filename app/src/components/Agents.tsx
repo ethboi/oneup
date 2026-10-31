@@ -135,7 +135,7 @@ export function Agents() {
             <ol className="flex flex-col">
               {journal.slice(0, 40).map((e, i) => {
                 const t = TOOL[e.tool] ?? { label: e.tool, icon: "info" as IconName };
-                const icon = e.tool === "open_trade" && (e.args as { side?: string }).side === "short" ? "down" : t.icon;
+                const icon = e.tool === "open_trade" && String((e.args as { side?: string }).side).toLowerCase() === "short" ? "down" : t.icon;
                 return (
                   <li key={`${e.t}-${i}`} className="journal-row">
                     <span className={`journal-icon ${e.ok ? "" : "failed"}`} aria-hidden>
@@ -147,7 +147,7 @@ export function Agents() {
                         {!e.ok && <span className="journal-failed">refused</span>}
                       </span>
                       {e.reason && <span className="journal-reason">“{e.reason}”</span>}
-                      {!e.ok && e.result && <span className="label block">{e.result.replace(/^Failed: /, "")}</span>}
+                      {!e.ok && e.result && <span className="label block">{e.result.replace(/^Failed: (Error: )?/, "")}</span>}
                     </span>
                     <span className="label num shrink-0">{ago(now, e.t)}</span>
                   </li>

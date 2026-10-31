@@ -15,8 +15,8 @@ async function switchAccount(page: Page, account: string) {
 }
 
 test("a buyer receives the Life and claims its USDC; the seller loses claim controls", async ({ page }) => {
+  // Automated browsers skip the power-on screen.
   await page.goto(lifePath);
-  await page.getByRole("button", { name: "ENTER", exact: true }).click();
   await switchAccount(page, fixture.seller);
   await expect(page.getByText(`${fixture.seller} (you)`, { exact: false })).toBeVisible();
   await expect(page.getByText("Available to claim", { exact: true })).toBeVisible();

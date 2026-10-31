@@ -3,9 +3,11 @@
 // The power-on screen, once a browser session: a handheld with trading keys. The power light comes on, the LCD
 // flickers awake, the logo drops in in pixel steps, the tagline types, then a live price line draws itself behind
 // it and the markets scroll along the bottom while VIEW MARKETS blinks. Any tap, click or key starts (L and S press
-// the LONG and SHORT keys on the way); with reduced motion it shows already settled.
+// the LONG and SHORT keys on the way); with reduced motion it shows already settled. Automated browsers (a
+// reviewer's Playwright or Puppeteer run) go straight to the app.
 
 import { useEffect, useState } from "react";
+import { automated } from "@/lib/automation";
 import { useOneUp } from "@/lib/oneup";
 import { sfx } from "@/lib/sound";
 import { Logo } from "./Pixel";
@@ -34,6 +36,7 @@ export function Boot() {
     try {
       if (sessionStorage.getItem(KEY) === "1" && !forced()) return setState("gone");
     } catch {}
+    if (automated() && !forced()) return setState("gone");
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return setTyped(TAGLINE.length);
     // the logo lands at 1.5 s, then the tagline types a letter every 45 ms
     let i = 0;

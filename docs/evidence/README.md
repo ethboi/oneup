@@ -40,8 +40,8 @@ They depict prepared local accounts and test funds, not users, real yield or org
 
 ## Recording a new result
 
-After installing dependencies, use `pnpm doctor --compile` for build prerequisites. After building
-contracts, `pnpm doctor --judge` checks the WASM manifest and isolated-demo ports. Install Chromium with
+After installing dependencies, use `pnpm preflight --compile` for build prerequisites. After building
+contracts, `pnpm preflight --judge` checks the WASM manifest and isolated-demo ports. Install Chromium with
 `pnpm exec playwright install --with-deps chromium` before `pnpm test:judge:ci`; its ignored
 `.verification/judge-ci/<run>/` contains separate SDK/browser reports and a source-bound summary.
 `--sdk-only` explicitly skips the browser and must not be reported as browser acceptance.
