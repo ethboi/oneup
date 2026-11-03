@@ -1,6 +1,7 @@
 import type { Order } from "@oneup/sdk";
 
-/** Snapshot every page before fills/expiries mutate the contract's iterable map. */
+/** Snapshot every page before fills/expiries mutate the contract's iterable map. Returns how many orders are still
+ *  waiting for a price published after them, so the keeper can push one now instead of on its next schedule. */
 export async function processOrders(
   listOrders: (from: number, limit: number) => Promise<Order[]>,
   keeper: { fill: (id: number) => Promise<boolean>; expire: (id: number) => Promise<unknown> },
@@ -10,8 +11,9 @@ export async function processOrders(
   FILL_WINDOW_S: number,
   LIMIT_EXPIRY_S: number,
   log: (message: string) => void,
-) {
+): Promise<number> {
   const orders: Order[] = [];
+  let waiting = 0;
   for (let from = 0; ; from += 200) {
     const page = await listOrders(from, 200);
     orders.push(...page);
@@ -29,10 +31,14 @@ export async function processOrders(
       continue;
     }
     const px = latest.get(feeds.get(o.market_id) ?? "");
-    if (!px || px.time <= o.placed_at) continue; // wait for a price published after the order
+    if (!px || px.time <= o.placed_at) {
+      waiting++; // wait for a price published after the order
+      continue;
+    }
     // a resting limit only fills once the price reaches it (the house checks again): no call, no gas, until then
     if (limit && "Open" in o.kind && (o.kind.Open.side === "Long" ? px.price > limit : px.price < limit)) continue;
     const ok = await keeper.fill(o.id);
     log(`${ok ? "filled" : "could not fill"} order ${o.id} (${label})`);
   }
+  return waiting;
 }

@@ -44,6 +44,9 @@ const { values: args } = parseArgs({
 });
 
 const d: Deployment = JSON.parse(readFileSync(args.config!, "utf8"));
+// a separate RPC for this process (ONEUP_RPC): on testnet the keeper, the bots and the site's visitors would
+// otherwise share one provider's free-tier rate limit
+if (process.env.ONEUP_RPC) d.rpcUrl = process.env.ONEUP_RPC;
 const oneup = new OneUp(d);
 const keeper = oneup.calls(accountSender(new Account(d.keeper.id, oneup.provider, d.keeper.key as KeyPairString)));
 const owner = oneup.calls(accountSender(new Account(d.owner.id, oneup.provider, d.owner.key as KeyPairString)));
@@ -87,7 +90,10 @@ async function pushPrices(pusher: ReturnType<OneUp["calls"]>) {
 }
 
 async function handleOrders() {
-  await processOrders(oneup.listOrders, keeper, feeds, latest, nowS, FILL_WINDOW_S, LIMIT_EXPIRY_S, log);
+  const waiting = await processOrders(oneup.listOrders, keeper, feeds, latest, nowS, FILL_WINDOW_S, LIMIT_EXPIRY_S, log);
+  // an order fills only on a price published after it: push one now rather than at the next scheduled push, so a
+  // slow --price-tick (to save gas on testnet) never lets an order run out its fill window
+  if (waiting > 0) wakePrices?.();
 }
 
 /** Liquidations, take-profits at the cap and trigger hits. They run on their own fast loop and key (riskLoop):
@@ -266,6 +272,11 @@ async function keySender(file: string, receiver: string, methods: string[]) {
   return oneup.calls(accountSender(new Account(d.keeper.id, oneup.provider, kp.toString() as KeyPairString)));
 }
 
+/** Cuts the price loop's wait short (handleOrders, when an order needs a newer price). */
+let wakePrices: (() => void) | null = null;
+/** The soonest a woken push may follow the last one. */
+const MIN_PUSH_GAP_MS = 3000;
+
 async function priceLoop(pusher: ReturnType<OneUp["calls"]>) {
   for (;;) {
     const start = Date.now();
@@ -274,7 +285,14 @@ async function priceLoop(pusher: ReturnType<OneUp["calls"]>) {
     } catch (e) {
       log(`prices: ${e instanceof Error ? e.message.split("\n")[0] : e}`);
     }
-    await new Promise((r) => setTimeout(r, Math.max(0, Number(args["price-tick"]) - (Date.now() - start))));
+    await new Promise<void>((r) => {
+      const t = setTimeout(r, Math.max(0, Number(args["price-tick"]) - (Date.now() - start)));
+      wakePrices = () => {
+        clearTimeout(t);
+        setTimeout(r, Math.max(0, MIN_PUSH_GAP_MS - (Date.now() - start)));
+      };
+    });
+    wakePrices = null;
   }
 }
 

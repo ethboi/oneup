@@ -25,6 +25,8 @@ import {
 } from "@oneup/sdk";
 
 const d: Deployment = JSON.parse(readFileSync(process.env.ONEUP_CONFIG ?? resolve(import.meta.dirname, "../../localnet.json"), "utf8"));
+// its own RPC (ONEUP_RPC), so the bots never use up the keeper's free-tier rate limit on testnet
+if (process.env.ONEUP_RPC) d.rpcUrl = process.env.ONEUP_RPC;
 // on testnet every trade costs real (test) gas and the public RPC rate-limits reads, so the bots take it slower
 const PACE = d.network === "testnet" ? 4 : 1;
 const o = new OneUp(d);
