@@ -1876,7 +1876,7 @@ kbd {
     --fx: -26cqw;
   }
 }
-.boot-nft-card {
+.life-card {
   --s1: var(--heart);
   --s2: #5b6bd6;
   --lit: var(--heart);
@@ -1884,7 +1884,7 @@ kbd {
   flex-direction: column;
   gap: 0.6em;
   padding: 0.85em 0.85em 1.2em;
-  font: 800 clamp(5px, var(--cw) / 15, 12px) / 1.15 var(--font-body);
+  font: 800 12px / 1.15 var(--font-body);
   color: var(--text);
   background: var(--panel);
   border: 1px solid var(--panel-edge);
@@ -1893,12 +1893,16 @@ kbd {
     inset 0 1px 0 rgb(255 255 255 / 0.07),
     0 3px 0 var(--panel-lip),
     0 24px 36px -18px rgb(0 0 0 / 0.9);
-  /* leaning toward the pointer, and bobbing a little as if held up */
+  /* leaning toward the pointer */
   transform: perspective(700px) rotateY(calc(var(--mx, 0) * 18deg)) rotateX(calc(var(--my, 0) * -14deg));
   transition: transform 0.3s ease-out;
+}
+/* on the power-on screen: sized to the console, bobbing a little as if held up */
+.boot-nft .life-card {
+  font-size: clamp(5px, var(--cw) / 15, 12px);
   animation: boot-float 7s ease-in-out calc(var(--i) * -1.2s) infinite;
 }
-.boot-nft-card.full_heal {
+.life-card.full_heal {
   --s1: #f2b705;
   --s2: var(--accent);
   --lit: #f2b705;
@@ -1908,43 +1912,43 @@ kbd {
     0 24px 36px -18px rgb(0 0 0 / 0.9),
     0 0 34px -8px rgb(242 183 5 / 0.55);
 }
-.boot-nft-card.expired {
+.life-card.expired {
   --s1: #8a8c99;
   --s2: #a9abb6;
   --lit: #8a8c99;
   color: var(--muted);
 }
-.boot-nft-card.backer {
+.life-card.backer {
   --s1: #2563eb;
   --s2: var(--info);
 }
-.boot-nft-top {
+.life-card-top {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 0.4em;
   white-space: nowrap;
 }
-.boot-nft-top .display {
+.life-card-top .display {
   font-size: 1.2em;
   font-weight: 700;
   letter-spacing: 0.06em;
 }
-.boot-nft-top .num {
+.life-card-top .num {
   color: var(--muted);
 }
-.boot-nft-stripes {
+.life-card-stripes {
   height: 0.5em;
   margin-top: -0.2em;
   background: linear-gradient(var(--s1) 0 28%, transparent 28% 64%, var(--s2) 64%);
 }
-.boot-nft-art {
+.life-card-art {
   position: relative;
   padding: 0.45em;
   border-radius: 0.5em 0.5em 1.4em 0.5em;
   background: var(--bezel);
 }
-.boot-nft-art img {
+.life-card-art img {
   display: block;
   width: 100%;
   height: auto;
@@ -1952,7 +1956,7 @@ kbd {
   image-rendering: pixelated;
 }
 /* foil: a glint across the picture that follows the pointer, rainbow on a Full Heal */
-.boot-nft-art::after {
+.life-card-art::after {
   content: "";
   position: absolute;
   inset: 0.45em;
@@ -1962,9 +1966,11 @@ kbd {
   background-position: calc(30% + var(--mx, 0) * 40%) 0;
   mix-blend-mode: soft-light;
   transition: background-position 0.3s ease-out;
+}
+.boot-nft .life-card-art::after {
   animation: boot-sheen 1.2s ease-out calc(3.1s + var(--i) * 90ms) backwards;
 }
-.boot-nft-card.full_heal .boot-nft-art::after {
+.life-card.full_heal .life-card-art::after {
   background-image: linear-gradient(
     115deg,
     transparent 25%,
@@ -1975,13 +1981,13 @@ kbd {
   );
   mix-blend-mode: overlay;
 }
-.boot-nft-trade {
+.life-card-trade {
   display: flex;
   align-items: center;
   gap: 0.5em;
   white-space: nowrap;
 }
-.boot-nft-side {
+.life-card-side {
   --k: var(--long-fill);
   padding: 0.2em 0.5em;
   border-radius: 0.45em;
@@ -1990,13 +1996,71 @@ kbd {
   background: var(--k);
   box-shadow: 0 0.15em 0 color-mix(in srgb, var(--k) 55%, #000);
 }
-.boot-nft-side.short {
+.life-card-side.short {
   --k: var(--short-fill);
 }
-.boot-nft-side.backer {
+.life-card-side.backer {
   --k: #2563eb;
 }
-.boot-nft-bar {
+.life-card-side.recovery {
+  --k: #c2185b;
+}
+.life-card-trade .truncate {
+  min-width: 0;
+}
+/* USDC waiting on a card in the Extra Lives page */
+.life-card-claim {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5em;
+  margin-top: -0.1em;
+  padding: 0.45em 0.6em;
+  border-radius: 0.5em;
+  font-size: 0.9em;
+  white-space: nowrap;
+  color: var(--long);
+  background: color-mix(in srgb, var(--long-fill) 18%, transparent);
+}
+.life-card-claim.listed {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+/* the Extra Lives page: the account's cards, each opening its Life */
+.life-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(168px, 100%), 1fr));
+  gap: 22px 16px;
+  padding: 16px 16px 22px;
+}
+.life-grid > a {
+  display: block;
+  border-radius: 0.8em 0.8em 2.6em 0.8em;
+  transition: translate 0.2s ease-out;
+}
+.life-grid > a:hover {
+  translate: 0 -3px;
+}
+.life-grid > a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+@media (max-width: 400px) {
+  .life-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 10px;
+    padding: 12px;
+  }
+  .life-grid .life-card {
+    font-size: 10px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .life-grid > a,
+  .life-card {
+    transition: none;
+  }
+}
+.life-card-bar {
   display: flex;
   gap: 0.22em;
   padding: 0.22em;
@@ -2004,17 +2068,17 @@ kbd {
   background: var(--field);
   border: 1px solid var(--input-edge);
 }
-.boot-nft-bar i {
+.life-card-bar i {
   flex: 1;
   height: 0.6em;
   border-radius: 0.15em;
   background: rgb(255 255 255 / 0.06);
 }
-.boot-nft-bar i.on {
+.life-card-bar i.on {
   background: var(--lit);
   box-shadow: 0 0 0.5em -0.1em var(--lit);
 }
-.boot-nft-foot {
+.life-card-foot {
   display: flex;
   justify-content: space-between;
   gap: 0.5em;
@@ -2022,10 +2086,10 @@ kbd {
   color: var(--muted);
   white-space: nowrap;
 }
-.boot-nft-foot > span:first-child {
+.life-card-foot > span:first-child {
   letter-spacing: 0.08em;
 }
-.boot-nft-card.full_heal .boot-nft-foot > span:first-child {
+.life-card.full_heal .life-card-foot > span:first-child {
   color: var(--accent);
 }
 .boot-top {

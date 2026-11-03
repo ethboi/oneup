@@ -9,9 +9,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { automated } from "@/lib/automation";
-import { lifeImage, lifeRows, type LifeState } from "@/lib/lifeArt";
+import type { LifeState } from "@/lib/lifeArt";
 import { useOneUp } from "@/lib/oneup";
 import { sfx } from "@/lib/sound";
+import { LifeCard } from "./LifeCard";
 import { Logo } from "./Pixel";
 import { fmtPrice } from "./Trade";
 
@@ -41,36 +42,21 @@ const CARDS: Card[] = [
 ];
 const usd = (n: number) => `$${n.toLocaleString("en-US")}`;
 
-function LifeCard({ card, i }: { card: Card; i: number }) {
+function SampleCard({ card, i }: { card: Card; i: number }) {
   const { id, trade, paid, owed, state } = card;
-  const lit = lifeRows(BigInt(paid), BigInt(owed));
   return (
     <div className="boot-nft" style={{ "--i": i } as React.CSSProperties}>
-      <div className={`boot-nft-card ${state} ${trade ? "" : "backer"}`}>
-        <div className="boot-nft-top">
-          <span className="display">EXTRA LIFE</span>
-          <span className="num">#{id}</span>
-        </div>
-        <span className="boot-nft-stripes" />
-        <div className="boot-nft-art">
-          <img src={lifeImage(BigInt(paid), BigInt(owed), state, !trade)} alt="" />
-        </div>
-        <div className="boot-nft-trade">
-          <span className={`boot-nft-side ${trade?.[1] ?? "backer"}`}>{trade ? trade[1].toUpperCase() : "BACKER"}</span>
-          <span>{trade ? `${trade[0]} ${trade[2]}×` : "House pool"}</span>
-        </div>
-        <div className="boot-nft-bar">
-          {Array.from({ length: 8 }, (_, k) => (
-            <i key={k} className={k < lit ? "on" : ""} />
-          ))}
-        </div>
-        <div className="boot-nft-foot">
-          <span>{state === "full_heal" ? "FULL HEAL" : state === "expired" ? "EXPIRED" : "PAID"}</span>
-          <span className="num">
-            {usd(paid)} / {usd(owed)}
-          </span>
-        </div>
-      </div>
+      <LifeCard
+        id={String(id)}
+        paid={BigInt(paid)}
+        owed={BigInt(owed)}
+        state={state}
+        backer={!trade}
+        tone={trade?.[1] ?? "backer"}
+        tag={trade ? trade[1].toUpperCase() : "BACKER"}
+        detail={trade ? `${trade[0]} ${trade[2]}×` : "House pool"}
+        amount={`${usd(paid)} / ${usd(owed)}`}
+      />
     </div>
   );
 }
@@ -169,7 +155,7 @@ export function Boot() {
       <div className="boot-stage">
         <div className="boot-nfts" aria-hidden>
           {CARDS.map((card, i) => (
-            <LifeCard key={card.id} card={card} i={i} />
+            <SampleCard key={card.id} card={card} i={i} />
           ))}
         </div>
         <div className="boot-console case">

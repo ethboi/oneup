@@ -5,7 +5,8 @@ import { fmtUsdc, ppmToNumber } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { lifeEconomics } from "@/lib/life-economics";
 import { fmtUsd as money } from "./Header";
-import { PixelHeart, HealthBar } from "./Pixel";
+import { HealthBar } from "./Pixel";
+import { LifeCard, lifeState } from "./LifeCard";
 import { Icon } from "./Icon";
 import { Sell, useListings } from "./Sell";
 import { OnExplorer, Stat } from "./ui";
@@ -33,9 +34,20 @@ export function LifeDetail({ tokenId, onBack }: { tokenId: string; onBack: () =>
   return (
     <section className="flex flex-col gap-4" aria-labelledby="life-detail-title">
       {back}
-      <div className="flex items-center gap-4">
-        <PixelHeart size={46} fill={progress} live={economics.canReceiveMore} />
-        <div className="min-w-0">
+      <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-end">
+        <LifeCard
+          className="w-[200px] shrink-0"
+          id={life.backer ? life.token_id : String(life.epoch)}
+          paid={BigInt(life.paid)}
+          owed={owed}
+          state={lifeState(life)}
+          backer={life.backer}
+          tone={life.backer ? "backer" : "recovery"}
+          tag={life.backer ? "BACKER" : "LOSS"}
+          detail={life.backer ? "House pool" : `Round ${life.epoch}`}
+          amount={`${money(BigInt(life.paid))} / ${money(owed)}`}
+        />
+        <div className="min-w-0 self-stretch sm:self-auto sm:pb-2">
           <h1 id="life-detail-title" ref={title} tabIndex={-1} className="page-title">{life.backer ? "Backer Life" : `Recovery Life · round ${life.epoch}`}</h1>
           <p className="mt-1 break-all text-sm text-[var(--muted)]">Token ID: <span className="num">{life.token_id}</span> <OnExplorer nft={{ contract: d.contracts.life, id: life.token_id }} /></p>
         </div>

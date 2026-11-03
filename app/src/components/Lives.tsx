@@ -8,7 +8,8 @@ import { groupLives, lifeClaimBatch, lifeFromHash, lifeHref } from "@/lib/recove
 import { fmtClock, fmtOneup, fmtUsd as money, useNow } from "./Header";
 import { Icon } from "./Icon";
 import { PixelHeart } from "./Pixel";
-import { Sell, useListings } from "./Sell";
+import { useListings } from "./Sell";
+import { LifeCard, lifeState } from "./LifeCard";
 import { LifeDetail } from "./LifeDetail";
 import { Empty, Explainer, PanelHead, Stat, SummaryBar } from "./ui";
 
@@ -51,7 +52,7 @@ export function Lives() {
   const conditionalCap = (lives ?? []).reduce((sum, life) => sum + lifeEconomics(life, epoch?.id, expiry).additionalCap, 0n);
   const allocated = (lives ?? []).reduce((sum, life) => sum + BigInt(life.paid), 0n);
   const claimable = (lives ?? []).reduce((sum, life) => sum + BigInt(life.claimable), 0n);
-  const rows = (items: LifeInfo[]) => items.map(l => <LifeRow key={l.token_id} l={l} expiry={expiry} currentEpoch={epoch?.id} listings={listings} open={openLife} />);
+  const rows = (items: LifeInfo[]) => <div className="life-grid">{items.map(l => <LifeTile key={l.token_id} l={l} expiry={expiry} currentEpoch={epoch?.id} listings={listings} open={openLife} />)}</div>;
 
   if (selected) return <LifeDetail key={selected} tokenId={selected} onBack={closeLife} />;
 
@@ -105,16 +106,48 @@ function NextLife({ epochId, left }: { epochId?: number; left: number }) {
   return <div className="flex items-center gap-3 bg-[var(--panel-2)] px-4 py-3"><PixelHeart size={28} fill={lost > 0n ? 0.5 : 0} /><div className="min-w-0 flex-1 text-sm"><b>Possible Extra Life · round {epochId ?? "…"}</b><div className="label num">{pending === undefined ? "Checking unsettled losses for this account…" : lost > 0n ? `$${fmtUsdc(lost)} net loss so far${oneup > 0n ? `, with an estimated ${fmtOneup(oneup.toString())} $1UP reward if the round settled now` : ""}. Round ends in ${fmtClock(Math.max(0, left - now))}; eligibility and payout amounts depend on the round’s final house profit.` : `No net loss this round. It closes in ${fmtClock(Math.max(0, left - now))}.`}</div></div></div>;
 }
 
-function LifeRow({ l, expiry, currentEpoch, listings, open }: { l: LifeInfo; expiry?: number; currentEpoch?: number; listings: Listing[]; open: (id: string) => void }) {
+/** One Life as its card; it opens the Life, where it can be claimed or listed. */
+function LifeTile({ l, expiry, currentEpoch, listings, open }: { l: LifeInfo; expiry?: number; currentEpoch?: number; listings: Listing[]; open: (id: string) => void }) {
   const { d } = useOneUp();
   const economics = lifeEconomics(l, currentEpoch, expiry);
-  const owed = BigInt(l.owed);
-  const progress = owed === 0n ? 0 : Number((economics.allocated * 10_000n) / owed) / 10_000;
-  return <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 p-4 sm:grid-cols-[auto_minmax(0,1fr)_8rem_10rem_11rem]">
-    <PixelHeart size={34} fill={progress} live={economics.canReceiveMore} />
-    <div className="min-w-0"><a href={lifeHref(l.token_id)} data-life-id={l.token_id} className="font-extrabold text-[var(--primary)] underline underline-offset-2" onClick={event => { if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return; event.preventDefault(); open(l.token_id); }}>{l.backer ? `Backer Life #${l.token_id}` : `Recovery Life · round ${l.epoch}`}</a><div className="label mt-1 break-all">Token {l.token_id}</div><div className="label mt-1">{lifeEarningLabel(l, currentEpoch, expiry)}</div></div>
-    <div className="col-start-2 sm:col-start-auto"><div className="num font-extrabold" style={economics.claimable > 0n ? { color: "var(--long)" } : undefined}>{money(economics.claimable)}</div><div className="label">Available to claim</div></div>
-    <div className="col-start-2 sm:col-start-auto"><div className="num font-extrabold">{money(economics.additionalCap)}</div><div className="label">Remaining payout limit</div></div>
-    <div className="col-start-2 sm:col-start-auto">{economics.hasRecoverableFunds && <Sell nft={d.contracts.life} tokenId={l.token_id} listings={listings} compact />}</div>
-  </div>;
+  const listing = listings.find(x => x.nft_contract === d.contracts.life && x.token_id === l.token_id);
+  const title = l.backer ? `Backer Life #${l.token_id}` : `Recovery Life · round ${l.epoch}`;
+  // the card leans toward the pointer while it's over it
+  const tilt = (event: React.PointerEvent<HTMLAnchorElement>) => {
+    if (event.pointerType !== "mouse" || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const r = event.currentTarget.getBoundingClientRect();
+    event.currentTarget.style.setProperty("--mx", (((event.clientX - r.left) / r.width) * 2 - 1).toFixed(3));
+    event.currentTarget.style.setProperty("--my", (((event.clientY - r.top) / r.height) * 2 - 1).toFixed(3));
+  };
+  const untilt = (event: React.PointerEvent<HTMLAnchorElement>) => {
+    event.currentTarget.style.removeProperty("--mx");
+    event.currentTarget.style.removeProperty("--my");
+  };
+  return (
+    <a
+      href={lifeHref(l.token_id)}
+      data-life-id={l.token_id}
+      aria-label={`${title}. ${economics.claimable > 0n ? `${money(economics.claimable)} to claim. ` : ""}${lifeEarningLabel(l, currentEpoch, expiry)}`}
+      title={lifeEarningLabel(l, currentEpoch, expiry)}
+      onPointerMove={tilt}
+      onPointerLeave={untilt}
+      onClick={event => { if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return; event.preventDefault(); open(l.token_id); }}
+    >
+      <LifeCard
+        id={l.backer ? l.token_id : String(l.epoch)}
+        paid={BigInt(l.paid)}
+        owed={BigInt(l.owed)}
+        state={lifeState(l)}
+        backer={l.backer}
+        tone={l.backer ? "backer" : "recovery"}
+        tag={l.backer ? "BACKER" : "LOSS"}
+        detail={l.backer ? "House pool" : `Round ${l.epoch}`}
+        amount={`${money(BigInt(l.paid))} / ${money(BigInt(l.owed))}`}
+        extra={<>
+          {economics.claimable > 0n && <span className="life-card-claim"><span>TO CLAIM</span><span className="num">{money(economics.claimable)}</span></span>}
+          {listing && <span className="life-card-claim listed"><span>LISTED</span><span className="num">{money(BigInt(listing.price))}</span></span>}
+        </>}
+      />
+    </a>
+  );
 }
