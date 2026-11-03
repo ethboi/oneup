@@ -947,124 +947,6 @@ body {
   }
 }
 
-/* Brief trade-review overlay; the legacy versus classes preserve its existing animation. */
-.versus {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  border-radius: 8px;
-  animation: versus-out 3.6s steps(1) both;
-}
-/* Legacy split layout, retained for existing presentation styles. */
-.versus-side {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 10px;
-  padding-bottom: 14%;
-  zoom: var(--fighter-zoom, 1);
-}
-.versus-side.you {
-  align-items: flex-start;
-  padding-left: 12%;
-  background: linear-gradient(100deg, #3b2a8c, #1f1650);
-  clip-path: polygon(0 0, 56% 0, 44% 100%, 0 100%);
-  animation: versus-in-left 0.35s cubic-bezier(0.2, 1, 0.3, 1) both;
-}
-.versus-side.market {
-  align-items: flex-end;
-  padding-right: 10%;
-  background: linear-gradient(100deg, #2a1416, #120a0b);
-  clip-path: polygon(56% 0, 100% 0, 100% 100%, 44% 100%);
-  animation: versus-in-right 0.35s cubic-bezier(0.2, 1, 0.3, 1) both;
-}
-.versus-side > :first-child {
-  filter: drop-shadow(0 0 14px rgb(255 255 255 / 0.18));
-}
-/* Scale the legacy split layout on larger screens. */
-@media (min-width: 640px) {
-  .versus-side {
-    --fighter-zoom: 1.6;
-  }
-}
-.versus-name {
-  font-size: clamp(14px, 3vw, 24px);
-  letter-spacing: 0.12em;
-  color: #fff;
-  -webkit-text-stroke: 1px var(--lcd-ink);
-  paint-order: stroke fill;
-  text-shadow: 3px 3px 0 var(--lcd-ink);
-}
-.versus-vs {
-  position: absolute;
-  left: 50%;
-  top: 38%;
-  font-size: clamp(48px, 11vw, 92px);
-  line-height: 1;
-  color: #f2b705;
-  -webkit-text-stroke: 3px var(--lcd-ink);
-  paint-order: stroke fill;
-  text-shadow:
-    5px 5px 0 var(--lcd-ink),
-    0 0 24px rgb(242 183 5 / 0.6);
-  transform: translate(-50%, -50%) rotate(-8deg);
-  animation: versus-slam 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) 0.3s both;
-}
-.versus-call {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 9%;
-  text-align: center;
-  font-size: clamp(16px, 3.4vw, 28px);
-  letter-spacing: 0.14em;
-  color: #fff;
-  -webkit-text-stroke: 1px var(--lcd-ink);
-  paint-order: stroke fill;
-  text-shadow: 3px 3px 0 var(--lcd-ink);
-  animation: versus-stamp 0.3s steps(3) 0.9s both;
-}
-.versus-fight {
-  color: #f2b705;
-  animation: versus-stamp 0.3s steps(3) 1.4s both;
-}
-@keyframes versus-in-left {
-  from {
-    transform: translateX(-100%);
-  }
-}
-@keyframes versus-in-right {
-  from {
-    transform: translateX(100%);
-  }
-}
-@keyframes versus-slam {
-  0% {
-    transform: translate(-50%, -50%) rotate(-8deg) scale(3);
-    opacity: 0;
-  }
-  70% {
-    transform: translate(-50%, -50%) rotate(-8deg) scale(0.9);
-    opacity: 1;
-  }
-}
-@keyframes versus-stamp {
-  from {
-    transform: scale(1.8);
-    opacity: 0;
-  }
-}
-/* gone in one cut at the end, like a game moving on */
-@keyframes versus-out {
-  92% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-  }
-}
 .angry-flame {
   animation: angry-flicker 0.3s steps(2) infinite;
 }
@@ -1106,8 +988,6 @@ body {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .versus,
-  .versus *,
   .angry-flame,
   .tilt-word {
     animation: none;
@@ -1286,35 +1166,69 @@ body {
     opacity: 0;
   }
 }
-/* a loss's Extra Life card: dealt in spinning as the cracked heart falls, held, then lifted away */
-.life-deal {
-  width: 150px;
-  animation: life-deal 3s cubic-bezier(0.3, 1.3, 0.5, 1) both;
+/* a loss's Extra Life, as a game banner: an LCD ink frame and a hard shadow, popping in in pixel steps */
+.life-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 168px;
+  padding: 9px 12px 11px;
+  border: 3px solid var(--lcd-ink);
+  border-radius: 6px 6px 22px 6px;
+  background: linear-gradient(180deg, #ffe3f1, #ff9fcd);
+  box-shadow: 5px 5px 0 var(--lcd-ink);
+  color: var(--lcd-ink);
+  animation:
+    banner-pop 0.35s steps(4) both,
+    banner-out 0.25s steps(3) 1.65s forwards;
 }
-.life-deal .life-card {
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.07),
-    0 3px 0 var(--panel-lip),
-    0 24px 40px -14px rgb(0 0 0 / 0.95),
-    0 0 40px -6px color-mix(in srgb, var(--heart) 60%, transparent);
+.life-banner-top {
+  display: flex;
+  justify-content: space-between;
+  align-self: stretch;
+  font-size: 12px;
+  letter-spacing: 0.06em;
 }
-@keyframes life-deal {
-  0%,
-  18% {
-    transform: translateY(60px) rotate(-14deg) scale(0.4);
+.life-banner-plus {
+  color: #e2257a;
+  -webkit-text-stroke: 1px var(--lcd-ink);
+  paint-order: stroke fill;
+}
+.life-banner-art {
+  width: 88px;
+  height: auto;
+  border: 3px solid var(--lcd-ink);
+  border-radius: 4px;
+  image-rendering: pixelated;
+}
+.life-banner-big {
+  font-size: 22px;
+  line-height: 1;
+  color: #e2257a;
+  -webkit-text-stroke: 1.5px var(--lcd-ink);
+  paint-order: stroke fill;
+  text-shadow: 2px 2px 0 var(--lcd-ink);
+}
+.life-banner-small {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 800 11.5px var(--font-body);
+  white-space: nowrap;
+}
+.life-banner-small .life-card-side {
+  font-size: 10px;
+}
+@keyframes banner-pop {
+  from {
+    transform: translateY(-30px) scale(1.3);
     opacity: 0;
   }
-  32% {
-    transform: translateY(-6px) rotate(3deg) scale(1.06);
-    opacity: 1;
-  }
-  40%,
-  86% {
-    transform: translateY(0) rotate(-2deg) scale(1);
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(-24px) rotate(-2deg) scale(0.96);
+}
+@keyframes banner-out {
+  to {
+    transform: translateY(-12px);
     opacity: 0;
   }
 }
@@ -1353,7 +1267,7 @@ body {
   .win-amount,
   .heart-crack,
   .heart-plus,
-  .life-deal,
+  .life-banner,
   .revenge,
   .heart-rain,
   .round-in,

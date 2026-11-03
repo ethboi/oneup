@@ -31,7 +31,7 @@ import { useTilt } from "@/lib/tilt";
 import { reservedMargin } from "@/lib/account";
 import { priceInput as toPrice, triggerValues, editablePrice } from "@/lib/triggers";
 import { payFromChain } from "@/lib/intents";
-import { useRevengeFlash, useStreak } from "./Streaks";
+import { useStreak } from "./Streaks";
 import { Burst, Gauge, HpBar, MoodGlow, hpOf, useCloseFx, useMood, useTensionSound } from "./Mood";
 import { ActivityList, useActivity } from "./Activity";
 import { HistoryList } from "./History";
@@ -711,7 +711,6 @@ function Console({
   const tilt = useTilt(me);
   useTensionSound(mood);
   const fx = useCloseFx(market);
-  const revenge = useRevengeFlash();
   const streak = useStreak(me);
   const [range, setRange] = useChartRange();
   const [style, setStyle] = useChartStyle();
@@ -851,23 +850,12 @@ function Console({
           <MoodGlow mood={mood} />
           <GameFx market={market} pos={pos} mark={mark} pts={pts} />
           {fx && <Burst fx={fx} />}
-          {(revenge || tilt > 0) && (
+          {tilt > 0 && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center" role="status">
-              {revenge ? (
-                // Keep the brief notification focused on the trade and its risk.
-                <span key={revenge} className="versus flex items-center justify-center bg-[var(--lcd)]/95 px-5 py-6 text-center text-[var(--lcd-ink)]" aria-label="Review your trade">
-                  <span className="flex max-w-sm flex-col items-center gap-3">
-                    <span className="display text-sm">{market}</span>
-                    <span className="display text-2xl leading-tight sm:text-3xl">REVIEW YOUR TRADE</span>
-                    <span className="text-sm leading-relaxed sm:text-base">Check the price, position size and risk.</span>
-                  </span>
-                </span>
-              ) : (
-                // a pinball machine's TILT
-                <span className="tilt display">
-                  <span className="tilt-word">TILT</span>
-                </span>
-              )}
+              {/* a pinball machine's TILT */}
+              <span className="tilt display">
+                <span className="tilt-word">TILT</span>
+              </span>
             </div>
           )}
         </div>
