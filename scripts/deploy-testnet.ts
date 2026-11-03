@@ -22,7 +22,8 @@ export function testnetPlan(input: PlanInput) {
   if (!/^[a-z0-9]+(?:[-_][a-z0-9]+)*(?:\.[a-z0-9]+(?:[-_][a-z0-9]+)*)*\.testnet$/.test(account) || account.length > 57) {
     throw Error("ONEUP_TESTNET_ACCOUNT must be a named .testnet account of at most 57 characters; all child account IDs must fit NEAR's 64-character limit.");
   }
-  const rpcUrl = input.rpcUrl ?? "https://rpc.testnet.near.org";
+  // rpc.testnet.near.org is deprecated and refuses requests partway through a deploy (HTTP 429)
+  const rpcUrl = input.rpcUrl ?? "https://test.rpc.fastnear.com";
   if (!ALLOWED_RPC.has(rpcUrl)) throw Error("RPC must be exactly https://rpc.testnet.near.org or https://test.rpc.fastnear.com.");
   const epochLengthS = Number(input.epochLengthS ?? "600");
   if (!Number.isInteger(epochLengthS) || epochLengthS < 60 || epochLengthS > 604800) throw Error("ONEUP_TESTNET_EPOCH_SECONDS must be an integer from 60 to 604800.");
