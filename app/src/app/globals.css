@@ -1902,7 +1902,8 @@ kbd {
   font-size: clamp(5px, var(--cw) / 15, 12px);
   animation: boot-float 7s ease-in-out calc(var(--i) * -1.2s) infinite;
 }
-.life-card.full_heal {
+.life-card.full_heal,
+.life-card.backer {
   --s1: #f2b705;
   --s2: var(--accent);
   --lit: #f2b705;
@@ -1917,10 +1918,6 @@ kbd {
   --s2: #a9abb6;
   --lit: #8a8c99;
   color: var(--muted);
-}
-.life-card.backer {
-  --s1: #2563eb;
-  --s2: var(--info);
 }
 .life-card-top {
   display: flex;
@@ -1970,7 +1967,8 @@ kbd {
 .boot-nft .life-card-art::after {
   animation: boot-sheen 1.2s ease-out calc(3.1s + var(--i) * 90ms) backwards;
 }
-.life-card.full_heal .life-card-art::after {
+.life-card.full_heal .life-card-art::after,
+.life-card.backer .life-card-art::after {
   background-image: linear-gradient(
     115deg,
     transparent 25%,
@@ -2000,7 +1998,8 @@ kbd {
   --k: var(--short-fill);
 }
 .life-card-side.backer {
-  --k: #2563eb;
+  --k: #f2b705;
+  color: #1c1b29;
 }
 .life-card-side.recovery {
   --k: #c2185b;
@@ -2089,7 +2088,8 @@ kbd {
 .life-card-foot > span:first-child {
   letter-spacing: 0.08em;
 }
-.life-card.full_heal .life-card-foot > span:first-child {
+.life-card.full_heal .life-card-foot > span:first-child,
+.life-card.backer .life-card-foot > span:first-child {
   color: var(--accent);
 }
 .boot-top {
