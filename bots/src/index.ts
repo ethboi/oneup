@@ -2,6 +2,7 @@
 // winners, losers, Extra Lives, emissions and buybacks. Each bot trades from its own account.
 //
 //   pnpm bots            (needs `pnpm localnet` and `pnpm keeper` running)
+//   ONEUP_CONFIG=/abs/.testnet/<operator>/operator.json pnpm bots   (testnet, after `pnpm testnet:bots`)
 
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -23,7 +24,9 @@ import {
   type Side,
 } from "@oneup/sdk";
 
-const d: Deployment = JSON.parse(readFileSync(resolve(import.meta.dirname, "../../localnet.json"), "utf8"));
+const d: Deployment = JSON.parse(readFileSync(process.env.ONEUP_CONFIG ?? resolve(import.meta.dirname, "../../localnet.json"), "utf8"));
+// on testnet every trade costs real (test) gas and the public RPC rate-limits reads, so the bots take it slower
+const PACE = d.network === "testnet" ? 4 : 1;
 const o = new OneUp(d);
 const MIN_HOLD_S = 60;
 
@@ -403,7 +406,7 @@ const ai = aiAgents(process.env.ONEUP_AI_AGENTS);
 const bots = d.bots.map((b, i) => new Bot(b.id, b.key, STYLES[i % STYLES.length])).filter((b) => !ai.includes(b.id.split(".")[0]));
 console.log(`${bots.length} bots on ${d.rpcUrl}: ${bots.map((b) => b.style.name).join(", ")}${ai.length ? ` (left to the AI agent: ${ai.join(", ")})` : ""}`);
 
-setInterval(() => samplePrices().catch(() => {}), 3000);
+setInterval(() => samplePrices().catch(() => {}), 3000 * PACE);
 await samplePrices();
 
 for (const [i, b] of bots.entries()) {
@@ -414,6 +417,6 @@ for (const [i, b] of bots.entries()) {
     } catch (e) {
       log(b.style.name, short(e));
     }
-    setTimeout(loop, 8_000 + Math.random() * 12_000);
+    setTimeout(loop, (8_000 + Math.random() * 12_000) * PACE);
   }, i * 1500);
 }
