@@ -242,7 +242,7 @@ fn one_owner_can_back_twice() {
     assert!(lives.iter().all(|l| l.backer && l.epoch == 0));
     let t = c.nft_token(a).unwrap().metadata.unwrap();
     assert_eq!(t.title.unwrap(), "Backer Life #1");
-    assert!(t.media.unwrap().contains("2563eb"));
+    assert!(t.media.unwrap().contains("b98b00"));
     // the old epoch-0 path still works after a backing
     ctx("house", 0);
     c.mint_batch(0, vec![item("seed", 1_000, 1_000_000)]);

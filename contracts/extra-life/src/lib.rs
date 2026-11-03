@@ -466,16 +466,18 @@ impl HeartState {
 }
 
 /// A pixel heart on an LCD screen, filled from the bottom by `paid / owed`: gold behind a Full Heal, grey
-/// once expired, a blue outline for a Backer Life. A `data:` URI, so wallets show it without any server.
+/// once expired, gold behind a Backer Life from the start. A `data:` URI, so wallets show it without any server.
 fn heart_svg(paid: u128, owed: u128, state: HeartState, backer: bool) -> String {
     let rows = HEART.len() as u128;
     let filled = if owed == 0 { rows } else { (paid.min(owed) * rows).div_ceil(owed) };
     let (bg, heart, empty) = match state {
+        // a Backer Life is gold from the start, its heart filling as it is paid
+        HeartState::Earning if backer => ("f2b705", "e2257a", "b98b00"),
         HeartState::Earning => ("b7c49a", "e2257a", "8e9e6e"),
         HeartState::Healed => ("f2b705", "e2257a", "e2257a"),
         HeartState::Expired => ("c9cbd4", "8a8c99", "a9abb6"),
     };
-    let ink = if backer { "2563eb" } else { "1c1b29" };
+    let ink = "1c1b29";
     let on = |x: i32, y: i32| (0..9).contains(&x) && (0..8).contains(&y) && HEART[y as usize][x as usize] != b'.';
     let mut cells = String::new();
     // the ink outline: empty cells touching the heart

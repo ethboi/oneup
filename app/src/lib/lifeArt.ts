@@ -1,6 +1,6 @@
 // An Extra Life NFT's image, drawn as the contract draws it (heart_svg in contracts/extra-life/src/lib.rs): a pixel
-// heart on an LCD tile, filled from the bottom by paid / owed, gold behind a Full Heal, grey once expired, outlined
-// in blue for a Backer Life. The same data: URI a wallet shows.
+// heart on an LCD tile, filled from the bottom by paid / owed, gold behind a Full Heal or a Backer Life, grey once
+// expired. The same data: URI a wallet shows.
 
 const HEART = [".##...##.", "#*#######", "#########", "#########", ".#######.", "..#####..", "...###...", "....#...."];
 /** background, heart, empty rows */
@@ -21,8 +21,9 @@ export function lifeRows(paid: bigint, owed: bigint): number {
 
 export function lifeImage(paid: bigint, owed: bigint, state: LifeState, backer = false): string {
   const filled = lifeRows(paid, owed);
-  const [bg, heart, empty] = COLORS[state];
-  const ink = backer ? "2563eb" : "1c1b29";
+  // a Backer Life is gold from the start, its heart filling as it is paid
+  const [bg, heart, empty] = backer && state === "earning" ? (["f2b705", "e2257a", "b98b00"] as const) : COLORS[state];
+  const ink = "1c1b29";
   const on = (x: number, y: number) => x >= 0 && x < 9 && y >= 0 && y < 8 && HEART[y][x] !== ".";
   let cells = "";
   // the ink outline: empty cells touching the heart
