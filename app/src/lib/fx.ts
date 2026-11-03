@@ -6,7 +6,7 @@ import { useEffect, useRef } from "react";
 export type FxEvent =
   /** `pnl`: USDC units after the winner's cut, judged at the last mark (the fill may differ slightly).
    *  `tier`: how big a win is (winTier), which sizes its burst. */
-  | { kind: "win" | "lose" | "liquidated"; market: string; positionId: number; pnl?: string; tier?: WinTier }
+  | { kind: "win" | "lose" | "liquidated"; market: string; positionId: number; pnl?: string; tier?: WinTier; side?: "Long" | "Short"; leverage?: number }
   | { kind: "heal"; tokenId: string; epoch: number; paid: string }
   | { kind: "revenge" }
   /** The game layer (components/Level.tsx, Game.tsx). */

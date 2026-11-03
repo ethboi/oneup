@@ -20,6 +20,8 @@ export function LifeCard({
   detail,
   amount,
   extra,
+  corner,
+  footLabel,
   className = "",
   style,
 }: {
@@ -37,6 +39,9 @@ export function LifeCard({
   amount: string;
   /** Under the card's foot, such as USDC waiting to be claimed. */
   extra?: ReactNode;
+  /** In place of `#id` in the corner, and of PAID / FULL HEAL / EXPIRED in the foot. */
+  corner?: string;
+  footLabel?: string;
   className?: string;
   style?: CSSProperties;
 }) {
@@ -45,7 +50,7 @@ export function LifeCard({
     <div className={`life-card ${state} ${backer ? "backer" : ""} ${className}`} style={style}>
       <div className="life-card-top">
         <span className="display">EXTRA LIFE</span>
-        <span className="num">#{id}</span>
+        <span className="num">{corner ?? `#${id}`}</span>
       </div>
       <span className="life-card-stripes" />
       <div className="life-card-art">
@@ -61,7 +66,7 @@ export function LifeCard({
         ))}
       </div>
       <div className="life-card-foot">
-        <span>{state === "full_heal" ? "FULL HEAL" : state === "expired" ? "EXPIRED" : "PAID"}</span>
+        <span>{footLabel ?? (state === "full_heal" ? "FULL HEAL" : state === "expired" ? "EXPIRED" : "PAID")}</span>
         <span className="num">{amount}</span>
       </div>
       {extra}

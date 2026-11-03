@@ -12,6 +12,7 @@ import { useFx, type FxEvent } from "@/lib/fx";
 import { setMusicTension } from "@/lib/music";
 import { nearMisses } from "@/lib/achievements";
 import { PixelAmount, PixelCoin, PixelHeart } from "./Pixel";
+import { LifeCard } from "./LifeCard";
 
 export interface Mood {
   state: "none" | "calm" | "danger" | "critical" | "hot";
@@ -147,12 +148,14 @@ export function useCloseFx(market: string) {
     const id = Date.now();
     setFx({ ...e, id });
     // a win holds a little longer so the amount can be read, longer still the bigger it is
-    setTimeout(() => setFx((f) => (f?.id === id ? null : f)), e.kind === "win" ? WIN[e.tier ?? 1].hold : 1600);
+    // a loss holds long enough to read the Extra Life card it may earn
+    setTimeout(() => setFx((f) => (f?.id === id ? null : f)), e.kind === "win" ? WIN[e.tier ?? 1].hold : LIFE_HOLD);
   });
   return fx;
 }
 
 type CloseFx = Extract<FxEvent, { kind: "win" | "lose" | "liquidated" }>;
+const LIFE_HOLD = 3000;
 
 /** Each win tier's burst: coins thrown, how far, the amount's height in px, how long it holds. */
 const WIN = [
@@ -209,15 +212,27 @@ export function Burst({ fx }: { fx: CloseFx & { id: number } }) {
       </div>
     );
   }
+  const lost = fx.pnl && BigInt(fx.pnl) < 0n ? -BigInt(fx.pnl) : 0n;
   return (
-    <div key={fx.id} className="pointer-events-none absolute inset-0 flex items-center justify-center" aria-hidden>
-      <span className="relative">
+    <div key={fx.id} className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center" aria-hidden>
+      <span className="relative flex items-center justify-center">
         <span className="heart-crack block">
           <PixelHeart size={72} fill={0} />
         </span>
-        <span className="heart-plus absolute inset-0">
-          <PixelHeart size={72} />
-          <span className="display absolute -top-4 left-1/2 -translate-x-1/2 text-2xl text-[var(--heart)]">+1</span>
+        {/* then the Extra Life this loss may earn, dealt in as a card: empty until the round settles and pays */}
+        <span className="life-deal absolute" style={{ animationDuration: `${LIFE_HOLD}ms` }}>
+          <LifeCard
+            id=""
+            corner="+1"
+            paid={0n}
+            owed={1n}
+            state="earning"
+            tone={fx.side === "Short" ? "short" : fx.side === "Long" ? "long" : "recovery"}
+            tag={fx.side ? fx.side.toUpperCase() : "LOSS"}
+            detail={`${fx.market.split("-")[0]}${fx.leverage ? ` ${fx.leverage}×` : ""}`}
+            footLabel={fx.kind === "liquidated" ? "LIQUIDATED" : "LOSS"}
+            amount={lost > 0n ? `$${fmtUsdc(lost)}` : ""}
+          />
         </span>
       </span>
     </div>
