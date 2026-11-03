@@ -7,7 +7,7 @@ import { Account, JsonRpcProvider, KeyPair, actions, nearToYocto, teraToGas, typ
 import { MARKETS, ONEUP, USDC, type Deployment } from "@oneup/sdk";
 import { CONTRACT_WASMS, ROOT, sha256, sourceIdentity, verifyBuildManifest } from "./artifacts.ts";
 
-const FUNDING = { house: 7, life: 5, oneup: 3, ve: 5, market: 3, usdc: 3, oracle: 2, swap: 2, vault: 2, keeper: 5 } as const;
+const FUNDING = { house: 7, life: 5, oneup: 3, ve: 5, market: 3, usdc: 3, oracle: 3, swap: 3, vault: 3, keeper: 5 } as const;
 const CONTRACT_NAMES = Object.keys(CONTRACT_WASMS) as (keyof typeof CONTRACT_WASMS)[];
 const ALLOWED_RPC = new Set(["https://rpc.testnet.near.org", "https://test.rpc.fastnear.com"]);
 const OPERATOR_RESERVE = 3;
