@@ -1,0 +1,12 @@
+# Never upload keys or chain state to Vercel: the app gets only the keyless public profile, from an env var
+.testnet
+.localnet
+localnet.json
+*.judge
+.judge*
+.env*
+.near-credentials
+contracts/target
+**/node_modules
+**/.next*
+docs/evidence
