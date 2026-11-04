@@ -32,12 +32,17 @@ import { HermesSource, LiveSource, SimSource, sane, type PriceSource, type Steer
 import { validSteer } from "./control.ts";
 import { processOrders } from "./orders.ts";
 import { reconcileBuybacks, restoreBuybacks } from "./buybacks.ts";
+import { PacedProvider } from "@oneup/sdk";
 
 const { values: args } = parseArgs({
   options: {
     prices: { type: "string", default: "live" },
     tick: { type: "string", default: "3000" },
     "price-tick": { type: "string", default: "1000" },
+    // the treasury and buyback checks: nothing in them is urgent, so a slower one saves a rate-limited RPC
+    "slow-tick": { type: "string" },
+    // the least time between this process's RPC requests (0: none), for a free-tier RPC's rate limit
+    "rpc-gap": { type: "string", default: "0" },
     control: { type: "string", default: "8787" },
     config: { type: "string", default: process.env.ONEUP_CONFIG ?? resolve(import.meta.dirname, "../../localnet.json") },
   },
@@ -47,7 +52,8 @@ const d: Deployment = JSON.parse(readFileSync(args.config!, "utf8"));
 // a separate RPC for this process (ONEUP_RPC): on testnet the keeper, the bots and the site's visitors would
 // otherwise share one provider's free-tier rate limit
 if (process.env.ONEUP_RPC) d.rpcUrl = process.env.ONEUP_RPC;
-const oneup = new OneUp(d);
+const rpc = new PacedProvider(d.rpcUrl, Number(args["rpc-gap"]));
+const oneup = new OneUp(d, rpc);
 const keeper = oneup.calls(accountSender(new Account(d.keeper.id, oneup.provider, d.keeper.key as KeyPairString)));
 const owner = oneup.calls(accountSender(new Account(d.owner.id, oneup.provider, d.owner.key as KeyPairString)));
 const params = await oneup.params();
@@ -69,8 +75,15 @@ const latest = new Map<string, { price: bigint; time: number }>();
 const jumps = new Map<string, number>();
 const JUMP_TICKS = 10;
 
+/** The chain's market list, read at most once a minute: it only changes when a vote lists a market. */
+let listedCache: { at: number; markets: Awaited<ReturnType<OneUp["markets"]>> } | null = null;
+async function liveMarkets() {
+  if (!listedCache || Date.now() - listedCache.at > 60_000) listedCache = { at: Date.now(), markets: await oneup.markets() };
+  return listedCache.markets.filter((m) => m.live);
+}
+
 async function pushPrices(pusher: ReturnType<OneUp["calls"]>) {
-  const listed = (await oneup.markets()).filter((m) => m.live);
+  const listed = await liveMarkets();
   feeds = new Map(listed.map((m) => [m.id, m.feed_id]));
   const updates = (await source.next(listed.map((m) => ({ id: m.id, feedId: m.feed_id })))).filter((u) => {
     const last = latest.get(u.feed_id);
@@ -131,9 +144,16 @@ async function handlePositions(risk: ReturnType<OneUp["calls"]>) {
   }
 }
 
+/** When the current epoch is due to end, once read: until then there is nothing to check. */
+let epochEndsAt = 0;
 async function handleEpoch() {
+  if (nowS() < epochEndsAt) return;
   const [epoch, closing] = await Promise.all([oneup.epoch(), oneup.closing()]);
-  if (!closing && nowS() < epoch.started_at + d.epochLengthS) return;
+  if (!closing && nowS() < epoch.started_at + d.epochLengthS) {
+    epochEndsAt = epoch.started_at + d.epochLengthS;
+    return;
+  }
+  epochEndsAt = 0;
   for (let i = 0; i < 20; i++) {
     const r = await keeper.closeEpoch();
     if (r === "begun") log(`epoch ${epoch.id} ended; closing`);
@@ -308,12 +328,14 @@ async function riskLoop(risk: ReturnType<OneUp["calls"]>) {
   }
 }
 
+let lastSlow = 0;
 async function tick() {
+  const slow = Date.now() - lastSlow >= Number(args["slow-tick"] ?? args.tick);
+  if (slow) lastSlow = Date.now();
   const steps: [string, () => Promise<void>][] = [
     ["orders", handleOrders],
     ["epoch", handleEpoch],
-    ["treasury", handleTreasury],
-    ["buybacks", handleBuybacks],
+    ...(slow ? ([["treasury", handleTreasury], ["buybacks", handleBuybacks]] as [string, () => Promise<void>][]) : []),
   ];
   for (const [name, fn] of steps) {
     try {
@@ -326,6 +348,16 @@ async function tick() {
 
 log(`keeper ${d.keeper.id} on ${d.rpcUrl}, ${args.prices} prices, ${d.markets.length} markets`);
 controlServer(Number(args.control));
+if (Number(args["rpc-gap"]) > 0) {
+  let seen = { sent: 0, limited: 0 };
+  setInterval(() => {
+    const now = { sent: rpc.sent, limited: rpc.limited };
+    const top = [...rpc.byMethod].sort((x, y) => y[1] - x[1]).slice(0, 6).map(([m, n]) => `${m} ${n}`).join(", ");
+    log(`rpc: ${now.sent - seen.sent} requests in 5 min, ${now.limited - seen.limited} refused for the rate limit and resent (${top})`);
+    rpc.byMethod.clear();
+    seen = now;
+  }, 300_000).unref();
+}
 void priceLoop(await priceSender());
 void riskLoop(await riskSender());
 for (;;) {

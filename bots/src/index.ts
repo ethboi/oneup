@@ -22,6 +22,7 @@ import {
   type LockInfo,
   type Position,
   type Side,
+  PacedProvider,
 } from "@oneup/sdk";
 
 const d: Deployment = JSON.parse(readFileSync(process.env.ONEUP_CONFIG ?? resolve(import.meta.dirname, "../../localnet.json"), "utf8"));
@@ -29,7 +30,8 @@ const d: Deployment = JSON.parse(readFileSync(process.env.ONEUP_CONFIG ?? resolv
 if (process.env.ONEUP_RPC) d.rpcUrl = process.env.ONEUP_RPC;
 // on testnet every trade costs real (test) gas and the public RPC rate-limits reads, so the bots take it slower
 const PACE = d.network === "testnet" ? 4 : 1;
-const o = new OneUp(d);
+// spaced requests, resent when the RPC refuses them for its rate limit, and never left hanging (ONEUP_RPC_GAP_MS)
+const o = new OneUp(d, new PacedProvider(d.rpcUrl, Number(process.env.ONEUP_RPC_GAP_MS ?? "0")));
 const MIN_HOLD_S = 60;
 
 interface Style {
