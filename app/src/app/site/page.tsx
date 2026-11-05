@@ -128,6 +128,30 @@ export default function Site() {
           </ol>
         </section>
 
+        <section className="site-section site-ad">
+          <figure className="site-tv">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/site/testimonial.webp"
+              width={1200}
+              height={675}
+              loading="lazy"
+              alt="Chad, a blond trader in sunglasses and red braces, holds up a gold Extra Life card and the handheld, beside a beaming TV host giving a thumbs up"
+            />
+          </figure>
+          <div className="site-ad-copy">
+            <blockquote className="display site-ad-quote">
+              <p>Got liquidated.</p>
+              <p>Got paid.</p>
+            </blockquote>
+            <p className="site-ad-by">Chad Lifeson, trader</p>
+            <p className="label">
+              Chad and the host are made-up characters from our ad, created with AI. Results not typical: a loss only earns a
+              Life if the house ends the round in profit, and payouts can be zero.
+            </p>
+          </div>
+        </section>
+
         <section id="life" className="site-section site-life">
           <div className="site-cards" aria-hidden>
             <LifeCard id="219" paid={30n} owed={240n} state="earning" tone="long" tag="LONG" detail="ETH 1000×" amount="$30 / $240" />
@@ -192,6 +216,17 @@ export default function Site() {
         </section>
 
         <section className="site-section site-end">
+          <figure className="site-tv site-tv-end">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/site/press-start.webp"
+              width={1100}
+              height={619}
+              loading="lazy"
+              alt="Chad and the TV host point straight at you, holding up a gold Extra Life card and the handheld"
+            />
+          </figure>
+          <p className="display site-end-line">Lost again? Get a life.</p>
           <h2 className="display site-h2">Press start</h2>
           <a className="btn btn-accent btn-big" href={APP}>
             Open the app
