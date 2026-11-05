@@ -40,7 +40,25 @@ interface Ctx {
   history: Record<string, { t: number; p: number }[]>;
   /** Bumps after every successful transaction so views refetch. */
   version: number;
+  /** Testnet without a connected wallet: everything shows, and any action asks for a wallet first. */
+  viewOnly: boolean;
 }
+
+/** What an account-specific read answers for no account (view-only), without asking the chain. */
+const NOBODY: Record<string, unknown> = {
+  balance: "0", usdcBalance: "0", oneupBalance: "0", tickets: "0", pendingLife: "0",
+  positions: [], orders: [], lives: [], locks: [],
+};
+function withoutAccount(o: OneUp): OneUp {
+  return new Proxy(o, {
+    get(target, key, receiver) {
+      const v = Reflect.get(target, key, receiver);
+      if (typeof key !== "string" || !(key in NOBODY) || typeof v !== "function") return v;
+      return (account: string, ...rest: unknown[]) => (account === "" ? Promise.resolve(NOBODY[key]) : v.call(target, account, ...rest));
+    },
+  });
+}
+const WATCH_KEY = "oneup.testnet.viewOnly";
 
 const OneUpContext = createContext<Ctx | null>(null);
 
@@ -72,14 +90,24 @@ function viaProxy(d: AppDeployment): AppDeployment {
 }
 
 function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
-  const o = useMemo(() => new OneUp(d), [d]);
+  const o = useMemo(() => withoutAccount(new OneUp(d)), [d]);
   const wallet = useNearWallet(d);
+  // a visitor can look around before connecting a wallet; remembered for this browser
+  const [watching, setWatching] = useState(false);
+  useEffect(() => {
+    try { setWatching(localStorage.getItem(WATCH_KEY) === "1"); } catch {}
+  }, []);
+  const watch = useCallback(() => {
+    setWatching(true);
+    try { localStorage.setItem(WATCH_KEY, "1"); } catch {}
+  }, []);
   const accounts = useMemo(
     () => d.demo ? [{ id: d.demo.id, label: "demo" }, ...d.bots.map((b, i) => ({ id: b.id, label: `bot ${i + 1}` }))] : [],
     [d],
   );
   const [localMe, setMeState] = useState(d.demo?.id ?? "");
   const me = d.network === "localnet" ? localMe : wallet.accountId;
+  const viewOnly = d.network === "testnet" && !me;
   useEffect(() => {
     try {
       const saved = localStorage.getItem("oneup.account");
@@ -119,8 +147,16 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [version, setVersion] = useState(0);
   const nextId = useRef(1);
+  const connect = wallet.connect;
   const run = useCallback(async (label: string, f: () => Promise<unknown>) => {
     const id = nextId.current++;
+    if (viewOnly) {
+      // nothing to sign with yet: open the wallet picker, and say why
+      setToasts((t) => [...t, { id, text: `Connect a NEAR testnet wallet to ${label.charAt(0).toLowerCase()}${label.slice(1)}`, kind: "error" }]);
+      setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 6000);
+      void connect();
+      return false;
+    }
     sfx("send");
     setToasts((t) => [...t, { id, text: label, kind: "pending" }]);
     const done = (kind: Toast["kind"], text: string) => {
@@ -138,7 +174,7 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
       done("error", `${label}: ${cleanError(e)}`);
       return false;
     }
-  }, []);
+  }, [viewOnly, connect]);
 
   // Prices: poll the oracle every second and keep the last 1,800 updates (30 minutes) per market. A point is added only
   // when the oracle publishes a new price, at the moment it arrives, so the chart moves with real updates
@@ -146,7 +182,7 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
   const [prices, setPrices] = useState<Record<string, bigint>>({});
   const [history, setHistory] = useState<Record<string, { t: number; p: number }[]>>({});
   useEffect(() => {
-    if (d.network === "testnet" && !me) return;
+    if (d.network === "testnet" && !me && !watching) return;
     let live = true;
     const published = new Map<string, number>();
     const tick = async () => {
@@ -196,10 +232,10 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
       live = false;
       stop();
     };
-  }, [o, d.network, me]);
+  }, [o, d.network, me, watching]);
 
-  const value: Ctx = { d, o, accounts, me, setMe, tx, main, mainKey, session, wallet, run, toasts, prices, history, version };
-  return <OneUpContext.Provider value={value}>{d.network === "testnet" && !me ? <WalletWelcome connect={wallet.connect} busy={wallet.busy} error={wallet.error} /> : children}</OneUpContext.Provider>;
+  const value: Ctx = { d, o, accounts, me, setMe, tx, main, mainKey, session, wallet, run, toasts, prices, history, version, viewOnly };
+  return <OneUpContext.Provider value={value}>{viewOnly && !watching ? <WalletWelcome connect={wallet.connect} busy={wallet.busy} error={wallet.error} watch={watch} /> : children}</OneUpContext.Provider>;
 }
 
 /** Polls `f` every `ms` and whenever `deps` or the transaction version change. */

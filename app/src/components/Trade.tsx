@@ -588,7 +588,7 @@ type Ticket = ReturnType<typeof useTicket>;
 
 /** The order ticket's state and what it would do, shared by the form and the phone trade bar. */
 function useTicket(market: string, maxLeverage: number) {
-  const { o, d, tx, run, prices, me, main, mainKey } = useOneUp();
+  const { o, d, tx, run, prices, me, main, mainKey, viewOnly } = useOneUp();
   // where the margin comes from: the wallet's USDC on NEAR, or a bridged asset via NEAR Intents (D-21)
   const [payWith, setPayWith] = useState("wallet");
   const [intentStep, setIntentStep] = useState<string | null>(null);
@@ -621,9 +621,12 @@ function useTicket(market: string, maxLeverage: number) {
   const slAt = toPrice(sl);
   // a trigger already past the price would fire on the first price after the hold: refuse it here
   const badTrigger = !!price && ((!!tpAt && targetHit(side, price, tpAt)) || (!!slAt && stopHit(side, price, slAt)));
-  const blocked =
-    !triggerValues(tp, sl) || !quote?.allowed || m === 0n || (!viaAsset && topUp > wallet) || badTrigger || intentStep !== null || (orderType === "limit" && (!limitAt || !!viaAsset));
-  const label = viaAsset
+  // view-only: the button stays live and asks for a wallet (run() in lib/oneup.tsx)
+  const blocked = !viewOnly && (
+    !triggerValues(tp, sl) || !quote?.allowed || m === 0n || (!viaAsset && topUp > wallet) || badTrigger || intentStep !== null || (orderType === "limit" && (!limitAt || !!viaAsset)));
+  const label = viewOnly
+    ? `Connect wallet to ${side.toLowerCase()}`
+    : viaAsset
     ? `${side} ${market} with ${viaAsset.symbol} on ${viaAsset.chain}`
     : orderType === "limit"
       ? `${topUp > 0n ? "Deposit & " : ""}Limit ${side.toLowerCase()} at ${limitAt ? fmtPrice(limitAt) : "…"}`
@@ -889,7 +892,7 @@ function posToLev(pos: number, max: number) {
  * triggers, the button, then what the order would do as label and value rows.
  */
 function OrderForm({ t }: { t: Ticket }) {
-  const { d } = useOneUp();
+  const { d, viewOnly } = useOneUp();
   const { side, setSide, margin, setMargin, leverage, setLeverage, maxLeverage, m, quote, free, wallet, pool, topUp, blocked, price } = t;
   const liq = quote?.liquidation_price ? BigInt(quote.liquidation_price) : null;
   // what a full loss would bring: an Extra Life of at most the loss × today's cap, and up to 20 $1UP per $1
@@ -1104,7 +1107,15 @@ function OrderForm({ t }: { t: Ticket }) {
       <TriggerFields side={side} entry={price} margin={m} leverage={leverage} liq={liq} tp={t.tp} setTp={t.setTp} sl={t.sl} setSl={t.setSl} />
 
       {quote && !quote.allowed && <p className="text-sm text-[var(--short)]">{quote.reason}</p>}
-      {topUp > wallet && <p className="text-sm text-[var(--short)]">Not enough USDC. Open Demo and select Get test USDC to add funds.</p>}
+      {viewOnly ? (
+        <p className="label">Connect a NEAR testnet wallet to trade. Your first trade asks for it.</p>
+      ) : (
+        topUp > wallet && (
+          <p className="text-sm text-[var(--short)]">
+            Not enough USDC. {d.network === "localnet" ? "Open Demo and select Get test USDC" : "Open your account menu and select Get 1,000 test USDC"} to add funds.
+          </p>
+        )
+      )}
 
       <button
         className="btn btn-big"

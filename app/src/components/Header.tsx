@@ -255,6 +255,18 @@ function DemoMenu() {
 /** Your account: wallet and trading balances, and moving USDC between them. Trades top themselves up, so
  *  depositing first is optional. */
 function AccountMenu() {
+  const { viewOnly, wallet } = useOneUp();
+  if (viewOnly)
+    return (
+      <button type="button" className="btn btn-accent" disabled={wallet.busy} onClick={() => void wallet.connect()}>
+        <Icon name="wallet" />
+        {wallet.busy ? "Waiting for wallet…" : "Connect wallet"}
+      </button>
+    );
+  return <AccountFunds />;
+}
+
+function AccountFunds() {
   const { o, d, me, tx, run } = useOneUp();
   const free = usePoll(() => o.balance(me), [me]);
   const wallet = usePoll(() => o.usdcBalance(me), [me]);
