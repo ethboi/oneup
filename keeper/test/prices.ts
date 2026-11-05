@@ -77,3 +77,14 @@ test("sim steer: a zero or bad target is refused, not divided by", async () => {
   for (let i = 0; i < 20; i++) await sim.next([{ id: "NEAR-USD", feedId: "a" }]);
   assert.equal(sim.prices.get("NEAR-USD"), 2.2);
 });
+
+test("priceDue pushes on a move, on age, or when nothing was pushed yet", async () => {
+  const { priceDue } = await import("../src/prices.ts");
+  const last = { price: 100, at: 0 };
+  assert.equal(priceDue(undefined, 100, 0, 10, 60_000), true);
+  assert.equal(priceDue(last, 100.05, 1_000, 10, 60_000), false); // 5 bps
+  assert.equal(priceDue(last, 100.1, 1_000, 10, 60_000), true); // 10 bps
+  assert.equal(priceDue(last, 99.9, 1_000, 10, 60_000), true); // down too
+  assert.equal(priceDue(last, 100, 60_000, 10, 60_000), true); // stale
+  assert.equal(priceDue(last, 100, 1_000, 0, 60_000), true); // 0: always, as on localnet
+});

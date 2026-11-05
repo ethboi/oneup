@@ -191,3 +191,13 @@ function gaussian(): number {
   const v = Math.random();
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
 }
+
+/** Whether a feed's new price is worth a transaction: a move of at least `moveBps` from the last pushed price, or
+ *  the last push older than `maxAgeMs`, or none yet. A forced push (an order waiting for a newer price) skips
+ *  this. moveBps 0 pushes every time, as on localnet. */
+export function priceDue(last: { price: number; at: number } | undefined, next: number, nowMs: number, moveBps: number, maxAgeMs: number): boolean {
+  if (!last || moveBps <= 0) return true;
+  if (nowMs - last.at >= maxAgeMs) return true;
+  // in basis points, with a hair of slack so a move of exactly moveBps isn't lost to floating point
+  return (Math.abs(next - last.price) / last.price) * 10_000 >= moveBps - 1e-9;
+}

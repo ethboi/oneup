@@ -28,7 +28,7 @@ import {
   type Deployment,
   type Position,
 } from "@oneup/sdk";
-import { HermesSource, LiveSource, SimSource, sane, type PriceSource, type Steerable } from "./prices.ts";
+import { HermesSource, LiveSource, SimSource, priceDue, sane, type PriceSource, type Steerable } from "./prices.ts";
 import { validSteer } from "./control.ts";
 import { processOrders } from "./orders.ts";
 import { reconcileBuybacks, restoreBuybacks } from "./buybacks.ts";
@@ -41,6 +41,11 @@ const { values: args } = parseArgs({
     "price-tick": { type: "string", default: "1000" },
     // the treasury and buyback checks: nothing in them is urgent, so a slower one saves a rate-limited RPC
     "slow-tick": { type: "string" },
+    // push a feed only when it moved this many basis points, or its last push is --price-max-age old (0: always)
+    "price-move-bps": { type: "string", default: "0" },
+    "price-max-age": { type: "string", default: "60000" },
+    // how often to look for liquidations and trigger hits (default: --price-tick)
+    "risk-tick": { type: "string" },
     // the least time between this process's RPC requests (0: none), for a free-tier RPC's rate limit
     "rpc-gap": { type: "string", default: "0" },
     control: { type: "string", default: "8787" },
@@ -82,7 +87,10 @@ async function liveMarkets() {
   return listedCache.markets.filter((m) => m.live);
 }
 
-async function pushPrices(pusher: ReturnType<OneUp["calls"]>) {
+/** What each feed last pushed, and when (ms), for --price-move-bps. */
+const pushedAt = new Map<string, { price: number; at: number }>();
+
+async function pushPrices(pusher: ReturnType<OneUp["calls"]>, forced: boolean) {
   const listed = await liveMarkets();
   feeds = new Map(listed.map((m) => [m.id, m.feed_id]));
   const updates = (await source.next(listed.map((m) => ({ id: m.id, feedId: m.feed_id })))).filter((u) => {
@@ -93,9 +101,10 @@ async function pushPrices(pusher: ReturnType<OneUp["calls"]>) {
     if (!why || n > JUMP_TICKS) return true;
     log(`price for ${listed.find((m) => m.feed_id === u.feed_id)?.id ?? u.feed_id} not pushed: ${why}`);
     return false;
-  });
+  }).filter((u) => forced || priceDue(pushedAt.get(u.feed_id), u.price * 10 ** u.expo, Date.now(), Number(args["price-move-bps"]), Number(args["price-max-age"])));
   if (!updates.length) return;
   await pusher.pushPrices(updates);
+  for (const u of updates) pushedAt.set(u.feed_id, { price: u.price * 10 ** u.expo, at: Date.now() });
   for (const u of updates) {
     const p = normalizePrice(BigInt(u.price), u.expo);
     if (p !== null) latest.set(u.feed_id, { price: p, time: u.publish_time });
@@ -298,16 +307,20 @@ let wakePrices: (() => void) | null = null;
 const MIN_PUSH_GAP_MS = 3000;
 
 async function priceLoop(pusher: ReturnType<OneUp["calls"]>) {
+  let forced = false;
   for (;;) {
     const start = Date.now();
     try {
-      await pushPrices(pusher);
+      await pushPrices(pusher, forced);
     } catch (e) {
       log(`prices: ${e instanceof Error ? e.message.split("\n")[0] : e}`);
     }
+    forced = false;
     await new Promise<void>((r) => {
       const t = setTimeout(r, Math.max(0, Number(args["price-tick"]) - (Date.now() - start)));
       wakePrices = () => {
+        // an order is waiting for a newer price: push every feed now, moved or not
+        forced = true;
         clearTimeout(t);
         setTimeout(r, Math.max(0, MIN_PUSH_GAP_MS - (Date.now() - start)));
       };
@@ -324,7 +337,7 @@ async function riskLoop(risk: ReturnType<OneUp["calls"]>) {
     } catch (e) {
       log(`positions: ${e instanceof Error ? e.message.split("\n")[0] : e}`);
     }
-    await new Promise((r) => setTimeout(r, Math.max(0, Number(args["price-tick"]) - (Date.now() - start))));
+    await new Promise((r) => setTimeout(r, Math.max(0, Number(args["risk-tick"] ?? args["price-tick"]) - (Date.now() - start))));
   }
 }
 
