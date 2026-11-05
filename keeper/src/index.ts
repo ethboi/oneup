@@ -26,6 +26,7 @@ import {
   stopHit,
   targetHit,
   type Deployment,
+  type Order,
   type Position,
 } from "@oneup/sdk";
 import { HermesSource, LiveSource, SimSource, priceDue, sane, type PriceSource, type Steerable } from "./prices.ts";
@@ -33,6 +34,7 @@ import { validSteer } from "./control.ts";
 import { processOrders } from "./orders.ts";
 import { reconcileBuybacks, restoreBuybacks } from "./buybacks.ts";
 import { PacedProvider } from "@oneup/sdk";
+import { crossesThreshold } from "./thresholds.ts";
 
 const { values: args } = parseArgs({
   options: {
@@ -89,6 +91,9 @@ async function liveMarkets() {
 
 /** What each feed last pushed, and when (ms), for --price-move-bps. */
 const pushedAt = new Map<string, { price: number; at: number }>();
+/** The open positions and orders as last read, so a small price move that crosses one of their lines still goes out. */
+let openPositions: Position[] = [];
+let openOrders: Order[] = [];
 
 async function pushPrices(pusher: ReturnType<OneUp["calls"]>, forced: boolean) {
   const listed = await liveMarkets();
@@ -101,7 +106,12 @@ async function pushPrices(pusher: ReturnType<OneUp["calls"]>, forced: boolean) {
     if (!why || n > JUMP_TICKS) return true;
     log(`price for ${listed.find((m) => m.feed_id === u.feed_id)?.id ?? u.feed_id} not pushed: ${why}`);
     return false;
-  }).filter((u) => forced || priceDue(pushedAt.get(u.feed_id), u.price * 10 ** u.expo, Date.now(), Number(args["price-move-bps"]), Number(args["price-max-age"])));
+  }).filter((u) => {
+    if (forced || priceDue(pushedAt.get(u.feed_id), u.price * 10 ** u.expo, Date.now(), Number(args["price-move-bps"]), Number(args["price-max-age"]))) return true;
+    const fresh = normalizePrice(BigInt(u.price), u.expo);
+    const market = listed.find((m) => m.feed_id === u.feed_id)?.id;
+    return fresh !== null && !!market && crossesThreshold(market, latest.get(u.feed_id)?.price, fresh, openPositions, openOrders, nowS(), minHoldS);
+  });
   if (!updates.length) return;
   await pusher.pushPrices(updates);
   for (const u of updates) pushedAt.set(u.feed_id, { price: u.price * 10 ** u.expo, at: Date.now() });
@@ -112,7 +122,10 @@ async function pushPrices(pusher: ReturnType<OneUp["calls"]>, forced: boolean) {
 }
 
 async function handleOrders() {
-  const waiting = await processOrders(oneup.listOrders, keeper, feeds, latest, nowS, FILL_WINDOW_S, LIMIT_EXPIRY_S, log);
+  const read: Order[] = [];
+  const list = (from: number, limit: number) => oneup.listOrders(from, limit).then((page) => (read.push(...page), page));
+  const waiting = await processOrders(list, keeper, feeds, latest, nowS, FILL_WINDOW_S, LIMIT_EXPIRY_S, log);
+  openOrders = read;
   // an order fills only on a price published after it: push one now rather than at the next scheduled push, so a
   // slow --price-tick (to save gas on testnet) never lets an order run out its fill window
   if (waiting > 0) wakePrices?.();
@@ -127,6 +140,7 @@ async function handlePositions(risk: ReturnType<OneUp["calls"]>) {
     all = all.concat(page);
     if (page.length < 100) break;
   }
+  openPositions = all;
   for (const p of all) {
     const px = latest.get(feeds.get(p.market_id) ?? "");
     if (!px || px.time < p.entry_publish_time) continue;
