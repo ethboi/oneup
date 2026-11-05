@@ -21,6 +21,6 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // pages only: the build's files and public assets (anything with an extension) pass straight through
-  matcher: ["/((?!_next/|.*\\.[a-zA-Z0-9]+$).*)"],
+  // pages only: the build's files, Vercel's analytics and public assets (anything with an extension) pass straight through
+  matcher: ["/((?!_next/|_vercel/|.*\\.[a-zA-Z0-9]+$).*)"],
 };

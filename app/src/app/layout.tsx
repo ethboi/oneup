@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { M_PLUS_Rounded_1c, Pixelify_Sans } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 // Pixelify Sans: the console's display face (logo, HUD, tabs, big numbers).
@@ -23,7 +24,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        {/* visit counts for the hosted site, without cookies; never on a local demo or a judge's run */}
+        {process.env.VERCEL && <Analytics />}
+      </body>
     </html>
   );
 }
