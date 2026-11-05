@@ -1,0 +1,374 @@
+/* oneup.markets: the handheld's instruction booklet. Same plastic, LCD and pixel print as the app; the console is
+   the one big element, everything else stays quiet. */
+
+.site {
+  --site-w: 1180px;
+  min-height: 100dvh;
+}
+.site main {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(72px, 10vw, 128px);
+  padding-bottom: 64px;
+}
+.site a:focus-visible {
+  outline: 3px solid var(--info);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+/* the bar: wordmark, three anchors, and the way into the app always in reach */
+.site-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  max-width: var(--site-w);
+  margin: 0 auto;
+  padding: 14px 16px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+}
+.site-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 22px;
+}
+.site-nav {
+  display: none;
+  gap: 22px;
+  margin-left: auto;
+  font-weight: 700;
+  color: var(--muted);
+}
+.site-nav a:hover {
+  color: var(--text);
+}
+.site-bar-cta {
+  margin-left: auto;
+}
+@media (min-width: 760px) {
+  .site-nav {
+    display: flex;
+  }
+  .site-bar-cta {
+    margin-left: 0;
+  }
+}
+
+/* the hero: the promise on the left, the console with the demo on its screen on the right */
+.site-hero {
+  display: grid;
+  gap: 40px;
+  align-items: center;
+  max-width: var(--site-w);
+  margin: 0 auto;
+  padding: clamp(24px, 6vw, 72px) 16px 0;
+}
+@media (min-width: 980px) {
+  .site-hero {
+    grid-template-columns: 1fr 1.05fr;
+    gap: 56px;
+  }
+}
+.site-hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.site-title {
+  font-size: clamp(32px, 5.4vw, 76px);
+  line-height: 0.98;
+  letter-spacing: -0.01em;
+}
+.site-lede {
+  max-width: 34em;
+  font-size: clamp(16px, 1.6vw, 18px);
+  line-height: 1.6;
+  color: color-mix(in srgb, var(--text) 86%, transparent);
+}
+.site-ctas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* the handheld: the app's own case, bezel and LCD, standing a little tilted */
+.site-console {
+  width: 100%;
+  max-width: 620px;
+  margin: 0 auto;
+  padding: 16px 22px 26px;
+  transform: rotate(-1.5deg);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .site-console {
+    animation: site-console-in 0.7s cubic-bezier(0.2, 0.9, 0.3, 1.1) both;
+  }
+}
+@keyframes site-console-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px) rotate(-1.5deg);
+  }
+}
+.site-console-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 4px 10px;
+  font: 800 9px var(--font-body);
+  letter-spacing: 0.14em;
+  color: var(--muted);
+}
+.site-led {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--heart);
+  box-shadow: 0 0 10px var(--heart);
+}
+.site-console-brand {
+  margin-left: auto;
+  font-size: 17px;
+  letter-spacing: 0;
+  color: color-mix(in srgb, var(--text) 30%, transparent);
+}
+.site-bezel {
+  padding: 14px 18px 24px;
+}
+.site-screen {
+  overflow: hidden;
+  aspect-ratio: 16 / 10;
+  padding: 0;
+}
+.site-screen img,
+.site-screen video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+.site-keys {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 10px 0;
+}
+.site-dpad {
+  width: 64px;
+  height: 64px;
+  background:
+    linear-gradient(var(--bezel), var(--bezel)) center / 22px 100% no-repeat,
+    linear-gradient(var(--bezel), var(--bezel)) center / 100% 22px no-repeat;
+  filter: drop-shadow(0 3px 0 var(--panel-lip));
+}
+.site-ab {
+  display: flex;
+  gap: 14px;
+  transform: rotate(-18deg);
+}
+/* LONG and SHORT, as the console's round keys */
+.site-key {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  font: 800 9px var(--font-body);
+  letter-spacing: 0.08em;
+  color: #fff;
+  box-shadow:
+    inset 0 2px 0 rgb(255 255 255 / 0.25),
+    0 4px 0 var(--panel-lip);
+}
+.site-key.long {
+  background: var(--long-fill);
+}
+.site-key.short {
+  background: var(--short-fill);
+}
+
+/* sections share one column and one heading style */
+.site-section {
+  width: 100%;
+  max-width: var(--site-w);
+  margin: 0 auto;
+  padding: 0 16px;
+  scroll-margin-top: 80px;
+}
+.site-h2 {
+  margin-bottom: 28px;
+  font-size: clamp(30px, 4.4vw, 44px);
+  line-height: 1.05;
+}
+.site h3 {
+  font-size: 19px;
+  line-height: 1.2;
+}
+
+/* how to play: four steps in order, each with its own little picture */
+.site-steps {
+  display: grid;
+  gap: 16px;
+  counter-reset: step;
+}
+@media (min-width: 700px) {
+  .site-steps {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (min-width: 1100px) {
+  .site-steps {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+.site-step {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  counter-increment: step;
+}
+.site-step h3::before {
+  content: counter(step) " ";
+  color: var(--accent);
+}
+.site-step p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+.site-step-art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 170px;
+  margin-bottom: 6px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--bezel);
+}
+.site-step-card .life-card {
+  width: 84px;
+  transform: rotate(-4deg);
+}
+.site-liquidated {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--short-fill);
+  color: #fff;
+  font-size: 20px;
+  letter-spacing: 0.04em;
+  transform: rotate(-6deg);
+  box-shadow: 0 4px 0 var(--panel-lip);
+}
+
+/* the Extra Life: three real cards fanned beside what's in one */
+.site-life {
+  display: grid;
+  gap: 48px;
+  align-items: center;
+}
+@media (min-width: 980px) {
+  .site-life {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.site-cards {
+  display: flex;
+  justify-content: center;
+  padding: 20px 0;
+}
+.site-cards .life-card {
+  width: clamp(100px, 26vw, 190px);
+  margin: 0 -14px;
+  box-shadow: 0 18px 30px -16px rgb(0 0 0 / 0.8);
+}
+.site-cards .life-card:nth-child(1) {
+  transform: rotate(-8deg) translateY(14px);
+}
+.site-cards .life-card:nth-child(2) {
+  z-index: 1;
+  transform: translateY(-10px);
+}
+.site-cards .life-card:nth-child(3) {
+  transform: rotate(8deg) translateY(14px);
+}
+.site-facts {
+  display: grid;
+  gap: 22px;
+}
+.site-facts dt {
+  margin-bottom: 4px;
+  font-size: 18px;
+  color: var(--heart);
+}
+.site-facts dd {
+  max-width: 34em;
+  line-height: 1.6;
+  color: color-mix(in srgb, var(--text) 86%, transparent);
+}
+.site-caveat {
+  margin-top: 22px;
+  max-width: 44em;
+}
+
+/* NEAR: four concrete jobs it does */
+.site-near {
+  display: grid;
+  gap: 16px;
+}
+@media (min-width: 760px) {
+  .site-near {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+.site-near li {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 22px;
+}
+.site-near p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+/* the end: one last way in */
+.site-end {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  text-align: center;
+}
+.site-end .site-h2 {
+  margin-bottom: 0;
+}
+.site-end .label {
+  max-width: 40em;
+}
+
+.site-foot {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  padding: 24px 16px 40px;
+  border-top: 1px solid var(--line);
+}
+.site-foot a {
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* each sentence of the headline keeps to one line */
+.site-title > span {
+  display: block;
+  white-space: nowrap;
+}
