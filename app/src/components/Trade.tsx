@@ -70,7 +70,7 @@ function MarketBar(props: {
   setRange: (r: number) => void;
 }) {
   const { market, setMarket, markets, held, style, setStyle, range, setRange } = props;
-  const { o, prices, history } = useOneUp();
+  const { o, d, prices, history, publishedAt } = useOneUp();
   const solvency = usePoll(() => o.solvency(), [], 5000);
   const now = useNow();
   const [open, setOpen] = useState(false);
@@ -103,8 +103,8 @@ function MarketBar(props: {
   const longPct = long + short > 0n ? Math.round(Number((long * 1000n) / (long + short)) / 10) : null;
   const sm = solvency?.markets.find((m) => m.id === market);
   const room = sm ? BigInt(sm.capacity) - BigInt(sm.liability) : null;
-  const lastTick = (history[market] ?? []).at(-1)?.t ?? 0;
-  const live = now * 1000 - lastTick < 5_000;
+  // live by the oracle's own clock: on testnet a price only goes out when it moves, or at least every minute or so
+  const live = now - (publishedAt[market] ?? 0) < (d.network === "localnet" ? 5 : 60);
   const windowName = RANGES.find(([, ms]) => ms === range)?.[0] ?? "";
   const pct = (ch: number | null) => (ch === null ? "–" : `${ch >= 0 ? "+" : "−"}${Math.abs(ch).toFixed(2)}%`);
   const tone = (ch: number | null) => (ch === null ? "var(--muted)" : ch >= 0 ? "var(--long)" : "var(--short)");

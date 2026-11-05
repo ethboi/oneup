@@ -6,6 +6,7 @@
 import { PixelCoin, PixelHeart, PixelMark } from "./Pixel";
 import type { MarkName } from "@/lib/marks";
 import { Icon, type IconName } from "./Icon";
+import { useOneUp } from "@/lib/oneup";
 
 const STEPS: { icon: React.ReactNode; title: string; body: string }[] = [
   {
@@ -60,6 +61,8 @@ const BUILT: { icon: IconName; title: string; body: string }[] = [
 ];
 
 type Status = "demo" | "simulated" | "mainnet";
+/** "In the demo" items that also run on the testnet site; the rest are only in the local demo. */
+const ON_TESTNET = new Set(["Rust smart contracts", "NEAR standards", "NEAR randomness"]);
 
 const STATUS: Record<Status, { label: string; bg: string; fg: string }> = {
   demo: { label: "In the demo", bg: "color-mix(in srgb, var(--long) 15%, transparent)", fg: "var(--long)" },
@@ -187,6 +190,8 @@ const NEAR: { title: string; status: Status; body: string; points: string[]; mar
 ];
 
 export function About() {
+  const { d } = useOneUp();
+  const testnet = d.network === "testnet";
   return (
     <div className="flex flex-col gap-4">
       <section className="case relative overflow-hidden p-5 sm:p-8">
@@ -309,12 +314,12 @@ export function About() {
                     <b>{n.title}</b>
                   </span>
                   <span className="shrink-0 rounded-md px-2 py-0.5 text-[11px] font-bold" style={{ background: STATUS[n.status].bg, color: STATUS[n.status].fg }}>
-                    {STATUS[n.status].label}
+                    {testnet && n.status === "demo" ? (ON_TESTNET.has(n.title) ? "On testnet" : "Local demo only") : STATUS[n.status].label}
                   </span>
                 </div>
                 <p className="mt-1 text-sm text-[var(--muted)]">{n.body}</p>
                 <ul className="mt-2 flex flex-col gap-1 text-sm">
-                  {n.points.map((p) => (
+                  {n.points.filter((p) => !(testnet && p.includes("on the House tab"))).map((p) => (
                     <li key={p} className="flex gap-2">
                       <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--primary)]" aria-hidden />
                       <span>{p}</span>

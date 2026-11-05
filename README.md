@@ -5,8 +5,9 @@ the house's future profit, which you can claim or sell.**
 
 ![A 50× long is liquidated; when the round closes the loss becomes an Extra Life, whose USDC is claimed; then another trader's Life is bought on the market](docs/media/oneup.gif)
 
-A NEAR HACKATHON entry for **NFTs That Do Something**, **Unstoppable DeFi** and **Agent Economy**. It runs on
-a local NEAR chain with test USDC; nothing is deployed to testnet or mainnet. All of it was written in the
+A NEAR HACKATHON entry for **NFTs That Do Something**, **Unstoppable DeFi** and **Agent Economy**. It is live
+on NEAR testnet at **https://oneup.markets** (the app is at https://app.oneup.markets), and runs as a fuller
+local demo, both with test USDC; nothing is on mainnet. All of it was written in the
 hackathon window: the first commit is 20 October 2026, the day after the announcement
 (`git log --reverse --format=%ad | head -1`).
 
@@ -16,11 +17,11 @@ On a perpetuals venue that trades against its users, a trader's loss is the venu
 position leaves the trader nothing to hold, sell or claim.
 
 OneUp gives losers part of the house's profit back, as an asset they own. When a round closes with the house
-in profit, each wallet with a net loss in that round gets an **Extra Life**: USDC to claim now, and a share of
-the house's profit for the next 13 rounds, up to a payout limit of 1.2–2× its face value. Losers also get
-$1UP tokens, locked for two years; lockers share the house's buybacks. A Life is an NFT: claim it, keep it or
-sell it, and the buyer gets its unclaimed USDC and its future payouts. Recovery depends on future house profit
-and can be zero.
+in profit, each wallet with a net loss in that round gets an **Extra Life**, an NFT that collects a share of the
+house's profit for the next 13 rounds, up to a payout limit of 1.2–2× its face value. A round pays out only from
+the surplus above the pool's reserve, so a profitable round can still pay nothing. Losers also get $1UP tokens,
+locked for 104 rounds; lockers share the house's buybacks. A Life can be claimed, kept or sold: the buyer gets
+its unclaimed USDC and its future payouts. Recovery depends on future house profit and can be zero.
 
 ## What NEAR does here
 
@@ -37,7 +38,25 @@ and can be zero.
 - **AI agents.** An MCP server gives an agent the trader's tools, including buying Lives on the market; every
   action is journalled with the agent's stated reason and shown on the app's Agents tab.
 
-## Try it
+The NFTs, USDC claims, locks and market run on testnet; Intents, the DAO, one-tap trading and agents run in the
+local demo.
+
+## Try it live
+
+| Step | Do | See |
+|---|---|---|
+| 1 | Open https://oneup.markets, then **Open the app** | What OneUp is, then the app's power-on screen (any key skips it) |
+| 2 | On the wallet screen choose **Look around first** | The Trade screen with no wallet: the live chart and the long/short split. Any action asks for a wallet |
+| 3 | Open the **Market** tab | The Lives and locks the bots have listed |
+| 4 | **Connect wallet** (a NEAR testnet wallet such as Meteor; see [wallet setup](docs/NEAR_WALLET_SETUP.md)), then in the account menu **Register test tokens** and **Get 1,000 test USDC** | Test USDC in your wallet |
+| 5 | Open a 1000× long on NEAR-USD | The order fills on the next price. A small move against it liquidates it, with the LIQUIDATED banner |
+| 6 | Wait for the round to close (the countdown is in the header), then open **Extra Lives** | If the house ended the round in profit, your Extra Life, its picture filling as it pays |
+| 7 | **Claim** what it has collected, or list it on the **Market** | USDC in your wallet, or your listing |
+
+The testnet contracts are accounts under `oneupmarkets.testnet`, which also owns them; on testnet the keeper and three
+bots run from the author's machine. History and leaderboards need the local demo's indexer.
+
+## Try it locally
 
 Tested on Linux with Node 24.13.0, pnpm 10.18.3, Rust 1.99.1 (with the `wasm32-unknown-unknown` target) and
 cargo-near 0.22.0, the versions CI uses.
@@ -71,6 +90,7 @@ http://127.0.0.1:3020, with state kept in `.localnet/`.
 |---|---|---|
 | Selling a Life transfers its payout rights | [Extra Life](contracts/extra-life/src/lib.rs), [market test](contracts/tests/tests/market.rs), [judge journey](scripts/judge-e2e.ts) | `pnpm test:judge`: the buyer owns and claims it; the former owner is refused |
 | A purchase can't land on a changed listing | [Market](contracts/market/src/lib.rs), sandbox `a_life_claimed_and_listed_again_is_not_sold_to_the_earlier_buyer` | `pnpm test:sandbox`: a Life claimed and listed again at the same price refunds the earlier buyer |
+| An NFT emptied during a transfer call can't sell on its old listing | [Extra Life](contracts/extra-life/src/lib.rs), [ve](contracts/ve/src/lib.rs), tests `a_life_emptied_during_a_transfer_call_returns_without_its_old_approvals` and `a_lock_emptied_…` | `pnpm test`: the token returns without its old approvals; one left untouched keeps them |
 | A Life is never sized above its loss | [Maths](contracts/math/src/lib.rs), house `a_quiet_rounds_fees_dont_inflate_its_lives` | `pnpm test`: a quiet round's marketplace fees don't inflate the round's Lives or $1UP |
 | Failed issuance keeps the obligation | [Recovery queue](contracts/house/src/recovery.rs), [receipt test](contracts/tests/tests/recovery.rs) | `pnpm test:sandbox`: a failure and retry keep the recipient and terms without duplicating rewards |
 | Expiry stops future payouts, not allocated cash | [Life tests](contracts/extra-life/src/tests.rs), [UI accounting](app/test/life-economics.ts) | `pnpm test` and `pnpm test:ts`: expired cash stays claimable; the remaining payout limit is zero |
@@ -82,11 +102,11 @@ http://127.0.0.1:3020, with state kept in `.localnet/`.
 
 | Component | State |
 |---|---|
-| House, Extra Life, $1UP token, locks, marketplace | OneUp's own contracts, on the local chain |
+| House, Extra Life, $1UP token, locks, marketplace | OneUp's own contracts, on testnet and the local chain |
 | NEAR Intents | The official Verifier and PoA token factory (v0.4.2, unchanged binaries); intents signed with the official SDK. OneUp's own solver fills them with `execute_intents`. Bridge deposits are simulated; there is no real Ethereum or Solana deposit and no 1Click integration |
-| Sputnik DAO | Unchanged mainnet Sputnik DAO v2 code; owns the house, the Extra Lives and the oracle. The council (the demo trader, bot4 and bot6) votes with disclosed test keys |
+| Sputnik DAO | Local demo only (an operator account owns the testnet contracts). Unchanged mainnet Sputnik DAO v2 code; owns the house, the Extra Lives and the oracle. The council (the demo trader, bot4 and bot6) votes with disclosed test keys |
 | Function-call keys, NEP-366 | Session keys limited to the house's trading methods; a local relayer. A trade-only key can still lose the trading balance |
-| NEAR wallet | Opt-in NEAR Connect 0.11.4 for testnet, described in [wallet setup](docs/NEAR_WALLET_SETUP.md). OneUp isn't deployed to testnet, so the local demo signs with its test accounts |
+| NEAR wallet | NEAR Connect 0.11.4 on testnet, described in [wallet setup](docs/NEAR_WALLET_SETUP.md). The local demo signs with its test accounts |
 | AI agents | The MCP server and `pnpm agent`. The agent signs with a full-access local test key; its limits on margin, leverage and stop-losses are instructions, not enforced in code |
 | Oracle | A mock with Pyth's interface. The keeper feeds it Binance prices (ordinary demo) or fixed prices (judge demo). Pyth through OutLayer is the plan and hasn't been tested on a real network |
 | Swap, vault, USDC | Mocks: a constant-product swap for buybacks (Rhea is the plan), a vault paying 5% on idle pool USDC (lending through Chain Signatures is the plan), and test USDC with a faucet |
@@ -104,7 +124,7 @@ http://127.0.0.1:3020, with state kept in `.localnet/`.
   of those losses: a Life's face value is never more than its loss. Lives share 60% of half the surplus above
   the reserve each round, two thirds to trader Lives and one third to Backer Lives.
 - **$1UP.** 1B minted once: 900M released to losers over four years, 20 per USDC of the house profit behind
-  their Lives, as two-year locks; 50M for liquidity, 42.5M treasury and 7.5M for backers. Lockers earn
+  their Lives, as 104-round locks; 50M for liquidity, 42.5M treasury and 7.5M for backers. Lockers earn
   buybacks by amount × time left; leaving early costs up to half.
 - **Backing.** The local deployment starts with a $250K house seed and $100K of bot backing, which earn Backer
   Lives that never expire. These are prepared state, not users or traction.

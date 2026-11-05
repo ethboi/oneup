@@ -372,3 +372,18 @@
   display: block;
   white-space: nowrap;
 }
+
+/* where each NEAR feature runs, on the card itself */
+.site-tag {
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 800;
+}
+.site-tag.live {
+  background: color-mix(in srgb, var(--long) 18%, transparent);
+  color: var(--long);
+}

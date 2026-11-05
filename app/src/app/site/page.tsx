@@ -10,7 +10,7 @@ import "./site.css";
 export const metadata: Metadata = {
   title: "OneUp: lose a trade, get a life",
   description:
-    "A perpetual futures game on NEAR. When the house ends a round in profit, traders with a net loss get an Extra Life: an NFT holding USDC and a share of future house profit. NEAR testnet, test money.",
+    "A perpetual futures game on NEAR. When the house ends a round in profit, traders with a net loss get an Extra Life: an NFT that collects a share of future house profit. NEAR testnet, test money.",
 };
 
 const APP = process.env.ONEUP_APP_URL ?? "/";
@@ -46,8 +46,8 @@ export default function Site() {
             </h1>
             <p className="site-lede">
               OneUp is a perpetual futures game on NEAR. When the house ends a round in profit, every trader with a net
-              loss gets an Extra Life: an NFT holding USDC you can claim, plus a share of the house’s profit for the next
-              13 rounds. Keep it, claim it or sell it.
+              loss gets an Extra Life: an NFT that collects a share of the house’s profit for the next 13 rounds. Claim what
+              it collects, keep it earning or sell it.
             </p>
             <div className="site-ctas">
               <a className="btn btn-accent btn-big" href={APP}>
@@ -101,7 +101,7 @@ export default function Site() {
                 <span className="site-key short">SHORT</span>
               </div>
               <h3 className="display">Pick a side</h3>
-              <p>Go long or short on BTC, ETH or NEAR, up to 1000×. There are no entry or funding fees; winning trades pay a fee on their profit.</p>
+              <p>Go long or short on BTC, ETH or NEAR, up to 1000×. There are no entry or funding fees; winning trades pay 10–25% of their profit.</p>
             </li>
             <li className="panel site-step">
               <div className="site-step-art" aria-hidden>
@@ -115,7 +115,7 @@ export default function Site() {
                 <LifeCard id="127" paid={0n} owed={300n} state="earning" tone="long" tag="LONG" detail="NEAR 50×" amount="$0 / $300" />
               </div>
               <h3 className="display">Get an Extra Life</h3>
-              <p>If the house ends the round in profit, each wallet with a net loss gets an Extra Life NFT, and $1UP locked for two years.</p>
+              <p>If the house ends the round in profit, each wallet with a net loss gets an Extra Life NFT, and $1UP locked for 104 rounds.</p>
             </li>
             <li className="panel site-step">
               <div className="site-step-art" aria-hidden>
@@ -123,7 +123,7 @@ export default function Site() {
                 <PixelHeart size={44} />
               </div>
               <h3 className="display">Claim it or sell it</h3>
-              <p>Claim its USDC as the house keeps earning, or list it on the market. Whoever holds it gets the payouts still to come.</p>
+              <p>Claim the USDC it collects, or list it on the market. Whoever holds it gets the payouts still to come.</p>
             </li>
           </ol>
         </section>
@@ -138,23 +138,23 @@ export default function Site() {
             <h2 className="display site-h2">What’s in an Extra Life</h2>
             <dl className="site-facts">
               <div>
-                <dt className="display">USDC to claim</dt>
-                <dd>Part of the round’s profit is in it from the moment it’s minted.</dd>
+                <dt className="display">USDC as it earns</dt>
+                <dd>Each round, part of the house’s profit above its reserves goes to Extra Lives. What yours collects is there to claim.</dd>
               </div>
               <div>
                 <dt className="display">13 more rounds</dt>
-                <dd>It keeps taking a share of the house’s profit each round, until it has paid 1.2–2× its face value or the 13 rounds run out.</dd>
+                <dd>It keeps collecting until it has paid 1.2–2× its face value or the 13 rounds run out. Face value comes from your share of the round’s losses, and is never more than your loss.</dd>
               </div>
               <div>
                 <dt className="display">Yours to sell</dt>
-                <dd>It’s an NFT. List it on the market: the buyer gets its unclaimed USDC and every payout after.</dd>
+                <dd>It’s an NFT. List it on the market, with a 2% seller fee: the buyer gets its unclaimed USDC and every payout after.</dd>
               </div>
               <div>
                 <dt className="display">Its picture is its balance</dt>
                 <dd>The heart fills row by row as it pays out, drawn by the contract itself. Backers who fund the house get gold ones.</dd>
               </div>
             </dl>
-            <p className="label site-caveat">Payouts depend on the house’s future profit. They can be zero.</p>
+            <p className="label site-caveat">Payouts depend on the house’s future profit and can be zero, even after a profitable round if the pool is below its reserves.</p>
           </div>
         </section>
 
@@ -163,28 +163,31 @@ export default function Site() {
           <ul className="site-near">
             <li className="panel">
               <PixelHeart size={28} />
+              <span className="site-tag live">On testnet</span>
               <h3 className="display">An NFT that holds money</h3>
               <p>Each Extra Life is a NEP-171 token that claims NEP-141 USDC from the house. Sell the token and the claim goes with it.</p>
             </li>
             <li className="panel">
               <PixelCoin size={28} />
+              <span className="site-tag">Local demo</span>
               <h3 className="display">Deposits from other chains</h3>
-              <p>With NEAR Intents, one signed intent swaps a bridged token, deposits it and opens the trade.</p>
+              <p>With NEAR Intents, one signed intent swaps a bridged token, deposits it and opens the trade. The bridge is simulated.</p>
             </li>
             <li className="panel">
               <PixelLock size={28} />
+              <span className="site-tag">Local demo</span>
               <h3 className="display">Run by a DAO</h3>
               <p>A Sputnik DAO owns the house, the Extra Lives and the price oracle, and votes on new markets.</p>
             </li>
             <li className="panel">
               <Logo size={28} />
+              <span className="site-tag">Local demo</span>
               <h3 className="display">One tap, or an agent</h3>
               <p>Function-call keys and a NEP-366 relayer make trading one tap and gasless. AI agents trade through an MCP server.</p>
             </li>
           </ul>
           <p className="label site-caveat">
-            On testnet now: trading, Extra Lives, claims and the market. Intents deposits (with a simulated bridge), DAO
-            ownership, gasless trading and agents run in the local demo.
+            On testnet: trading, Extra Lives, claims, locks and the market, owned by an operator account rather than a DAO.
           </p>
         </section>
 

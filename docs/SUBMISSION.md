@@ -15,13 +15,13 @@ Claude Code and Codex screen every entry before the human jury (Q-017).
 ```text
 On a perpetuals venue that trades against its users, a trader's loss is the venue's profit, and a liquidated position leaves the trader nothing.
 
-OneUp gives losers part of the house's profit back, as an asset they own. When a round closes with the house in profit, each wallet with a net loss gets an Extra Life: an NFT holding USDC to claim now and a share of the house's profit for the next 13 rounds, up to 1.2-2x its face value. Losers also get $1UP, locked for two years; lockers share the house's buybacks. A Life can be claimed, kept or sold: the buyer gets its unclaimed USDC and future payouts, and the former owner can't claim them. Recovery depends on future house profit and can be zero.
+OneUp gives losers part of the house's profit back, as an asset they own. When a round closes with the house in profit, each wallet with a net loss gets an Extra Life: an NFT that collects a share of the house's profit for the next 13 rounds, up to 1.2-2x its face value. Losers also get $1UP, locked for 104 rounds; lockers share the house's buybacks. A Life can be claimed, kept or sold: the buyer gets its unclaimed USDC and future payouts, and the former owner can't claim them. Recovery depends on future house profit and can be zero.
 
 NEAR makes the Life an NFT that holds money: NEP-171 with on-chain art, claiming NEP-141 USDC, sold on a built-in market. Deposits go through the official NEAR Intents Verifier: one signed intent swaps a bridged token, deposits it and opens a trade, and the house lets it trade only that deposit. A Sputnik DAO owns the house, the Lives and the oracle. One-tap trading uses function-call keys and a NEP-366 relayer. AI agents trade through an MCP server that journals each action with the agent's reason.
 
-To try it: pnpm demo:judge starts an isolated local chain with a prepared Life and a listing to buy; pnpm test:judge checks the loop end to end; pnpm verify runs the Rust unit, property and sandbox tests, the TypeScript tests and a production build.
+To try it: open https://oneup.markets (NEAR testnet, with or without a wallet). The NFTs, claims, locks and market run on testnet; Intents, the DAO, one-tap trading and agents run in the local demo, where pnpm demo:judge starts an isolated chain with a prepared Life and a listing to buy, and pnpm test:judge checks the loop end to end.
 
-OneUp is a prototype on a local chain with test USDC. The bridge, oracle, swap and vault are mocks, nothing is deployed to testnet or mainnet, and demand for buying Lives is untested.
+OneUp is a prototype using test USDC. The bridge, oracle, swap and vault are mocks, nothing is on mainnet, and demand for buying Lives is untested.
 ```
 
 ## Demo post draft (for the author to post)

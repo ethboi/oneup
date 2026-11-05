@@ -38,6 +38,8 @@ interface Ctx {
   /** Latest price per market (1e8 units) and recent history (USD). */
   prices: Record<string, bigint>;
   history: Record<string, { t: number; p: number }[]>;
+  /** When the oracle published each market's latest price (seconds). */
+  publishedAt: Record<string, number>;
   /** Bumps after every successful transaction so views refetch. */
   version: number;
   /** Testnet without a connected wallet: everything shows, and any action asks for a wallet first. */
@@ -181,6 +183,7 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
   // instead of repeating the same price on every poll.
   const [prices, setPrices] = useState<Record<string, bigint>>({});
   const [history, setHistory] = useState<Record<string, { t: number; p: number }[]>>({});
+  const [publishedAt, setPublishedAt] = useState<Record<string, number>>({});
   useEffect(() => {
     if (d.network === "testnet" && !me && !watching) return;
     let live = true;
@@ -189,12 +192,14 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
       const markets = await o.markets().catch(() => []);
       const next: Record<string, bigint> = {};
       const fresh: Record<string, number> = {};
+      const times: Record<string, number> = {};
       await Promise.all(
         markets.map(async (m) => {
           const p = await o.price(m.feed_id).catch(() => null);
           const v = p && normalizePrice(BigInt(p.price), p.expo);
           if (!v) return;
           next[m.id] = v;
+          times[m.id] = p.publish_time;
           if (published.get(m.id) !== p.publish_time) {
             published.set(m.id, p.publish_time);
             fresh[m.id] = Number(v) / 1e8;
@@ -203,6 +208,7 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
       );
       if (!live) return;
       setPrices(next);
+      setPublishedAt(times);
       if (Object.keys(fresh).length === 0) return;
       const t = Date.now();
       setHistory((h) => {
@@ -234,7 +240,7 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
     };
   }, [o, d.network, me, watching]);
 
-  const value: Ctx = { d, o, accounts, me, setMe, tx, main, mainKey, session, wallet, run, toasts, prices, history, version, viewOnly };
+  const value: Ctx = { d, o, accounts, me, setMe, tx, main, mainKey, session, wallet, run, toasts, prices, history, publishedAt, version, viewOnly };
   return <OneUpContext.Provider value={value}>{viewOnly && !watching ? <WalletWelcome connect={wallet.connect} busy={wallet.busy} error={wallet.error} watch={watch} /> : children}</OneUpContext.Provider>;
 }
 

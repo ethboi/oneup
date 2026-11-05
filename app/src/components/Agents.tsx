@@ -84,13 +84,26 @@ export function Agents() {
   const { ai, journal } = useAgents();
   const rows = useStandings();
   const now = useNow();
-  const agentId = d.bots.find((b) => short(b.id) === ai[0])?.id ?? `${ai[0]}.test.near`;
+  const testnet = d.network === "testnet";
+  // no agent account or journal on testnet: "" reads as an empty account, without asking the chain
+  const agentId = testnet ? "" : d.bots.find((b) => short(b.id) === ai[0])?.id ?? `${ai[0]}.test.near`;
   const positions = usePoll(() => o.positions(agentId), [agentId], 10_000) ?? [];
   const lives = usePoll(() => o.lives(agentId), [agentId], 20_000) ?? [];
   const mine = rows?.find((r) => r.account === agentId);
   const pnl = mine ? BigInt(mine.pnl) : 0n;
   const held = lives.filter((l) => !l.expired && !l.full_heal);
   const bought = journal.filter((e) => e.tool === "buy_listing" && e.ok).length;
+
+  if (testnet)
+    return (
+      <div className="flex flex-col gap-5">
+        <Explainer title="Agents" line="OneUp is built to be traded by AI agents as well as people, through its MCP server.">
+          An agent gets the same tools a trader has: markets, quotes, open and close, Extra Lives and the market. Each action goes into a journal with
+          the agent&apos;s own reason. That runs in the local demo; on this testnet site there is no agent or journal yet, and three rule-based bots
+          provide the trading you see.
+        </Explainer>
+      </div>
+    );
 
   return (
     <div className="flex flex-col gap-5">
