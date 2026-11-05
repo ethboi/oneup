@@ -428,3 +428,63 @@ fn once_repointed_the_old_house_cannot_mint() {
     ctx("house", 0);
     c.mint_backer(acc("seed"), U128(USDC), U128(1_000_000));
 }
+
+/// Runs the transfer call's callback as the chain would, with the receiver's answer (true: give it back).
+fn resolve(c: &mut ExtraLife, from: &str, to: &str, id: &str, approvals: Option<std::collections::HashMap<AccountId, u64>>) -> bool {
+    testing_env!(
+        VMContextBuilder::new().predecessor_account_id(near_sdk::test_utils::accounts(0)).current_account_id(near_sdk::test_utils::accounts(0)).build(),
+        near_sdk::test_vm_config(),
+        near_sdk::RuntimeFeesConfig::test(),
+        Default::default(),
+        vec![near_sdk::PromiseResult::Successful(b"true".to_vec())],
+    );
+    use near_contract_standards::non_fungible_token::core::NonFungibleTokenResolver;
+    c.nft_resolve_transfer(acc(from), acc(to), id.into(), approvals)
+}
+
+fn old_approval() -> Option<std::collections::HashMap<AccountId, u64>> {
+    Some(std::iter::once((acc("market"), 1)).collect())
+}
+
+fn life_in_flight_to_helper() -> ExtraLife {
+    let mut c = setup();
+    ctx("house", 0);
+    c.mint_batch(1, vec![item("alice", 1_000, 2_000_000)]);
+    pot(&mut c, 500);
+    ctx("alice", 1);
+    let _ = c.nft_transfer_call(acc("helper"), "1:alice".into(), None, None, "".into());
+    c
+}
+
+#[test]
+fn a_life_emptied_during_a_transfer_call_returns_without_its_old_approvals() {
+    let mut c = life_in_flight_to_helper();
+    ctx("helper", 0);
+    let _ = c.claim(vec!["1:alice".into()]);
+    assert!(!resolve(&mut c, "alice", "helper", "1:alice", old_approval()));
+    assert_eq!(c.tokens.owner_by_id.get(&"1:alice".to_string()), Some(acc("alice")));
+    assert!(!c.nft_is_approved("1:alice".into(), acc("market"), None));
+    assert!(c.in_flight.get(&"1:alice".to_string()).is_none());
+}
+
+#[test]
+fn a_life_untouched_during_a_transfer_call_gets_its_approvals_back() {
+    let mut c = life_in_flight_to_helper();
+    assert!(!resolve(&mut c, "alice", "helper", "1:alice", old_approval()));
+    assert_eq!(c.tokens.owner_by_id.get(&"1:alice".to_string()), Some(acc("alice")));
+    assert!(c.nft_is_approved("1:alice".into(), acc("market"), Some(1)));
+    assert!(c.in_flight.get(&"1:alice".to_string()).is_none());
+}
+
+#[test]
+fn a_nested_transfer_call_cannot_wipe_the_mark() {
+    let mut c = life_in_flight_to_helper();
+    ctx("helper", 0);
+    let _ = c.claim(vec!["1:alice".into()]);
+    ctx("helper", 1);
+    let _ = c.nft_transfer_call(acc("helper2"), "1:alice".into(), None, None, "".into());
+    assert!(!resolve(&mut c, "helper", "helper2", "1:alice", None));
+    assert!(!resolve(&mut c, "alice", "helper", "1:alice", old_approval()));
+    assert_eq!(c.tokens.owner_by_id.get(&"1:alice".to_string()), Some(acc("alice")));
+    assert!(!c.nft_is_approved("1:alice".into(), acc("market"), None));
+}

@@ -518,3 +518,49 @@ fn recovery_lock_receipts_cannot_be_forged_by_a_trader() {
     let mut v = setup();
     send(&mut v, "mallory", ONEUP, r#"{"recovery_locks":{"batch_id":7,"created":1,"items":[["mallory","1000000000000000000"]]}}"#);
 }
+
+fn resolve_lock(v: &mut Ve, from: &str, to: &str, id: &str, approvals: Option<std::collections::HashMap<AccountId, u64>>) -> bool {
+    testing_env!(
+        VMContextBuilder::new().predecessor_account_id(near_sdk::test_utils::accounts(0)).current_account_id(near_sdk::test_utils::accounts(0)).build(),
+        near_sdk::test_vm_config(),
+        near_sdk::RuntimeFeesConfig::test(),
+        Default::default(),
+        vec![near_sdk::PromiseResult::Successful(b"true".to_vec())],
+    );
+    use near_contract_standards::non_fungible_token::core::NonFungibleTokenResolver;
+    v.nft_resolve_transfer(acc(from), acc(to), id.into(), approvals)
+}
+
+fn old_approval() -> Option<std::collections::HashMap<AccountId, u64>> {
+    Some(std::iter::once((acc("market"), 1)).collect())
+}
+
+fn lock_in_flight_to_helper() -> (Ve, String) {
+    let mut v = setup();
+    let id = lock(&mut v, "alice", 1_000, 10);
+    checkpoint(&mut v, 2);
+    buyback(&mut v, 2, 100);
+    checkpoint(&mut v, 3);
+    testing_env!(VMContextBuilder::new().predecessor_account_id(acc("alice")).attached_deposit(NearToken::from_yoctonear(1)).build());
+    let _ = v.nft_transfer_call(acc("helper"), id.clone(), None, None, "".into());
+    (v, id)
+}
+
+#[test]
+fn a_lock_emptied_during_a_transfer_call_returns_without_its_old_approvals() {
+    let (mut v, id) = lock_in_flight_to_helper();
+    ctx("helper");
+    v.claim(id.clone(), vec![2]);
+    assert!(!resolve_lock(&mut v, "alice", "helper", &id, old_approval()));
+    assert_eq!(v.tokens.owner_by_id.get(&id), Some(acc("alice")));
+    assert!(!approved(&v, &id));
+    assert!(v.in_flight.get(&id).is_none());
+}
+
+#[test]
+fn a_lock_untouched_during_a_transfer_call_gets_its_approvals_back() {
+    let (mut v, id) = lock_in_flight_to_helper();
+    assert!(!resolve_lock(&mut v, "alice", "helper", &id, old_approval()));
+    assert!(approved(&v, &id));
+    assert!(v.in_flight.get(&id).is_none());
+}

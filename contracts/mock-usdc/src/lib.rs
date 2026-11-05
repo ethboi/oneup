@@ -108,8 +108,10 @@ impl StorageManagement for MockUsdc {
     }
 
     #[payable]
-    fn storage_unregister(&mut self, force: Option<bool>) -> bool {
-        self.token.internal_storage_unregister(force).is_some()
+    /// The faucet registers accounts for free, so accounts stay registered: unregistering would refund a deposit
+    /// nobody paid, and repeating it would drain this contract's NEAR.
+    fn storage_unregister(&mut self, _force: Option<bool>) -> bool {
+        env::panic_str("Accounts stay registered on this test token")
     }
 
     fn storage_balance_bounds(&self) -> StorageBalanceBounds {

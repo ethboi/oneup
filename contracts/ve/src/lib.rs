@@ -99,6 +99,7 @@ enum StorageKey {
     Claimed,
     Owed,
     RecoveryReceipts,
+    InFlight,
 }
 
 #[allow(dead_code)]
@@ -134,6 +135,10 @@ pub struct Ve {
     /// $1UP owed after a failed transfer.
     owed: LookupMap<AccountId, u128>,
     recovery_receipts: LookupMap<u64, Vec<u8>>,
+    /// Per token: transfer calls still waiting on their receiver, and whether it paid out meanwhile. A token
+    /// that paid out during a transfer call doesn't get its old approvals back when it returns, or a buyer could
+    /// use an old listing to buy what the temporary holder emptied.
+    in_flight: LookupMap<TokenId, (u32, bool)>,
 }
 
 #[near]
@@ -160,6 +165,7 @@ impl Ve {
             claimed: LookupMap::new(StorageKey::Claimed),
             owed: LookupMap::new(StorageKey::Owed),
             recovery_receipts: LookupMap::new(StorageKey::RecoveryReceipts),
+            in_flight: LookupMap::new(StorageKey::InFlight),
         }
     }
 
@@ -428,6 +434,9 @@ impl Ve {
 
     /// Drops every approval on a lock, refunding their storage to the owner.
     fn revoke_all(&mut self, token_id: &TokenId, owner: AccountId) {
+        if let Some(t) = self.in_flight.get_mut(token_id) {
+            t.1 = true;
+        }
         if let Some(approvals) = self.tokens.approvals_by_id.as_mut().and_then(|a| a.remove(token_id)) {
             refund_approved_account_ids(owner, &approvals).detach();
         }
@@ -532,6 +541,9 @@ impl NonFungibleTokenCore for Ve {
         msg: String,
     ) -> PromiseOrValue<bool> {
         require!(!self.closed(&token_id), "Lock is closed");
+        let count = self.in_flight.get(&token_id).map_or(0, |t| t.0);
+        let changed = self.in_flight.get(&token_id).is_some_and(|t| t.1);
+        self.in_flight.insert(token_id.clone(), (count + 1, changed));
         self.tokens.nft_transfer_call(receiver_id, token_id, approval_id, memo, msg)
     }
 
@@ -550,7 +562,21 @@ impl NonFungibleTokenResolver for Ve {
         token_id: TokenId,
         approved_account_ids: Option<HashMap<AccountId, u64>>,
     ) -> bool {
-        self.tokens.nft_resolve_transfer(previous_owner_id, receiver_id, token_id, approved_account_ids)
+        let (count, changed) = self.in_flight.get(&token_id).copied().unwrap_or((1, false));
+        if count <= 1 {
+            self.in_flight.remove(&token_id);
+        } else {
+            self.in_flight.insert(token_id.clone(), (count - 1, changed));
+        }
+        let approvals = if changed {
+            if let Some(old) = &approved_account_ids {
+                refund_approved_account_ids(previous_owner_id.clone(), old).detach();
+            }
+            None
+        } else {
+            approved_account_ids
+        };
+        self.tokens.nft_resolve_transfer(previous_owner_id, receiver_id, token_id, approvals)
     }
 }
 

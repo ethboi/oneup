@@ -212,3 +212,56 @@ async fn buyer_gas_cannot_separate_nft_delivery_from_payment() -> anyhow::Result
     }
     Ok(())
 }
+
+/// A real transfer call whose receiver refuses, on the compiled contracts and the chain's gas limits: the callback
+/// fits its small gas budget, the Life comes back, and with nothing changed its listing survives.
+#[tokio::test]
+async fn a_refused_transfer_call_returns_the_life_with_its_listing() -> anyhow::Result<()> {
+    let e = setup(5).await?;
+    let bob = trader(&e, "bob", 500).await?;
+    let (pos, placed_at) = open(&e, &bob, "Long", 500, 50, 500).await?;
+    push(&e, 490, placed_at + 2).await?;
+    let ok: bool = e.keeper.call(e.house.id(), "liquidate").args_json(json!({"position_id": pos})).max_gas().transact().await?.json()?;
+    assert!(ok);
+    e.worker.fast_forward(10).await?;
+    close_epoch(&e).await?;
+    let life_id = format!("1:{}", bob.id());
+    list(&e, &bob, &e.life, &life_id, 50).await?;
+    let id = approval(&e, &e.life, &life_id).await?;
+
+    // no contract there, so the call fails and the token must come back
+    let nobody = e.worker.dev_create_account().await?;
+    let r = bob
+        .call(e.life.id(), "nft_transfer_call")
+        .args_json(json!({"receiver_id": nobody.id(), "token_id": life_id, "msg": ""}))
+        .deposit(NearToken::from_yoctonear(1))
+        .max_gas()
+        .transact()
+        .await?;
+    let burnt: Vec<u64> = r.receipt_outcomes().iter().map(|o| o.gas_burnt.as_gas() / 1_000_000_000).collect();
+    println!("receipts' gas in Ggas: {burnt:?} (the resolver is given 5,000)");
+    assert_eq!(owner_of(&e.life, &life_id).await?, bob.id().to_string());
+    assert_eq!(approval(&e, &e.life, &life_id).await?, id);
+    let approved = view(&e.life, "nft_is_approved", json!({"token_id": life_id, "approved_account_id": e.market.id(), "approval_id": id})).await?;
+    assert_eq!(approved, json!(true));
+    Ok(())
+}
+
+/// The faucet registers for free, so unregistering must not refund a deposit nobody paid.
+#[tokio::test]
+async fn the_faucet_cannot_be_drained_by_unregistering() -> anyhow::Result<()> {
+    let e = setup(5).await?;
+    let farmer = e.worker.dev_create_account().await?;
+    farmer.call(e.usdc.id(), "faucet").args_json(json!({"amount": "0"})).max_gas().transact().await?.into_result()?;
+    let before = e.usdc.view_account().await?.balance;
+    let r = farmer
+        .call(e.usdc.id(), "storage_unregister")
+        .args_json(json!({"force": false}))
+        .deposit(NearToken::from_yoctonear(1))
+        .max_gas()
+        .transact()
+        .await?;
+    assert!(r.is_failure());
+    assert!(e.usdc.view_account().await?.balance >= before);
+    Ok(())
+}
