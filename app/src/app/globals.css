@@ -1185,15 +1185,10 @@ body {
 }
 .life-banner-top {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-self: stretch;
   font-size: 12px;
   letter-spacing: 0.06em;
-}
-.life-banner-plus {
-  color: #e2257a;
-  -webkit-text-stroke: 1px var(--lcd-ink);
-  paint-order: stroke fill;
 }
 .life-banner-art {
   width: 88px;

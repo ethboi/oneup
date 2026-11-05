@@ -219,8 +219,8 @@ export function Burst({ fx }: { fx: CloseFx & { id: number } }) {
           settles and pays */}
       <span className="life-banner">
         <span className="life-banner-top display">
-          <span>EXTRA LIFE</span>
-          <span className="life-banner-plus">+1</span>
+          {/* a question: whether this loss earns one is only settled when the round closes */}
+          <span>EXTRA LIFE?</span>
         </span>
         <img className="life-banner-art" src={lifeImage(0n, 1n, "earning")} alt="" />
         <span className="display life-banner-big">{fx.kind === "liquidated" ? "LIQUIDATED" : "LOSS"}</span>
