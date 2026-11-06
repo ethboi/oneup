@@ -3,8 +3,8 @@ import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, writeFileSyn
 import { isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { Account, JsonRpcProvider, KeyPair, actions, nearToYocto, teraToGas, type KeyPairString } from "near-api-js";
-import { MARKETS, ONEUP, USDC, type Deployment } from "@oneup/sdk";
+import { Account, KeyPair, actions, nearToYocto, teraToGas, type KeyPairString } from "near-api-js";
+import { MARKETS, ONEUP, PacedProvider, USDC, type Deployment } from "@oneup/sdk";
 import { CONTRACT_WASMS, ROOT, sha256, sourceIdentity, verifyBuildManifest } from "./artifacts.ts";
 
 const FUNDING = { house: 7, life: 5, oneup: 3, ve: 5, market: 3, usdc: 3, oracle: 3, swap: 3, vault: 3, keeper: 5 } as const;
@@ -42,6 +42,21 @@ export function testnetPlan(input: PlanInput) {
   };
 }
 export type TestnetPlan = ReturnType<typeof testnetPlan>;
+
+/** What `new` is called with on each contract. */
+export function contractInits(plan: TestnetPlan): Record<keyof typeof CONTRACT_WASMS, Record<string, unknown>> {
+  const id = (name: keyof typeof CONTRACT_WASMS) => plan.contracts[name];
+  return {
+    usdc: { owner: plan.operator }, oracle: { owner: plan.operator, pusher: `keeper.${plan.operator}` },
+    house: { owner: plan.operator, usdc: id("usdc"), oracle: id("oracle"), params: { leverage_hard_limit: 1000, min_margin: USDC.toString(), min_hold_s: 60, fill_window_s: 30, max_price_age_s: 60, max_conf_ppm: "10000", solvency_both_sides: true, epoch_length_s: plan.epochLengthS, life_expiry_epochs: 13, market_capacity_ppm: "500000", oneup_per_usdc: 20 } },
+    life: { owner: plan.operator, house: id("house"), usdc: id("usdc") },
+    oneup: { house: id("house"), rhea_seed: plan.operator, treasury: plan.operator },
+    ve: { owner: plan.operator, house: id("house"), oneup: id("oneup") },
+    swap: { owner: plan.operator, usdc: id("usdc"), oneup: id("oneup") },
+    market: { usdc: id("usdc"), nft_contracts: [id("life"), id("ve")], house: id("house"), fee_ppm: "20000" },
+    vault: { usdc: id("usdc"), apr_ppm: "0", year_s: 31_536_000 },
+  };
+}
 
 /** Deliberately construct an allowlisted public object; never serialize the operator deployment. */
 export function publicTestnetProfile(plan: TestnetPlan) {
@@ -96,7 +111,8 @@ export async function executeTestnet(plan: TestnetPlan, credentialPath?: string)
   const build = verifyBuildManifest();
   const wasm = Object.fromEntries(CONTRACT_NAMES.map(name => [name, readFileSync(resolve(ROOT, `contracts/target/near/${CONTRACT_WASMS[name]}/${CONTRACT_WASMS[name]}.wasm`))])) as Record<keyof typeof CONTRACT_WASMS, Buffer>;
   const operatorKey = readCredential(plan.operator, credentialPath);
-  const provider = new JsonRpcProvider({ url: plan.rpcUrl });
+  // paced: FastNEAR refuses a burst partway through, with an error the send would take for a failed transaction
+  const provider = new PacedProvider(plan.rpcUrl, 300, 5, undefined, 240_000);
   if (await provider.getNetworkId() !== "testnet") throw Error("RPC network is not testnet; deployment aborted.");
   const root = new Account(plan.operator, provider, operatorKey);
   const permission = await provider.viewAccessKey({ accountId: plan.operator, publicKey: KeyPair.fromString(operatorKey).getPublicKey().toString() });
@@ -138,16 +154,7 @@ export async function executeTestnet(plan: TestnetPlan, credentialPath?: string)
   const ftCall = (step: string, token: string, receiver: string, amount: bigint, msg: unknown) => call(step, token, "ft_transfer_call", { receiver_id: receiver, amount: amount.toString(), msg: JSON.stringify(msg) }, 1n);
   try {
     for (const a of plan.accounts) await run(`create ${a.name}`, () => send(root, a.accountId, [actions.createAccount(), actions.transfer(nearToYocto(a.allocatedTestNear)), actions.addFullAccessKey(KeyPair.fromString(keys[a.name]!).getPublicKey())]));
-    const init: Record<keyof typeof CONTRACT_WASMS, Record<string, unknown>> = {
-      usdc: { owner: plan.operator }, oracle: { owner: plan.operator, pusher: accounts.keeper!.accountId },
-      house: { owner: plan.operator, usdc: id("usdc"), oracle: id("oracle"), params: { leverage_hard_limit: 1000, min_margin: USDC.toString(), min_hold_s: 60, fill_window_s: 30, max_price_age_s: 60, max_conf_ppm: "10000", solvency_both_sides: true, epoch_length_s: plan.epochLengthS, life_expiry_epochs: 13, market_capacity_ppm: "500000", oneup_per_usdc: 20 } },
-      life: { owner: plan.operator, house: id("house"), usdc: id("usdc") },
-      oneup: { house: id("house"), rhea_seed: plan.operator, treasury: plan.operator },
-      ve: { owner: plan.operator, house: id("house"), oneup: id("oneup") },
-      swap: { owner: plan.operator, usdc: id("usdc"), oneup: id("oneup") },
-      market: { usdc: id("usdc"), nft_contracts: [id("life"), id("ve")], house: id("house"), fee_ppm: "20000" },
-      vault: { usdc: id("usdc"), apr_ppm: "0", year_s: 31_536_000 },
-    };
+    const init = contractInits(plan);
     // Deployment and initialization share one transaction: no public uninitialized-contract window.
     for (const name of CONTRACT_NAMES) await run(`deploy and initialize ${name}`, () => send(accounts[name]!, id(name), [actions.deployContract(wasm[name]), actions.functionCall("new", init[name], teraToGas("300"), 0n)]));
     await call("wire Life", id("house"), "set_life", { life: id("life") });

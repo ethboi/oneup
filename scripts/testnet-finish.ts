@@ -1,17 +1,17 @@
-// Finishes a testnet deployment that `pnpm deploy:testnet --execute` left incomplete after its contracts were
-// deployed, wired and their markets added (for example, when the RPC started refusing requests). It runs the
-// remaining setup steps in the deploy's order, skipping any whose effect is already on chain, then verifies,
-// removes the contract deployment keys and writes operator.json and public.json, like a complete deploy.
+// Finishes a testnet deployment that `pnpm deploy:testnet --execute` left incomplete after creating its accounts
+// (for example, when the RPC started refusing requests). It runs the remaining setup steps in the deploy's order,
+// skipping any in the progress log or whose effect is already on chain, then verifies, removes the contract
+// deployment keys and writes operator.json and public.json, like a complete deploy.
 //
 //   ONEUP_TESTNET_ACCOUNT=<operator>.testnet ONEUP_TESTNET_CREDENTIALS=/abs/operator-key.json \
 //     ONEUP_TESTNET_RPC=https://test.rpc.fastnear.com pnpm testnet:finish
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { Account, JsonRpcProvider, KeyPair, actions, nearToYocto, teraToGas, type KeyPairString } from "near-api-js";
-import { MARKETS, ONEUP, USDC, type Deployment } from "@oneup/sdk";
+import { Account, KeyPair, actions, nearToYocto, teraToGas, type KeyPairString } from "near-api-js";
+import { MARKETS, ONEUP, PacedProvider, USDC, type Deployment } from "@oneup/sdk";
 import { CONTRACT_WASMS, ROOT, sha256 } from "./artifacts.ts";
-import { assertTestnetTransaction, publicTestnetProfile, testnetPlan, type TestnetPlan } from "./deploy-testnet.ts";
+import { assertTestnetTransaction, contractInits, publicTestnetProfile, testnetPlan, type TestnetPlan } from "./deploy-testnet.ts";
 
 const SEED_USDC = 250_000n * USDC;
 const SWAP_USDC = 100_000n * USDC;
@@ -28,7 +28,7 @@ const plan = testnetPlan({ account: operator, rpcUrl, epochLengthS: String(saved
 if (JSON.stringify({ ...saved, rpcUrl }) !== JSON.stringify(plan)) throw Error("plan.json does not match this operator's deployment plan.");
 const progress = JSON.parse(readFileSync(resolve(dir, "progress.json"), "utf8")) as { status: string; pendingStep: string; completed: { step: string; transactionHash: string | null }[]; finishedBy?: string };
 if (progress.status === "complete") throw Error("This deployment is already complete.");
-if (!progress.completed.some((s) => s.step === "add ETH-USD")) throw Error("The deploy stopped before its markets were added; this script only finishes the later steps.");
+if (!progress.completed.some((s) => s.step === "create keeper")) throw Error("The deploy stopped before its accounts were created; this script only finishes one after that.");
 const recovery = JSON.parse(readFileSync(resolve(dir, "recovery-keys.json"), "utf8")) as { accounts: { id: string; key: KeyPairString }[] };
 const keyOf = (name: string) => recovery.accounts.find((a) => a.id === `${name}.${operator}`)!.key;
 
@@ -36,7 +36,8 @@ const credential = JSON.parse(readFileSync(process.env.ONEUP_TESTNET_CREDENTIALS
 if (credential.account_id !== operator) throw Error("Credential account_id does not match ONEUP_TESTNET_ACCOUNT.");
 const operatorKey = (credential.private_key ?? credential.secret_key) as KeyPairString;
 
-const provider = new JsonRpcProvider({ url: rpcUrl });
+// a deploy waits for finality, so give it longer than the keeper's 60 s before calling a send lost
+const provider = new PacedProvider(rpcUrl, 300, 5, undefined, 240_000);
 if ((await provider.getNetworkId()) !== "testnet") throw Error("RPC network is not testnet.");
 const root = new Account(operator, provider, operatorKey);
 const keeper = new Account(`keeper.${operator}`, provider, keyOf("keeper"));
@@ -66,6 +67,24 @@ const registered = (token: string, account: string) => view<unknown>(token, "sto
 const balance = (token: string, account: string) => view<string>(token, "ft_balance_of", { account_id: account }).then(BigInt);
 
 progress.finishedBy = "scripts/testnet-finish.ts";
+// deployment and initialization are one transaction, so a contract with code is initialized
+const init = contractInits(plan);
+for (const name of CONTRACT_NAMES) {
+  const wasm = readFileSync(resolve(ROOT, `contracts/target/near/${CONTRACT_WASMS[name]}/${CONTRACT_WASMS[name]}.wasm`));
+  await step(`deploy and initialize ${name}`, () => provider.viewContractCode({ contractId: id(name) }).then(() => true, () => false), () => new Account(id(name), provider, keyOf(name)).signAndSendTransaction({ receiverId: id(name), actions: [actions.deployContract(wasm), actions.functionCall("new", init[name], teraToGas("300"), 0n)], waitUntil: "FINAL" }));
+}
+// these setters have no cheap view either, so they rely on the progress log too
+const wiring: [string, string, Record<string, unknown>][] = [
+  ["wire Life", "set_life", { life: id("life") }],
+  ["wire token and locks", "set_token_and_ve", { oneup: id("oneup"), ve: id("ve") }],
+  ["wire swap", "set_swap", { swap: id("swap") }],
+  ["wire vault", "set_vault", { vault: id("vault") }],
+  ["wire marketplace", "set_marketplace", { marketplace: id("market") }],
+  ["set keeper", "set_keeper", { keeper: `keeper.${operator}` }],
+  ["set operator", "set_operator", { operator }],
+  ...MARKETS.map((m): [string, string, Record<string, unknown>] => [`add ${m.id}`, "add_market", { market_id: m.id, feed_id: m.feedId, max_leverage: 1000 }]),
+];
+for (const [name, method, args] of wiring) await step(name, async () => false, () => fn(root, id("house"), method, args));
 for (const name of ["house", "life", "ve", "swap", "market", "vault"] as const)
   await step(`register USDC ${name}`, () => registered(id("usdc"), id(name)), () => fn(root, id("usdc"), "mint", { receiver_id: id(name), amount: "0" }));
 for (const name of ["ve", "swap", "keeper"] as const)
