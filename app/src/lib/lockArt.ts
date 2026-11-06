@@ -1,6 +1,6 @@
 // A $1UP lock's picture, in the style of an Extra Life's (lifeArt.ts): a pixel padlock on an LCD tile. Its gold body
 // drains from the top as the unlock nears, the way a Life's heart fills as it pays. The shackle opens once it can be
-// unlocked, and it goes grey once closed. Drawn by the app: the lock contract has no picture of its own.
+// unlocked, and it goes grey once closed. The same picture the lock contract draws (lock_svg in contracts/ve/src/lib.rs).
 
 const LOCKED = ["..#####..", ".##...##.", ".#.....#.", ".#.....#.", "GGGGGGGGG", "GGGGKGGGG", "GGGKKKGGG", "GGGGKGGGG", "GGGGGGGGG"];
 /** The shackle lifted free on its left side. */
