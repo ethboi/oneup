@@ -26,7 +26,7 @@ export function useNearWallet(d: AppDeployment) {
     if (!enabled) return Promise.reject(new Error("NEAR wallets connect to the testnet profile, not the local demo"));
     if (!pending.current) {
       pending.current = import("@hot-labs/near-connect").then(({ NearConnector }) => new NearConnector({
-        ...walletOptions(d.rpcUrl),
+        ...walletOptions(d.network === "testnet" ? rpcList(d.rpcUrl) : [d.rpcUrl]),
         storage: {
           async get(key) { return localStorage.getItem(`oneup.testnet.wallet.${key}`); },
           async set(key, value) { localStorage.setItem(`oneup.testnet.wallet.${key}`, value); },

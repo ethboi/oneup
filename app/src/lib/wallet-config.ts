@@ -1,10 +1,10 @@
 import type { EventMap, NearConnectorOptions, NearWalletBase } from "@hot-labs/near-connect";
 
 /** Keep the picker and every wallet request on the configured test network. */
-export function walletOptions(rpcUrl: string): NearConnectorOptions {
+export function walletOptions(rpcUrls: string[]): NearConnectorOptions {
   return {
     network: "testnet",
-    providers: { testnet: [rpcUrl] },
+    providers: { testnet: rpcUrls },
     features: { testnet: true, signInWithoutAddKey: true, signAndSendTransaction: true },
     excludedWallets: ["mynearwallet", "ethereum-wallets"],
     autoConnect: false,

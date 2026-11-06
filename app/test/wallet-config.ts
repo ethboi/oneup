@@ -8,10 +8,10 @@ const wallet = (id = "meteor-wallet", features: Record<string, boolean> = {
 }) => ({ manifest: { id, features } }) as unknown as Pick<NearWalletBase, "manifest">;
 
 test("wallet selection requires testnet and account-only connection without adding an access key", () => {
-  const options = walletOptions("https://rpc.testnet.near.org");
+  const options = walletOptions(["https://rpc.testnet.near.org", "https://near-testnet.drpc.org"]);
   assert.deepEqual(options, {
     network: "testnet",
-    providers: { testnet: ["https://rpc.testnet.near.org"] },
+    providers: { testnet: ["https://rpc.testnet.near.org", "https://near-testnet.drpc.org"] },
     features: { testnet: true, signInWithoutAddKey: true, signAndSendTransaction: true },
     excludedWallets: ["mynearwallet", "ethereum-wallets"],
     autoConnect: false,
