@@ -2020,6 +2020,56 @@ kbd {
     transition: none;
   }
 }
+/* a $1UP lock: the Extra Life's frame in the lock's blue and gold, then green once it can be unlocked */
+.life-card.lock {
+  --s1: var(--info);
+  --s2: var(--accent);
+  --lit: var(--info);
+}
+/* the pixel face's C closes up at this size, and LOCK reads as LOOK */
+.life-card.lock .life-card-top .display {
+  font-family: var(--font-body);
+  font-size: 1.1em;
+  font-weight: 800;
+}
+.life-card.lock.ready {
+  --s1: var(--long);
+  --lit: var(--long);
+}
+.life-card.lock.closed {
+  --s1: #8a8c99;
+  --s2: #a9abb6;
+  --lit: #8a8c99;
+  color: var(--muted);
+}
+.life-card-side.locked {
+  --k: #2b62c4;
+}
+.life-card-side.merged {
+  --k: #7a4fd0;
+}
+.lock-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+@media (min-width: 401px) {
+  .lock-grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(190px, 100%), 1fr));
+  }
+}
+/* confirming an early withdrawal takes the row: the sentence doesn't fit under a card */
+.lock-tile.leaving {
+  grid-column: 1 / -1;
+}
+@media (min-width: 640px) {
+  .lock-tile.leaving {
+    display: grid;
+    grid-template-columns: 190px minmax(0, 1fr);
+    gap: 16px;
+  }
+}
 .life-card-bar {
   display: flex;
   gap: 0.22em;

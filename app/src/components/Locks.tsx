@@ -1,7 +1,7 @@
 "use client";
 
 // Locks: stake $1UP for up to 104 rounds and earn the house's buybacks by weight (amount × time left).
-// Losers' $1UP arrives here already locked. A summary with Claim all and Merge, then your locks as rows;
+// Losers' $1UP arrives here already locked. A summary with Claim all and Merge, then your locks as cards;
 // closed ones fold away. Leave early for a penalty, or sell a lock on the market.
 
 import { parseTokenAmount } from "@oneup/sdk";
@@ -12,6 +12,7 @@ import { lockOrigin, lockCountdown } from "@/lib/locks";
 import { lockValue, useOneupPrice } from "@/lib/value";
 import { fmtOneup, fmtUsd } from "./Header";
 import { Icon } from "./Icon";
+import { LockCard } from "./LockCard";
 import { Sell, useListings } from "./Sell";
 import { Empty, Explainer, OnExplorer, PanelHead, Stat, SummaryBar } from "./ui";
 
@@ -97,9 +98,11 @@ export function Locks() {
             {running.length === 0 ? (
               <Empty icon="lock">No locks yet. Lock $1UP from your wallet or buy a lock on the market. Eligible net trading losses can also earn you $1UP in a {MAX}-round reward lock.</Empty>
             ) : (
-              running
-                .sort((a, b) => Number(BigInt(b.amount) - BigInt(a.amount)))
-                .map((l) => <LockRow key={l.token_id} l={l} epoch={id} px={px} claimable={claimable[l.token_id] ?? 0n} listings={listings} />)
+              <div className="life-grid lock-grid">
+                {running
+                  .sort((a, b) => Number(BigInt(b.amount) - BigInt(a.amount)))
+                  .map((l) => <LockTile key={l.token_id} l={l} epoch={id} px={px} claimable={claimable[l.token_id] ?? 0n} listings={listings} />)}
+              </div>
             )}
           </div>
 
@@ -113,8 +116,11 @@ export function Locks() {
                   </button>
                 }
               />
-              {showClosed &&
-                closed.map((l) => <LockRow key={l.token_id} l={l} epoch={id} px={px} claimable={claimable[l.token_id] ?? 0n} listings={listings} />)}
+              {showClosed && (
+                <div className="life-grid lock-grid">
+                  {closed.map((l) => <LockTile key={l.token_id} l={l} epoch={id} px={px} claimable={claimable[l.token_id] ?? 0n} listings={listings} />)}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -128,52 +134,52 @@ export function Locks() {
   );
 }
 
-function LockRow({ l, epoch, px, claimable, listings }: { l: LockInfo; epoch: number; px: bigint; claimable: bigint; listings: ReturnType<typeof useListings> }) {
+function LockTile({ l, epoch, px, claimable, listings }: { l: LockInfo; epoch: number; px: bigint; claimable: bigint; listings: ReturnType<typeof useListings> }) {
   const { d, tx, run } = useOneUp();
   const [leaving, setLeaving] = useState(false);
-  const left = Math.max(0, l.end - epoch - 1);
+  const left = Math.max(0, l.end - epoch);
   const ended = epoch >= l.end;
   const penalty = BigInt(l.exit_penalty);
   const worth = px > 0n && !l.withdrawn ? lockValue(l, px) : null;
-  const origin = lockOrigin(l);
+  const closedText = l.exited !== null ? `Closed in round ${l.exited}` : "Unlocked";
   return (
-    <div className="p-3 sm:p-4">
-      {/* fixed widths on the right, as on Extra Lives, so the bars line up */}
-      <div className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_6.5rem_16rem] sm:gap-x-4">
-        <div className="min-w-0">
-          <div className="num flex items-center gap-1.5 font-extrabold">
-            {fmtOneup(l.amount)} $1UP
+    <div className={`lock-tile ${leaving && !l.withdrawn ? "leaving" : ""}`} title={l.withdrawn ? closedText : lockCountdown(l.end, epoch)}>
+      <LockCard
+        id={l.token_id}
+        left={left}
+        of={MAX}
+        state={l.withdrawn ? "closed" : ended ? "ready" : "locked"}
+        tone={l.merged > 0 ? "merged" : l.from_loss ? "recovery" : "locked"}
+        tag={l.merged > 0 ? "MERGED" : l.from_loss ? "REWARD" : "LOCKED"}
+        detail={l.merged > 0 ? `${l.merged} locks` : `Round ${l.created}`}
+        foot={l.withdrawn ? "CLOSED" : ended ? "READY" : `${left} ROUND${left === 1 ? "" : "S"}`}
+        amount={`${fmtOneup(l.amount)} $1UP`}
+        extra={
+          claimable > 0n && (
+            <span className="life-card-claim">
+              <span>TO CLAIM</span>
+              <span className="num">{fmtOneup(claimable.toString(), 2)}</span>
+            </span>
+          )
+        }
+      />
+      <div className="flex min-w-0 flex-col gap-2">
+        <div className="label num flex flex-col gap-0.5">
+          {l.withdrawn ? (
+            <span>{closedText}</span>
+          ) : (
+            <>
+              <span>Weight {fmtOneup(l.power)}</span>
+              {worth !== null && <span>{fmtUsd(worth)} after exit penalty</span>}
+            </>
+          )}
+          <span className="flex items-center gap-1">
+            {lockOrigin(l)}
             <OnExplorer nft={{ contract: d.contracts.ve, id: l.token_id }} />
-          </div>
-          <div className="label truncate">{origin}</div>
-        </div>
-        <div className="col-span-2 row-start-2 sm:col-span-1 sm:row-start-1 sm:col-start-2">
-          <div className="h-2 overflow-hidden rounded-full bg-[var(--panel-2)]" role="progressbar" aria-label="Rounds until unlock" aria-valuenow={left} aria-valuemin={0} aria-valuemax={MAX}>
-            <div className="h-full rounded-full bg-[var(--info)]" style={{ width: `${(l.withdrawn ? 0 : left / MAX) * 100}%` }} />
-          </div>
-          <div className="label num mt-1">
-            {l.withdrawn
-              ? l.exited !== null
-                ? `Closed in round ${l.exited}`
-                : "Unlocked"
-              : (
-                  <>
-                    <span className="block">
-                      {lockCountdown(l.end, epoch)}
-                    </span>
-                    <span className="block">Weight {fmtOneup(l.power)}</span>
-                  </>
-                )}
-          </div>
-        </div>
-        <div className="text-right sm:col-start-3">
-          <div className="num font-extrabold" style={claimable > 0n ? { color: "var(--long)" } : undefined}>
-            {claimable > 0n ? fmtOneup(claimable.toString(), 2) : worth !== null ? fmtUsd(worth) : "–"}
-          </div>
-          <div className="label">{claimable > 0n ? "$1UP to claim" : worth !== null ? "Est. value after penalty" : ""}</div>
+          </span>
         </div>
         {!l.withdrawn && (
-          <div className="col-span-2 flex gap-2 sm:col-span-1 sm:col-start-4">
+          <div className="flex gap-2">
             {ended ? (
               <button className="btn btn-accent flex-1" onClick={() => run(`Unlock #${l.token_id}`, () => tx.unlock(l.token_id))}>
                 <Icon name="unlock" />
@@ -191,22 +197,22 @@ function LockRow({ l, epoch, px, claimable, listings }: { l: LockInfo; epoch: nu
             )}
           </div>
         )}
+        {leaving && !l.withdrawn && (
+          <div className="flex flex-col gap-2 rounded-lg border border-[var(--short)] p-3 text-sm">
+            <p>
+              Withdraw now to receive <b className="num">{fmtOneup((BigInt(l.amount) - penalty).toString())} $1UP</b>. A penalty of{" "}
+              <b className="num">{fmtOneup(penalty.toString())} $1UP</b> ({((Number(penalty) / Number(l.amount)) * 100).toFixed(1)}%) is shared among the remaining locks. You can also list this lock for sale, but a sale requires a buyer.
+            </p>
+            <button
+              className="btn"
+              style={{ "--btn-bg": "var(--short-fill)", color: "var(--on-fill)" } as React.CSSProperties}
+              onClick={() => run(`Withdraw from lock #${l.token_id} early`, () => tx.exitEarly(l.token_id)).then(() => setLeaving(false))}
+            >
+              Confirm early withdrawal
+            </button>
+          </div>
+        )}
       </div>
-      {leaving && !l.withdrawn && (
-        <div className="mt-3 flex flex-col gap-2 rounded-lg border border-[var(--short)] p-3 text-sm sm:flex-row sm:items-center">
-          <p className="flex-1">
-            Withdraw now to receive <b className="num">{fmtOneup((BigInt(l.amount) - penalty).toString())} $1UP</b>. A penalty of{" "}
-            <b className="num">{fmtOneup(penalty.toString())} $1UP</b> ({((Number(penalty) / Number(l.amount)) * 100).toFixed(1)}%) is shared among the remaining locks. You can also list this lock for sale, but a sale requires a buyer.
-          </p>
-          <button
-            className="btn shrink-0"
-            style={{ "--btn-bg": "var(--short-fill)", color: "var(--on-fill)" } as React.CSSProperties}
-            onClick={() => run(`Withdraw from lock #${l.token_id} early`, () => tx.exitEarly(l.token_id)).then(() => setLeaving(false))}
-          >
-            Confirm early withdrawal
-          </button>
-        </div>
-      )}
     </div>
   );
 }
