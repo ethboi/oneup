@@ -1,4 +1,4 @@
-//! Extra Life NFTs (NEP-171 + metadata + enumeration + approvals): capped USDC claims on house profit.
+//! Life NFT NFTs (NEP-171 + metadata + enumeration + approvals): capped USDC claims on house profit.
 //! The house mints one per losing wallet per epoch and sends each epoch's pot here; holders claim.
 //! Unclaimed USDC moves with the token when it's sold. The metadata is dynamic: every NFT view draws the
 //! token's image (a pixel heart that fills as it pays back) and description from its current state.
@@ -204,7 +204,7 @@ impl ExtraLife {
                 fmt_ppm(item.cap_ppm.0),
                 fmt_usdc(item.face.0)
             );
-            self.mint_life(id.clone(), item.owner, life, format!("Extra Life · round {epoch}"), description);
+            self.mint_life(id.clone(), item.owner, life, format!("Life NFT · round {epoch}"), description);
             ids.push(id);
         }
         ids
@@ -482,7 +482,7 @@ fn heart_svg(paid: u128, owed: u128, state: HeartState, backer: bool) -> String 
     let (bg, heart, empty) = match state {
         // a Backer Life is gold from the start, its heart filling as it is paid
         HeartState::Earning if backer => ("f2b705", "e2257a", "b98b00"),
-        HeartState::Earning => ("b7c49a", "e2257a", "8e9e6e"),
+        HeartState::Earning => ("b4f7c8", "e2257a", "6fe29a"),
         HeartState::Healed => ("f2b705", "e2257a", "e2257a"),
         HeartState::Expired => ("c9cbd4", "8a8c99", "a9abb6"),
     };
@@ -616,7 +616,7 @@ impl NonFungibleTokenMetadataProvider for ExtraLife {
     fn nft_metadata(&self) -> NFTContractMetadata {
         NFTContractMetadata {
             spec: NFT_METADATA_SPEC.to_string(),
-            name: "OneUp Extra Life".to_string(),
+            name: "OneUp Life NFT".to_string(),
             symbol: "1UPLIFE".to_string(),
             icon: Some(heart_svg(1, 1, HeartState::Healed, false)),
             base_uri: None,

@@ -370,7 +370,7 @@ fn epoch_runs_its_length() {
 #[test]
 fn epoch_close_mints_and_pays() {
     let mut h = setup(usd(25_000));
-    assert_eq!(h.lives_owed, usd(25_000)); // the seed's Extra Life, 1.0×
+    assert_eq!(h.lives_owed, usd(25_000)); // the seed's Life NFT, 1.0×
     for w in ["alice", "bob", "carol"] {
         deposit(&mut h, w, usd(1_000));
     }
@@ -779,7 +779,7 @@ fn stop_loss_on_a_short_counts_as_a_loss() {
     h.internal_keeper_close(pos, CloseReason::Stop, px(506, T0 + 71), T0 + 71).unwrap();
     let order = h.get_position(pos).unwrap().close_order.unwrap();
     h.internal_fill(order, px(506, T0 + 72), T0 + 72).unwrap();
-    // −1.2% on 10,000 = −120: the rest comes back and the loss counts toward an Extra Life
+    // −1.2% on 10,000 = −120: the rest comes back and the loss counts toward a Life NFT
     assert_eq!(h.get_balance(acc("bob")).0, usd(880));
     assert_eq!(h.get_pending_life(acc("bob")).0, usd(120));
 }

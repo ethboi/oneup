@@ -2,11 +2,11 @@
 //! returns "closed". Trading never pauses; the next epoch starts at the first call.
 //!
 //! 1. begin: freeze the epoch's counters and its losers; start the next epoch
-//! 2. mint: one Extra Life per loser, `limit` per call, sized from the house's net result, and the
+//! 2. mint: one Life NFT per loser, `limit` per call, sized from the house's net result, and the
 //!    loser's share of the epoch's $1UP release as a max-length lock (D-16)
 //! 3. wait: until every mint and lock has landed, so this epoch's lives share this epoch's pot (D-4)
 //! 4. expire: lives past their window stop earning (D-13); the life contract returns what's still owed
-//! 5. pay: the surplus above the reserve → Extra Life pot + buyback USDC; record the summary
+//! 5. pay: the surplus above the reserve → Life NFT pot + buyback USDC; record the summary
 
 use near_sdk::json_types::U128;
 use near_sdk::store::IterableMap;
@@ -318,7 +318,7 @@ impl House {
 
     /// Mints a Backer Life (D-22). The caller has already counted what it's owed.
     pub(crate) fn mint_backer(&mut self, owner: AccountId, amount: u128, cap_ppm: u128, oneup: u128) -> Promise {
-        let life = self.life.clone().unwrap_or_else(|| env::panic_str("Set the Extra Life contract first"));
+        let life = self.life.clone().unwrap_or_else(|| env::panic_str("Set the Life NFT contract first"));
         ext_life::ext(life)
             .with_static_gas(GAS_MINT_BASE.saturating_add(GAS_MINT_PER_LIFE))
             .mint_backer(owner.clone(), U128(amount), U128(cap_ppm))

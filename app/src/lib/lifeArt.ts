@@ -5,7 +5,7 @@
 const HEART = [".##...##.", "#*#######", "#########", "#########", ".#######.", "..#####..", "...###...", "....#...."];
 /** background, heart, empty rows */
 const COLORS = {
-  earning: ["b7c49a", "e2257a", "8e9e6e"],
+  earning: ["b4f7c8", "e2257a", "6fe29a"],
   full_heal: ["f2b705", "e2257a", "e2257a"],
   expired: ["c9cbd4", "8a8c99", "a9abb6"],
 } as const;

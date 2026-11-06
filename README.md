@@ -17,7 +17,7 @@ On a perpetuals venue that trades against its users, a trader's loss is the venu
 position leaves the trader nothing to hold, sell or claim.
 
 OneUp gives losers part of the house's profit back, as an asset they own. When a round closes with the house
-in profit, each wallet with a net loss in that round gets an **Life NFT**, an NFT that collects a share of the
+in profit, each wallet with a net loss in that round gets a **Life NFT**, an NFT that collects a share of the
 house's profit for the next 13 rounds, up to a payout limit of 1.2–2× its face value. A round pays out only from
 the surplus above the pool's reserve, so a profitable round can still pay nothing. Losers also get $1UP tokens,
 locked for 104 rounds; lockers share the house's buybacks. A Life can be claimed, kept or sold: the buyer gets

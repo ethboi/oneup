@@ -698,7 +698,7 @@ fn lock_svg(left: u64, state: LockState) -> String {
     let rows = if matches!(state, LockState::Ready) { &OPEN } else { &LOCKED };
     let (bg, shackle, gold, drained) = match state {
         LockState::Locked => ("a8cbd0", "4f5570", "f2b705", "7fa9b0"),
-        LockState::Ready => ("b7c49a", "4f5570", "f2b705", "f2b705"),
+        LockState::Ready => ("b4f7c8", "4f5570", "f2b705", "f2b705"),
         LockState::Closed => ("c9cbd4", "8a8c99", "a9abb6", "a9abb6"),
     };
     let filled = match state {

@@ -101,7 +101,7 @@ impl House {
         self.epoch.clone()
     }
 
-    /// Net loss so far this epoch (losses − profit paid): the wallet's pending Extra Life. Face value is
+    /// Net loss so far this epoch (losses − profit paid): the wallet's pending Life NFT. Face value is
     /// set at epoch close.
     pub fn get_pending_life(&self, account_id: AccountId) -> U128 {
         U128(self.epoch_losses.get(&account_id).copied().unwrap_or(0).max(0) as u128)

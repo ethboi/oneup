@@ -175,9 +175,9 @@ pub fn settle_liquidation(margin: u128) -> Settlement {
     Settlement { to_trader: 0, cut: 0, pool_paid: 0, pool_taken: margin }
 }
 
-// §5 Extra Lives
+// §5 Life NFTs
 
-/// What a round's Extra Lives and $1UP are sized from: the house's net result, but never more than the round's
+/// What a round's Life NFTs and $1UP are sized from: the house's net result, but never more than the round's
 /// net losses. Marketplace fees count as house profit (D-28); in a quiet round they could otherwise make a Life
 /// worth more than the loss behind it. Anything above stays in the pool.
 pub fn recovery_base(house_net: u128, net_losses: u128) -> u128 {
@@ -248,7 +248,7 @@ pub fn epoch_payout(pool: u128, liability: u128, owed_remaining: u128, floor: u1
     EpochPayout { reserve, surplus, lives_pot, buyback_pot }
 }
 
-/// One Extra Life's share of the pot, pro rata to what it is still owed.
+/// One Life NFT's share of the pot, pro rata to what it is still owed.
 pub fn life_payment(lives_pot: u128, owed_remaining: u128, total_owed_remaining: u128) -> u128 {
     if total_owed_remaining == 0 {
         return 0;

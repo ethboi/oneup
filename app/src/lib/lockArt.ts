@@ -10,7 +10,7 @@ const BODY_ROWS = 5;
 /** background, shackle, gold, drained gold */
 const COLORS = {
   locked: ["a8cbd0", "4f5570", "f2b705", "7fa9b0"],
-  ready: ["b7c49a", "4f5570", "f2b705", "f2b705"],
+  ready: ["b4f7c8", "4f5570", "f2b705", "f2b705"],
   closed: ["c9cbd4", "8a8c99", "a9abb6", "a9abb6"],
 } as const;
 

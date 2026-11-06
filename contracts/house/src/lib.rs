@@ -55,7 +55,7 @@ pub struct Params {
     /// D-1: count both sides of each market (true) or only the bigger side (spec as written).
     pub solvency_both_sides: bool,
     pub epoch_length_s: u64,
-    /// D-13: an Extra Life shares the pots of the epoch it's minted in and this many after, then expires.
+    /// D-13: a Life NFT shares the pots of the epoch it's minted in and this many after, then expires.
     pub life_expiry_epochs: u64,
     /// D-14: the share of the pool a newly listed market may use (ppm).
     pub market_capacity_ppm: U128,
@@ -199,7 +199,7 @@ pub struct Epoch {
     /// Σ profit paid out after the cut.
     pub payouts: U128,
     pub cuts: U128,
-    /// Σ over wallets of max(0, losses − profit paid): what the epoch's Extra Lives and $1UP are shared by.
+    /// Σ over wallets of max(0, losses − profit paid): what the epoch's Life NFTs and $1UP are shared by.
     pub net_losses: U128,
     pub markets: Vec<MarketTotals>,
     /// D-28: the house's cut of marketplace sales, counted as house profit.
@@ -250,11 +250,11 @@ pub struct House {
     positions: IterableMap<u64, Position>,
     next_id: u64,
     epoch: Epoch,
-    /// Each wallet's losses minus profit paid in the current epoch; above zero, its pending Extra Life.
+    /// Each wallet's losses minus profit paid in the current epoch; above zero, its pending Life NFT.
     epoch_losses: IterableMap<AccountId, i128>,
-    /// The Extra Life NFT contract.
+    /// The Life NFT NFT contract.
     life: Option<AccountId>,
-    /// Σ still owed to Extra Lives (mirrors the life contract's total).
+    /// Σ still owed to Life NFTs (mirrors the life contract's total).
     lives_owed: u128,
     /// USDC sent to the life contract as epoch pots.
     lives_paid: u128,

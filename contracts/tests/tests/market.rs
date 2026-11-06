@@ -1,4 +1,4 @@
-//! Sandbox: the marketplace (D-17). A loser lists their Extra Life and their $1UP lock; a buyer pays
+//! Sandbox: the marketplace (D-17). A loser lists their Life NFT and their $1UP lock; a buyer pays
 //! USDC and gets each NFT, with change back; a stale listing refunds the buyer.
 
 mod common;
@@ -49,7 +49,7 @@ async fn owner_of(nft: &near_workspaces::Contract, token_id: &str) -> anyhow::Re
 async fn sell_an_extra_life_and_a_lock() -> anyhow::Result<()> {
     let e = setup(5).await?;
 
-    // Bob loses 500 and the epoch closes: an Extra Life and a $1UP lock
+    // Bob loses 500 and the epoch closes: a Life NFT and a $1UP lock
     let bob = trader(&e, "bob", 500).await?;
     let (pos, placed_at) = open(&e, &bob, "Long", 500, 50, 500).await?;
     push(&e, 490, placed_at + 2).await?;
@@ -144,7 +144,7 @@ async fn a_listing_cannot_change_under_the_buyer() -> anyhow::Result<()> {
 #[tokio::test]
 async fn a_life_claimed_and_listed_again_is_not_sold_to_the_earlier_buyer() -> anyhow::Result<()> {
     let e = setup(5).await?;
-    // Bob loses 500 and the epoch closes: an Extra Life with 100 USDC to claim
+    // Bob loses 500 and the epoch closes: a Life NFT with 100 USDC to claim
     let bob = trader(&e, "bob", 500).await?;
     let (pos, placed_at) = open(&e, &bob, "Long", 500, 50, 500).await?;
     push(&e, 490, placed_at + 2).await?;

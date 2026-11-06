@@ -1,4 +1,4 @@
-//! Sandbox test of a full epoch: lose → close the epoch → Extra Life NFT → pot → claim USDC.
+//! Sandbox test of a full epoch: lose → close the epoch → Life NFT NFT → pot → claim USDC.
 
 mod common;
 use common::*;
@@ -27,7 +27,7 @@ async fn lose_close_epoch_claim() -> anyhow::Result<()> {
     assert_eq!(steps.first().map(String::as_str), Some("begun"));
     assert_eq!(steps.last().map(String::as_str), Some("closed"), "{steps:?}");
 
-    // Bob's Extra Life: face 500 (the whole house profit), cap 2.0 − 0.8 × 100_500 / 1M = 1.9196×
+    // Bob's Life NFT: face 500 (the whole house profit), cap 2.0 − 0.8 × 100_500 / 1M = 1.9196×
     let summary = view(&e.house, "get_epoch_summary", json!({"epoch": 1})).await?;
     assert_eq!(summary["house_net"], json!(usd(500)));
     assert_eq!(summary["lives_minted"], json!(1));

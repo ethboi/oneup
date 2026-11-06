@@ -1,4 +1,4 @@
-//! Marketplace for Extra Lives and $1UP locks (D-17).
+//! Marketplace for Life NFTs and $1UP locks (D-17).
 //!
 //! List: `nft_approve(token_id, market, msg = {"price":"<USDC>"})` on the NFT contract; it calls
 //! `nft_on_approve` here. Buy: one USDC `ft_transfer_call` to the market with
@@ -76,7 +76,7 @@ trait Ft {
 #[derive(PanicOnDefault)]
 pub struct Market {
     usdc: AccountId,
-    /// NFT contracts that can be listed: the Extra Life and ve contracts.
+    /// NFT contracts that can be listed: the Life NFT and ve contracts.
     nft_contracts: Vec<AccountId>,
     listings: IterableMap<(AccountId, TokenId), Listing>,
     /// USDC owed to sellers after a failed payout.
@@ -218,7 +218,7 @@ impl Market {
 impl NonFungibleTokenApprovalReceiver for Market {
     fn nft_on_approve(&mut self, token_id: TokenId, owner_id: AccountId, approval_id: u64, msg: String) -> PromiseOrValue<String> {
         let nft_contract = env::predecessor_account_id();
-        require!(self.nft_contracts.contains(&nft_contract), "Only Extra Lives and $1UP locks can be listed");
+        require!(self.nft_contracts.contains(&nft_contract), "Only Life NFTs and $1UP locks can be listed");
         let ListMsg { price } = near_sdk::serde_json::from_str(&msg).unwrap_or_else(|_| env::panic_str("Bad message"));
         require!(price.0 > 0, "Set a price");
         let listing = Listing {
@@ -314,7 +314,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Only Extra Lives and $1UP locks")]
+    #[should_panic(expected = "Only Life NFTs and $1UP locks")]
     fn other_nfts_are_refused() {
         let mut m = setup();
         list(&mut m, "punks", "1", "alice", 1);

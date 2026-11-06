@@ -482,7 +482,7 @@ impl House {
         self.epoch.losses.0 += s.pool_taken;
         self.epoch.payouts.0 += s.pool_paid;
         self.epoch.cuts.0 += s.cut;
-        // Extra Lives go by each wallet's net loss, so a long and a short on yourself earn nothing extra
+        // Life NFTs go by each wallet's net loss, so a long and a short on yourself earn nothing extra
         let before = self.epoch_losses.get(&pos.owner).copied().unwrap_or(0);
         let after = before + s.pool_taken as i128 - s.pool_paid as i128;
         self.epoch_losses.insert(pos.owner.clone(), after);

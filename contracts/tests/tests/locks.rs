@@ -68,7 +68,7 @@ async fn buyback_flow(reject_delivery: bool) -> anyhow::Result<()> {
     assert_eq!(carol_lock["from_loss"], json!(true));
     let end = carol_lock["end"].as_u64().unwrap();
     assert_eq!(end - carol_lock["created"].as_u64().unwrap(), 105);
-    // and her Extra Life
+    // and her Life NFT
     let life = view(&e.life, "life_info", json!({"token_id": format!("2:{}", carol.id())})).await?;
     assert_eq!(life["face"], json!(usd(500)));
 

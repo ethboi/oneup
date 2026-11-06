@@ -2,7 +2,7 @@
 //!
 //! Each epoch releases `oneup_per_usdc` $1UP per USDC of house profit (up to the epoch's net losses, like the
 //! Lives' faces), capped by the epoch's schedule plus anything unreleased before; the rest carries forward. The release is shared across the epoch's losers
-//! by loss and arrives as max-length locks in `ve`, minted alongside the Extra Lives. Winners are paid in
+//! by loss and arrives as max-length locks in `ve`, minted alongside the Life NFTs. Winners are paid in
 //! USDC and earn no $1UP. The house holds the 900M emissions supply.
 
 use near_sdk::json_types::U128;
