@@ -69,6 +69,7 @@ export const TESTNET_RPCS = [
   "https://testnet-rpc.intea.rs/",
   "https://test.rpc.fastnear.com/",
   "https://near-testnet.drpc.org/",
+  "https://near-testnet.gateway.tatum.io/",
   "https://rpc.testnet.near.org/",
   "https://archival-rpc.testnet.near.org/",
 ];
