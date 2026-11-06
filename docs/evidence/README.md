@@ -55,3 +55,5 @@ contracts, `pnpm preflight --judge` checks the WASM manifest and isolated-demo p
    and private paths; never include account/config files. Identify mocks, prepared state and failures.
 5. Label current evidence with its exact source identity. Keep historical reports unchanged, and replace
    no historical result with a more favorable claim. CI links count as evidence only after a run exists.
+
+Commit hashes in these historical files predate a rewrite of the repository's commit messages, so they no longer resolve to commits here.
