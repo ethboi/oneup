@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { networkInterfaces } from "node:os";
 import { resolve } from "node:path";
 import type { Deployment } from "@oneup/sdk";
-import { hasPublicProfile } from "./public-config";
+import { hasPublicProfile } from "./public-config.ts";
 
 export const configPath = () => resolve(/*turbopackIgnore: true*/ process.env.ONEUP_CONFIG ?? resolve(process.cwd(), "../localnet.json"));
 export const stateDir = () => resolve(/*turbopackIgnore: true*/ process.env.ONEUP_STATE_DIR ?? resolve(process.cwd(), "../.localnet"));

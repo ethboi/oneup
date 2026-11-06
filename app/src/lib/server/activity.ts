@@ -7,7 +7,7 @@
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { configPath, stateDir } from "./localnet";
+import { configPath, stateDir } from "./localnet.ts";
 import { ONEUP, OneUp, displayAccount, netTradePnl } from "@oneup/sdk";
 export { netTradePnl } from "@oneup/sdk";
 
