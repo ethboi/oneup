@@ -286,6 +286,17 @@ export function toItems(ev: Event, executor: string, t: number, c: Record<string
   }
 }
 
+/** The events in a transaction's receipts. A failed receipt's logs are skipped: its state changes rolled back, so
+ *  what it logged didn't happen. */
+export function eventLogs(outcomes: { logs: string[]; executor_id: string; status?: unknown }[], tx: string): [string, string, string][] {
+  const out: [string, string, string][] = [];
+  for (const outcome of outcomes) {
+    if (outcome.status && typeof outcome.status === "object" && "Failure" in outcome.status) continue;
+    for (const log of outcome.logs) if (log.startsWith("EVENT_JSON:")) out.push([outcome.executor_id, log.slice(11), tx]);
+  }
+  return out;
+}
+
 /** Reads one block's OneUp events, without recording them (blocks are read in parallel, recorded in order). */
 async function readBlock(url: string, height: number, c: Record<string, string>): Promise<{ t: number; logs: [string, string, string][] } | null> {
   const block = await rpc<{ header: { timestamp_nanosec: string }; chunks: { chunk_hash: string; tx_root: string }[] }>(url, "block", { block_id: height }).catch((error: unknown) => {
@@ -301,14 +312,12 @@ async function readBlock(url: string, height: number, c: Record<string, string>)
     const chunk = await rpc<{ transactions: { hash: string; signer_id: string; receiver_id: string }[] }>(url, "chunk", { chunk_id: ch.chunk_hash });
     for (const tx of chunk.transactions) {
       if (tx.receiver_id === c.oracle) continue; // price pushes: no events
-      const res = await rpc<{ receipts_outcome: { outcome: { logs: string[]; executor_id: string } }[] }>(url, "EXPERIMENTAL_tx_status", {
+      const res = await rpc<{ receipts_outcome: { outcome: { logs: string[]; executor_id: string; status?: unknown } }[] }>(url, "EXPERIMENTAL_tx_status", {
         tx_hash: tx.hash,
         sender_account_id: tx.signer_id,
         wait_until: "FINAL",
       });
-      for (const r of res?.receipts_outcome ?? []) {
-        for (const log of r.outcome.logs) if (log.startsWith("EVENT_JSON:")) logs.push([r.outcome.executor_id, log.slice(11), tx.hash]);
-      }
+      logs.push(...eventLogs((res?.receipts_outcome ?? []).map((r) => r.outcome), tx.hash));
     }
   }
   return { t, logs };

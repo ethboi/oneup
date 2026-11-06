@@ -17,6 +17,8 @@ export class PacedProvider extends JsonRpcProvider {
   /** Requests sent per RPC method (with a contract view's method name), for finding what uses the limit. */
   readonly byMethod = new Map<string, number>();
   private next = 0;
+  /** Set by a refusal: requests already waiting for their turn hold off until then too. */
+  private coolUntil = 0;
 
   constructor(
     url: string,
@@ -37,6 +39,8 @@ export class PacedProvider extends JsonRpcProvider {
       const at = Math.max(now, this.next);
       this.next = at + this.gapMs;
       if (at > now) await this.sleep(at - now);
+      const cooling = this.coolUntil - Date.now();
+      if (cooling > 0) await this.sleep(cooling);
       this.sent++;
       const p = a[1] as { request_type?: string; method_name?: string } | undefined;
       const key = [String(a[0]), p?.request_type, p?.method_name].filter(Boolean).join(" ");
@@ -55,7 +59,8 @@ export class PacedProvider extends JsonRpcProvider {
         if (!isRateLimited(e) || attempt >= this.retries) throw e;
         this.limited++;
         // back off every queued request, not just this one: the limit is the provider's
-        this.next = Math.max(this.next, Date.now() + 1000 * 2 ** attempt);
+        this.coolUntil = Date.now() + 1000 * 2 ** attempt;
+        this.next = Math.max(this.next, this.coolUntil);
       }
     }
   }

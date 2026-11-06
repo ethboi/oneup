@@ -48,6 +48,36 @@ describe("PacedProvider", () => {
   });
 });
 
+describe("PacedProvider's backoff", () => {
+  it("holds back a request already waiting for its turn", async () => {
+    const sleeps: number[] = [];
+    let release = () => {};
+    const parked = new Promise<void>((r) => (release = r));
+    let parkedOnce = false;
+    const p = new PacedProvider("http://rpc.invalid", 100, 5, async (ms) => {
+      sleeps.push(ms);
+      // the second request waits for its turn while the first is refused
+      if (!parkedOnce) {
+        parkedOnce = true;
+        await parked;
+      }
+    });
+    let calls = 0;
+    vi.spyOn(JsonRpcProvider.prototype, "sendJsonRpc").mockImplementation(async () => {
+      if (++calls === 1) throw limitError;
+      return "ok";
+    });
+    const first = send(p);
+    const second = send(p);
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+    release();
+    await Promise.all([first, second]);
+    // beyond its 100 ms turn, the waiting request also sat out the refusal's cooldown
+    expect(sleeps.some((ms) => ms > 500)).toBe(true);
+  });
+});
+
 describe("FailoverProvider", () => {
   const rpc = (answer: () => unknown) => {
     const p = new JsonRpcProvider({ url: "http://rpc.invalid" });

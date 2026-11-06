@@ -315,8 +315,10 @@ server.registerTool(
   logged("claim_lives", async () => {
     const ready = (await o.lives(me)).filter((l) => BigInt(l.claimable) > 0n);
     if (ready.length === 0) return { claimed_usd: 0 };
-    await tx.claimLives(ready.map((l) => l.token_id));
-    return { claimed_usd: ready.reduce((s, l) => s + dollars(l.claimable), 0), lives: ready.length };
+    // one transaction claims at most 30
+    const batch = ready.slice(0, 30);
+    await tx.claimLives(batch.map((l) => l.token_id));
+    return { claimed_usd: batch.reduce((s, l) => s + dollars(l.claimable), 0), lives: batch.length, lives_still_to_claim: ready.length - batch.length };
   }),
 );
 
@@ -366,6 +368,7 @@ server.registerTool(
         kind: isLife ? "extra_life" : "lock",
         nft_contract: l.nft_contract,
         token_id: l.token_id,
+        approval_id: l.approval_id,
         seller: l.seller,
         price_usd: dollars(price),
         worth_usd: dollars(worth),
@@ -382,11 +385,12 @@ server.registerTool(
   {
     title: "Buy a listing",
     description: "Buys an Extra Life or a lock from the market at its listed price, paid from this account's wallet USDC (the seller pays a 2% fee). Check market_listings first.",
-    inputSchema: { nft_contract: z.string(), token_id: z.string(), max_price_usd: z.number().positive().describe("Refuse if the listing now costs more"), reason },
+    inputSchema: { nft_contract: z.string(), token_id: z.string(), approval_id: z.number().int().describe("From market_listings: refuses a listing replaced since you looked at it"), max_price_usd: z.number().positive().describe("Refuse if the listing now costs more"), reason },
   },
-  logged("buy_listing", async ({ nft_contract, token_id, max_price_usd }) => {
+  logged("buy_listing", async ({ nft_contract, token_id, approval_id, max_price_usd }) => {
     const l = (await o.listings()).find((x) => x.nft_contract === nft_contract && x.token_id === token_id);
     if (!l) throw new Error("Not listed any more");
+    if (l.approval_id !== approval_id) throw new Error("The listing has been replaced since you looked: check market_listings again");
     const price = BigInt(l.price);
     if (price > usdc(max_price_usd)) throw new Error(`Listed at $${fmtUsdc(price)} now, above your $${max_price_usd}`);
     if (l.seller === me) throw new Error("That's your own listing");

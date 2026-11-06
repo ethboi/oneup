@@ -13,3 +13,13 @@ test("zero remaining earning periods does not describe an immature lock as unloc
   assert.equal(lockCountdown(7, 7), "Ready to unlock");
   assert.equal(lockCountdown(7, 8), "Ready to unlock");
 });
+
+
+test("reward checks cover every round since the oldest lock, skipping those already settled", async () => {
+  const { isSettledRound, roundsToCheck } = await import("../src/lib/locks.ts");
+  assert.deepEqual(roundsToCheck(5, 9, new Set()), [8, 7, 6, 5]);
+  assert.deepEqual(roundsToCheck(5, 9, new Set([6, 7])), [8, 5]);
+  assert.equal(roundsToCheck(0, 500, new Set()).length, 25, "a long history fills in a few at a time");
+  assert.equal(isSettledRound(95, 100), true);
+  assert.equal(isSettledRound(97, 100), false, "rewards can still land on a recent round");
+});

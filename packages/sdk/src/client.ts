@@ -256,7 +256,7 @@ export class OneUp {
   solvency = () => this.house<Solvency>("get_solvency");
   epoch = () => this.house<Epoch>("get_epoch");
   epochSummary = (epoch: number) => this.house<EpochSummary | null>("get_epoch_summary", { epoch });
-  closing = () => this.house<unknown | null>("get_closing");
+  closing = () => this.house<{ epoch: number } | null>("get_closing");
   balance = (account_id: string) => this.house<U128>("get_balance", { account_id });
   positions = (account_id: string) => this.house<Position[]>("get_positions", { account_id });
   orders = (account_id: string) => this.house<Order[]>("get_orders", { account_id });
@@ -304,7 +304,14 @@ export class OneUp {
     return out;
   };
   lifeInfo = (token_id: string) => this.view<LifeInfo | null>(this.d.contracts.life, "life_info", { token_id });
-  listings = () => this.view<Listing[]>(this.d.contracts.market, "get_listings", {});
+  listings = async (): Promise<Listing[]> => {
+    const all: Listing[] = [];
+    for (;;) {
+      const page = await this.view<Listing[]>(this.d.contracts.market, "get_listings", { from_index: all.length, limit: 100 });
+      all.push(...page);
+      if (page.length < 100) return all;
+    }
+  };
   /** $1UP out for `usdc_in` on the swap (Rhea's stand-in). */
   swapQuote = (usdc_in: bigint) => this.view<U128>(this.d.contracts.swap, "get_quote", { usdc_in: usdc_in.toString() });
   daoPolicy = () =>

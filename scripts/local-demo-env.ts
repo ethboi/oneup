@@ -2,5 +2,6 @@
 export function localDemoEnv(environment: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const result = { ...environment };
   delete result.ONEUP_PUBLIC_CONFIG;
+  delete result.ONEUP_PUBLIC_CONFIG_JSON;
   return result;
 }

@@ -12,6 +12,7 @@ import { readFileSync } from "node:fs";
 import { FailoverProvider, OneUp, rpcList, type Deployment } from "@oneup/sdk";
 import {
   boardBetween,
+  eventLogs,
   historyFor,
   indexedAccounts,
   indexerCursor,
@@ -55,7 +56,7 @@ interface Row {
 }
 interface Tx {
   transaction: { hash: string };
-  receipts: { execution_outcome: { outcome: { executor_id: string; logs: string[] } } }[];
+  receipts: { execution_outcome: { outcome: { executor_id: string; logs: string[]; status?: unknown } } }[];
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {
@@ -103,21 +104,14 @@ async function ingest(rows: Row[]): Promise<{ from: number; to: number }[]> {
       const tx = byHash.get(row.transaction_hash);
       // not there yet: stop here, and the cursor brings it back next time
       if (!tx) return closed;
-      const logs: [string, string, string][] = [];
-      for (const receipt of tx.receipts) {
-        const { executor_id, logs: lines } = receipt.execution_outcome.outcome;
-        for (const line of lines) {
-          if (!line.startsWith("EVENT_JSON:")) continue;
-          const json = line.slice(11);
-          logs.push([executor_id, json, row.transaction_hash]);
-          if (executor_id === c.house && json.includes('"epoch_closed"')) {
-            try {
-              const { started_at, ended_at } = JSON.parse(json).data.summary ?? JSON.parse(json).data[0].summary;
-              closed.push({ from: started_at * 1000, to: ended_at * 1000 });
-            } catch {
-              // malformed: the round simply has no results screen
-            }
-          }
+      const logs = eventLogs(tx.receipts.map((r) => r.execution_outcome.outcome), row.transaction_hash);
+      for (const [executor_id, json] of logs) {
+        if (executor_id !== c.house || !json.includes('"epoch_closed"')) continue;
+        try {
+          const { started_at, ended_at } = JSON.parse(json).data.summary ?? JSON.parse(json).data[0].summary;
+          closed.push({ from: started_at * 1000, to: ended_at * 1000 });
+        } catch {
+          // malformed: the round simply has no results screen
         }
       }
       recordBlock({ t: Math.floor(row.tx_block_timestamp / 1e6), logs }, c);

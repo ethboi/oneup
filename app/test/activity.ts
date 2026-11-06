@@ -67,3 +67,17 @@ test("RPC failures leave a batch uncommitted; retry indexes once and rankings us
     globalThis.fetch = originalFetch;
   }
 });
+
+
+test("a failed receipt's logs aren't activity: its state changes rolled back", async () => {
+  const { eventLogs } = await import("../src/lib/server/activity.ts");
+  const logs = eventLogs(
+    [
+      { executor_id: "house", logs: ['EVENT_JSON:{"a":1}', "plain text"], status: { SuccessValue: "" } },
+      { executor_id: "house", logs: ['EVENT_JSON:{"b":2}'], status: { Failure: { ActionError: {} } } },
+      { executor_id: "market", logs: ['EVENT_JSON:{"c":3}'] },
+    ],
+    "tx1",
+  );
+  assert.deepEqual(logs, [["house", '{"a":1}', "tx1"], ["market", '{"c":3}', "tx1"]]);
+});

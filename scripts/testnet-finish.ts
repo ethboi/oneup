@@ -110,8 +110,9 @@ for (const name of CONTRACT_NAMES) {
   await step(`remove deployment key ${name}`, () => provider.viewAccessKeyList({ accountId: id(name) }).then((l) => !l.keys.some((k) => k.public_key === pub.toString())), () => new Account(id(name), provider, keyOf(name)).signAndSendTransaction({ receiverId: id(name), actions: [actions.deleteKey(pub)], waitUntil: "FINAL" }));
 }
 const privateConfig: Deployment = { network: "testnet", rpcUrl, epochLengthS: plan.epochLengthS, contracts: plan.contracts, owner: { id: operator, key: operatorKey }, keeper: { id: `keeper.${operator}`, key: keyOf("keeper") }, demo: { id: operator, key: operatorKey }, bots: [], markets: MARKETS };
-writeFileSync(resolve(dir, "operator.json"), `${JSON.stringify(privateConfig, null, 2)}\n`, { mode: 0o600, flag: "wx" });
-writeFileSync(resolve(dir, "public.json"), `${JSON.stringify(publicTestnetProfile(plan), null, 2)}\n`, { mode: 0o600, flag: "wx" });
+// rewritten whole, so a crash between the two can't stop a restart: nothing here depends on what was there before
+writeFileSync(resolve(dir, "operator.json"), `${JSON.stringify(privateConfig, null, 2)}\n`, { mode: 0o600 });
+writeFileSync(resolve(dir, "public.json"), `${JSON.stringify(publicTestnetProfile(plan), null, 2)}\n`, { mode: 0o600 });
 progress.status = "complete";
 save();
 console.log(`Testnet setup complete. Private keeper config: ${resolve(dir, "operator.json")}\nKeyless app profile: ${resolve(dir, "public.json")}`);

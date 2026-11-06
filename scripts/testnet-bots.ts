@@ -5,7 +5,7 @@
 //
 //   ONEUP_CONFIG=/abs/.testnet/<operator>/operator.json ONEUP_TESTNET_BOTS=6 pnpm testnet:bots --execute
 
-import { readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import { Account, KeyPair, nearToYocto, teraToGas, type KeyPairString } from "near-api-js";
 import { FailoverProvider, ONEUP, PacedProvider, USDC, rpcList, type Deployment } from "@oneup/sdk";
@@ -34,10 +34,16 @@ const root = new Account(d.owner.id, provider, d.owner.key as KeyPairString);
 const call = (contractId: string, methodName: string, args: Record<string, unknown>, deposit = 0n) =>
   root.callFunction({ contractId, methodName, args, gas: teraToGas("100"), deposit, waitUntil: "FINAL" });
 
+// a new bot's key is on disk before its account exists, so no failure can strand a funded account
+const pendingFile = `${file}.new-bots.json`;
+const pending: Record<string, string> = existsSync(pendingFile) ? JSON.parse(readFileSync(pendingFile, "utf8")) : {};
 for (const i of missing) {
   const id = `bot${i}.${d.owner.id}`;
-  const key = KeyPair.fromRandom("ed25519");
-  await root.createSubAccount({ accountOrPrefix: `bot${i}`, publicKey: key.getPublicKey(), nearToTransfer: nearToYocto(nearEach as `${number}`) });
+  pending[id] ??= KeyPair.fromRandom("ed25519").toString();
+  writeFileSync(pendingFile, JSON.stringify(pending), { mode: 0o600 });
+  const key = KeyPair.fromString(pending[id] as KeyPairString);
+  const exists = await provider.viewAccount({ accountId: id }).then(() => true, () => false);
+  if (!exists) await root.createSubAccount({ accountOrPrefix: `bot${i}`, publicKey: key.getPublicKey(), nearToTransfer: nearToYocto(nearEach as `${number}`) });
   // saved straight away, so a later failure never loses a funded account's key
   d.bots.push({ id, key: key.toString() });
   writeFileSync(file, `${JSON.stringify(d, null, 2)}\n`, { mode: 0o600 });
@@ -47,4 +53,5 @@ for (const i of missing) {
   await call(d.contracts.oneup, "ft_transfer", { receiver_id: id, amount: (10_000n * ONEUP).toString() }, 1n).catch(() => console.log(`  ${id}: no $1UP sent`));
   console.log(`added ${id}`);
 }
+rmSync(pendingFile, { force: true });
 console.log(`${d.bots.length} bots. Start them with ONEUP_CONFIG=${file} pnpm bots (they take test USDC from the faucet, ${(10_000n * USDC) / USDC} at a time).`);

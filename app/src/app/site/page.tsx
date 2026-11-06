@@ -85,7 +85,11 @@ export default function Site() {
                   <video src={VIDEO} controls playsInline preload="metadata" poster="/site/app-preview.gif" />
                 ) : (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src="/site/app-preview.gif" alt="OneUp's trading screen: a live price chart, an order ticket and open positions" />
+                  <picture>
+                    {/* no looping recording for anyone who's asked for less motion */}
+                    <source media="(prefers-reduced-motion: reduce)" srcSet="/site/app-preview-still.webp" />
+                    <img src="/site/app-preview.gif" alt="OneUp's trading screen: a live price chart, an order ticket and open positions" />
+                  </picture>
                 )}
               </div>
             </div>

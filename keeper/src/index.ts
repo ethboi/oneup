@@ -34,6 +34,7 @@ import { validSteer } from "./control.ts";
 import { processOrders } from "./orders.ts";
 import { reconcileBuybacks, restoreBuybacks } from "./buybacks.ts";
 import { FailoverProvider, PacedProvider, rpcList } from "@oneup/sdk";
+import { TOP_UP_BY, closeCanContinue, marketsToPrice, spareNear, topUpsDue } from "./upkeep.ts";
 import { crossesThreshold } from "./thresholds.ts";
 
 const { values: args } = parseArgs({
@@ -88,9 +89,9 @@ const JUMP_TICKS = 10;
 
 /** The chain's market list, read at most once a minute: it only changes when a vote lists a market. */
 let listedCache: { at: number; markets: Awaited<ReturnType<OneUp["markets"]>> } | null = null;
-async function liveMarkets() {
+async function pricedMarkets() {
   if (!listedCache || Date.now() - listedCache.at > 60_000) listedCache = { at: Date.now(), markets: await oneup.markets() };
-  return listedCache.markets.filter((m) => m.live);
+  return marketsToPrice(listedCache.markets, openPositions, openOrders);
 }
 
 /** What each feed last pushed, and when (ms), for --price-move-bps. */
@@ -100,7 +101,7 @@ let openPositions: Position[] = [];
 let openOrders: Order[] = [];
 
 async function pushPrices(pusher: ReturnType<OneUp["calls"]>, forced: boolean) {
-  const listed = await liveMarkets();
+  const listed = await pricedMarkets();
   feeds = new Map(listed.map((m) => [m.id, m.feed_id]));
   const updates = (await source.next(listed.map((m) => ({ id: m.id, feedId: m.feed_id })))).filter((u) => {
     const last = latest.get(u.feed_id);
@@ -173,6 +174,7 @@ async function handlePositions(risk: ReturnType<OneUp["calls"]>) {
 
 /** When the current epoch is due to end, once read: until then there is nothing to check. */
 let epochEndsAt = 0;
+let closeRetries = 0;
 async function handleEpoch() {
   if (nowS() < epochEndsAt) return;
   const [epoch, closing] = await Promise.all([oneup.epoch(), oneup.closing()]);
@@ -185,12 +187,17 @@ async function handleEpoch() {
     const r = await keeper.closeEpoch();
     if (r === "begun") log(`epoch ${epoch.id} ended; closing`);
     if (r === "closed") {
+      closeRetries = 0;
       const e = (await oneup.epoch()).id - 1;
       const s = await oneup.epochSummary(e);
       log(`epoch ${e} closed: house net ${fmt(s?.house_net)}, ${s?.lives_minted} Extra Lives, lives pot ${fmt(s?.lives_pot)}, buyback ${fmt(s?.buyback_pot)}`);
       return;
     }
-    if (r === "waiting for mints" || r === "waiting for recall") return; // next tick
+    if (!closeCanContinue(r)) {
+      // "retrying" more than a few times means something needs fixing: this morning's stuck round looked like this
+      if (r.startsWith("retrying") && ++closeRetries % 20 === 1) log(`round close is retrying (${closeRetries} so far): check the contracts' spare NEAR`);
+      return; // next tick
+    }
   }
 }
 
@@ -229,13 +236,14 @@ let savedBuybacks: unknown;
 try { savedBuybacks = JSON.parse(readFileSync(buybackFile, "utf8")); } catch { /* reconstruct */ }
 const buybackQueue = restoreBuybacks(savedBuybacks, buybackIdentity);
 async function handleBuybacks() {
-  const epoch = await oneup.epoch();
+  // a round's number moves on before its buyback exists: only ask about rounds that have finished closing
+  const [epoch, closing] = await Promise.all([oneup.epoch(), oneup.closing()]);
   await reconcileBuybacks({
     read: oneup.buyback,
     quote: async usdc => BigInt(await oneup.view<string>(d.contracts.swap, "get_quote", { usdc_in: usdc })),
     swap: owner.buyback,
     deliver: owner.retryBuybackDelivery,
-  }, buybackQueue, epoch.id, queue => {
+  }, buybackQueue, closing ? closing.epoch : epoch.id, queue => {
     writeFileSync(`${buybackFile}.tmp`, JSON.stringify({ identity: buybackIdentity, ...queue }), { mode: 0o600 });
     renameSync(`${buybackFile}.tmp`, buybackFile);
   }, log);
@@ -366,7 +374,7 @@ async function tick() {
   const steps: [string, () => Promise<void>][] = [
     ["orders", handleOrders],
     ["epoch", handleEpoch],
-    ...(slow ? ([["treasury", handleTreasury], ["buybacks", handleBuybacks]] as [string, () => Promise<void>][]) : []),
+    ...(slow ? ([["treasury", handleTreasury], ["buybacks", handleBuybacks], ["storage", handleStorage]] as [string, () => Promise<void>][]) : []),
   ];
   for (const [name, fn] of steps) {
     try {
@@ -378,6 +386,23 @@ async function tick() {
 }
 
 // the host only: a private RPC URL carries its key
+/** Testnet: keeps the contracts able to store what they mint, from the operator's balance, every ten minutes. */
+let lastUpkeep = 0;
+async function handleStorage() {
+  if (d.network !== "testnet" || Date.now() - lastUpkeep < 600_000) return;
+  lastUpkeep = Date.now();
+  const contracts = Object.values(d.contracts).filter((id): id is string => typeof id === "string");
+  const spare = async (accountId: string) => spareNear(await oneup.provider.viewAccount({ accountId }));
+  const accounts = await Promise.all(contracts.map(async (id) => ({ id, spare: await spare(id) })));
+  const { due, short } = topUpsDue(accounts, await spare(d.owner.id));
+  const operator = new Account(d.owner.id, oneup.provider, d.owner.key as KeyPairString);
+  for (const id of due) {
+    await operator.signAndSendTransaction({ receiverId: id, actions: [actions.transfer(TOP_UP_BY)] });
+    log(`storage: topped up ${id}`);
+  }
+  if (short.length) log(`storage: LOW and the operator can't cover it: ${short.join(", ")}`);
+}
+
 log(`keeper ${d.keeper.id} on ${new URL(d.rpcUrl).host}, ${args.prices} prices, ${d.markets.length} markets`);
 controlServer(Number(args.control));
 if (Number(args["rpc-gap"]) > 0) {

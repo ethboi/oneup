@@ -5,10 +5,10 @@
 // closed ones fold away. Leave early for a penalty, or sell a lock on the market.
 
 import { parseTokenAmount } from "@oneup/sdk";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ONEUP, VE_MAX_EPOCHS, type LockInfo } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
-import { lockOrigin, lockCountdown } from "@/lib/locks";
+import { CLAIM_ROUNDS, isSettledRound, lockOrigin, lockCountdown, roundsToCheck } from "@/lib/locks";
 import { lockValue, useOneupPrice } from "@/lib/value";
 import { fmtOneup, fmtUsd } from "./Header";
 import { Icon } from "./Icon";
@@ -27,7 +27,22 @@ export function Locks() {
   const px = useOneupPrice();
   const [showClosed, setShowClosed] = useState(false);
   const id = epoch?.id ?? 0;
-  const past = Array.from({ length: Math.min(20, Math.max(0, id - 1)) }, (_, i) => id - 1 - i);
+  // every finished round with rewards since the oldest lock began, newest first: a returning trader's older rewards
+  // still show. Only those rounds are worth asking about, and a settled round's answer is remembered.
+  const oldest = locks.reduce((min, l) => Math.min(min, l.created), id);
+  const settled = useRef(new Map<number, boolean>());
+  const rewarded =
+    usePoll(async () => {
+      const known = new Set(settled.current.keys());
+      const fresh = new Map<number, boolean>();
+      for (const e of roundsToCheck(oldest, id, known)) {
+        const has = BigInt(await o.lockRewards(e)) > 0n;
+        fresh.set(e, has);
+        if (isSettledRound(e, id)) settled.current.set(e, has);
+      }
+      return [...new Map([...settled.current, ...fresh])].filter(([, has]) => has).map(([e]) => e).sort((a, b) => b - a);
+    }, [oldest, id], 15_000) ?? [];
+  const past = rewarded;
   // every lock's claimable in one poll
   const claimable =
     usePoll(async () => {
@@ -66,7 +81,7 @@ export function Locks() {
                 className="btn btn-accent w-full sm:w-auto"
                 disabled={claimSum === 0n}
                 title="Claim available rewards from up to 30 locks."
-                onClick={() => run("Claim rewards from up to 30 locks", () => tx.claimVeMany(toClaim.slice(0, 30).map(([k]) => k), past))}
+                onClick={() => run("Claim rewards from up to 30 locks", () => tx.claimVeMany(toClaim.slice(0, 30).map(([k]) => k), past.slice(0, CLAIM_ROUNDS)))}
               >
                 <Icon name="claim" />
                 {claimSum > 0n ? "Claim rewards" : "No rewards to claim"}
