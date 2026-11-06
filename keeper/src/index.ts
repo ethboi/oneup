@@ -377,7 +377,8 @@ async function tick() {
   }
 }
 
-log(`keeper ${d.keeper.id} on ${d.rpcUrl}, ${args.prices} prices, ${d.markets.length} markets`);
+// the host only: a private RPC URL carries its key
+log(`keeper ${d.keeper.id} on ${new URL(d.rpcUrl).host}, ${args.prices} prices, ${d.markets.length} markets`);
 controlServer(Number(args.control));
 if (Number(args["rpc-gap"]) > 0) {
   let seen = { sent: 0, limited: 0 };
