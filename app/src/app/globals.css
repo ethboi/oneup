@@ -3124,7 +3124,10 @@ kbd {
     min-height: 40px;
   }
   .net-badge {
-    display: none;
+    min-width: 44px;
+    padding-inline: 8px;
+    gap: 5px;
+    font-size: 12px;
   }
   footer a,
   footer button {

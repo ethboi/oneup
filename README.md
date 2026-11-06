@@ -3,7 +3,7 @@
 **Perpetuals on NEAR where a losing trade can leave you a Life NFT: an NFT that holds USDC and a share of
 the house's future profit, which you can claim or sell.**
 
-![A 50× long is liquidated; when the round closes the loss becomes a Life NFT, whose USDC is claimed; then another trader's Life is bought on the market](docs/media/oneup.gif)
+![A 50× long is liquidated; when the round closes the loss becomes a Life NFT, whose USDC is claimed](docs/media/oneup.gif)
 
 A NEAR HACKATHON entry for **NFTs That Do Something**, **Unstoppable DeFi** and **Agent Economy**. It is live
 on NEAR testnet at **https://oneup.markets** (the app is at https://app.oneup.markets), and runs as a fuller

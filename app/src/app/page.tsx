@@ -105,11 +105,11 @@ export default function Home() {
         <div className="mx-auto flex max-w-[1280px] items-center justify-center gap-x-2 px-4 py-1.5 text-center text-[12.5px] font-bold">
           <span>
             <span className="hidden sm:inline">In development for </span>
-            <span className="hidden font-extrabold sm:inline">NEAR HACKATHON</span>
+            <span className="font-extrabold">NEAR HACKATHON</span>
             <span className="hidden sm:inline">, November 2026</span>
             <NetworkLabel />
           </span>
-          <button type="button" className="-my-1.5 hidden py-2 underline decoration-dotted underline-offset-2 opacity-90 hover:opacity-100 sm:inline" onClick={() => go("About")}>
+          <button type="button" className="-my-1.5 py-2 underline decoration-dotted underline-offset-2 opacity-90 hover:opacity-100" onClick={() => go("About")}>
             About
           </button>
         </div>
@@ -181,10 +181,7 @@ function NetworkLabel() {
   const { d } = useOneUp();
   return (
     <>
-      {/* phones: just what you need to know, and the way to the wallet help */}
-      <a className="inline-block py-1 sm:hidden" href="/wallet-setup">
-        {d.network === "testnet" ? "NEAR testnet" : "Local demo"} · test money
-      </a>
+      <span className="sm:hidden"> · {d.network === "testnet" ? "testnet" : "local demo"}, test money</span>
       {/* wider screens: the header's badge names a public network */}
       <span className="hidden sm:inline">{d.network === "testnet" ? "" : " · local NEAR demo"} · test money only</span>
     </>

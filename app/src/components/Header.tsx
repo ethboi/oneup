@@ -133,7 +133,7 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
 
 /**
  * Which network this is, the one place the header says so: a status light and its name, the same height as the tools
- * beside it. Amber is test money; green would be mainnet. On phones the banner above names the network instead.
+ * beside it. Amber is test money; green would be mainnet. Phones shorten the name.
  */
 function NetworkBadge({ network }: { network: string }) {
   const name = network.charAt(0).toUpperCase() + network.slice(1);
@@ -141,7 +141,8 @@ function NetworkBadge({ network }: { network: string }) {
   return (
     <a href="/wallet-setup" className="net-badge bar-pill" data-network={network} title={about} aria-label={about}>
       <span className="net-led" aria-hidden />
-      <span>{name}</span>
+      <span className="sm:hidden">Test</span>
+      <span className="hidden sm:inline">{name}</span>
     </a>
   );
 }
