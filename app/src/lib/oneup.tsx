@@ -220,7 +220,8 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
       const t = Date.now();
       setHistory((h) => {
         const out = { ...h };
-        for (const [k, p] of Object.entries(fresh)) out[k] = (out[k] ?? []).concat({ t, p }).slice(-1800);
+        // the first price starts the line straight away: a market that isn't moving may not publish another for a while
+        for (const [k, p] of Object.entries(fresh)) out[k] = (out[k]?.length ? out[k] : [{ t: t - 1000, p }]).concat({ t, p }).slice(-1800);
         return out;
       });
     };

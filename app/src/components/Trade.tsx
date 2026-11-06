@@ -34,6 +34,7 @@ import { payFromChain } from "@/lib/intents";
 import { useStreak } from "./Streaks";
 import { Burst, Gauge, HpBar, MoodGlow, hpOf, useCloseFx, useMood, useTensionSound } from "./Mood";
 import { ActivityList, useActivity } from "./Activity";
+import { Onboarding } from "./Onboarding";
 import { HistoryList } from "./History";
 import { ShareButton, type CardData } from "./PnlCard";
 import { Jackpot, fmtDuration } from "./Jackpot";
@@ -363,6 +364,10 @@ export function Trade() {
         </div>
         <div className="order-4 min-w-0">
           <Below positions={positions} orders={orders} focused={focused?.id} pick={pick} market={market} />
+        </div>
+        {/* the guide to recovery, under the trading itself */}
+        <div className="order-5 min-w-0">
+          <Onboarding />
         </div>
       </div>
       <div ref={formRef} id="order-form" className="order-3 flex flex-col gap-4">

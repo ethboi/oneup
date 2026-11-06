@@ -20,7 +20,10 @@ if (process.env.ONEUP_NEXT_DIST) {
   base.include = ["next-env.d.ts", "src", `${process.env.ONEUP_NEXT_DIST}/types/**/*.ts`, `${process.env.ONEUP_NEXT_DIST}/dev/types/**/*.ts`];
   writeFileSync(isolatedTsconfig, JSON.stringify(base, null, 2));
 }
+// where the app links back to the website: its own host when it has one (ONEUP_SITE_HOSTS), otherwise /site
+const siteHost = process.env.ONEUP_SITE_HOSTS?.split(",")[0]?.trim();
 const config: NextConfig = {
+  env: { ONEUP_SITE_URL: siteHost ? `https://${siteHost}` : "/site" },
   typescript: { tsconfigPath: isolatedTsconfig },
   distDir: process.env.ONEUP_NEXT_DIST ?? ".next",
   transpilePackages: ["@oneup/sdk"],

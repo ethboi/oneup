@@ -36,7 +36,7 @@ export function Onboarding() {
     { icon: <Icon name="store" size={20} />, title: "List your Life for sale", line: "Set your asking price. If someone buys your Life, its unclaimed USDC and remaining payout rights transfer to them. Listing it does not guarantee a sale.", href: next.tokenId ? lifeHref(next.tokenId) : "/market", action: next.tokenId ? "View your Life" : "Explore the market" },
   ];
   return (
-    <details className="panel mb-4 p-4" open={expanded} onToggle={event => { const open = event.currentTarget.open; setExpanded(open); try { localStorage.setItem(KEY, open ? "0" : "1"); } catch {} }}>
+    <details className="panel p-4" open={expanded} onToggle={event => { const open = event.currentTarget.open; setExpanded(open); try { localStorage.setItem(KEY, open ? "0" : "1"); } catch {} }}>
       <summary className="cursor-pointer text-sm font-bold marker:text-[var(--primary)]">
         How recovery works{" "}
         <span className="mt-1 block font-normal text-[var(--muted)] sm:ml-3 sm:mt-0 sm:inline">{status}</span>

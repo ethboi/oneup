@@ -58,11 +58,12 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
 
   return (
     <header className="mb-4 flex items-center gap-2 border-b border-[var(--line)] py-3 sm:gap-4 lg:mb-5">
-      <div className="flex shrink-0 items-center gap-2">
+      {/* the way back to the website */}
+      <a href={process.env.ONEUP_SITE_URL} className="flex shrink-0 items-center gap-2" title="OneUp website" aria-label="OneUp website">
         <Logo size={34} />
         {/* the wordmark makes way for the tabs on small desktops */}
         <span className="display hidden text-[22px] leading-none sm:inline lg:hidden xl:inline">OneUp</span>
-      </div>
+      </a>
       <nav ref={nav} className="hidden min-w-0 flex-1 lg:block" aria-label="Sections">
         <div className="tabs" role="tablist">
           {bar

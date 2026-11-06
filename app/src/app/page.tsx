@@ -21,7 +21,6 @@ import { AchievementWatcher, BadgesDialog } from "@/components/Achievements";
 import { FullHeal } from "@/components/FullHeal";
 import { JackpotWin } from "@/components/JackpotWin";
 import { EpochResults } from "@/components/EpochResults";
-import { Onboarding } from "@/components/Onboarding";
 import { Icon, type IconName } from "@/components/Icon";
 import { Logo } from "@/components/Pixel";
 
@@ -123,18 +122,7 @@ export default function Home() {
           go={(t) => go(t as Tab)}
         />
         <div className={tab === "Trade" ? undefined : "mx-auto max-w-[1280px] 2xl:max-w-[1440px]"}>
-          {/* the three-step intro belongs on the trading screen, not every page */}
-          {/* phones: under the trading screen, so the chart is the first thing you see */}
-          {tab === "Trade" && (
-            <div className="flex flex-col">
-              <div className="order-2 lg:order-1">
-                <Onboarding />
-              </div>
-              <div className="order-1 lg:order-2">
-                <Trade />
-              </div>
-            </div>
-          )}
+          {tab === "Trade" && <Trade />}
           {tab === "Extra Lives" && <Lives />}
           {tab === "Locks" && <Locks />}
           {tab === "Market" && <Market />}
@@ -213,6 +201,11 @@ function Footer({ go }: { go: (t: Tab, at?: string) => void }) {
         <div>
           <b className="block text-[var(--text)]">Read more</b>
           <ul className="label mt-1.5 flex flex-col gap-1">
+            <li>
+              <a className={link} href={process.env.ONEUP_SITE_URL}>
+                OneUp website
+              </a>
+            </li>
             <li>
               <button type="button" className={link} onClick={() => go("About")}>
                 How it works
