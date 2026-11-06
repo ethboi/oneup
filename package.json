@@ -32,7 +32,8 @@
     "test:economics": "tsx scripts/economic-report.ts",
     "deploy:testnet": "tsx scripts/deploy-testnet.ts",
     "testnet:bots": "tsx scripts/testnet-bots.ts",
-    "testnet:finish": "tsx scripts/testnet-finish.ts"
+    "testnet:finish": "tsx scripts/testnet-finish.ts",
+    "testnet:indexer": "tsx scripts/testnet-indexer.ts"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",

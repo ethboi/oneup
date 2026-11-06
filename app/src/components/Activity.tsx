@@ -45,14 +45,15 @@ export function useActivity(keep = 60): ActivityItem[] {
   const [items, setItems] = useState<ActivityItem[]>([]);
   useEffect(() => {
     setItems([]);
-    if (d.network !== "localnet") return;
+    // testnet: the published feed, a little behind the chain, so there's no need to ask often
+    const testnet = d.network !== "localnet";
     return pollActivity<ActivityItem>(async after => {
-      const response = await fetch(`/api/activity?after=${after}`);
+      const response = await fetch(testnet ? "/api/activity" : `/api/activity?after=${after}`);
       if (!response.ok) throw new Error("Activity unavailable");
       return (await response.json()).items ?? [];
-    }, setItems, keep);
+    }, setItems, keep, testnet ? 20_000 : 2000);
   }, [keep, d.network]);
-  return d.network === "localnet" ? items : [];
+  return items;
 }
 
 const ago = (now: number, t: number) => {
@@ -62,8 +63,6 @@ const ago = (now: number, t: number) => {
 
 export function ActivityList({ items, limit = 8, empty = "Waiting for activity…" }: { items: ActivityItem[]; limit?: number; empty?: string }) {
   const now = useNow();
-  const { d } = useOneUp();
-  if (d.network !== "localnet") return <p className="label">Activity history is not indexed on testnet. Current balances and positions still update from the contracts.</p>;
   if (items.length === 0) return <p className="label">{empty}</p>;
   return (
     <ul className="flex flex-col">

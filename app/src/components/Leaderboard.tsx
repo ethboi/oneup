@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { AgentBadge } from "./ui";
-import { fmtUsdc } from "@oneup/sdk";
+import { displayAccount, fmtUsdc } from "@oneup/sdk";
 import { fmtUsd } from "./Header";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import type { Standing } from "@/lib/server/activity";
@@ -14,7 +14,7 @@ import { Jackpot } from "./Jackpot";
 
 type Period = "round" | "day" | "all";
 
-const short = (a: string) => a.replace(/\.test\.near$/, "");
+const short = displayAccount;
 const usd = (x: bigint) => fmtUsd(x, true);
 
 export function Leaderboard() {
@@ -25,15 +25,16 @@ export function Leaderboard() {
   const from = period === "round" ? (epoch ? epoch.started_at * 1000 : null) : period === "day" ? Date.now() - 86_400_000 : 0;
 
   useEffect(() => {
-    if (from === null || d.network !== "localnet") return;
+    if (from === null) return;
     let live = true;
+    const testnet = d.network !== "localnet";
     const tick = () =>
-      fetch(`/api/standings?from=${from}&to=${Date.now()}`)
+      fetch(testnet ? `/api/standings?period=${period}` : `/api/standings?from=${from}&to=${Date.now()}`)
         .then((r) => (r.ok ? r.json() : null))
         .then((j) => live && j && setData(j))
         .catch(() => {});
     tick();
-    const i = setInterval(tick, 5000);
+    const i = setInterval(tick, testnet ? 20_000 : 5000);
     return () => {
       live = false;
       clearInterval(i);
@@ -42,7 +43,6 @@ export function Leaderboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period, epoch?.id, d.network]);
 
-  if (d.network === "testnet") return <div className="panel p-5"><h1 className="page-title">Leaderboard</h1><p className="label mt-3">Rankings require the local demo indexer and are not available in this testnet profile.</p></div>;
   const rows = data?.rows ?? [];
   const winners = rows.filter((r) => BigInt(r.pnl) > 0n);
   const losers = rows.filter((r) => BigInt(r.pnl) < 0n).reverse();
@@ -54,7 +54,10 @@ export function Leaderboard() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="page-title">Leaderboard</h1>
-          <p className="label">Profit and loss from closed trades, after fees on winning trades.</p>
+          <p className="label">
+            Profit and loss from closed trades, after fees on winning trades.
+            {d.network !== "localnet" && " Updated about once a minute."}
+          </p>
         </div>
         <div className="chip-track" role="group" aria-label="Period">
           {(

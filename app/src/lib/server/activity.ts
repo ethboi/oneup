@@ -8,7 +8,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { configPath, stateDir } from "./localnet";
-import { ONEUP, OneUp, netTradePnl } from "@oneup/sdk";
+import { ONEUP, OneUp, displayAccount, netTradePnl } from "@oneup/sdk";
 export { netTradePnl } from "@oneup/sdk";
 
 export interface ActivityItem {
@@ -84,6 +84,8 @@ interface State {
   running: boolean;
   history: Map<string, HistoryItem[]>;
   opened: Map<number, Opened>;
+  /** Testnet: the last transaction read, "<block height>:<index>" (scripts/testnet-indexer.ts). */
+  cursor: string | null;
 }
 
 /** Blocks behind the head before a block is read, so the receipts it started have run. */
@@ -92,7 +94,7 @@ const KEEP = 200;
 const KEEP_PER_ACCOUNT = 1000;
 /** Blocks read at once while catching up. */
 const BATCH = 25;
-const short = (a: string) => a.replace(/\.test\.near$/, "");
+const short = displayAccount;
 const usd = (raw: string | number) => {
   const v = Number(raw) / 1e6;
   const d = v >= 1000 ? 0 : 2;
@@ -110,6 +112,7 @@ const state: State = (g.__oneupActivity2 ??= {
   running: false,
   history: new Map(),
   opened: new Map(),
+  cursor: null,
 });
 
 const SAVE = resolve(stateDir(), "indexer.json");
@@ -120,7 +123,7 @@ function load(genesis: string) {
   try {
     const j = JSON.parse(readFileSync(SAVE, "utf8"));
     if (j.genesis !== genesis) return; // a different chain
-    Object.assign(state, { next: j.next, items: j.items, seq: j.seq, history: new Map(j.history), opened: new Map(j.opened) });
+    Object.assign(state, { next: j.next, items: j.items, seq: j.seq, history: new Map(j.history), opened: new Map(j.opened), cursor: j.cursor ?? null });
   } catch {
     // unreadable: rescan
   }
@@ -129,8 +132,8 @@ function load(genesis: string) {
 function save() {
   if (!state.dirty) return;
   state.dirty = false;
-  const { genesis, next, items, seq } = state;
-  writeFileSync(SAVE, JSON.stringify({ genesis, next, items, seq, history: [...state.history], opened: [...state.opened] }));
+  const { genesis, next, items, seq, cursor } = state;
+  writeFileSync(SAVE, JSON.stringify({ genesis, next, items, seq, cursor, history: [...state.history], opened: [...state.opened] }));
 }
 
 function config() {
@@ -346,7 +349,7 @@ const pendingSales: Omit<ActivityItem, "seq">[] = [];
 
 /** What a sold life or lock was worth as it sold: a life's USDC still to pay, a lock's $1UP if left today at
  *  the swap price. The NFT has just moved, so its state is the state at the sale. */
-async function valueSales() {
+export async function valueSales() {
   if (pendingSales.length === 0) return;
   const o = new OneUp(JSON.parse(readFileSync(configPath(), "utf8")));
   for (const item of pendingSales.splice(0)) {
@@ -392,6 +395,26 @@ async function step() {
     const heights = Array.from({ length: Math.min(BATCH, target - state.next + 1) }, (_, i) => state.next! + i);
     await indexBatch(url, heights, c);
   }
+}
+
+/** For scripts/testnet-indexer.ts, which reads transactions from elsewhere rather than scanning blocks. */
+export const loadIndexerState = (id: string) => load(id);
+export const saveIndexerState = () => save();
+export const indexerCursor = () => state.cursor;
+export const indexedAccounts = () => [...state.history.keys()];
+export const recentActivity = () => state.items;
+export function setIndexerCursor(cursor: string) {
+  state.cursor = cursor;
+  state.dirty = true;
+}
+export function recordBlock(block: { t: number; logs: [string, string, string][] }, c: Record<string, string>) {
+  record(block, c);
+  state.dirty = true;
+}
+/** The testnet indexer is always current with the chain, bar its short delay. */
+export function markSynced(head: number) {
+  state.head = head;
+  state.next = head + 1;
 }
 
 export function startActivity() {

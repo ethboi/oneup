@@ -42,7 +42,7 @@ export function EpochResults({ automatic }: { automatic: boolean }) {
   }, []);
 
   useEffect(() => {
-    if (d.network !== "localnet" || !epoch) return;
+    if (!epoch) return;
     const prev = last.current;
     last.current = epoch.id;
     if (prev === null || epoch.id <= prev || !automatic || automated()) return;
@@ -59,7 +59,8 @@ export function EpochResults({ automatic }: { automatic: boolean }) {
         if (!s) await new Promise((r) => setTimeout(r, 1500));
       }
       if (!s || cancelled()) return;
-      await new Promise((r) => setTimeout(r, 6000));
+      // testnet: the indexer reads a round's trades a little behind the chain
+      await new Promise((r) => setTimeout(r, d.network === "localnet" ? 6000 : 75_000));
       if (cancelled()) return;
       const board = await fetch(`/api/leaderboard?from=${s.started_at * 1000}&to=${s.ended_at * 1000}`)
         .then((r) => (r.ok ? (r.json() as Promise<Board>) : null))

@@ -33,7 +33,8 @@ function useStandings() {
   useEffect(() => {
     let live = true;
     const tick = () =>
-      fetch("/api/standings?from=0")
+      // on testnet the route takes a period; locally, a time range
+      fetch("/api/standings?from=0&period=all")
         .then((r) => (r.ok ? r.json() : { rows: [] }))
         .then((j) => live && setRows(j.rows ?? []))
         .catch(() => {});
@@ -97,11 +98,11 @@ export function Agents() {
   if (testnet)
     return (
       <div className="flex flex-col gap-5">
-        <Explainer title="Agents" line="OneUp is built to be traded by AI agents as well as people, through its MCP server.">
-          An agent gets the same tools a trader has: markets, quotes, open and close, Extra Lives and the market. Each action goes into a journal with
-          the agent&apos;s own reason. That runs in the local demo; on this testnet site there is no agent or journal yet, and three rule-based bots
-          provide the trading you see.
+        <Explainer title="Agents" line="OneUp is built to be traded by AI agents as well as people, through its MCP server. Here, rule-based bots keep the market moving.">
+          An agent gets the same tools a trader has: markets, quotes, open and close, Extra Lives and the market. Each action goes in a public journal with
+          the agent&apos;s own reason. That runs in the local demo; on this testnet site there is no AI agent yet, and the bots below provide the flow you see.
         </Explainer>
+        <BotTable accounts={rows?.filter((r) => agentOf(r.account, ai)?.kind === "bot").map((r) => r.account) ?? []} rows={rows} ai={ai} note="Rule-based strategies trading around the clock with test money, so the house always has flow. Updated about once a minute." />
       </div>
     );
 
@@ -189,11 +190,25 @@ pnpm agent`}
         <p className="label mt-2">Tools: how_it_works, markets, account, quote_trade, open_trade, close_trade, set_triggers, extra_lives, claim_lives, market_listings, buy_listing, house, faucet.</p>
       </section>
 
-      <section className="panel">
-        <div className="px-4 pt-4">
-          <h2 className="font-extrabold">The bots</h2>
-          <p className="label">Twelve rule-based strategies trading around the clock, so the house always has flow.</p>
+      <BotTable accounts={d.bots.map((b) => b.id)} rows={rows} ai={ai} note="Twelve rule-based strategies trading around the clock, so the house always has flow." />
+    </div>
+  );
+}
+
+function BotTable({ accounts, rows, ai, note }: { accounts: string[]; rows: Standing[] | null; ai: string[]; note: string }) {
+  // a bot's strategy goes with its number, so the table keeps that order whatever the results
+  const ordered = [...accounts].sort((a, b) => Number(short(a).replace(/\D/g, "")) - Number(short(b).replace(/\D/g, "")));
+  return (
+    <section className="panel">
+      <div className="px-4 pt-4">
+        <h2 className="font-extrabold">The bots</h2>
+        <p className="label">{note}</p>
+      </div>
+      {ordered.length === 0 ? (
+        <div className="px-4 py-3">
+          <p className="label">{rows ? "No bot has closed a trade yet." : "Loading…"}</p>
         </div>
+      ) : (
         <div className="overflow-x-auto px-4 pb-3">
           <table className="num mt-3 w-full text-sm">
             <thead>
@@ -206,16 +221,16 @@ pnpm agent`}
               </tr>
             </thead>
             <tbody>
-              {d.bots.map((b, i) => {
-                const a = agentOf(b.id, ai);
-                const r = rows?.find((x) => x.account === b.id);
+              {ordered.map((id) => {
+                const a = agentOf(id, ai);
+                const r = rows?.find((x) => x.account === id);
                 const p = r ? BigInt(r.pnl) : 0n;
-                const strategy = BOT_STRATEGIES[i];
+                const strategy = BOT_STRATEGIES[Number(short(id).replace(/\D/g, "")) - 1];
                 return (
-                  <tr key={b.id} className="border-t border-[var(--line)]">
+                  <tr key={id} className="border-t border-[var(--line)]">
                     <td className="py-2">
-                      <b>{strategy ?? short(b.id)}</b>
-                      <span className="label"> · {short(b.id)}</span>
+                      <b>{strategy ?? short(id)}</b>
+                      <span className="label"> · {short(id)}</span>
                       {a?.kind === "ai" && <span className="agent-badge ai">AI</span>}
                     </td>
                     <td className="hidden py-2 text-[var(--muted)] md:table-cell">{a?.kind === "ai" ? "Driven by the AI agent" : strategy ? BOT_NOTES[strategy] : ""}</td>
@@ -230,7 +245,7 @@ pnpm agent`}
             </tbody>
           </table>
         </div>
-      </section>
-    </div>
+      )}
+    </section>
   );
 }

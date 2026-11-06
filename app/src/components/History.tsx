@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { OnExplorer } from "./ui";
-import { fmtUsdc, netTradePnl } from "@oneup/sdk";
+import { displayAccount, fmtUsdc, netTradePnl } from "@oneup/sdk";
 import { useOneUp } from "@/lib/oneup";
 import type { HistoryItem } from "@/lib/server/activity";
 import { fmtOneup } from "./Header";
@@ -23,7 +23,7 @@ export function useHistory(account: string) {
   const { d } = useOneUp();
   const [h, setH] = useState<History | null>(null);
   useEffect(() => {
-    if (d.network !== "localnet") return;
+    if (!account) return;
     let live = true;
     setH(null);
     const tick = () =>
@@ -32,7 +32,8 @@ export function useHistory(account: string) {
         .then((j) => live && j && setH(j))
         .catch(() => {});
     tick();
-    const i = setInterval(tick, 3000);
+    // testnet: published every 30 seconds, so there's no need to ask often
+    const i = setInterval(tick, d.network === "localnet" ? 3000 : 20_000);
     return () => {
       live = false;
       clearInterval(i);
@@ -50,12 +51,12 @@ const REASON: Record<string, string> = {
 };
 
 const when = (t: number) => new Date(t).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
-const short = (a: string) => a.replace(/\.test\.near$/, "");
+const short = displayAccount;
 
 export function HistoryList() {
   const { me, d } = useOneUp();
   const h = useHistory(me);
-  if (d.network === "testnet") return <p className="label py-2">History indexing is not enabled on testnet. <a className="underline" href={`https://testnet.nearblocks.io/address/${encodeURIComponent(me)}`} target="_blank" rel="noreferrer">View this account on the explorer</a>.</p>;
+  if (!me && d.network !== "localnet") return <p className="label py-2">Connect a wallet to see your history.</p>;
   if (!h) return <p className="label py-2">Loading…</p>;
   return (
     <div>

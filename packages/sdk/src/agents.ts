@@ -26,6 +26,9 @@ export const DEFAULT_AI_AGENTS = ["bot12"];
 
 const short = (id: string) => id.split(".")[0];
 
+/** An account as the app shows it: our bots by their first name, a local demo account without its suffix. */
+export const displayAccount = (account: string) => (/^bot\d+\./.test(account) ? short(account) : account.replace(/\.test\.near$/, ""));
+
 /** The AI agents' short names, from a comma-separated list (ONEUP_AI_AGENTS) or the default. */
 export function aiAgents(env?: string): string[] {
   const list = env?.split(",").map((x) => short(x.trim())).filter(Boolean);
