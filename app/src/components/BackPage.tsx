@@ -3,6 +3,7 @@
 // Initial pool funding in full (D-22, D-26): what backing gets you, the form and the curve, when it pays back,
 // your Backer Lives, the exit, and the risks in plain words.
 
+import { JumpLinks } from "./ui";
 import { USDC, fmtUsdc, lifeCapPpm, ppmToNumber } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { Backing } from "./Backing";
@@ -69,7 +70,7 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
               <HealthBar value={pct / 100} segments={20} color="var(--primary)" label={`${pct.toFixed(1)}% of the round raised`} />
             </div>
           </div>
-          <dl className="num mt-5 grid max-w-2xl grid-cols-3 gap-4">
+          <dl className="num mt-5 grid max-w-2xl grid-cols-2 gap-4 pr-6 sm:grid-cols-3">
             <div>
               <dt className="label">Current payout multiplier</dt>
               <dd className="text-xl font-extrabold">{capNow === null ? "…" : `${capNow.toFixed(2)}×`}</dd>
@@ -96,7 +97,7 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card icon={<PixelHeart size={26} />} title="A Backer Life">
-          A Backer Life has no expiry date, and its payout limit depends on the pool size when it is created. Backer Lives
+          A Backer Life has no expiry date, and its payout limit depends on the pool size when it is created. Backer Life NFTs
           share one third of the Life NFT payout pool each round; unused funds can move between the backer and trader shares. The full payout limit may never be reached.
         </Card>
         <Card icon={<PixelLock size={24} />} title="$1UP, locked">
@@ -109,10 +110,13 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
         </Card>
       </div>
 
-      <Backing />
+      <JumpLinks items={[["back-contribute", "Contribute"], ["back-times", "Payout times"], ["back-consider", "What to consider"]]} />
+      <div id="back-contribute" className="scroll-mt-4">
+        <Backing />
+      </div>
 
       <section className="panel p-5">
-        <h2 className="text-lg font-extrabold">Illustrative payout times</h2>
+        <h2 id="back-times" className="scroll-mt-4 text-lg font-extrabold">Illustrative payout times</h2>
         <p className="label mt-1 max-w-3xl">
           Backer Life payouts depend on house profit. These examples assume $1M in initial funding, weekly rounds and
           house profit averaging 15% of trader losses. Results are medians from 200 simulations. They are illustrations, not forecasts:
@@ -146,9 +150,9 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
 
       <div className="grid gap-5 lg:grid-cols-2">
         <section className="panel p-5">
-          <h2 className="text-lg font-extrabold">Your Backer Lives</h2>
+          <h2 className="text-lg font-extrabold">Your Backer Life NFTs</h2>
           {mine.length === 0 ? (
-            <p className="label mt-2">You have no Backer Lives yet. Any you receive will appear here and under Life NFTs.</p>
+            <p className="label mt-2">You have no Backer Life NFTs yet. Any you receive will appear here and under Life NFTs.</p>
           ) : (
             <ul className="mt-3 flex flex-col gap-3">
               {mine.map((l) => {
@@ -173,8 +177,8 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
           )}
         </section>
         <section className="panel p-5">
-          <h2 className="text-lg font-extrabold">Backer Lives for sale</h2>
-          <p className="label mt-1">Browse Backer Lives offered for sale by other owners.</p>
+          <h2 className="text-lg font-extrabold">Backer Life NFTs for sale</h2>
+          <p className="label mt-1">Browse Backer Life NFTs offered for sale by other owners.</p>
           {listings.length === 0 ? (
             <p className="label mt-3">None listed right now.</p>
           ) : (
@@ -190,13 +194,13 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
       </div>
 
       <section className="panel p-5">
-        <h2 className="text-lg font-extrabold">What to consider</h2>
+        <h2 id="back-consider" className="scroll-mt-4 text-lg font-extrabold">What to consider</h2>
         <ul className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
           <li>
             <b>Permanent contribution.</b> <span className="text-[var(--muted)]">Backing can&apos;t be withdrawn: the USDC stays in the pool. Repayment depends on future profit; an early sale needs a buyer and may recover less than the contribution.</span>
           </li>
           <li>
-            <b>No repayment deadline.</b> <span className="text-[var(--muted)]">If traders win more than they lose, the house makes nothing and Backer Lives aren&apos;t paid.</span>
+            <b>No repayment deadline.</b> <span className="text-[var(--muted)]">If traders win more than they lose, the house makes nothing and Backer Life NFTs aren&apos;t paid.</span>
           </li>
           <li>
             <b>Capped.</b> <span className="text-[var(--muted)]">A Backer Life cannot pay more than its original limit, which is at most 2× its face value. Rewards from the separate $1UP lock have no fixed payout cap.</span>
@@ -204,7 +208,7 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
           <li>
             <b>If OneUp winds down.</b>{" "}
             <span className="text-[var(--muted)]">
-              The proposed shutdown process would pay Backer Lives and trader Lives from the pool before distributing any remainder to lock holders. This process is not implemented yet.
+              The proposed shutdown process would pay Backer Life NFTs and trader Life NFTs from the pool before distributing any remainder to lock holders. This process is not implemented yet.
             </span>
           </li>
           <li>

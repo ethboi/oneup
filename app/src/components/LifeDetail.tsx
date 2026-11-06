@@ -48,7 +48,7 @@ export function LifeDetail({ tokenId, onBack }: { tokenId: string; onBack: () =>
           amount={`${money(BigInt(life.paid))} / ${money(owed)}`}
         />
         <div className="min-w-0 self-stretch sm:self-auto sm:pb-2">
-          <h1 id="life-detail-title" ref={title} tabIndex={-1} className="page-title">{life.backer ? "Backer Life" : `Recovery Life · round ${life.epoch}`}</h1>
+          <h1 id="life-detail-title" ref={title} tabIndex={-1} className="page-title">{life.backer ? "Backer Life" : `Life NFT · round ${life.epoch}`}</h1>
           <p className="mt-1 break-all text-sm text-[var(--muted)]">Token ID: <span className="num">{life.token_id}</span> <OnExplorer nft={{ contract: d.contracts.life, id: life.token_id }} /></p>
         </div>
       </div>
@@ -84,7 +84,7 @@ export function LifeDetail({ tokenId, onBack }: { tokenId: string; onBack: () =>
           <h2 className="font-extrabold">Lifetime totals</h2>
           <HealthBar value={progress} label="USDC allocated toward the maximum payout" />
           <div className="grid grid-cols-2 gap-4"><Stat label="Total USDC allocated" value={money(economics.allocated)} /><Stat label="Total USDC withdrawn" value={money(economics.withdrawn)} /></div>
-          <p className="text-sm text-[var(--muted)]">These totals cover this Life across all owners, so they do not show your personal profit. A transaction history for individual Lives is not available.</p>
+          <p className="text-sm text-[var(--muted)]">These totals cover this Life across all owners, so they do not show your personal profit. A transaction history for individual Life NFTs is not available.</p>
         </div>
       </div>
     </section>

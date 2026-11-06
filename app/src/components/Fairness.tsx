@@ -1,6 +1,6 @@
 "use client";
 
-// "Fair to late players": USDC recovered within a year per $1 lost, by when the loss happened, from the
+// "Fair to late traders": USDC recovered within a year per $1 lost, by when the loss happened, from the
 // simulation (sim/). OneUp with expiring lives, OneUp as first specified, and Papertrade-style rules.
 
 import { useEffect, useState } from "react";
@@ -38,7 +38,7 @@ export function Fairness() {
   const [first, , , last] = r.quarters.oneup;
 
   return (
-    // a section of the House tab (Solvency.tsx); the footer's "Fair to late players" opens it here
+    // a section of the House tab (Solvency.tsx); the footer's "Fair to late traders" opens it here
     <div id="fairness" className="panel scroll-mt-4 p-5">
       <h2 className="text-lg font-extrabold">Recovery under one growth scenario</h2>
       <p className="label mt-1 mb-3">This simplified model illustrates possible outcomes. It does not predict returns or prove that recovery is equal.</p>
@@ -50,7 +50,7 @@ export function Fairness() {
       </p>
       <p className="label mt-1">
         In this model, Life NFTs can receive payouts for {r.params.lifeExpiryEpochs} rounds after their minting round.
-        Expired Lives receive no new allocations, but recovery can still differ between traders. Each set of rules uses the same trading activity across {r.params.seeds} randomly generated runs,
+        Expired Life NFTs receive no new allocations, but recovery can still differ between traders. Each set of rules uses the same trading activity across {r.params.seeds} randomly generated runs,
         and each loss is tracked for {r.params.window} weeks. Weekly losses are assumed to grow from ${r.params.start?.toLocaleString()} to ${r.params.peak?.toLocaleString()}, with a {r.params.edge * 100}% average house edge, {r.params.utilisation * 100}% pool usage and a ${r.params.seed?.toLocaleString()} initial pool backed by a 1× claim. The separate sensitivity report also tests less favorable scenarios using the deployment’s funding amounts. This model does not check whether each trade could actually be accepted, so simulated trading flows can exceed available cash.
       </p>
       <Chart r={r} />

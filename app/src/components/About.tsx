@@ -3,6 +3,7 @@
 // About: what OneUp is, how it works, what's built on NEAR and what's mocked, for judges and first-time
 // visitors. The app's entry for NEAR HACKATHON.
 
+import { JumpLinks } from "./ui";
 import { PixelCoin, PixelHeart, PixelMark } from "./Pixel";
 import type { MarkName } from "@/lib/marks";
 import { Icon, type IconName } from "./Icon";
@@ -56,7 +57,7 @@ const LINEAGE: { from: string; idea: string; rows: { topic: string; them: string
 const BUILT: { icon: IconName; title: string; body: string }[] = [
   { icon: "shield", title: "9 Rust contracts", body: "House, Life NFT (NEP-171), $1UP (NEP-141), locks, market (NEP-178 approvals), and mock USDC, oracle, swap and yield vault. Events follow NEP-297." },
   { icon: "check", title: "Tests for failures and recovery", body: "Tests cover contract logic, generated edge cases, SDK flows and integrations with fresh local contracts. Run pnpm verify to check the current version. Review findings and regression coverage are documented in docs/SECURITY.md." },
-  { icon: "demo", title: "Keeper and bots", body: "A keeper updates prices, fills orders, liquidates positions, executes take-profit and stop-loss orders, and closes rounds. Only the configured keeper, owner or operator can fill orders. Twelve trading bots exercise the app, and an MCP server lets AI agents trade too." },
+  { icon: "demo", title: "Keeper and bots", body: "A keeper updates prices, fills orders, liquidates positions, executes take-profit and stop-loss orders, and closes rounds. Only the configured keeper, owner or operator can fill orders. Trading bots exercise the app, and an MCP server lets AI agents trade too." },
   { icon: "scale", title: "Simulations", body: "Models explore how profit, growth and trading across one or several wallets affect recovery. They do not prove market demand, fair outcomes or resistance to abuse through multiple wallets." },
 ];
 
@@ -181,7 +182,7 @@ const NEAR: { title: string; status: Status; body: string; points: string[]; mar
     title: "AI agents (MCP)",
     marks: [{ name: "near", label: "NEAR" }],
     status: "demo",
-    body: "OneUp is built to be traded by AI agents as well as people. An MCP server gives an agent the trader’s tools: markets, quotes, open and close, exit orders, Life claims, and buying Life NFTs and locks on the market. Each action carries the agent’s reason, shown on the Agents tab.",
+    body: "OneUp is built to be traded by AI agents as well as people. An MCP server gives an agent the trader’s tools: markets, quotes, open and close, exit orders, Life claims, and buying Life NFTs and locks on the market. An action can carry the agent’s stated reason, shown on the Agents tab.",
     points: [
       "pnpm agent runs one autonomous Claude session over these tools; the bots leave its account (bot12) to it",
       "Configured in .mcp.json. On the local demo it signs with a bot account’s full-access key, without a separate spending limit",
@@ -218,8 +219,9 @@ export function About() {
         </div>
       </section>
 
+      <JumpLinks items={[["about-how", "How it works"], ["about-origin", "Influences"], ["about-why", "Why it's different"], ["about-built", "What's built"], ["built", "Built on NEAR"], ["about-demo", "What runs where"]]} />
       <div className="panel divide-y divide-[var(--line)]">
-        <section className="p-5">
+        <section id="about-how" className="scroll-mt-4 p-5">
           <h2 className="text-lg font-extrabold">How it works</h2>
           <ol className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {STEPS.map((s, i) => (
@@ -235,7 +237,7 @@ export function About() {
           </ol>
         </section>
 
-        <section className="p-5">
+        <section id="about-origin" className="scroll-mt-4 p-5">
           <h2 className="text-lg font-extrabold">Papertrade meets Aerodrome</h2>
           <p className="mt-2 max-w-3xl text-sm text-[var(--muted)]">
             OneUp draws on two ideas: Papertrade’s profit-sharing claims for traders who lose, and Aerodrome’s
@@ -265,7 +267,7 @@ export function About() {
           </div>
         </section>
 
-        <section className="p-5">
+        <section id="about-why" className="scroll-mt-4 p-5">
           <h2 className="text-lg font-extrabold">Why it&apos;s different</h2>
           <ul className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
             <li>
@@ -274,7 +276,7 @@ export function About() {
             </li>
             <li>
               <b className="block">A limited earning period</b>
-              <span className="text-[var(--muted)]">Lives stop earning when they expire, while allocated USDC remains available to claim. This limits how long older claims compete with newer ones. The scenarios show how recovery changes under different assumptions.</span>
+              <span className="text-[var(--muted)]">Life NFTs stop earning when they expire, while allocated USDC remains available to claim. This limits how long older claims compete with newer ones. The scenarios show how recovery changes under different assumptions.</span>
             </li>
             <li>
               <b className="block">Reward incentives</b>
@@ -283,7 +285,7 @@ export function About() {
           </ul>
         </section>
 
-        <section className="p-5">
+        <section id="about-built" className="scroll-mt-4 p-5">
           <h2 className="text-lg font-extrabold">What&apos;s built</h2>
           <ul className="mt-3 grid gap-4 sm:grid-cols-2">
             {BUILT.map((b) => (
@@ -331,11 +333,10 @@ export function About() {
           </ul>
         </section>
 
-        <section className="p-5">
-          <h2 className="text-lg font-extrabold">This demo</h2>
+        <section id="about-demo" className="scroll-mt-4 p-5">
+          <h2 className="text-lg font-extrabold">What runs where</h2>
           <p className="mt-2 max-w-3xl text-sm text-[var(--muted)]">
-            Everything runs on a local NEAR chain using test funds. Live-price mode sends Binance prices, with Coinbase as a
-            fallback, to a mock oracle. USDC, swaps and yield are also simulated locally. Outlayer and Rhea integrations remain unverified on real networks. New standard demos use live prices and 10-minute rounds; existing demos keep their configured round length. The separate judge demo uses controllable prices and 45-second rounds.
+            The hosted app runs on NEAR testnet with test money: trading, Life NFTs, claims, locks and the market. NEAR Intents, the DAO, one-tap trading and AI agents run only in the local demo. Prices come from Binance, with Coinbase as a fallback, through a mock oracle. USDC, swaps and yield are also mocks. Outlayer and Rhea integrations remain unverified on real networks. The judge demo uses controllable prices and 45-second rounds.
           </p>
         </section>
       </div>

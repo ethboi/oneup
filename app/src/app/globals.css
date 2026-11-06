@@ -25,7 +25,7 @@
   --field: #1a1c29;
   --panel-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 3px 0 var(--panel-lip), 0 16px 28px -18px rgb(0 0 0 / 0.8);
   --text: #eceef6;
-  --muted: #9ba0b9;
+  --muted: #b4b8ce;
   --accent: #ffc83d; /* coin */
   --jackpot: #ffc83d; /* coin gold dark enough for text */
   --heart: #ff4fa3;
@@ -1500,7 +1500,7 @@ kbd {
 
 
 /* the LCD's scenery (components/PriceChart.tsx): pixel landscape along the bottom and clouds up top, in the
-   screen's second shade and faint, drifting slowly left like a handheld game's background */
+   screen's second shade and faint, drifting slowly left */
 .lcd-scenery {
   position: absolute;
   overflow: hidden;
@@ -1515,9 +1515,9 @@ kbd {
   mask-repeat: repeat-x;
   -webkit-mask-repeat: repeat-x;
 }
-/* the screen's background, in the Super Mario style: three-bump clouds, big round hills with spots, faded
-   floating blocks and staircases, bushes, green pipes and the odd flagpole on a brick ground, each a fill and its
-   outline (public/scene/, on a 2px grid). The near layers run half an hour before they repeat, at their own paces. */
+/* the screen's background, OneUp's own: flat clouds, rolling hills, floating hearts, palms and
+   grass on plain ground, each a fill and its outline (public/scene/, on a 2px grid). The near layers run half an
+   hour before they repeat, at their own paces. */
 .lcd-cloud {
   top: 2px;
   height: 110px;
@@ -1546,60 +1546,46 @@ kbd {
   -webkit-mask-image: url("/scene/hill-line.svg");
   animation: lcd-drift-9600 3600s linear infinite;
 }
-.lcd-brick {
+.lcd-heart {
   bottom: 32px;
   height: 230px;
-  mask-image: url("/scene/brick.svg");
-  -webkit-mask-image: url("/scene/brick.svg");
+  mask-image: url("/scene/heart.svg");
+  -webkit-mask-image: url("/scene/heart.svg");
   animation: lcd-drift-12800 1920s linear infinite;
 }
-.lcd-brick-line {
+.lcd-heart-line {
   bottom: 32px;
   height: 230px;
-  mask-image: url("/scene/brick-line.svg");
-  -webkit-mask-image: url("/scene/brick-line.svg");
+  mask-image: url("/scene/heart-line.svg");
+  -webkit-mask-image: url("/scene/heart-line.svg");
   animation: lcd-drift-12800 1920s linear infinite;
 }
-.lcd-qblock {
-  bottom: 32px;
-  height: 230px;
-  mask-image: url("/scene/qblock.svg");
-  -webkit-mask-image: url("/scene/qblock.svg");
-  animation: lcd-drift-12800 1920s linear infinite;
-}
-.lcd-qblock-line {
-  bottom: 32px;
-  height: 230px;
-  mask-image: url("/scene/qblock-line.svg");
-  -webkit-mask-image: url("/scene/qblock-line.svg");
-  animation: lcd-drift-12800 1920s linear infinite;
-}
-.lcd-bush {
+.lcd-grass {
   bottom: 32px;
   height: 110px;
-  mask-image: url("/scene/bush.svg");
-  -webkit-mask-image: url("/scene/bush.svg");
+  mask-image: url("/scene/grass.svg");
+  -webkit-mask-image: url("/scene/grass.svg");
   animation: lcd-drift-12800 1920s linear infinite;
 }
-.lcd-bush-line {
+.lcd-grass-line {
   bottom: 32px;
   height: 110px;
-  mask-image: url("/scene/bush-line.svg");
-  -webkit-mask-image: url("/scene/bush-line.svg");
+  mask-image: url("/scene/grass-line.svg");
+  -webkit-mask-image: url("/scene/grass-line.svg");
   animation: lcd-drift-12800 1920s linear infinite;
 }
-.lcd-pipe {
+.lcd-palm {
   bottom: 32px;
   height: 110px;
-  mask-image: url("/scene/pipe.svg");
-  -webkit-mask-image: url("/scene/pipe.svg");
+  mask-image: url("/scene/palm.svg");
+  -webkit-mask-image: url("/scene/palm.svg");
   animation: lcd-drift-12800 1920s linear infinite;
 }
-.lcd-pipe-line {
+.lcd-palm-line {
   bottom: 32px;
   height: 110px;
-  mask-image: url("/scene/pipe-line.svg");
-  -webkit-mask-image: url("/scene/pipe-line.svg");
+  mask-image: url("/scene/palm-line.svg");
+  -webkit-mask-image: url("/scene/palm-line.svg");
   animation: lcd-drift-12800 1920s linear infinite;
 }
 .lcd-ground {
@@ -2472,10 +2458,10 @@ kbd {
   display: none;
 }
 
-/* ===== Game Boy Color =====
+/* ===== Colour screen =====
    The screen has colour: a backlit LCD with a sky behind the chart, green and red candles, a blue price line
    and coloured scenery. The shell comes in the GBC's colours. Classic (and the badge skins Arcade, Midnight
-   and Gold) keep the original Game Boy's mono screen by setting the colour tokens back to its shades. */
+   and Gold) keep a one-colour screen by setting the colour tokens back to its shades. */
 :root {
   --lcd: #eef3e4;
   --lcd-2: #c2cfe6;
@@ -2510,7 +2496,7 @@ kbd {
   --case-ink: var(--text);
   --case-muted: var(--muted);
 }
-/* the original Game Boy: one green, four shades */
+/* the one-colour screen: one green, four shades */
 :root[data-skin="classic"],
 :root[data-skin="arcade"],
 :root[data-skin="midnight"],
@@ -2620,16 +2606,16 @@ kbd {
 .lcd-scenery > .lcd-hill-line {
   background: var(--sc-hill-line);
 }
-.lcd-scenery > .lcd-bush {
+.lcd-scenery > .lcd-grass {
   background: var(--sc-bush);
 }
-.lcd-scenery > .lcd-bush-line {
+.lcd-scenery > .lcd-grass-line {
   background: var(--sc-bush-line);
 }
-.lcd-scenery > .lcd-pipe {
+.lcd-scenery > .lcd-palm {
   background: var(--sc-pipe);
 }
-.lcd-scenery > .lcd-pipe-line {
+.lcd-scenery > .lcd-palm-line {
   background: var(--sc-pipe-line);
 }
 .lcd-scenery > .lcd-ground {
@@ -2638,19 +2624,11 @@ kbd {
 .lcd-scenery > .lcd-ground-line {
   background: var(--sc-ground-line);
 }
-.lcd-scenery > .lcd-brick {
-  background: var(--sc-brick);
-  opacity: 0.7;
-}
-.lcd-scenery > .lcd-brick-line {
-  background: var(--sc-brick-line);
-  opacity: 0.7;
-}
-.lcd-scenery > .lcd-qblock {
+.lcd-scenery > .lcd-heart {
   background: var(--sc-qblock);
   opacity: 0.7;
 }
-.lcd-scenery > .lcd-qblock-line {
+.lcd-scenery > .lcd-heart-line {
   background: var(--sc-qblock-line);
   opacity: 0.7;
 }
@@ -3028,26 +3006,21 @@ kbd {
     mask-size: 4800px 75px;
     -webkit-mask-size: 4800px 75px;
   }
-  .lcd-brick,
-  .lcd-brick-line {
+  .lcd-candle,
+    .lcd-heart,
+  .lcd-heart-line {
     bottom: 16px; height: 115px;
     mask-size: 6400px 115px;
     -webkit-mask-size: 6400px 115px;
   }
-  .lcd-qblock,
-  .lcd-qblock-line {
-    bottom: 16px; height: 115px;
-    mask-size: 6400px 115px;
-    -webkit-mask-size: 6400px 115px;
-  }
-  .lcd-bush,
-  .lcd-bush-line {
+  .lcd-grass,
+  .lcd-grass-line {
     bottom: 16px; height: 55px;
     mask-size: 6400px 55px;
     -webkit-mask-size: 6400px 55px;
   }
-  .lcd-pipe,
-  .lcd-pipe-line {
+  .lcd-palm,
+  .lcd-palm-line {
     bottom: 16px; height: 55px;
     mask-size: 6400px 55px;
     -webkit-mask-size: 6400px 55px;
@@ -3136,4 +3109,83 @@ kbd {
   font: 12.5px/1.6 ui-monospace, monospace;
   color: var(--text);
   background: var(--panel-2);
+}
+
+/* phones: things you tap are big enough to hit, small print is big enough to read */
+@media (max-width: 640px) {
+  .label {
+    font-size: max(12.5px, 0.8rem);
+  }
+  .mkt-stats dt {
+    font-size: 12.5px;
+  }
+  .bar-opt {
+    min-width: 42px;
+    min-height: 40px;
+  }
+  .net-badge {
+    display: none;
+  }
+  footer a,
+  footer button {
+    display: inline-block;
+    padding-block: 7px;
+  }
+  footer {
+    padding-bottom: 72px;
+  }
+}
+.hdr-clock-label {
+  display: none;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--muted);
+}
+@media (max-width: 640px) {
+  .hdr-clock-label {
+    display: block;
+  }
+}
+/* the order button, kept in reach while it's scrolled out of view */
+.pinned-cta {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+  z-index: 30;
+}
+.pinned-cta .btn {
+  width: 100%;
+  box-shadow: 0 8px 18px rgb(0 0 0 / 0.45);
+}
+@media (min-width: 1024px) {
+  .pinned-cta {
+    display: none;
+  }
+}
+/* jump links at the top of a long page */
+.jump-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-block: 12px;
+}
+.jump-links button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--panel-edge);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+}
+/* tables that have to fit a phone */
+.rounds-table th {
+  vertical-align: bottom;
+  line-height: 1.2;
+}
+.rounds-table th + th,
+.rounds-table td + td {
+  padding-left: 12px;
 }

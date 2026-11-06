@@ -22,16 +22,16 @@ export function Onboarding() {
     const roomy = window.matchMedia("(min-width: 1024px)").matches;
     try { setExpanded(roomy && localStorage.getItem(KEY) !== "1"); } catch { setExpanded(roomy); }
   }, []);
-  const status = next.phase === "loading" ? "Checking your Lives…"
-    : next.phase === "claim" ? `$${fmtUsdc(next.claimable)} available to claim from ${next.count} ${next.count === 1 ? "Life" : "Lives"}`
-    : next.phase === "earning" ? `${next.count} ${next.count === 1 ? "Life can" : "Lives can"} still receive payouts. Future payouts may be zero.`
+  const status = next.phase === "loading" ? "Checking your Life NFTs…"
+    : next.phase === "claim" ? `$${fmtUsdc(next.claimable)} available to claim from ${next.count} ${next.count === 1 ? "Life" : "Life NFTs"}`
+    : next.phase === "earning" ? `${next.count} ${next.count === 1 ? "Life can" : "Life NFTs can"} still receive payouts. Future payouts may be zero.`
     : next.phase === "pending" ? `$${fmtUsdc(BigInt(pending!))} net loss this round. Eligibility for a Life NFT is confirmed when the round settles.`
-    : next.phase === "finished" ? "Your Lives have reached their payout limits or ended their earning periods. No USDC remains to claim."
+    : next.phase === "finished" ? "Your Life NFTs have reached their payout limits or ended their earning periods. No USDC remains to claim."
     : "You do not have a Life NFT or an unsettled net loss yet.";
-  const action = next.phase === "claim" ? "View USDC to claim" : next.phase === "earning" ? "View your latest Life" : next.phase === "pending" ? "View this round" : next.phase === "finished" ? "View your finished Lives" : "Explore Life NFTs";
+  const action = next.phase === "claim" ? "View USDC to claim" : next.phase === "earning" ? "View your latest Life" : next.phase === "pending" ? "View this round" : next.phase === "finished" ? "View your finished Life NFTs" : "Explore Life NFTs";
   const steps = [
     { icon: <Icon name="chart" size={20} />, title: "Trade", line: "OneUp takes 10–25% of winning trade profits. There are no entry or funding fees. Losses can be permanent.", href: "/about", action: "Read the rules" },
-    { icon: <PixelHeart size={20} />, title: "Receive a Life NFT", line: `An eligible net loss in a profitable round can earn you a Life NFT.${expiry === undefined ? " The contract sets its earning period." : ` It is eligible for payouts in the round it is created and up to ${expiry} more rounds.`}`, href: "/life-nfts", action: lives ? `Your Lives (${lives.length})` : "Find your Lives" },
+    { icon: <PixelHeart size={20} />, title: "Receive a Life NFT", line: `An eligible net loss in a profitable round can earn you a Life NFT.${expiry === undefined ? " The contract sets its earning period." : ` It is eligible for payouts in the round it is created and up to ${expiry} more rounds.`}`, href: "/life-nfts", action: lives ? `Your Life NFTs (${lives.length})` : "Find your Life NFTs" },
     { icon: <Icon name="claim" size={20} />, title: "Claim USDC", line: "USDC already allocated to your Life is available to claim. Its remaining payout limit is a maximum, not a forecast. Future payouts depend on house profit and may be zero.", href: next.phase === "claim" && next.tokenId ? lifeHref(next.tokenId) : "/life-nfts", action: next.claimable > 0n ? `$${fmtUsdc(next.claimable)} available to claim` : "Check available USDC" },
     { icon: <Icon name="store" size={20} />, title: "List your Life for sale", line: "Set your asking price. If someone buys your Life, its unclaimed USDC and remaining payout rights transfer to them. Listing it does not guarantee a sale.", href: next.tokenId ? lifeHref(next.tokenId) : "/market", action: next.tokenId ? "View your Life" : "Explore the market" },
   ];

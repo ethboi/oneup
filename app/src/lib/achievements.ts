@@ -6,7 +6,7 @@ import type { LifeInfo, LockInfo } from "@oneup/sdk";
 import type { HistoryItem } from "./server/activity";
 
 export type Rarity = "common" | "rare" | "epic" | "legendary";
-export type Group = "Trading" | "Streaks" | "Losses" | "Lives & locks";
+export type Group = "Trading" | "Streaks" | "Losses" | "Life NFTs & locks";
 
 export interface Achievement {
   id: string;
@@ -19,11 +19,11 @@ export interface Achievement {
   rarity: Rarity;
 }
 
-export const GROUPS: Group[] = ["Trading", "Streaks", "Losses", "Lives & locks"];
+export const GROUPS: Group[] = ["Trading", "Streaks", "Losses", "Life NFTs & locks"];
 
 export const ACHIEVEMENTS: Achievement[] = [
   // Trading
-  { id: "player1", name: "Player 1", how: "Close your first trade", detail: "Everyone starts somewhere. Win or lose, you're in the game.", group: "Trading", rarity: "common" },
+  { id: "player1", name: "First trade", how: "Close your first trade", detail: "Everyone starts somewhere. Win or lose, you're in.", group: "Trading", rarity: "common" },
   { id: "regular", name: "Regular", how: "Close 25 trades", detail: "The house knows your name by now.", group: "Trading", rarity: "rare" },
   { id: "centurion", name: "Centurion", how: "Close 100 trades", detail: "A hundred trades against the house. Few get this far.", group: "Trading", rarity: "epic" },
   { id: "globetrotter", name: "Globetrotter", how: "Trade every market", detail: "NEAR, BTC and ETH: you've had a go at all of them.", group: "Trading", rarity: "common" },
@@ -51,17 +51,17 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: "revengetrader", name: "Back to Market", how: "Opened a trade within two minutes of a loss", detail: "Opened another position soon after a loss. Review risk before placing a new trade.", group: "Losses", rarity: "common" },
   { id: "clutch", name: "Clutch", how: "Close in profit after nearly being liquidated", detail: "Inches from liquidation, and you still came out ahead.", group: "Losses", rarity: "epic" },
   // Lives & locks
-  { id: "oneup", name: "1UP", how: "Get your first Life NFT", detail: "You received your first Life NFT, with rights to eligible house-profit payouts. Unlocks the Berry skin.", group: "Lives & locks", rarity: "common" },
-  { id: "collector", name: "Collector", how: "Hold five Life NFTs at once", detail: "You hold five active Life NFTs. Their payouts depend on house profit.", group: "Lives & locks", rarity: "rare" },
-  { id: "payback", name: "Payback", how: "Claim USDC from a Life NFT", detail: "You claimed USDC allocated to a Life NFT.", group: "Lives & locks", rarity: "rare" },
-  { id: "fullheal", name: "Full Heal", how: "A Life NFT reaches its payout limit", detail: "A Life NFT received its maximum payout. Unlocks the Gold skin.", group: "Lives & locks", rarity: "legendary" },
-  { id: "diamond", name: "Diamond Hands", how: "Lock $1UP for 104 rounds", detail: "For the same amount of $1UP, a longer lock gives more reward weight.", group: "Lives & locks", rarity: "epic" },
-  { id: "trader", name: "Trader", how: "Buy or sell on the market", detail: "Life NFTs and locks are NFTs: you've traded one.", group: "Lives & locks", rarity: "common" },
-  { id: "exit", name: "Exit Liquidity", how: "Sell a Life NFT", detail: "Took the cash now instead of waiting for the house's profit.", group: "Lives & locks", rarity: "common" },
-  { id: "backer", name: "Backer", how: "Back the house", detail: "You contributed USDC to the pool and received a Backer Life.", group: "Lives & locks", rarity: "rare" },
+  { id: "oneup", name: "1UP", how: "Get your first Life NFT", detail: "You received your first Life NFT, with rights to eligible house-profit payouts. Unlocks the Berry skin.", group: "Life NFTs & locks", rarity: "common" },
+  { id: "collector", name: "Collector", how: "Hold five Life NFTs at once", detail: "You hold five active Life NFTs. Their payouts depend on house profit.", group: "Life NFTs & locks", rarity: "rare" },
+  { id: "payback", name: "Payback", how: "Claim USDC from a Life NFT", detail: "You claimed USDC allocated to a Life NFT.", group: "Life NFTs & locks", rarity: "rare" },
+  { id: "fullheal", name: "Full Heal", how: "A Life NFT reaches its payout limit", detail: "A Life NFT received its maximum payout. Unlocks the Gold skin.", group: "Life NFTs & locks", rarity: "legendary" },
+  { id: "diamond", name: "Diamond Hands", how: "Lock $1UP for 104 rounds", detail: "For the same amount of $1UP, a longer lock gives more reward weight.", group: "Life NFTs & locks", rarity: "epic" },
+  { id: "trader", name: "Trader", how: "Buy or sell on the market", detail: "Life NFTs and locks are NFTs: you've traded one.", group: "Life NFTs & locks", rarity: "common" },
+  { id: "exit", name: "Exit Liquidity", how: "Sell a Life NFT", detail: "Took the cash now instead of waiting for the house's profit.", group: "Life NFTs & locks", rarity: "common" },
+  { id: "backer", name: "Backer", how: "Back the house", detail: "You contributed USDC to the pool and received a Backer Life.", group: "Life NFTs & locks", rarity: "rare" },
 ];
 
-/** Console skins: Game Boy Color shells (unlocked by level) and the original mono screens (by badges). */
+/** Console skins: colour shells (unlocked by level) and one-colour screens (by badges). */
 export interface Skin {
   id: string;
   name: string;

@@ -160,7 +160,7 @@ function YourItems({ px, listings, epoch, expiryEpochs }: { px: bigint; listings
   const shownLives = all ? lives : lives.slice(0, 3);
   const shownLocks = all ? locks : locks.slice(0, Math.max(0, 3 - shownLives.length));
   if (total === 0) {
-    return <p className="label px-4 pb-4">You have no Lives or locks to list yet. Eligible net losses in profitable rounds can earn you Life NFTs and $1UP locks.</p>;
+    return <p className="label px-4 pb-4">You have no Life NFTs or locks to list yet. Eligible net losses in profitable rounds can earn you Life NFTs and $1UP locks.</p>;
   }
   return (
     <div className="divide-y divide-[var(--line)]">

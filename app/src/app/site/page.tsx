@@ -4,12 +4,12 @@ import { Logo, PixelCoin, PixelHeart, PixelLock } from "@/components/Pixel";
 import "./site.css";
 
 // oneup.markets: the website, written like the handheld's instruction booklet. The console is the hero, with the
-// demo video on its screen; then how to play, what a Life NFT is, and what NEAR does. src/proxy.ts serves it at
+// demo video on its screen; then how it works, what a Life NFT is, and what NEAR does. src/proxy.ts serves it at
 // `/` on the site's own hosts; anywhere else it is at /site.
 
 const TITLE = "OneUp: lose a trade, get a life";
 const DESCRIPTION =
-  "A perpetual futures game on NEAR. When the house ends a round in profit, traders with a net loss get a Life NFT: an NFT that collects a share of future house profit. NEAR testnet, test money.";
+  "A perpetual futures exchange on NEAR. When the house ends a round in profit, traders with a net loss get a Life NFT: an NFT that collects a share of future house profit. NEAR testnet, test money.";
 /** The site's own host, so its preview image links there rather than to the app. */
 const HOST = process.env.ONEUP_SITE_HOSTS?.split(",")[0]?.trim();
 
@@ -36,7 +36,7 @@ export default function Site() {
           <span className="display">OneUp</span>
         </a>
         <nav className="site-nav" aria-label="Sections">
-          <a href="#how">How to play</a>
+          <a href="#how">How it works</a>
           <a href="#life">Life NFTs</a>
           <a href="#near">NEAR</a>
         </nav>
@@ -53,9 +53,8 @@ export default function Site() {
               <span>Get a life.</span>
             </h1>
             <p className="site-lede">
-              OneUp is a perpetual futures game on NEAR. When the house ends a round in profit, every trader with a net
-              loss gets a Life NFT: an NFT that collects a share of the house’s profit for the next 13 rounds. Claim what
-              it collects, keep it earning or sell it.
+              Perps on NEAR. Lose in a round the house wins, and you can get a Life NFT that collects USDC from its future
+              profit.
             </p>
             <div className="site-ctas">
               <a className="btn btn-accent btn-big" href={APP}>
@@ -65,7 +64,7 @@ export default function Site() {
                 Watch the demo
               </a>
             </div>
-            <p className="label">On NEAR testnet with test money. Connect a testnet wallet, or look around without one.</p>
+            <p className="label">NEAR testnet, test money. No wallet needed to look around.</p>
           </div>
 
           <figure id="demo" className="site-console case">
@@ -105,34 +104,51 @@ export default function Site() {
         </section>
 
         <section id="how" className="site-section">
-          <h2 className="display site-h2">How to play</h2>
+          <h2 className="display site-h2">How it works</h2>
           <ol className="site-steps">
             <li className="panel site-step">
-              <div className="site-step-art" aria-hidden>
-                <span className="site-key long">LONG</span>
-                <span className="site-key short">SHORT</span>
+              <div className="site-step-art site-art-sky" aria-hidden>
+                <svg className="site-art-line" viewBox="0 0 320 170" preserveAspectRatio="none">
+                  <polyline points="0,130 40,118 70,126 110,92 150,104 190,70 230,80 270,44 320,30" />
+                </svg>
+                <span className="site-art-tag display">NEAR 50×</span>
+                <div className="site-art-keys">
+                  <span className="site-key long">LONG</span>
+                  <span className="site-key short">SHORT</span>
+                </div>
               </div>
               <h3 className="display">Pick a side</h3>
               <p>Go long or short on BTC, ETH or NEAR, up to 1000×. There are no entry or funding fees; winning trades pay 10–25% of their profit.</p>
             </li>
             <li className="panel site-step">
-              <div className="site-step-art" aria-hidden>
+              <div className="site-step-art site-art-loss" aria-hidden>
+                <svg className="site-art-line" viewBox="0 0 320 170" preserveAspectRatio="none">
+                  <polyline points="0,24 60,30 110,26 150,48 190,44 225,92 255,118 285,150 320,168" />
+                </svg>
+                <span className="site-art-amount num">−$500.00</span>
                 <span className="site-liquidated display">LIQUIDATED</span>
               </div>
               <h3 className="display">Lose it</h3>
               <p>Get liquidated, or close at a loss. On most venues that’s the end of it: your loss is the house’s profit.</p>
             </li>
             <li className="panel site-step">
-              <div className="site-step-art site-step-card" aria-hidden>
-                <LifeCard id="127" paid={0n} owed={300n} state="earning" tone="long" tag="LONG" detail="NEAR 50×" amount="$0 / $300" />
+              <div className="site-step-art site-step-card site-art-life" aria-hidden>
+                <LifeCard id="127" paid={110n} owed={300n} state="earning" tone="long" tag="LONG" detail="NEAR 50×" amount="$110 / $300" />
               </div>
               <h3 className="display">Get a Life NFT</h3>
               <p>If the house ends the round in profit, each wallet with a net loss gets a Life NFT, and $1UP locked for 104 rounds.</p>
             </li>
             <li className="panel site-step">
-              <div className="site-step-art" aria-hidden>
-                <PixelCoin size={44} />
-                <PixelHeart size={44} />
+              <div className="site-step-art site-art-gold" aria-hidden>
+                <span className="site-art-choice">
+                  <PixelCoin size={64} />
+                  <b className="display">CLAIM</b>
+                </span>
+                <span className="site-art-or display">or</span>
+                <span className="site-art-choice">
+                  <PixelHeart size={64} />
+                  <b className="display">SELL</b>
+                </span>
               </div>
               <h3 className="display">Claim it or sell it</h3>
               <p>Claim the USDC it collects, or list it on the market. Whoever holds it gets the payouts still to come.</p>
@@ -239,7 +255,7 @@ export default function Site() {
             />
           </figure>
           <p className="display site-end-line">Lost again? Get a life.</p>
-          <h2 className="display site-h2">Press start</h2>
+          <h2 className="display site-h2">Try it</h2>
           <a className="btn btn-accent btn-big" href={APP}>
             Open the app
           </a>

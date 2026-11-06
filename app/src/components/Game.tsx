@@ -1,6 +1,6 @@
 "use client";
 
-// The trading screen's progress layer, on a Game Boy Color, in trading terms: a strip on the bezel (your trader
+// The trading screen's progress layer, in trading terms: a strip on the bezel (your trader
 // tier and points, your win streak, and the house's P&L this round), banners on the screen for a tier-up, a win
 // streak, a take-profit or stop-loss set and a big move, profit popping off your position as it gains, and daily
 // goals. It rewards trading and planned exits, never risk: see lib/xp.ts.
@@ -44,7 +44,7 @@ export function GameHud({ score }: { score?: React.ReactNode }) {
     }
   }, [combo, me]);
   return (
-    <div className="game-hud num" aria-label="Game">
+    <div className="game-hud num" aria-label="Trader progress">
       <LevelBar lv={lv} />
       {score}
       {combo >= 2 && (

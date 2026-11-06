@@ -47,11 +47,11 @@ export function Explainer({ title, line, children }: { title?: string; line: Rea
 export function Stat({ label, value, tone, sub }: { label: string; value: React.ReactNode; tone?: "good" | "bad"; sub?: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <div className="label truncate">{label}</div>
+      <div className="label">{label}</div>
       <div className="num truncate text-xl font-extrabold" style={tone ? { color: tone === "good" ? "var(--long)" : "var(--short)" } : undefined}>
         {value}
       </div>
-      {sub && <div className="label num truncate">{sub}</div>}
+      {sub && <div className="label num">{sub}</div>}
     </div>
   );
 }
@@ -107,5 +107,18 @@ export function AgentBadge({ account, bots = true }: { account?: string; bots?: 
     <span className={`agent-badge ${a.kind}`} title={a.kind === "ai" ? "An AI agent, trading through OneUp's MCP server" : `A rule-based bot: the ${a.name} strategy`}>
       {a.kind === "ai" ? "AI" : "BOT"}
     </span>
+  );
+}
+
+/** Buttons at the top of a long page that jump to its sections. */
+export function JumpLinks({ items }: { items: [id: string, label: string][] }) {
+  return (
+    <nav className="jump-links" aria-label="On this page">
+      {items.map(([id, label]) => (
+        <button key={id} type="button" onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })}>
+          {label}
+        </button>
+      ))}
+    </nav>
   );
 }

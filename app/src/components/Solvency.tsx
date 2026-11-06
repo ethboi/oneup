@@ -9,7 +9,7 @@ import { fmtUsd } from "./Header";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { Icon } from "./Icon";
 import { Governance } from "./Governance";
-import { PageTitle } from "./ui";
+import { JumpLinks, PageTitle } from "./ui";
 import { PoolAtWork } from "./PoolAtWork";
 
 const big = (x?: string) => (x === undefined ? 0n : BigInt(x));
@@ -39,6 +39,7 @@ export function Solvency() {
         <PageTitle>The house</PageTitle>
         <p className="label mt-1.5">View the house’s on-chain reserves and explore modeled recovery scenarios. Reserves do not remove oracle, custody or contract risks.</p>
       </div>
+      <JumpLinks items={[["house-markets", "Capacity"], ["house-rounds", "Rounds"], ["house-pool", "The pool"]]} />
       <div className="panel p-5">
         <p className="text-lg">
           Accepted trades reserve up to{" "}
@@ -98,7 +99,7 @@ export function Solvency() {
         </div>
 
         <div className="-mx-5 mt-5 flex flex-wrap items-baseline justify-between gap-2 border-t border-[var(--line)] px-5 pt-5">
-          <h2 className="text-lg font-extrabold">Maximum profit payouts and capacity by market</h2>
+          <h2 id="house-markets" className="scroll-mt-4 text-lg font-extrabold">Maximum profit payouts and capacity by market</h2>
           <div className="flex gap-4 text-sm">
             <Legend color="var(--series-long)" label="Longs" />
             <Legend color="var(--series-short)" label="Shorts" />
@@ -144,12 +145,12 @@ export function Solvency() {
         </div>
 
         <div className="-mx-5 mt-5 overflow-x-auto border-t border-[var(--line)] px-5 pt-5">
-          <h2 className="text-lg font-extrabold">Rounds</h2>
+          <h2 id="house-rounds" className="scroll-mt-4 text-lg font-extrabold">Rounds</h2>
           {(history ?? []).length === 0 ? (
             <p className="label mt-2">No closed rounds yet.</p>
           ) : (
             // phones: the round, what traders lost, the house's result, what lives got and the pool; the rest from 640px
-            <table className="num mt-3 w-full text-sm">
+            <table className="rounds-table num mt-3 w-full text-sm">
               <thead>
                 <tr className="label text-left">
                   <th className="pb-2 font-normal">Round</th>
@@ -157,9 +158,9 @@ export function Solvency() {
                   <th className="hidden pb-2 text-right font-normal sm:table-cell">Winner payouts</th>
                   <th className="hidden pb-2 text-right font-normal md:table-cell">Market fees</th>
                   <th className="pb-2 text-right font-normal">House profit/loss</th>
-                  <th className="hidden pb-2 text-right font-normal md:table-cell">Lives issued</th>
+                  <th className="hidden pb-2 text-right font-normal md:table-cell">Life NFTs issued</th>
                   <th className="hidden pb-2 text-right font-normal lg:table-cell">Payout multiplier</th>
-                  <th className="pb-2 text-right font-normal">Allocated to Lives</th>
+                  <th className="pb-2 text-right font-normal">Allocated to Life NFTs</th>
                   <th className="hidden pb-2 text-right font-normal sm:table-cell">Buyback</th>
                   <th className="hidden pb-2 text-right font-normal sm:table-cell">Closing pool</th>
                 </tr>

@@ -1,7 +1,7 @@
 "use client";
 
 // The Agents tab: OneUp as a venue AI agents trade on. The AI agent's record and its journal (every action it
-// took through the MCP server, with the reason it gave), how to connect your own, and the twelve rule-based bots
+// took through the MCP server, with the reason it gave), how to connect your own, and the rule-based bots
 // beside it with their strategies and results.
 
 import { useEffect, useState } from "react";
@@ -114,7 +114,7 @@ export function Agents() {
       >
         The MCP server (mcp/) gives any MCP client, such as Claude, the same tools a trader has: markets, quotes, open and close,
         take-profit and stop-loss, Life NFTs and claims, and the market for lives and locks. Each action it takes goes into the journal below
-        with the agent&apos;s own reason, so you can see what it did and why. Beside it, twelve rule-based bots trade around the clock, one
+        with any reason the agent gives, so you can see what it did and why. Beside it, rule-based bots trade around the clock, one
         strategy each, so the house always has flow. On this local demo the agent signs with a development key; a mainnet agent would hold a
         constrained session key instead.
       </Explainer>
@@ -190,7 +190,7 @@ pnpm agent`}
         <p className="label mt-2">Tools: how_it_works, markets, account, quote_trade, open_trade, close_trade, set_triggers, extra_lives, claim_lives, market_listings, buy_listing, house, faucet.</p>
       </section>
 
-      <BotTable accounts={d.bots.map((b) => b.id)} rows={rows} ai={ai} note="Twelve rule-based strategies trading around the clock, so the house always has flow." />
+      <BotTable accounts={d.bots.map((b) => b.id)} rows={rows} ai={ai} note="Rule-based strategies trading around the clock, so the house always has flow." />
     </div>
   );
 }

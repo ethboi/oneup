@@ -75,11 +75,11 @@ export function Backing() {
               </button>
             </>
           ) : (
-            <p className="text-sm font-bold">The initial funding round is closed. You can check the Market for Backer Lives offered for sale.</p>
+            <p className="text-sm font-bold">The initial funding round is closed. You can check the Market for Backer Life NFTs offered for sale.</p>
           )}
           {mine.length > 0 && (
             <p className="label num">
-              Your {mine.length === 1 ? "Backer Life has" : `${mine.length} Backer Lives have`} received ${fmtUsdc(paidMine)} toward a total payout limit of $
+              Your {mine.length === 1 ? "Backer Life has" : `${mine.length} Backer Life NFTs have`} received ${fmtUsdc(paidMine)} toward a total payout limit of $
               {fmtUsdc(owedMine, 0)}.
             </p>
           )}

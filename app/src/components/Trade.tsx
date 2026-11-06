@@ -1,5 +1,6 @@
 "use client";
 
+import { createPortal } from "react-dom";
 import { parseTokenAmount } from "@oneup/sdk";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -1124,15 +1125,7 @@ function OrderForm({ t }: { t: Ticket }) {
         )
       )}
 
-      <button
-        className="btn btn-big"
-        style={{ "--btn-bg": side === "Long" ? "var(--long-fill)" : "var(--short-fill)", color: "var(--on-fill)" } as React.CSSProperties}
-        disabled={blocked}
-        onClick={t.submit}
-      >
-        {!blocked && <Icon name={side === "Long" ? "up" : "down"} size={20} />}
-        {t.label}
-      </button>
+      <OrderButton side={side} blocked={blocked} label={t.label} submit={t.submit} />
       {t.intentStep && (
         <span className="label flex items-center gap-2" role="status">
           <Icon name="spinner" /> {t.intentStep}
@@ -1194,7 +1187,7 @@ function OrderForm({ t }: { t: Ticket }) {
               If the house makes a profit this round, eligible net losses may earn a Life NFT with a payout limit of up to ${fmtUsdc(lifeUpTo, 0)}, plus up to{" "}
               {oneupUpTo.toLocaleString("en-US")} $1UP locked for 104 rounds. The round&apos;s profit determines how much is issued.
               Net losses also earn one jackpot ticket per $1 lost, whether or not the house makes a profit.
-              Life payouts depend on future house profits and may be zero. Trader Lives can earn payouts in their first round and the next 13 rounds.
+              Life payouts depend on future house profits and may be zero. Trader Life NFTs can earn payouts in their first round and the next 13 rounds.
             </p>
           )}
         </div>
@@ -1800,5 +1793,40 @@ function LossBanner() {
         <Icon name="x" />
       </button>
     </div>
+  );
+}
+
+/** The order button, with a copy pinned above the phone tab bar while the real one is scrolled out of view. */
+function OrderButton({ side, blocked, label, submit }: { side: Side; blocked: boolean; label: string; submit: () => void }) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const [inView, setInView] = useState(true);
+  useEffect(() => {
+    if (!ref.current || typeof IntersectionObserver === "undefined") return;
+    const seen = new IntersectionObserver(([e]) => setInView(e.isIntersecting), { rootMargin: "0px 0px -68px 0px" });
+    seen.observe(ref.current);
+    return () => seen.disconnect();
+  }, []);
+  const style = { "--btn-bg": side === "Long" ? "var(--long-fill)" : "var(--short-fill)", color: "var(--on-fill)" } as React.CSSProperties;
+  const inner = (
+    <>
+      {!blocked && <Icon name={side === "Long" ? "up" : "down"} size={20} />}
+      {label}
+    </>
+  );
+  return (
+    <>
+      <button ref={ref} className="btn btn-big" style={style} disabled={blocked} onClick={submit}>
+        {inner}
+      </button>
+      {!inView &&
+        createPortal(
+          <div className="pinned-cta">
+            <button className="btn btn-big" style={style} disabled={blocked} onClick={submit}>
+              {inner}
+            </button>
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }

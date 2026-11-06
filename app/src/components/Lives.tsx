@@ -58,8 +58,8 @@ export function Lives() {
 
   return (
     <div ref={list} tabIndex={-1} className="flex flex-col gap-5">
-      <Explainer title="Life NFTs" line="View your recovery NFTs, claim USDC or list a Life for sale.">
-        An eligible net loss in a profitable round can earn you a Life NFT. Its face value is based on your share of that round&apos;s house profit. Each round, half the surplus above the reserve forms the payout budget; 60% of that budget is shared among eligible Lives. Payouts depend on available profit and each Life&apos;s remaining limit, and may be zero.
+      <Explainer title="Life NFTs" line="View your Life NFTs, claim USDC or list a Life for sale.">
+        An eligible net loss in a profitable round can earn you a Life NFT. Its face value is based on your share of that round&apos;s house profit. Each round, half the surplus above the reserve forms the payout budget; 60% of that budget is shared among eligible Life NFTs. Payouts depend on available profit and each Life&apos;s remaining limit, and may be zero.
         {expiry === undefined ? " The contract sets each Life's earning period." : ` A recovery Life is eligible for payouts in the round it is created and up to ${expiry} more rounds. It keeps any unclaimed USDC after that.`}{" "}
         If someone buys your Life, its unclaimed USDC and remaining payout rights transfer to them. The payout limit is not a sale price.
       </Explainer>
@@ -67,23 +67,23 @@ export function Lives() {
       <div className="panel divide-y divide-[var(--line)]">
         <SummaryBar action={
           <div className="flex flex-col gap-1">
-            <button className="btn btn-accent w-full sm:w-auto" disabled={batch.amount === 0n} onClick={() => run(`Claim $${fmtUsdc(batch.amount)} from ${batch.tokenIds.length} ${batch.tokenIds.length === 1 ? "Life" : "Lives"}`, () => tx.claimLives(batch.tokenIds))}>
-              <Icon name="claim" />{batch.amount > 0n ? `Claim $${fmtUsdc(batch.amount)}${batch.remainingCount > 0 ? " from 30 Lives" : ""}` : "Nothing to claim yet"}
+            <button className="btn btn-accent w-full sm:w-auto" disabled={batch.amount === 0n} onClick={() => run(`Claim $${fmtUsdc(batch.amount)} from ${batch.tokenIds.length} ${batch.tokenIds.length === 1 ? "Life" : "Life NFTs"}`, () => tx.claimLives(batch.tokenIds))}>
+              <Icon name="claim" />{batch.amount > 0n ? `Claim $${fmtUsdc(batch.amount)}${batch.remainingCount > 0 ? " from 30 Life NFTs" : ""}` : "Nothing to claim yet"}
             </button>
-            {batch.remainingCount > 0 && <span className="label">{batch.remainingCount} more {batch.remainingCount === 1 ? "Life has" : "Lives have"} USDC to claim after this batch</span>}
+            {batch.remainingCount > 0 && <span className="label">{batch.remainingCount} more {batch.remainingCount === 1 ? "Life has" : "Life NFTs have"} USDC to claim after this batch</span>}
           </div>
         }>
           <Stat label="Available to claim" value={lives ? money(claimable) : "…"} tone={claimable > 0n ? "good" : undefined} />
           <Stat label="Remaining payout limit" value={lives ? money(conditionalCap) : "…"} sub="Maximum additional USDC. Future payouts may be zero." />
-          <Stat label="Lifetime USDC allocated" value={lives ? money(allocated) : "…"} sub="Across these Lives, including previous owners" />
-          <Stat label="Allocated last round · all Lives" value={last ? money(BigInt(last.lives_pot)) : "–"} />
+          <Stat label="Lifetime USDC allocated" value={lives ? money(allocated) : "…"} sub="Across these Life NFTs, including previous owners" />
+          <Stat label="Allocated last round · all Life NFTs" value={last ? money(BigInt(last.lives_pot)) : "–"} />
         </SummaryBar>
         <NextLife epochId={epoch?.id} left={epoch ? epoch.started_at + d.epochLengthS : 0} />
         {lives === undefined ? <Empty icon="heart">Loading your Life NFTs…</Empty> : <>
-          {ready.length > 0 && <div className="divide-y divide-[var(--line)]"><PanelHead title={`Ready to claim (${ready.length})`} /><p className="px-4 pb-2 text-sm text-[var(--muted)]">Includes Lives whose earning period has ended. Open a Life to claim its USDC or manage its listing.</p>{rows(ready)}</div>}
+          {ready.length > 0 && <div className="divide-y divide-[var(--line)]"><PanelHead title={`Ready to claim (${ready.length})`} /><p className="px-4 pb-2 text-sm text-[var(--muted)]">Includes Life NFTs whose earning period has ended. Open a Life to claim its USDC or manage its listing.</p>{rows(ready)}</div>}
           <div className="divide-y divide-[var(--line)]">
             <PanelHead title={`Awaiting future payouts (${earning.length})`} />
-            {earning.length === 0 ? <Empty icon="heart">{ready.length ? "None of your other Lives can receive further payouts." : "No Lives are awaiting payouts. An eligible net loss in a profitable round can earn you a Life when the round settles."}</Empty> : rows(earning)}
+            {earning.length === 0 ? <Empty icon="heart">{ready.length ? "None of your other Life NFTs can receive further payouts." : "No Life NFTs are awaiting payouts. An eligible net loss in a profitable round can earn you a Life when the round settles."}</Empty> : rows(earning)}
           </div>
           {finished.length > 0 && <div className="divide-y divide-[var(--line)]"><PanelHead title={`Finished · no USDC to claim (${finished.length})`} action={<button className="chip" onClick={() => setShowDone(!showDone)} aria-expanded={showDone}>{showDone ? "Hide" : "Show"}</button>} />{showDone && rows(finished)}</div>}
         </>}
@@ -111,7 +111,7 @@ function LifeTile({ l, expiry, currentEpoch, listings, open }: { l: LifeInfo; ex
   const { d } = useOneUp();
   const economics = lifeEconomics(l, currentEpoch, expiry);
   const listing = listings.find(x => x.nft_contract === d.contracts.life && x.token_id === l.token_id);
-  const title = l.backer ? `Backer Life #${l.token_id}` : `Recovery Life · round ${l.epoch}`;
+  const title = l.backer ? `Backer Life #${l.token_id}` : `Life NFT · round ${l.epoch}`;
   // the card leans toward the pointer while it's over it
   const tilt = (event: React.PointerEvent<HTMLAnchorElement>) => {
     if (event.pointerType !== "mouse" || matchMedia("(prefers-reduced-motion: reduce)").matches) return;

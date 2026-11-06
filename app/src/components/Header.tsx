@@ -93,7 +93,10 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
           <span className="bar-cell" title={`Round ${epoch?.id ?? ""} ends in ${fmtClock(left)}. Eligible losses may earn Life NFTs and $1UP locks if the house makes a profit.`}>
             {/* the label goes on narrow desktops too, where the tabs need the room */}
             <span className="label hidden sm:inline lg:hidden 2xl:inline">Round {epoch?.id ?? "…"}</span>
-            <b>{fmtClock(left)}</b>
+            <span className="flex flex-col items-center">
+              <span className="hdr-clock-label">Round</span>
+              <b>{fmtClock(left)}</b>
+            </span>
           </span>
           {round && (
             <span
@@ -130,7 +133,7 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
 
 /**
  * Which network this is, the one place the header says so: a status light and its name, the same height as the tools
- * beside it. Amber is test money; green would be mainnet. Phones keep the light, and the banner above names the network.
+ * beside it. Amber is test money; green would be mainnet. On phones the banner above names the network instead.
  */
 function NetworkBadge({ network }: { network: string }) {
   const name = network.charAt(0).toUpperCase() + network.slice(1);
@@ -138,7 +141,7 @@ function NetworkBadge({ network }: { network: string }) {
   return (
     <a href="/wallet-setup" className="net-badge bar-pill" data-network={network} title={about} aria-label={about}>
       <span className="net-led" aria-hidden />
-      <span className="hidden sm:inline">{name}</span>
+      <span>{name}</span>
     </a>
   );
 }

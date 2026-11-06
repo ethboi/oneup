@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "OneUp",
     short_name: "OneUp",
-    description: "A perps game on NEAR where a losing trade can earn a Life NFT. NEAR testnet, test money.",
+    description: "Perps on NEAR where a losing trade can earn a Life NFT. NEAR testnet, test money.",
     start_url: "/",
     display: "standalone",
     background_color: "#15162a",

@@ -88,7 +88,7 @@ export function PoolAtWork({ pool, liability }: { pool: bigint; liability: bigin
   return (
     <div className="panel p-5" id="pool-at-work">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <h2 className="text-lg font-extrabold">The pool at work</h2>
+        <h2 id="house-pool" className="scroll-mt-4 text-lg font-extrabold">The pool at work</h2>
         <span className="flex items-center gap-2 rounded-lg border border-[var(--line)] px-2 py-1 text-xs font-bold">
           <PixelMark name="intents" label="NEAR Intents" size={20} />
           Simulated yield · local mock vault

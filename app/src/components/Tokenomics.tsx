@@ -112,7 +112,7 @@ export function Tokenomics() {
         <h2 className="text-lg font-extrabold">Proposed shutdown process</h2>
         <ol className="mt-2 flex list-decimal flex-col gap-1 pl-5 text-sm">
           <li>Positions would close at the oracle price, and traders could withdraw their remaining balances.</li>
-          <li>The pool would pay Life NFTs and Backer Lives in proportion to their remaining payout limits.</li>
+          <li>The pool would pay Life NFTs and Backer Life NFTs in proportion to their remaining payout limits.</li>
           <li>
             Any funds left would go to $1UP lock holders in proportion to their lock weight.
           </li>

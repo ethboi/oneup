@@ -44,7 +44,7 @@ const PHONE_TABS: Tab[] = ["Trade", "Life NFTs", "Locks", "Market"];
 const MORE_TABS: Tab[] = ["Leaders", "Backing", "$1UP", "House", "About"];
 /** Below 1280px these join them, so the bar fits beside the round strip. */
 const NARROW_MORE_TABS: Tab[] = [];
-const PHONE_LABEL: Partial<Record<Tab, string>> = { "Life NFTs": "Lives" };
+const PHONE_LABEL: Partial<Record<Tab, string>> = {};
 
 /** Each tab's address: /locks, /life-nfts, /house… (Trade is the root). */
 const slug = (t: Tab) => (t === "Trade" ? "" : t.toLowerCase().replace(/\$/g, "").replace(/\s+/g, "-"));
@@ -105,11 +105,11 @@ export default function Home() {
         <div className="mx-auto flex max-w-[1280px] items-center justify-center gap-x-2 px-4 py-1.5 text-center text-[12.5px] font-bold">
           <span>
             <span className="hidden sm:inline">In development for </span>
-            <span className="font-extrabold">NEAR HACKATHON</span>
+            <span className="hidden font-extrabold sm:inline">NEAR HACKATHON</span>
             <span className="hidden sm:inline">, November 2026</span>
             <NetworkLabel />
           </span>
-          <button type="button" className="underline decoration-dotted underline-offset-2 opacity-80 hover:opacity-100" onClick={() => go("About")}>
+          <button type="button" className="-my-1.5 hidden py-2 underline decoration-dotted underline-offset-2 opacity-90 hover:opacity-100 sm:inline" onClick={() => go("About")}>
             About
           </button>
         </div>
@@ -181,7 +181,10 @@ function NetworkLabel() {
   const { d } = useOneUp();
   return (
     <>
-      <span className="sm:hidden"> · {d.network === "testnet" ? "testnet" : "local demo"}, test money</span>
+      {/* phones: just what you need to know, and the way to the wallet help */}
+      <a className="inline-block py-1 sm:hidden" href="/wallet-setup">
+        {d.network === "testnet" ? "NEAR testnet" : "Local demo"} · test money
+      </a>
       {/* wider screens: the header's badge names a public network */}
       <span className="hidden sm:inline">{d.network === "testnet" ? "" : " · local NEAR demo"} · test money only</span>
     </>
@@ -191,8 +194,8 @@ function NetworkLabel() {
 function Footer({ go }: { go: (t: Tab, at?: string) => void }) {
   const { d } = useOneUp();
   const link = "font-semibold text-[var(--muted)] underline-offset-2 transition-colors hover:text-[var(--text)] hover:underline";
-  return (
-    <footer className="mt-10 border-t border-[var(--line)] pt-6 text-sm">
+  const body = (
+    <>
       <div className="grid gap-6 sm:grid-cols-[1.4fr_1fr_1fr]">
         <div className="flex items-start gap-3">
           <Logo size={30} />
@@ -268,6 +271,15 @@ function Footer({ go }: { go: (t: Tab, at?: string) => void }) {
           </a>
         </p>
       </div>
+    </>
+  );
+  return (
+    <footer className="mt-10 border-t border-[var(--line)] pt-6 text-sm">
+      <div className="hidden sm:block">{body}</div>
+      <details className="sm:hidden">
+        <summary className="label cursor-pointer py-2">{d.network === "testnet" ? "A NEAR testnet prototype" : "A local NEAR demo"} using test money. Not audited. More</summary>
+        <div className="mt-3">{body}</div>
+      </details>
     </footer>
   );
 }

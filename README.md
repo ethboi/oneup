@@ -36,7 +36,7 @@ its unclaimed USDC and its future payouts. Recovery depends on future house prof
 - **Function-call keys and NEP-366.** One-tap trading uses a session key that can only call the house's
   trading methods, and a relayer pays the gas.
 - **AI agents.** An MCP server gives an agent the trader's tools, including buying Lives on the market; every
-  action is journalled with the agent's stated reason and shown on the app's Agents tab.
+  action is journalled, with the agent's stated reason when it gives one, and shown on the app's Agents tab.
 
 The NFTs, USDC claims, locks and market run on testnet; Intents, the DAO, one-tap trading and agents run in the
 local demo.

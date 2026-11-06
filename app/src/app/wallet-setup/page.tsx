@@ -1,25 +1,23 @@
 export default function WalletSetup() {
   return <main className="mx-auto flex max-w-3xl flex-col gap-6 px-5 py-12">
-    <a className="font-bold underline" href="/">← Back to OneUp</a>
-    <p className="label">OneUp · testnet setup</p>
+    <a className="py-2 font-bold underline" href="/">← Back to OneUp</a>
     <h1 className="page-title">Use your own NEAR wallet</h1>
-    <p>The local demo uses built-in test accounts. To connect your own wallet, run OneUp with a deployed NEAR testnet configuration.</p>
+    <p>OneUp runs on NEAR testnet with test money. You need a testnet wallet and a little test NEAR for gas.</p>
     <div className="panel space-y-4 p-5">
-      <h2 className="text-xl font-bold">For testers</h2>
       <ol className="list-decimal space-y-3 pl-5">
-        <li>Select the testnet network and create or import your test account in <a className="underline" href="https://wallet.meteorwallet.app" target="_blank" rel="noreferrer">Meteor Wallet</a>. Obtain test NEAR for gas.</li>
-        <li>Open the configured testnet app and choose <b>Connect NEAR testnet wallet</b>. Choose Meteor or another compatible testnet wallet from the picker. Allow the wallet’s connection window.</li>
-        <li>Open <b>Account and funds</b>, register the test tokens and use <b>Get 1,000 test USDC</b> if the deployment enables its test faucet.</li>
-        <li>Deposit test USDC, trade, inspect a Life and try the marketplace. Each transaction asks for wallet approval.</li>
+        <li>Create or import a test account in <a className="underline" href="https://wallet.meteorwallet.app" target="_blank" rel="noreferrer">Meteor Wallet</a>, switch it to testnet, and get some test NEAR.</li>
+        <li>Back in OneUp, choose <b>Connect wallet</b>, pick Meteor or another testnet wallet, and allow the connection.</li>
+        <li>Open <b>Account and funds</b>, register the test tokens and select <b>Get 1,000 test USDC</b>.</li>
+        <li>Deposit, trade, and try the market. Your wallet asks you to approve each transaction.</li>
       </ol>
-      <p className="label">OneUp uses NEAR Connect and requests no access key during connection. Reconnect after a full page reload. MyNearWallet is excluded because it is being sunset. Rabby and Phantom are not supported by this wallet integration. Never enter a seed phrase or private key into OneUp.</p>
+      <p className="label">OneUp uses NEAR Connect and requests no access key when you connect. Reconnect after a full page reload. MyNearWallet, Rabby and Phantom aren&apos;t supported. Never enter a seed phrase or private key into OneUp.</p>
     </div>
-    <div className="panel space-y-4 p-5">
-      <h2 className="text-xl font-bold">For the person running OneUp</h2>
-      <p>Follow <code>docs/NEAR_WALLET_SETUP.md</code> in the repository. The deployment planner lists the accounts, test NEAR allocation and contract setup before any transaction.</p>
-      <p>Set <code>ONEUP_PUBLIC_CONFIG</code> to the generated public testnet configuration and run the app. This profile contains contract addresses, never operator or demo keys.</p>
-      <p>Run the keeper separately. The oracle and test tokens are still demonstration contracts; connecting a real wallet does not make them production services.</p>
-    </div>
-    <p className="label">The testnet profile supports wallet-signed contract actions and live contract views. Local account switching, simulated bridges and sponsored sessions are disabled. History and rankings come from the contracts' events, about a minute behind the chain. No testnet deployment is included automatically.</p>
+    <details className="panel p-5">
+      <summary className="cursor-pointer py-1 font-bold">Running your own copy</summary>
+      <div className="mt-3 space-y-3">
+        <p>Follow <a className="underline" href="https://github.com/ethboi/oneup/blob/main/docs/NEAR_WALLET_SETUP.md" target="_blank" rel="noreferrer">the wallet setup guide</a> in the repository. Set <code>ONEUP_PUBLIC_CONFIG</code> to the generated testnet configuration, which holds contract addresses and never any keys, and run the keeper separately.</p>
+        <p>The oracle and test tokens are demonstration contracts, so connecting a real wallet doesn&apos;t make them production services.</p>
+      </div>
+    </details>
   </main>;
 }

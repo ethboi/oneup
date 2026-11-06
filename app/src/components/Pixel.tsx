@@ -124,23 +124,10 @@ export function PixelBadge({ id, size = 32, locked }: { id: string; size?: numbe
 /** An amount in the pixel font, `height` px tall, in coin gold with a highlight row, outlined in ink. Shrinks
  *  to fit narrow screens. */
 export function PixelAmount({ text, height }: { text: string; height: number }) {
-  // drawn at double resolution: two-cell strokes with a one-cell outline, so the counters in 0, 6, 8 and 9
-  // stay open instead of filling with ink
-  const rows = pixelText(text)
-    .flatMap((r) => {
-      const wide = r.replace(/./g, (c) => c + c);
-      return [wide, wide];
-    })
-    .map((r, y) => (y === 0 ? r.replace(/#/g, "*") : r));
-  const cell = height / 16; // 14 rows plus the outline above and below
   return (
-    <Sprite
-      rows={rows}
-      colors={{ "#": "var(--accent)", "*": "color-mix(in srgb, var(--accent) 45%, #fff)" }}
-      size={cell * (rows[0].length + 2)}
-      label={text}
-      style={{ maxWidth: "88vw", height: "auto", filter: "drop-shadow(3px 3px 0 var(--lcd-ink))" }}
-    />
+    <span className="num block whitespace-nowrap font-extrabold" style={{ fontSize: height * 0.82, lineHeight: 1.1, color: "#1c1b29" }}>
+      {text}
+    </span>
   );
 }
 
