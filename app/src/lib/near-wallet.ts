@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { NearConnector, NearWalletBase, EventMap } from "@hot-labs/near-connect";
+import { FailoverProvider } from "@oneup/sdk";
 import { JsonRpcProvider } from "near-api-js";
-import type { AppDeployment } from "./app-config";
+import { rpcList, type AppDeployment } from "./app-config";
 import { assertTestnetWallet, walletOptions, signedInAccount } from "./wallet-config";
 import { walletSender } from "./wallet-send";
 
@@ -14,7 +15,10 @@ export function useNearWallet(d: AppDeployment) {
   const selected = useRef("");
   const chosenWallet = useRef<NearWalletBase | null>(null);
   const signingLock = useRef({ busy: false });
-  const provider = useMemo(() => new JsonRpcProvider({ url: d.rpcUrl }), [d.rpcUrl]);
+  const provider = useMemo(
+    () => (d.network === "testnet" ? new FailoverProvider(rpcList(d.rpcUrl)) : new JsonRpcProvider({ url: d.rpcUrl })),
+    [d.network, d.rpcUrl],
+  );
   const pending = useRef<Promise<NearConnector> | null>(null);
   const enabled = d.network === "testnet";
   const clearAccount = useCallback(() => { selected.current = ""; chosenWallet.current = null; setAccountId(""); }, []);

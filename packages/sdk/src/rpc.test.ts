@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { JsonRpcProvider } from "near-api-js";
-import { PacedProvider, isRateLimited } from "./rpc.ts";
+import { FailoverProvider, PacedProvider, isRateLimited } from "./rpc.ts";
 
 const limitError = Error('{"jsonrpc": "2.0", "error": {"code": -429, "message": "Rate limits exceeded."}}');
 const send = (p: PacedProvider) => p.sendJsonRpc("status" as never, {} as never);
@@ -45,5 +45,62 @@ describe("PacedProvider", () => {
     const p = new PacedProvider("http://rpc.invalid", 0, 5, noWait, 20);
     await expect(send(p)).rejects.toThrow(/no answer/);
     expect(parent).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("FailoverProvider", () => {
+  const rpc = (answer: () => unknown) => {
+    const p = new JsonRpcProvider({ url: "http://rpc.invalid" });
+    const spy = vi.spyOn(p, "sendJsonRpc").mockImplementation(async () => answer());
+    return { p, spy };
+  };
+  const setup = (...rpcs: ReturnType<typeof rpc>[]) => {
+    let t = 1000;
+    const f = new FailoverProvider(rpcs.map((_, i) => `http://${i}.invalid`), 30_000, () => t, (url) => rpcs[Number(new URL(url).hostname[0])]!.p);
+    return { f, advance: (ms: number) => { t += ms; } };
+  };
+  const call = (f: FailoverProvider) => f.sendJsonRpc("status" as never, {} as never);
+  const refuse = () => { throw limitError; };
+
+  it("moves on when an RPC refuses, and rests it", async () => {
+    const a = rpc(refuse);
+    const b = rpc(() => "b");
+    const { f } = setup(a, b);
+    expect(await call(f)).toBe("b");
+    expect(await call(f)).toBe("b");
+    expect(a.spy).toHaveBeenCalledTimes(1);
+  });
+
+  it("moves on when the browser can't reach an RPC", async () => {
+    const { f } = setup(rpc(() => { throw new TypeError("Failed to fetch"); }), rpc(() => "b"));
+    expect(await call(f)).toBe("b");
+  });
+
+  it("tries a rested RPC again after its rest", async () => {
+    let up = false;
+    const a = rpc(() => (up ? "a" : refuse()));
+    const { f, advance } = setup(a, rpc(() => "b"));
+    await call(f);
+    up = true;
+    advance(30_001);
+    expect(await call(f)).toBe("a");
+  });
+
+  it("passes on a contract's error without trying another RPC", async () => {
+    const b = rpc(() => "b");
+    const { f } = setup(rpc(() => { throw Error("Smart contract panicked: Epoch not finished"); }), b);
+    await expect(call(f)).rejects.toThrow("panicked");
+    expect(b.spy).not.toHaveBeenCalled();
+  });
+
+  it("with every RPC resting, asks only the one due back first", async () => {
+    const a = rpc(refuse);
+    const b = rpc(refuse);
+    const { f, advance } = setup(a, b);
+    await expect(call(f)).rejects.toThrow();
+    advance(1);
+    await expect(call(f)).rejects.toThrow();
+    expect(a.spy).toHaveBeenCalledTimes(2);
+    expect(b.spy).toHaveBeenCalledTimes(1);
   });
 });

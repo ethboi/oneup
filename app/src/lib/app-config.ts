@@ -10,7 +10,11 @@ export type AppDeployment = Pick<Deployment, "network" | "rpcUrl" | "epochLength
 
 const CONTRACTS = ["house", "life", "oneup", "ve", "usdc", "oracle", "swap", "market"] as const;
 const OPTIONAL_CONTRACTS = ["vault", "dao"] as const;
-const TESTNET_RPC_HOSTS = new Set(["rpc.testnet.near.org", "test.rpc.fastnear.com", "testnet-rpc.intea.rs"]);
+/** Public testnet RPCs that answer browsers, in the order the app falls back through them. Our keeper and bots use the last. */
+const TESTNET_RPCS = ["https://testnet-rpc.intea.rs/", "https://test.rpc.fastnear.com/", "https://rpc.testnet.near.org/", "https://near-testnet.drpc.org/"];
+const TESTNET_RPC_HOSTS = new Set(TESTNET_RPCS.map((url) => new URL(url).hostname));
+/** The configured RPC first, then the others. */
+export const rpcList = (primary: string) => [primary, ...TESTNET_RPCS.filter((url) => url !== primary)];
 const accountPattern = /^[a-z0-9]+(?:[-_][a-z0-9]+)*(?:\.[a-z0-9]+(?:[-_][a-z0-9]+)*)*\.testnet$/;
 function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Expected a configuration object");

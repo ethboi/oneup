@@ -4,13 +4,13 @@
 // and a `run` helper that shows each transaction's progress.
 
 import { Account, type KeyPairString } from "near-api-js";
-import type { AppDeployment } from "./app-config";
+import { rpcList, type AppDeployment } from "./app-config";
 import { useNearWallet } from "./near-wallet";
 import { WalletWelcome } from "@/components/WalletWelcome";
 import { sfx } from "./sound";
 import { pollSerial } from "./poll";
 import { loadSession, saveSession, sessionExists, sessionSender, type Session } from "./session";
-import { OneUp, accountSender, normalizePrice } from "@oneup/sdk";
+import { FailoverProvider, OneUp, accountSender, normalizePrice } from "@oneup/sdk";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 export interface Toast {
@@ -96,7 +96,10 @@ function viaProxy(d: AppDeployment): AppDeployment {
 }
 
 function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
-  const o = useMemo(() => withoutAccount(new OneUp(d)), [d]);
+  const o = useMemo(
+    () => withoutAccount(d.network === "testnet" ? new OneUp(d, new FailoverProvider(rpcList(d.rpcUrl))) : new OneUp(d)),
+    [d],
+  );
   const wallet = useNearWallet(d);
   // a visitor can look around before connecting a wallet; remembered for this browser
   const [watching, setWatching] = useState(false);

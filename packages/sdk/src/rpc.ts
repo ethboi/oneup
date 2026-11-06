@@ -58,3 +58,45 @@ export class PacedProvider extends JsonRpcProvider {
     }
   }
 }
+
+/** The RPC couldn't answer, as opposed to answering with an error such as a contract panic. */
+const isUnavailable = (e: unknown) =>
+  e instanceof TypeError || isRateLimited(e) || /retries|attempts|bad gateway|unavailable|timeout|internal server error|fetch/i.test(String(e instanceof Error ? e.message : e));
+
+/**
+ * Reads and sends through the first RPC that isn't resting. One that refuses or fails rests for `restMs` while the
+ * others carry on. Each gets a single attempt, because the library's own 12 retries turn one refusal into a burst
+ * that keeps the limit tripped. Resending a signed transaction is safe: it has one hash and one nonce.
+ */
+export class FailoverProvider extends JsonRpcProvider {
+  private readonly rpcs: { provider: JsonRpcProvider; restUntil: number }[];
+
+  constructor(
+    urls: string[],
+    private readonly restMs = 30_000,
+    private readonly now = () => Date.now(),
+    make = (url: string) => new JsonRpcProvider({ url }, { retries: 1, wait: 0, backoff: 1 }),
+  ) {
+    super({ url: urls[0]! });
+    this.rpcs = urls.map((url) => ({ provider: make(url), restUntil: 0 }));
+  }
+
+  // the parent's signature is generic over every RPC method; this only forwards it
+  override async sendJsonRpc(...a: Parameters<JsonRpcProvider["sendJsonRpc"]>): Promise<any> {
+    const t = this.now();
+    const awake = this.rpcs.filter((r) => r.restUntil <= t);
+    // all resting: only the one due back soonest, so a tab doesn't hammer every RPC at once
+    const order = awake.length ? awake : [this.rpcs.reduce((a, b) => (b.restUntil < a.restUntil ? b : a))];
+    let last: unknown;
+    for (const rpc of order) {
+      try {
+        return await rpc.provider.sendJsonRpc(...a);
+      } catch (e) {
+        if (!isUnavailable(e)) throw e;
+        rpc.restUntil = this.now() + this.restMs;
+        last = e;
+      }
+    }
+    throw last;
+  }
+}
