@@ -25,7 +25,7 @@ export function WalletActions() {
     <button className="btn btn-ghost" disabled={wallet.busy || !registered || ready} onClick={() => run("Register test tokens", prepare)}>
       {!registered ? "Checking token registration…" : ready ? "Test tokens registered" : "Register test tokens"}
     </button>
-    {d.testUsdcFaucet && <button className="btn btn-ghost" disabled={wallet.busy || !ready} onClick={() => run("Get 1,000 test USDC", () => tx.faucet(1000n * USDC))}>Get 1,000 test USDC</button>}
+    {d.testUsdcFaucet && <button className="btn btn-ghost" disabled={wallet.busy} onClick={() => run("Get 1,000 test USDC", () => tx.faucet(1000n * USDC))}>Get 1,000 test USDC</button>}
     <button className="btn btn-ghost" disabled={wallet.busy} onClick={() => void wallet.disconnect()}>Disconnect wallet</button>
     {wallet.error && <p role="alert" className="text-sm text-[var(--short)]">{wallet.error}</p>}
     <a className="label underline" href="/wallet-setup">Wallet and testnet help</a>

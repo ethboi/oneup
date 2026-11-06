@@ -1111,9 +1111,12 @@ function OrderForm({ t }: { t: Ticket }) {
         <p className="label">Connect a NEAR testnet wallet to trade. Your first trade asks for it.</p>
       ) : (
         topUp > wallet && (
-          <p className="text-sm text-[var(--short)]">
-            Not enough USDC. {d.network === "localnet" ? "Open Demo and select Get test USDC" : "Open your account menu and select Get 1,000 test USDC"} to add funds.
-          </p>
+          <div className="flex flex-col gap-2">
+            <p className="text-sm text-[var(--short)]">
+              Not enough USDC.{d.network === "localnet" && " Open Demo and select Get test USDC to add funds."}
+            </p>
+            {d.testUsdcFaucet && <GetTestUsdc short={topUp - wallet} className="btn btn-accent" />}
+          </div>
         )
       )}
 
@@ -1215,8 +1218,28 @@ function OrderForm({ t }: { t: Ticket }) {
   );
 }
 
+/**
+ * Testnet: test USDC in one tap. The faucet registers the account itself, so nothing has to come first. It gives
+ * whole thousands, enough for this trade, up to its limit of 10,000 a call.
+ */
+function GetTestUsdc({ short, className }: { short: bigint; className: string }) {
+  const { tx, run, wallet } = useOneUp();
+  const thousand = 1000n * USDC;
+  const thousands = (short + thousand - 1n) / thousand;
+  const amount = (thousands < 1n ? 1n : thousands > 10n ? 10n : thousands) * thousand;
+  const label = `Get ${fmtUsdc(amount, 0)} test USDC`;
+  return (
+    <button type="button" className={className} disabled={wallet.busy} onClick={() => run(label, () => tx.faucet(amount))}>
+      <Icon name="faucet" />
+      {label}
+    </button>
+  );
+}
+
 /** Phones: the ticket's main action stays in reach while you scroll the chart and positions. */
 function TradeBar({ t }: { t: Ticket }) {
+  const { d, viewOnly } = useOneUp();
+  const needsUsdc = !viewOnly && d.testUsdcFaucet && t.payWith === "wallet" && t.topUp > t.wallet;
   return (
     <div className="fixed inset-x-0 bottom-[60px] z-30 border-t border-[var(--panel-edge)] bg-[var(--panel)] px-4 py-2.5 lg:hidden">
       <div className="mx-auto flex max-w-[1280px] items-center gap-3">
@@ -1226,16 +1249,20 @@ function TradeBar({ t }: { t: Ticket }) {
           </span>
           <span className="label">Edit order</span>
         </a>
-        <button
-          className="btn shrink-0 px-5 py-2.5"
-          style={{ "--btn-bg": t.side === "Long" ? "var(--long-fill)" : "var(--short-fill)", color: "var(--on-fill)" } as React.CSSProperties}
-          disabled={t.blocked}
-          onClick={t.submit}
-        >
-          <Icon name={t.side === "Long" ? "up" : "down"} />
-          {t.topUp > 0n ? "Deposit & " : ""}
-          {t.side}
-        </button>
+        {needsUsdc ? (
+          <GetTestUsdc short={t.topUp - t.wallet} className="btn btn-accent shrink-0 px-4 py-2.5" />
+        ) : (
+          <button
+            className="btn shrink-0 px-5 py-2.5"
+            style={{ "--btn-bg": t.side === "Long" ? "var(--long-fill)" : "var(--short-fill)", color: "var(--on-fill)" } as React.CSSProperties}
+            disabled={t.blocked}
+            onClick={t.submit}
+          >
+            <Icon name={t.side === "Long" ? "up" : "down"} />
+            {t.topUp > 0n ? "Deposit & " : ""}
+            {t.side}
+          </button>
+        )}
       </div>
     </div>
   );
