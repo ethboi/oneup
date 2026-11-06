@@ -7,7 +7,11 @@ import { Account, KeyPair, actions, nearToYocto, teraToGas, type KeyPairString }
 import { MARKETS, ONEUP, PacedProvider, USDC, type Deployment } from "@oneup/sdk";
 import { CONTRACT_WASMS, ROOT, sha256, sourceIdentity, verifyBuildManifest } from "./artifacts.ts";
 
-const FUNDING = { house: 7, life: 5, oneup: 3, ve: 5, market: 3, usdc: 3, oracle: 3, swap: 3, vault: 3, keeper: 5 } as const;
+// ve and life pay for what they mint from their own balance, so they start with room to run for weeks
+const FUNDING = { house: 10, life: 12, oneup: 3, ve: 15, market: 4, usdc: 4, oracle: 3, swap: 3, vault: 3, keeper: 5 } as const;
+/** The mock vault's simulated interest, the jackpot's funding: 5% over a "year" of 52 rounds, as in the local demo. */
+const VAULT_APR_PPM = "50000";
+const VAULT_YEAR_ROUNDS = 52;
 const CONTRACT_NAMES = Object.keys(CONTRACT_WASMS) as (keyof typeof CONTRACT_WASMS)[];
 const ALLOWED_RPC = new Set(["https://rpc.testnet.near.org", "https://test.rpc.fastnear.com"]);
 const OPERATOR_RESERVE = 3;
@@ -37,7 +41,7 @@ export function testnetPlan(input: PlanInput) {
     outputDirectory: resolve(ROOT, ".testnet", account),
     mocked: ["USDC", "oracle", "swap", "vault"],
     excluded: ["Intents", "bridge", "solver", "DAO", "bots", "mainnet"],
-    preparedSeedTestUsdc: "250000", preparedSwapTestUsdc: "100000", mockVaultAprPpm: "0",
+    preparedSeedTestUsdc: "250000", preparedSwapTestUsdc: "100000", mockVaultAprPpm: VAULT_APR_PPM,
     contractKeysDeletedAfterSetup: true,
   };
 }
@@ -54,7 +58,7 @@ export function contractInits(plan: TestnetPlan): Record<keyof typeof CONTRACT_W
     ve: { owner: plan.operator, house: id("house"), oneup: id("oneup") },
     swap: { owner: plan.operator, usdc: id("usdc"), oneup: id("oneup") },
     market: { usdc: id("usdc"), nft_contracts: [id("life"), id("ve")], house: id("house"), fee_ppm: "20000" },
-    vault: { usdc: id("usdc"), apr_ppm: "0", year_s: 31_536_000 },
+    vault: { usdc: id("usdc"), apr_ppm: VAULT_APR_PPM, year_s: plan.epochLengthS * VAULT_YEAR_ROUNDS },
   };
 }
 

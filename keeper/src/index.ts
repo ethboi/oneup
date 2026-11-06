@@ -44,6 +44,8 @@ const { values: args } = parseArgs({
     "price-tick": { type: "string", default: "1000" },
     // the treasury and buyback checks: nothing in them is urgent, so a slower one saves a rate-limited RPC
     "slow-tick": { type: "string" },
+    /** How often to bring the vault's interest home (ms). */
+    "harvest-tick": { type: "string", default: "60000" },
     // push a feed only when it moved this many basis points, or its last push is --price-max-age old (0: always)
     "price-move-bps": { type: "string", default: "0" },
     "price-max-age": { type: "string", default: "60000" },
@@ -219,7 +221,7 @@ async function handleTreasury() {
     await keeper.deployToVault(target - deployed);
     log(`treasury: deployed ${fmt((target - deployed).toString())} to the vault`);
   }
-  if (Date.now() - lastHarvest > 60_000) {
+  if (Date.now() - lastHarvest > Number(args["harvest-tick"])) {
     lastHarvest = Date.now();
     const dep = await oneup.vaultDeposit();
     if (dep && BigInt(dep.interest) >= USDC) {

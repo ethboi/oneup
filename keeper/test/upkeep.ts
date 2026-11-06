@@ -12,8 +12,8 @@ test("spare NEAR is what storage hasn't locked up", () => {
 test("contracts running low get topped up, lowest first, while the operator can afford it", () => {
   const accounts = [
     { id: "fine", spare: 9n * NEAR },
-    { id: "low", spare: 2n * NEAR },
-    { id: "lowest", spare: NEAR },
+    { id: "low", spare: NEAR / 2n },
+    { id: "lowest", spare: NEAR / 4n },
   ];
   assert.deepEqual(topUpsDue(accounts, 100n * NEAR), { due: ["lowest", "low"], short: [] });
   assert.deepEqual(topUpsDue(accounts, 11n * NEAR), { due: ["lowest"], short: ["low"] });

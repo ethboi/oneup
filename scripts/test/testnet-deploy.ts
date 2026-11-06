@@ -10,11 +10,11 @@ test("testnet plan is bounded and includes only nine core contracts and one keep
   const p = plan();
   assert.equal(p.accounts.length, 10);
   assert.equal(Object.keys(p.contracts).length, 9);
-  assert.equal(p.allocatedTestNear, 40);
-  assert.equal(p.minimumAvailableTestNear, 43);
+  assert.equal(p.allocatedTestNear, 62);
+  assert.equal(p.minimumAvailableTestNear, 65);
   assert.ok(p.accounts.every(a => a.accountId.endsWith(".operator-example.testnet") && a.accountId.length <= 64));
   assert.deepEqual(p.excluded, ["Intents", "bridge", "solver", "DAO", "bots", "mainnet"]);
-  assert.equal(p.mockVaultAprPpm, "0");
+  assert.equal(p.mockVaultAprPpm, "50000");
 });
 test("testnet plan rejects mainnet, invalid/oversized names, unapproved RPC and invalid cadence", () => {
   for (const account of [undefined, "alice.near", "Alice.testnet", "a..testnet", "a-.testnet", "a_b_.testnet", `${"a".repeat(50)}.testnet`]) assert.throws(() => testnetPlan({ account }), /testnet account/);

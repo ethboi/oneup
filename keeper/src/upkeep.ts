@@ -3,8 +3,9 @@ import type { Market, Order, Position } from "@oneup/sdk";
 /** Each byte a NEAR account stores locks up this much of its balance. */
 const YOCTO_PER_BYTE = 10n ** 19n;
 const NEAR = 10n ** 24n;
-/** A contract with less spare than this can't store what it next mints: a stuck round close, as on 6 Nov. */
-export const TOP_UP_BELOW = 3n * NEAR;
+/** A contract with less spare than this may soon be unable to store what it next mints: a stuck round close, as on
+ *  6 Nov. Low enough that a contract that barely stores anything, such as the oracle, is left alone. */
+export const TOP_UP_BELOW = NEAR;
 export const TOP_UP_BY = 5n * NEAR;
 /** What the operator keeps back for itself. */
 export const OPERATOR_KEEPS = 5n * NEAR;

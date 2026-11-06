@@ -28,11 +28,11 @@ must not be represented as public testnet integrations.
 
 Only test assets are used. Setup mints 250,000 test USDC as prepared house seed and 100,000 as mock swap
 liquidity. Neither is external funding. The test USDC faucet permits up to 10,000 per call and is not scarce
-collateral. The mock vault has **zero APR** in this profile; it proves deposit/recall behavior, not yield.
+collateral. The mock vault pays **simulated interest** (5% over a "year" of 52 rounds) to fund the jackpot, as in the local demo. It is minted test USDC, not yield.
 
-Contract accounts receive 35 test NEAR in total and the keeper receives 5: **40 test NEAR allocated**.
+Contract accounts receive 57 test NEAR in total and the keeper receives 5: **62 test NEAR allocated**.
 The script requires another 3 available test NEAR on the operator for transaction/storage headroom,
-**43 available after the operator's existing storage requirement**. These fixed amounts are a preparation
+**65 available after the operator's existing storage requirement**. These fixed amounts are a preparation
 budget, not a price quote or an unlimited operating allowance. Keeper gas requires later monitoring.
 Successful setup deletes the nine deployment keys, so this script offers no upgrade or automatic refund
 path for their balances. Never use a mainnet account or real USDC with this prototype.
