@@ -155,6 +155,11 @@
   object-fit: cover;
   border-radius: inherit;
 }
+/* the whole ad, with its captions and end card, not cropped to the screen */
+.site-screen video {
+  object-fit: contain;
+  background: #000;
+}
 .site-keys {
   display: flex;
   align-items: center;
