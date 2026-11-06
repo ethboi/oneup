@@ -813,9 +813,9 @@ function Console({
         setRange={setRange}
       />
       <div className="bezel px-3 pb-5 pt-3 sm:px-5">
-        <div className="faceplate mb-3" aria-hidden>
+        <div className="faceplate mb-3 hidden sm:flex" aria-hidden>
           <span className="stripes" />
-          <span className="faceplate-print hidden sm:inline">NEAR · BTC · ETH MARKETS · NEAR HACKATHON 2026</span>
+          <span className="faceplate-print">NEAR · BTC · ETH MARKETS · NEAR HACKATHON 2026</span>
           <span className="stripes" />
         </div>
         <GameHud score={pos && mark ? <PnlHero value={afterCut(pnl(pos.side, BigInt(pos.margin), pos.leverage, BigInt(pos.entry_price), mark), pos.cut_ppm)} margin={BigInt(pos.margin)} /> : undefined} />

@@ -18,7 +18,9 @@ export function Onboarding() {
   const next = recoveryStep(lives, pending);
   const [expanded, setExpanded] = useState(false);
   useEffect(() => {
-    try { setExpanded(localStorage.getItem(KEY) !== "1"); } catch { setExpanded(true); }
+    // open once on a first visit, except on phones, where the steps would stand between you and the screen
+    const roomy = window.matchMedia("(min-width: 1024px)").matches;
+    try { setExpanded(roomy && localStorage.getItem(KEY) !== "1"); } catch { setExpanded(roomy); }
   }, []);
   const status = next.phase === "loading" ? "Checking your Lives…"
     : next.phase === "claim" ? `$${fmtUsdc(next.claimable)} available to claim from ${next.count} ${next.count === 1 ? "Life" : "Lives"}`

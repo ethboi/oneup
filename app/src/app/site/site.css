@@ -4,6 +4,8 @@
 .site {
   --site-w: 1180px;
   min-height: 100dvh;
+  /* the tilted console and fanned cards may poke past a narrow phone, without widening the page */
+  overflow-x: clip;
 }
 .site main {
   display: flex;

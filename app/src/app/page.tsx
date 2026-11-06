@@ -100,7 +100,9 @@ export default function Home() {
       <div className="bg-[var(--primary)] text-white">
         <div className="mx-auto flex max-w-[1280px] items-center justify-center gap-x-2 px-4 py-1.5 text-center text-[12.5px] font-bold">
           <span>
-            In development for <span className="font-extrabold">NEAR HACKATHON</span>, November 2026
+            <span className="hidden sm:inline">In development for </span>
+            <span className="font-extrabold">NEAR HACKATHON</span>
+            <span className="hidden sm:inline">, November 2026</span>
             <NetworkLabel />
           </span>
           <button type="button" className="underline decoration-dotted underline-offset-2 opacity-80 hover:opacity-100" onClick={() => go("About")}>
@@ -122,8 +124,17 @@ export default function Home() {
         />
         <div className={tab === "Trade" ? undefined : "mx-auto max-w-[1280px] 2xl:max-w-[1440px]"}>
           {/* the three-step intro belongs on the trading screen, not every page */}
-          {tab === "Trade" && <Onboarding />}
-          {tab === "Trade" && <Trade />}
+          {/* phones: under the trading screen, so the chart is the first thing you see */}
+          {tab === "Trade" && (
+            <div className="flex flex-col">
+              <div className="order-2 lg:order-1">
+                <Onboarding />
+              </div>
+              <div className="order-1 lg:order-2">
+                <Trade />
+              </div>
+            </div>
+          )}
           {tab === "Extra Lives" && <Lives />}
           {tab === "Locks" && <Locks />}
           {tab === "Market" && <Market />}
@@ -175,7 +186,13 @@ export default function Home() {
 /** What OneUp is and where to read more, under every tab. */
 function NetworkLabel() {
   const { d } = useOneUp();
-  return <span className="hidden sm:inline"> · {d.network === "testnet" ? "NEAR testnet" : "local NEAR demo"} · test money only</span>;
+  const where = d.network === "testnet" ? "NEAR testnet" : "local NEAR demo";
+  return (
+    <>
+      <span className="sm:hidden"> · {d.network === "testnet" ? "testnet" : "local demo"}, test money</span>
+      <span className="hidden sm:inline"> · {where} · test money only</span>
+    </>
+  );
 }
 
 function Footer({ go }: { go: (t: Tab, at?: string) => void }) {

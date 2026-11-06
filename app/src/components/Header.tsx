@@ -119,7 +119,8 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
       {/* the tools: one height, close together */}
       <div className="hdr-tools flex shrink-0 items-center gap-2">
         <MuteButton />
-        {d.network === "localnet" ? <DemoMenu /> : <span className="chip text-xs">NEAR testnet</span>}
+        {/* phones: the banner above says testnet, and the round clock needs the room */}
+        {d.network === "localnet" ? <DemoMenu /> : <span className="chip hidden text-xs sm:inline-flex">NEAR testnet</span>}
         {d.network === "localnet" && <a href="/wallet-setup" className="chip hidden sm:inline-flex">Wallet setup</a>}
         <AccountMenu />
       </div>
@@ -260,7 +261,13 @@ function AccountMenu() {
     return (
       <button type="button" className="btn btn-accent" disabled={wallet.busy} onClick={() => void wallet.connect()}>
         <Icon name="wallet" />
-        {wallet.busy ? "Waiting for wallet…" : "Connect wallet"}
+        {wallet.busy ? (
+          "Waiting…"
+        ) : (
+          <span>
+            Connect<span className="hidden sm:inline"> wallet</span>
+          </span>
+        )}
       </button>
     );
   return <AccountFunds />;
