@@ -432,11 +432,198 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 22px;
+  padding: 0 0 22px;
+  overflow: hidden;
+}
+.site-near h3 {
+  margin: 0 20px;
+  font-size: 23px;
 }
 .site-near p {
-  color: var(--muted);
-  line-height: 1.55;
+  margin: 0 20px;
+  font-size: 16px;
+  color: color-mix(in srgb, var(--text) 88%, transparent);
+  line-height: 1.5;
+}
+.site-near .site-tag {
+  align-self: flex-start;
+  margin: 8px 20px 0;
+}
+/* each job NEAR does, as a bright scene like the steps above */
+.site-near-art {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  height: 290px;
+  overflow: hidden;
+  border-bottom: 4px solid var(--bezel);
+}
+.site-art-money {
+  background: linear-gradient(#8b6cff, #4d33c9);
+}
+.site-art-money .life-card {
+  width: 140px;
+  flex: none;
+  transform: rotate(-3deg);
+  box-shadow: 0 14px 24px -10px rgb(20 8 70 / 0.7);
+}
+.site-art-payouts {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.site-art-payouts span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--bezel);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 4px 0 rgb(20 8 70 / 0.5);
+}
+.site-art-chains {
+  background: linear-gradient(#58c2ff, #1d6fd8);
+}
+.site-art-tokens {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.site-art-tokens span {
+  display: grid;
+  place-items: center;
+  width: 66px;
+  height: 66px;
+  border: 4px solid var(--bezel);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--bezel);
+  font-size: 17px;
+  font-weight: 800;
+}
+.site-art-arrow {
+  color: #fff;
+  font-size: 40px;
+  line-height: 1;
+}
+.site-art-intent {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 170px;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--bezel);
+  box-shadow: 0 6px 0 rgb(4 40 96 / 0.55);
+}
+.site-art-intent small,
+.site-art-ballot small,
+.site-art-chat small {
+  color: #c7cbe0;
+  font-size: 13px;
+  font-weight: 700;
+}
+.site-art-intent b {
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: #2b2e4a;
+  color: #fff;
+  font-size: 16px;
+}
+.site-art-intent b:last-child {
+  background: var(--long-fill);
+}
+.site-art-dao {
+  background: linear-gradient(#ff8bd0, #d6247f);
+}
+.site-art-ballot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(300px, 80%);
+  padding: 18px;
+  border-radius: 16px;
+  background: var(--bezel);
+  box-shadow: 0 6px 0 rgb(90 8 50 / 0.55);
+}
+.site-art-ballot b {
+  color: #fff;
+  font-size: 20px;
+}
+.site-art-votes {
+  display: grid;
+  grid-template-columns: 34px 1fr 16px;
+  align-items: center;
+  gap: 8px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+}
+.site-art-votes i {
+  display: block;
+  height: 12px;
+  border-radius: 4px;
+  background: var(--long);
+}
+.site-art-votes.no i {
+  background: var(--short);
+}
+.site-art-ballot em {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--long-fill);
+  color: #fff;
+  font-size: 18px;
+  font-style: normal;
+  transform: rotate(-3deg);
+}
+.site-art-agent {
+  background: linear-gradient(#ffb15c, #ef6a2a);
+}
+.site-art-tap {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.site-art-tap .site-key {
+  width: 104px;
+  height: 104px;
+  font-size: 16px;
+}
+.site-art-tap small {
+  color: #3e1a00;
+  font-size: 14px;
+  font-weight: 800;
+}
+.site-art-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 170px;
+  padding: 14px;
+  border-radius: 16px 16px 16px 4px;
+  background: var(--bezel);
+  box-shadow: 0 6px 0 rgb(90 40 0 / 0.5);
+}
+.site-art-chat b {
+  color: #fff;
+  font-size: 18px;
+}
+.site-art-chat span {
+  color: #d6d8e6;
+  font-size: 14px;
+  line-height: 1.35;
 }
 
 /* the end: one last way in */

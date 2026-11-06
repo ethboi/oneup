@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { LifeCard } from "@/components/LifeCard";
-import { Logo, PixelCoin, PixelHeart, PixelLock } from "@/components/Pixel";
+import { Logo, PixelCoin, PixelHeart } from "@/components/Pixel";
 import "./site.css";
 
 // oneup.markets: the website, written like the handheld's instruction booklet. The console is the hero, with the
@@ -214,25 +214,62 @@ export default function Site() {
           <h2 className="display site-h2">What NEAR does here</h2>
           <ul className="site-near">
             <li className="panel">
-              <PixelHeart size={28} />
+              <div className="site-near-art site-art-money" aria-hidden>
+                <LifeCard id="88" paid={180n} owed={420n} state="earning" tone="recovery" tag="LOSS" detail="Round 12" amount="$180 / $420" />
+                <div className="site-art-payouts">
+                  <span><PixelCoin size={26} /> +$42 USDC</span>
+                  <span><PixelCoin size={26} /> +$67 USDC</span>
+                  <span><PixelCoin size={26} /> +$71 USDC</span>
+                </div>
+              </div>
               <span className="site-tag live">On testnet</span>
-              <h3 className="display">An NFT that holds money</h3>
+              <h3 className="display">An NFT with money attached</h3>
               <p>Each Life NFT is a NEP-171 token that claims NEP-141 USDC from the house. Sell the token and the claim goes with it.</p>
             </li>
             <li className="panel">
-              <PixelCoin size={28} />
+              <div className="site-near-art site-art-chains" aria-hidden>
+                <div className="site-art-tokens">
+                  <span>ETH</span>
+                  <span>SOL</span>
+                </div>
+                <b className="site-art-arrow">→</b>
+                <div className="site-art-intent">
+                  <small>One signed intent</small>
+                  <b>Swap</b>
+                  <b>Deposit</b>
+                  <b>Trade</b>
+                </div>
+              </div>
               <span className="site-tag">Local demo</span>
               <h3 className="display">Deposits from other chains</h3>
-              <p>With NEAR Intents, one signed intent swaps a bridged token, deposits it and opens the trade. The bridge is simulated.</p>
+              <p>With NEAR Intents, one signed intent swaps a bridged token, deposits it and requests the trade. The bridge is simulated.</p>
             </li>
             <li className="panel">
-              <PixelLock size={28} />
+              <div className="site-near-art site-art-dao" aria-hidden>
+                <div className="site-art-ballot">
+                  <small>Council proposal</small>
+                  <b>List a new market</b>
+                  <div className="site-art-votes"><span>Yes</span><i style={{ width: "100%" }} /><span>2</span></div>
+                  <div className="site-art-votes no"><span>No</span><i style={{ width: "6%" }} /><span>0</span></div>
+                  <em className="display">PASSED</em>
+                </div>
+              </div>
               <span className="site-tag">Local demo</span>
               <h3 className="display">Run by a DAO</h3>
               <p>A Sputnik DAO owns the house, the Life NFTs and the price oracle, and votes on new markets.</p>
             </li>
             <li className="panel">
-              <Logo size={28} />
+              <div className="site-near-art site-art-agent" aria-hidden>
+                <div className="site-art-tap">
+                  <span className="site-key long">LONG</span>
+                  <small>One tap, no gas</small>
+                </div>
+                <div className="site-art-chat">
+                  <small>AI agent</small>
+                  <b>Long NEAR 5×</b>
+                  <span>“Momentum is up, stop set below entry.”</span>
+                </div>
+              </div>
               <span className="site-tag">Local demo</span>
               <h3 className="display">One tap, or an agent</h3>
               <p>Function-call keys and a NEP-366 relayer make trading one tap and gasless. AI agents trade through an MCP server.</p>
