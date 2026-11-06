@@ -7,7 +7,7 @@ import { type LifeInfo, type Listing, type LockInfo } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { lockValue, useOneupPrice } from "@/lib/value";
 import { lifeEconomics, lifeEarningLabel } from "@/lib/life-economics";
-import { compareAskingPrices, listingPriceInput, listingsPollKey, type AskingPriceOrder } from "@/lib/market-pricing";
+import { compareAskingPrices, listingPriceInput, listingPriceLabel, listingsPollKey, type AskingPriceOrder } from "@/lib/market-pricing";
 import { lifeHref } from "@/lib/recovery-journey";
 import { fmtOneup, fmtUsd } from "./Header";
 import { PixelHeart, PixelLock } from "./Pixel";
@@ -204,7 +204,7 @@ function YourItems({ px, listings, epoch, expiryEpochs }: { px: bigint; listings
 function Row({ x, wallet, epoch, expiryEpochs, totalPower }: { x: Item; wallet: bigint; epoch?: number; expiryEpochs?: number; totalPower: bigint }) {
   const { me, tx, run } = useOneUp();
   const price = BigInt(x.l.price);
-  const askingPrice = `$${listingPriceInput(x.l)}`;
+  const askingPrice = listingPriceLabel(x.l);
   const mine = x.l.seller === me;
   const short = wallet < price;
 
@@ -244,7 +244,7 @@ function Row({ x, wallet, epoch, expiryEpochs, totalPower }: { x: Item; wallet: 
         {x.kind === "life" && <a className="mt-1 inline-block text-sm font-bold underline decoration-dotted underline-offset-2" href={lifeHref(x.l.token_id)}>View Life details</a>}
       </div>
       <div className="flex w-full shrink-0 items-center justify-between gap-2 pl-14 sm:w-auto sm:flex-col sm:items-end sm:gap-1 sm:pl-0">
-        <span className="text-right"><span className="label block">Asking price</span><span className="display num text-lg">{askingPrice}</span></span>
+        <span className="text-right"><span className="label block">Asking price</span><span className="display num text-lg" title={`$${listingPriceInput(x.l)} exactly`}>{askingPrice}</span></span>
         {mine ? (
           <button className="btn btn-ghost px-3 py-1" onClick={() => run("Remove listing", () => tx.delist(x.l.nft_contract, x.l.token_id))}>
             Remove listing

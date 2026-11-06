@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { compareAskingPrices, listingPriceInput, listingsPollKey } from "../src/lib/market-pricing.ts";
+import { compareAskingPrices, listingPriceInput, listingPriceLabel, listingsPollKey } from "../src/lib/market-pricing.ts";
 import { parseTokenAmount } from "@oneup/sdk";
 
 test("listing creation starts blank and repricing preserves the exact current ask", () => {
@@ -34,4 +34,10 @@ test("same-price sale and relisting refresh the captured seller and approval use
   assert.notEqual(listingsPollKey([{ ...listing, seller: "bob.test.near" }]), original);
   assert.notEqual(listingsPollKey([{ ...listing, approval_id: 2 }]), original);
   assert.notEqual(listingsPollKey([{ ...listing, listed_at: 11 }]), original);
+});
+
+test("a listing's price reads in dollars and cents, never below what the buyer pays", () => {
+  assert.equal(listingPriceLabel({ price: "4637361" }), "$4.64");
+  assert.equal(listingPriceLabel({ price: "5000000" }), "$5.00");
+  assert.equal(listingPriceLabel({ price: "1234500000" }), "$1,234.50");
 });
