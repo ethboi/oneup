@@ -7,6 +7,7 @@ const dir = resolve(ROOT, ".verification"); mkdirSync(dir, {recursive:true});
 const source = sourceIdentity();
 const appDir = copyApp(resolve(dir,`app-${Date.now()}`));
 const steps = [
+  ["Secret scan", ["exec", "tsx", "scripts/check-secrets.ts"]],
   ["Root typecheck", ["exec", "tsc", "--noEmit"]],
   ["Workspace typecheck", ["-r", "typecheck"]],
   ["Rust, SDK and model tests", ["test"]],

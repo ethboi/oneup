@@ -8,6 +8,8 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the secret scan in pnpm verify reads every commit
       - uses: pnpm/action-setup@v4
         with:
           version: 10.18.3

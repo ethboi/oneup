@@ -73,7 +73,7 @@ cargo-near 0.22.0, the versions CI uses.
 | 8 | In a second terminal: `ONEUP_CONFIG=<path printed in step 4> pnpm test:judge` | Eleven assertions pass in one to two minutes: fills, liquidation, Life minted, USDC claimed, sale, former owner refused, buyer claims, reserve admission, deployed hashes, DAO ownership. `e2e.json` is written beside the config |
 | 9 | On the Trade screen, open a 50× long on NEAR-USD; then `curl -XPOST 127.0.0.1:8887/price -H 'content-type: application/json' -d '{"market":"NEAR-USD","movePct":-2}'` | The keeper liquidates the position; when the 45-second round closes, a new Life appears on the Extra Lives tab |
 | 10 | `pnpm agent` (needs `ANTHROPIC_API_KEY` or the `claude` CLI) | An AI agent trades as bot12; the **Agents** tab lists each action and the reason it gave |
-| 11 | `pnpm verify` | About seven minutes: typechecks, Rust unit, property and sandbox tests, TypeScript tests and a production build, ending `Complete verification passed` |
+| 11 | `pnpm verify` | About seven minutes: a secret scan, typechecks, Rust unit, property and sandbox tests, TypeScript tests and a production build, ending `Complete verification passed` |
 
 `pnpm demo:judge` starts a fresh chain under `.judge/<time>/` on every run and never touches the regular demo.
 It uses ports 3021 (app), 3130 (RPC), 8887 (price control) and 25567, and refuses to start if one is taken

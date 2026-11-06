@@ -21,3 +21,19 @@ next-env.d.ts
 
 # Private testnet operator credentials, setup journal and public profile output
 .testnet/
+
+# Keys and login state, wherever they end up
+.near-credentials/
+.vercel/
+operator.json
+recovery-keys.json
+wallet.json
+*-credential.json
+keeper-*-key
+id_rsa
+id_ed25519
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
