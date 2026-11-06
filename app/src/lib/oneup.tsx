@@ -64,6 +64,10 @@ const WATCH_KEY = "oneup.testnet.viewOnly";
 
 const OneUpContext = createContext<Ctx | null>(null);
 
+/** Public testnet RPCs limit each IP, and a tab at the local chain's pace (about 230 requests a minute) runs into
+ *  that limit. A transaction still refreshes straight away: `version` restarts every poll. */
+const pollFactor = (network: string) => (network === "testnet" ? 4 : 1);
+
 export function useOneUp() {
   const c = useContext(OneUpContext);
   if (!c) throw new Error("useOneUp outside provider");
@@ -217,7 +221,7 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
         return out;
       });
     };
-    const stop = pollSerial(tick, () => {}, 1000);
+    const stop = pollSerial(tick, () => {}, 1000 * pollFactor(d.network));
     // the server has been watching too: start the chart from its last 30 minutes rather than empty
     if (d.network === "localnet") fetch("/api/prices")
       .then((r) => (r.ok ? r.json() : {}))
@@ -245,8 +249,9 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
 }
 
 /** Polls `f` every `ms` and whenever `deps` or the transaction version change. */
-export function usePoll<T>(f: () => Promise<T>, deps: unknown[], ms = 2000): T | undefined {
-  const { version } = useOneUp();
+export function usePoll<T>(f: () => Promise<T>, deps: unknown[], baseMs = 2000): T | undefined {
+  const { version, d } = useOneUp();
+  const ms = baseMs * pollFactor(d.network);
   // Identity changes invalidate the old value during render, before effects can run.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const identity = useMemo(() => ({}), deps);
