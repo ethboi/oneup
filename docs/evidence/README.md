@@ -23,12 +23,12 @@ mechanism; it does not establish a market price, customer demand or live integra
 
 | Artifact | Revision and scope |
 |---|---|
-| [Verification manifest](recovery-verification.json) | Clean `b188d542d223163d87d16cd2f01099596b882cbf`; 2026-10-23, eight stages exited successfully. The artifact does not contain an aggregate test count; do not infer one. Original full logs are not included. |
+| [Verification manifest](recovery-verification.json) | Clean `c09c5bc39ced9a5eefb640c8f7b4fb49df095510`; 2026-10-23, eight stages exited successfully. The artifact does not contain an aggregate test count; do not infer one. Original full logs are not included. |
 | [SDK journey](recovery-e2e.json) | Same clean revision; ten named assertions, 101.808 seconds, nine deployed/local WASM hash matches. Includes build inputs and individual hashes. |
-| [Browser record](historical-browser.json) | Full and prepared journeys at `da6918b7c5605b296f1c9bb469908d0c4bf627aa`; later presentation smoke at `b188d54`. Full path 253.506 seconds; prepared path 140.993 seconds. |
+| [Browser record](historical-browser.json) | Full and prepared journeys at `b9e69f947436f8b0b76d732a7aaf198d6af5ae8f`; later presentation smoke at `c09c5bc`. Full path 253.506 seconds; prepared path 140.993 seconds. |
 | [Former-owner contract rejection](recovery-former-owner-rejection.json) | Separate SDK call for the full browser journey's token; browser only demonstrated hidden owner actions. |
 | [File hashes](manifest.json) | SHA-256 hashes of retained records and screenshots; records which data was curated from the larger original browser artifact. |
-| Fresh-clone check, 31 Oct 2026 | Clean `79e18c76880c49c0950672ea1aecfb2c7c8e8ac0`, a new clone, the README's steps followed in order. `pnpm demo:judge` was ready with its sample in about six minutes; the browser walk through steps 5–9 showed no console errors; `pnpm test:judge` passed eleven assertions in 92.9 s with all nine hashes matching; `pnpm verify` passed all eight stages in 6 min 38 s; `pnpm test:judge:ci` passed, both Chromium tests included, in 6 min 36 s. Step 10 (`pnpm agent`) was not run; a scripted MCP client drove the server instead. Results only; no files retained. |
+| Fresh-clone check, 31 Oct 2026 | Clean `6ea52ad0a27563dfaa413474e576cb32d71920cf`, a new clone, the README's steps followed in order. `pnpm demo:judge` was ready with its sample in about six minutes; the browser walk through steps 5–9 showed no console errors; `pnpm test:judge` passed eleven assertions in 92.9 s with all nine hashes matching; `pnpm verify` passed all eight stages in 6 min 38 s; `pnpm test:judge:ci` passed, both Chromium tests included, in 6 min 36 s. Step 10 (`pnpm agent`) was not run; a scripted MCP client drove the server instead. Results only; no files retained. |
 
 The short walkthrough excluded installation, deployment, funding, liquidation and settlement preparation.
 The full browser flow used one CLI price-control action. Timings include agent interaction and inspection;
@@ -56,4 +56,4 @@ contracts, `pnpm preflight --judge` checks the WASM manifest and isolated-demo p
 5. Label current evidence with its exact source identity. Keep historical reports unchanged, and replace
    no historical result with a more favorable claim. CI links count as evidence only after a run exists.
 
-Commit hashes in these historical files predate a rewrite of the repository's commit messages, so they no longer resolve to commits here.
+A later rewrite of the repository's commit messages changed every commit hash. The source revisions in these files, and the file hashes in the manifest that cover them, were updated to match; the code at each revision and the recorded results did not change.

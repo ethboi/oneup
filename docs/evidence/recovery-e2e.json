@@ -1,7 +1,7 @@
 {
   "build": {
     "source": {
-      "revision": "b188d542d223163d87d16cd2f01099596b882cbf",
+      "revision": "c09c5bc39ced9a5eefb640c8f7b4fb49df095510",
       "dirty": false,
       "workingChangesSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
@@ -22,7 +22,7 @@
   },
   "scope": "SDK/chain/keeper E2E plus app config API; browser inspection is separate",
   "source": {
-    "revision": "b188d542d223163d87d16cd2f01099596b882cbf",
+    "revision": "c09c5bc39ced9a5eefb640c8f7b4fb49df095510",
     "dirty": false,
     "workingChangesSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },

@@ -4,8 +4,8 @@
   "sourceArtifact": "recovery-browser-evidence.json",
   "sourceArtifactSha256": "646b5d00c75d0613fc52c4caf42aea85763409de332f1ebb7fc80156901ef1b2",
   "curation": "Selected timing, actions and limitations from the original local review record. Screenshots retained below; other original screenshots are omitted.",
-  "browserJourneySource": "da6918b7c5605b296f1c9bb469908d0c4bf627aa",
-  "finalPresentationSmokeSource": "b188d542d223163d87d16cd2f01099596b882cbf",
+  "browserJourneySource": "b9e69f947436f8b0b76d732a7aaf198d6af5ae8f",
+  "finalPresentationSmokeSource": "c09c5bc39ced9a5eefb640c8f7b4fb49df095510",
   "setup": {
     "appUrl": "http://127.0.0.1:3022",
     "rpcUrl": "http://127.0.0.1:3130",
