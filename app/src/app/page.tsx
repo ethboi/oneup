@@ -236,7 +236,7 @@ function Footer({ go }: { go: (t: Tab, at?: string) => void }) {
         <div>
           <b className="block">Built on NEAR</b>
           <p className="label mt-1.5">
-            {d.network === "localnet" ? "Runs locally on NEAR with Rust contracts, simulated cross-chain deposits through NEAR Intents, Sputnik DAO ownership, sponsored trading, and AI agents trading through MCP." : "NEAR testnet contracts with wallet-approved transactions. Oracle, tokens, swap and vault are test implementations. Historical activity and rankings are available only in the local demo."}
+            {d.network === "localnet" ? "Runs locally on NEAR with Rust contracts, simulated cross-chain deposits through NEAR Intents, Sputnik DAO ownership, sponsored trading, and AI agents trading through MCP." : "NEAR testnet contracts with wallet-approved transactions. Oracle, tokens, swap and vault are test implementations. Rankings and history come from the contracts' events."}
           </p>
           <button
             type="button"

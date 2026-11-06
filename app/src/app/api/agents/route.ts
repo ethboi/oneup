@@ -1,17 +1,20 @@
 // The agents trading on OneUp: which accounts are AI agents (ONEUP_AI_AGENTS, bot12 by default) and which are
 // rule-based bots, and the AI agents' journal (written by the MCP server: every action with its stated reason),
-// newest first. Localnet only, like /api/activity.
+// newest first.
 
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { aiAgents, type JournalEntry } from "@oneup/sdk";
 import { guard, stateDir } from "@/lib/server/localnet";
+import { hasPublicProfile } from "@/lib/server/public-config";
 
 export const dynamic = "force-dynamic";
 
 const KEEP = 200;
 
 export async function GET(req: Request) {
+  // testnet has no AI agent or journal yet: an empty answer the CDN can keep, not an error
+  if (hasPublicProfile()) return Response.json({ ai: aiAgents(process.env.ONEUP_AI_AGENTS), journal: [] }, { headers: { "cache-control": "public, s-maxage=300" } });
   const no = guard(req);
   if (no) return no;
   const file = resolve(stateDir(), "agent-journal.jsonl");

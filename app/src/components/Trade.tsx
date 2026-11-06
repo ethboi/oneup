@@ -480,7 +480,6 @@ const agoShort = (ms: number) => {
 
 /** The market's trades as they happen, newest first, under how its open max wins split between longs and shorts. */
 function TradesTape({ market, info }: { market: string; info?: Market }) {
-  const { d } = useOneUp();
   const feed = useActivity(300);
   const now = useNow();
   const rows = feed.filter((a) => a.trade?.market === market).slice(0, 40);
@@ -519,7 +518,7 @@ function TradesTape({ market, info }: { market: string; info?: Market }) {
         <span className="text-right">Time</span>
       </div>
       <ol className="num min-h-0 flex-1 overflow-y-auto px-3.5 pb-3 text-[13px]">
-        {rows.length === 0 && <li className="label py-2">{d.network === "localnet" ? <>No trades on {market} yet.</> : "Trade history is not indexed on testnet. Live exposure still comes from the contracts."}</li>}
+        {rows.length === 0 && <li className="label py-2">No trades on {market} yet.</li>}
         {rows.map((a) => {
           const tr = a.trade!;
           return (

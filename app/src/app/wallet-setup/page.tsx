@@ -20,6 +20,6 @@ export default function WalletSetup() {
       <p>Set <code>ONEUP_PUBLIC_CONFIG</code> to the generated public testnet configuration and run the app. This profile contains contract addresses, never operator or demo keys.</p>
       <p>Run the keeper separately. The oracle and test tokens are still demonstration contracts; connecting a real wallet does not make them production services.</p>
     </div>
-    <p className="label">The testnet profile supports wallet-signed contract actions and live contract views. Local account switching, simulated bridges, sponsored sessions, historical activity and rankings are disabled. Use the testnet explorer for transaction history. No testnet deployment is included automatically.</p>
+    <p className="label">The testnet profile supports wallet-signed contract actions and live contract views. Local account switching, simulated bridges and sponsored sessions are disabled. History and rankings come from the contracts' events, about a minute behind the chain. No testnet deployment is included automatically.</p>
   </main>;
 }

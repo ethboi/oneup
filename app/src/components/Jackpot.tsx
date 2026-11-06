@@ -89,7 +89,7 @@ export function Jackpot({ compact }: { compact?: boolean }) {
         The demo jackpot is funded by simulated vault interest. Each $1 of eligible net loss adds a ticket. One winning ticket receives the full prize.
         {myTickets === 0n && " You have no tickets for this draw."}
       </p>
-      compact ? <LastWinner draws={draws} me={me} /> : <PastDraws draws={draws} me={me} />
+      {compact ? <LastWinner draws={draws} me={me} /> : <PastDraws draws={draws} me={me} />}
     </div>
   );
 }
