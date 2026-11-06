@@ -7,10 +7,18 @@ import "./site.css";
 // demo video on its screen; then how to play, what an Extra Life is, and what NEAR does. src/proxy.ts serves it at
 // `/` on the site's own hosts; anywhere else it is at /site.
 
+const TITLE = "OneUp: lose a trade, get a life";
+const DESCRIPTION =
+  "A perpetual futures game on NEAR. When the house ends a round in profit, traders with a net loss get an Extra Life: an NFT that collects a share of future house profit. NEAR testnet, test money.";
+/** The site's own host, so its preview image links there rather than to the app. */
+const HOST = process.env.ONEUP_SITE_HOSTS?.split(",")[0]?.trim();
+
 export const metadata: Metadata = {
-  title: "OneUp: lose a trade, get a life",
-  description:
-    "A perpetual futures game on NEAR. When the house ends a round in profit, traders with a net loss get an Extra Life: an NFT that collects a share of future house profit. NEAR testnet, test money.",
+  metadataBase: HOST ? new URL(`https://${HOST}`) : undefined,
+  title: TITLE,
+  description: DESCRIPTION,
+  openGraph: { title: TITLE, description: DESCRIPTION, siteName: "OneUp", type: "website", url: "/" },
+  twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },
 };
 
 const APP = process.env.ONEUP_APP_URL ?? "/";

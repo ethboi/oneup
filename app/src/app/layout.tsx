@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { M_PLUS_Rounded_1c, Pixelify_Sans } from "next/font/google";
 import Script from "next/script";
 import { Analytics } from "@vercel/analytics/next";
@@ -12,10 +12,18 @@ const rounded = M_PLUS_Rounded_1c({ subsets: ["latin"], weight: ["400", "500", "
 /** Our Google Analytics stream, for the live site and app only: never a preview, a local demo or a judge's run. */
 const GA_ID = process.env.VERCEL_ENV === "production" ? "G-MXCW2QCS5E" : null;
 
+const description = "Perpetual trading with capped profits and Extra Life NFTs for eligible losses. A NEAR prototype using test money; recovery is not guaranteed.";
+
+// the image files beside this one (opengraph-image, twitter-image, icon, apple-icon) are added to the page by Next
 export const metadata: Metadata = {
+  metadataBase: process.env.ONEUP_APP_URL ? new URL(process.env.ONEUP_APP_URL) : undefined,
   title: "OneUp",
-  description: "Perpetual trading with capped profits and Extra Life NFTs for eligible losses. A NEAR prototype using test money; recovery is not guaranteed.",
+  description,
+  openGraph: { title: "OneUp", description, siteName: "OneUp", type: "website", url: "/" },
+  twitter: { card: "summary_large_image", title: "OneUp", description },
 };
+
+export const viewport: Viewport = { themeColor: "#15162a" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
