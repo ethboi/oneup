@@ -4,13 +4,13 @@
 // and a `run` helper that shows each transaction's progress.
 
 import { Account, type KeyPairString } from "near-api-js";
-import { rpcList, type AppDeployment } from "./app-config";
+import type { AppDeployment } from "./app-config";
 import { useNearWallet } from "./near-wallet";
 import { WalletWelcome } from "@/components/WalletWelcome";
 import { sfx } from "./sound";
 import { pollSerial } from "./poll";
 import { loadSession, saveSession, sessionExists, sessionSender, type Session } from "./session";
-import { FailoverProvider, OneUp, accountSender, normalizePrice } from "@oneup/sdk";
+import { FailoverProvider, OneUp, accountSender, normalizePrice, rpcList } from "@oneup/sdk";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 export interface Toast {

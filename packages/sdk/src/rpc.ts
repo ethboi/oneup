@@ -24,6 +24,8 @@ export class PacedProvider extends JsonRpcProvider {
     private readonly retries = 5,
     private readonly sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms)),
     private readonly timeoutMs = 60_000,
+    /** Sends through this instead of `url`, such as a FailoverProvider. */
+    private readonly through?: JsonRpcProvider,
   ) {
     super({ url });
   }
@@ -45,7 +47,7 @@ export class PacedProvider extends JsonRpcProvider {
           timer = setTimeout(() => reject(Error(`RPC ${String(a[0])} had no answer in ${this.timeoutMs / 1000} s`)), this.timeoutMs);
         });
         try {
-          return await Promise.race([super.sendJsonRpc(...a), timeout]);
+          return await Promise.race([this.through ? this.through.sendJsonRpc(...a) : super.sendJsonRpc(...a), timeout]);
         } finally {
           clearTimeout(timer);
         }
@@ -59,9 +61,26 @@ export class PacedProvider extends JsonRpcProvider {
   }
 }
 
+/**
+ * Public NEAR testnet RPCs that take requests from anywhere, browsers included. They all limit each IP, so the app,
+ * keeper and bots fall through them (FailoverProvider). The last two are slow and for when the others refuse.
+ */
+export const TESTNET_RPCS = [
+  "https://testnet-rpc.intea.rs/",
+  "https://test.rpc.fastnear.com/",
+  "https://near-testnet.drpc.org/",
+  "https://rpc.testnet.near.org/",
+  "https://archival-rpc.testnet.near.org/",
+];
+/** The configured RPC first, then the others. */
+export const rpcList = (primary: string) => {
+  const first = new URL(primary).href;
+  return [first, ...TESTNET_RPCS.filter((url) => url !== first)];
+};
+
 /** The RPC couldn't answer, as opposed to answering with an error such as a contract panic. */
 const isUnavailable = (e: unknown) =>
-  e instanceof TypeError || isRateLimited(e) || /retries|attempts|bad gateway|unavailable|timeout|internal server error|fetch/i.test(String(e instanceof Error ? e.message : e));
+  e instanceof TypeError || isRateLimited(e) || /retries|attempts|bad gateway|unavailable|timeout|no answer|internal server error|fetch/i.test(String(e instanceof Error ? e.message : e));
 
 /**
  * Reads and sends through the first RPC that isn't resting. One that refuses or fails rests for `restMs` while the
@@ -76,6 +95,7 @@ export class FailoverProvider extends JsonRpcProvider {
     private readonly restMs = 30_000,
     private readonly now = () => Date.now(),
     make = (url: string) => new JsonRpcProvider({ url }, { retries: 1, wait: 0, backoff: 1 }),
+    private readonly timeoutMs = 30_000,
   ) {
     super({ url: urls[0]! });
     this.rpcs = urls.map((url) => ({ provider: make(url), restUntil: 0 }));
@@ -90,7 +110,15 @@ export class FailoverProvider extends JsonRpcProvider {
     let last: unknown;
     for (const rpc of order) {
       try {
-        return await rpc.provider.sendJsonRpc(...a);
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const timeout = new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(Error(`RPC ${String(a[0])} had no answer in ${this.timeoutMs / 1000} s`)), this.timeoutMs);
+        });
+        try {
+          return await Promise.race([rpc.provider.sendJsonRpc(...a), timeout]);
+        } finally {
+          clearTimeout(timer);
+        }
       } catch (e) {
         if (!isUnavailable(e)) throw e;
         rpc.restUntil = this.now() + this.restMs;

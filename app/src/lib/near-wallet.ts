@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { NearConnector, NearWalletBase, EventMap } from "@hot-labs/near-connect";
-import { FailoverProvider } from "@oneup/sdk";
+import { FailoverProvider, rpcList } from "@oneup/sdk";
 import { JsonRpcProvider } from "near-api-js";
-import { rpcList, type AppDeployment } from "./app-config";
+import type { AppDeployment } from "./app-config";
 import { assertTestnetWallet, walletOptions, signedInAccount } from "./wallet-config";
 import { walletSender } from "./wallet-send";
 

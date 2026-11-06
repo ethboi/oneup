@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { JsonRpcProvider } from "near-api-js";
-import { FailoverProvider, PacedProvider, isRateLimited } from "./rpc.ts";
+import { FailoverProvider, PacedProvider, TESTNET_RPCS, isRateLimited, rpcList } from "./rpc.ts";
 
 const limitError = Error('{"jsonrpc": "2.0", "error": {"code": -429, "message": "Rate limits exceeded."}}');
 const send = (p: PacedProvider) => p.sendJsonRpc("status" as never, {} as never);
@@ -86,6 +86,12 @@ describe("FailoverProvider", () => {
     expect(await call(f)).toBe("a");
   });
 
+  it("moves on from an RPC that never answers", async () => {
+    const a = rpc(() => new Promise(() => {}));
+    const f = new FailoverProvider(["http://0.invalid", "http://1.invalid"], 30_000, () => 1000, (url) => (url.includes("0") ? a.p : rpc(() => "b").p), 5);
+    expect(await call(f)).toBe("b");
+  });
+
   it("passes on a contract's error without trying another RPC", async () => {
     const b = rpc(() => "b");
     const { f } = setup(rpc(() => { throw Error("Smart contract panicked: Epoch not finished"); }), b);
@@ -102,5 +108,17 @@ describe("FailoverProvider", () => {
     await expect(call(f)).rejects.toThrow();
     expect(a.spy).toHaveBeenCalledTimes(2);
     expect(b.spy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("rpcList", () => {
+  it("puts the configured RPC first, once", () => {
+    const list = rpcList("https://near-testnet.drpc.org");
+    expect(list[0]).toBe("https://near-testnet.drpc.org/");
+    expect(list).toHaveLength(TESTNET_RPCS.length);
+    expect(new Set(list).size).toBe(list.length);
+  });
+  it("keeps an RPC that isn't on the list", () => {
+    expect(rpcList("https://other.invalid")).toHaveLength(TESTNET_RPCS.length + 1);
   });
 });

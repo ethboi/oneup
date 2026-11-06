@@ -33,7 +33,7 @@ import { HermesSource, LiveSource, SimSource, priceDue, sane, type PriceSource, 
 import { validSteer } from "./control.ts";
 import { processOrders } from "./orders.ts";
 import { reconcileBuybacks, restoreBuybacks } from "./buybacks.ts";
-import { PacedProvider } from "@oneup/sdk";
+import { FailoverProvider, PacedProvider, rpcList } from "@oneup/sdk";
 import { crossesThreshold } from "./thresholds.ts";
 
 const { values: args } = parseArgs({
@@ -59,7 +59,11 @@ const d: Deployment = JSON.parse(readFileSync(args.config!, "utf8"));
 // a separate RPC for this process (ONEUP_RPC): on testnet the keeper, the bots and the site's visitors would
 // otherwise share one provider's free-tier rate limit
 if (process.env.ONEUP_RPC) d.rpcUrl = process.env.ONEUP_RPC;
-const rpc = new PacedProvider(d.rpcUrl, Number(args["rpc-gap"]));
+// on testnet, an RPC that refuses or hangs hands over to the next; the outer limit leaves time to go through them
+const rpc =
+  d.network === "testnet"
+    ? new PacedProvider(d.rpcUrl, Number(args["rpc-gap"]), 5, undefined, 180_000, new FailoverProvider(rpcList(d.rpcUrl)))
+    : new PacedProvider(d.rpcUrl, Number(args["rpc-gap"]));
 const oneup = new OneUp(d, rpc);
 const keeper = oneup.calls(accountSender(new Account(d.keeper.id, oneup.provider, d.keeper.key as KeyPairString)));
 const owner = oneup.calls(accountSender(new Account(d.owner.id, oneup.provider, d.owner.key as KeyPairString)));
