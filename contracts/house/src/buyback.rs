@@ -10,7 +10,7 @@ use near_sdk::{env, near, require, AccountId, Gas, NearToken, PromiseError, Prom
 use crate::oracle::ext_ft;
 use crate::{Epoch, House, HouseExt};
 
-const GAS_SWAP: Gas = Gas::from_tgas(150);
+const GAS_SWAP: Gas = Gas::from_tgas(170);
 const GAS_SWAP_CALLBACK: Gas = Gas::from_tgas(15);
 const GAS_FORWARD: Gas = Gas::from_tgas(60);
 const GAS_FORWARD_CALLBACK: Gas = Gas::from_tgas(15);

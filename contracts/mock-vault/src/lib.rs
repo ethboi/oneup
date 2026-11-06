@@ -8,6 +8,8 @@ use near_sdk::store::LookupMap;
 use near_sdk::{env, ext_contract, near, require, AccountId, Gas, NearToken, PanicOnDefault, Promise, PromiseOrValue};
 
 const GAS_FT: Gas = Gas::from_tgas(10);
+const GAS_CALLBACK: Gas = Gas::from_tgas(5);
+const GAS_REPORT: Gas = Gas::from_tgas(2);
 /// The mock USDC faucet's limit per call.
 const FAUCET_MAX: u128 = 10_000 * 1_000_000;
 const PPM: u128 = 1_000_000;
@@ -65,7 +67,26 @@ impl MockVault {
         ext_usdc::ext(self.usdc.clone())
             .with_attached_deposit(NearToken::from_yoctonear(1))
             .with_static_gas(GAS_FT)
-            .ft_transfer(who, amount, None)
+            .ft_transfer(who.clone(), amount, None)
+            .then(Self::ext(env::current_account_id()).with_static_gas(GAS_CALLBACK.saturating_add(GAS_REPORT)).on_withdrawn(who, amount))
+    }
+
+    /// A failed transfer gives the principal back. The caller still has to see the failure, and a panic here would
+    /// undo the restoring, so that comes from a promise of its own.
+    #[private]
+    pub fn on_withdrawn(&mut self, who: AccountId, amount: U128, #[callback_result] r: Result<(), near_sdk::PromiseError>) -> PromiseOrValue<()> {
+        if r.is_ok() {
+            return PromiseOrValue::Value(());
+        }
+        let mut d = self.settled(&who);
+        d.principal.0 += amount.0;
+        self.deposits.insert(who, d);
+        PromiseOrValue::Promise(Self::ext(env::current_account_id()).with_static_gas(GAS_REPORT).withdrawal_failed())
+    }
+
+    #[private]
+    pub fn withdrawal_failed(&self) {
+        env::panic_str("Withdrawal failed; the principal is still deposited");
     }
 
     /// Sends the caller's accrued interest (up to the faucet's 10,000 per call; the rest stays accrued) and
@@ -85,14 +106,21 @@ impl MockVault {
             ext_usdc::ext(usdc.clone())
                 .with_static_gas(GAS_FT)
                 .faucet(None, U128(amount))
-                .then(ext_usdc::ext(usdc).with_attached_deposit(NearToken::from_yoctonear(1)).with_static_gas(GAS_FT).ft_transfer(who, U128(amount), None))
-                .then(Self::ext(env::current_account_id()).with_static_gas(Gas::from_tgas(5)).sent(U128(amount))),
+                .then(ext_usdc::ext(usdc).with_attached_deposit(NearToken::from_yoctonear(1)).with_static_gas(GAS_FT).ft_transfer(who.clone(), U128(amount), None))
+                .then(Self::ext(env::current_account_id()).with_static_gas(Gas::from_tgas(5)).sent(who, U128(amount))),
         )
     }
 
     #[private]
-    pub fn sent(&mut self, amount: U128, #[callback_result] r: Result<(), near_sdk::PromiseError>) -> U128 {
-        if r.is_ok() { amount } else { U128(0) }
+    pub fn sent(&mut self, who: AccountId, amount: U128, #[callback_result] r: Result<(), near_sdk::PromiseError>) -> U128 {
+        if r.is_ok() {
+            return amount;
+        }
+        // not delivered: it stays accrued
+        let mut d = self.settled(&who);
+        d.interest.0 += amount.0;
+        self.deposits.insert(who, d);
+        U128(0)
     }
 
     /// A depositor's principal and interest accrued to now.

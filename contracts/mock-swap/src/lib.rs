@@ -5,6 +5,7 @@ use near_sdk::json_types::U128;
 use near_sdk::{env, ext_contract, near, require, AccountId, Gas, NearToken, PanicOnDefault, PromiseOrValue};
 
 const GAS_PAYOUT: Gas = Gas::from_tgas(100);
+const GAS_SWAPPED: Gas = Gas::from_tgas(5);
 const FEE_PPM: u128 = 3_000;
 
 #[near(serializers = [json])]
@@ -59,14 +60,28 @@ impl MockSwap {
                 require!(out > 0 && out >= min_out.0, "Not enough output");
                 self.usdc_reserve += amount.0;
                 self.oneup_reserve -= out;
-                ext_ft::ext(self.oneup.clone())
-                    .with_attached_deposit(NearToken::from_yoctonear(1))
-                    .with_static_gas(GAS_PAYOUT)
-                    .ft_transfer_call(receiver_id, U128(out), None, msg)
-                    .detach();
-                PromiseOrValue::Value(U128(0))
+                PromiseOrValue::Promise(
+                    ext_ft::ext(self.oneup.clone())
+                        .with_attached_deposit(NearToken::from_yoctonear(1))
+                        .with_static_gas(GAS_PAYOUT)
+                        .ft_transfer_call(receiver_id, U128(out), None, msg)
+                        .then(Self::ext(env::current_account_id()).with_static_gas(GAS_SWAPPED).on_swapped(amount, U128(out))),
+                )
             }
         }
+    }
+
+    /// How much of the USDC to give back, by what the receiver kept of the output: nothing delivered undoes the
+    /// swap and refunds the USDC, and a part delivered returns only the rest of the $1UP to the reserve.
+    #[private]
+    pub fn on_swapped(&mut self, usdc_in: U128, out: U128, #[callback_result] used: Result<U128, near_sdk::PromiseError>) -> U128 {
+        let delivered = used.map_or(0, |u| u.0.min(out.0));
+        self.oneup_reserve += out.0 - delivered;
+        if delivered > 0 {
+            return U128(0);
+        }
+        self.usdc_reserve -= usdc_in.0;
+        usdc_in
     }
 
     /// $1UP out for `usdc_in`, after a 0.3% fee.
@@ -108,5 +123,47 @@ mod tests {
         // 1_000 USDC into a 100K / 10M pool: 10M × 997 / 100_997 ≈ 98_715.8 $1UP
         let out = s.get_quote(U128(1_000 * 1_000_000)).0;
         assert_eq!(out / one, 98_715);
+    }
+
+    fn callback(result: near_sdk::PromiseResult) {
+        testing_env!(
+            VMContextBuilder::new().predecessor_account_id(env::current_account_id()).current_account_id(env::current_account_id()).build(),
+            near_sdk::test_vm_config(),
+            near_sdk::RuntimeFeesConfig::test(),
+            Default::default(),
+            vec![result],
+        );
+    }
+
+    fn pool() -> MockSwap {
+        testing_env!(VMContextBuilder::new().predecessor_account_id("usdc".parse().unwrap()).build());
+        let mut s = MockSwap::new("owner".parse().unwrap(), "usdc".parse().unwrap(), "oneup".parse().unwrap());
+        s.usdc_reserve = 1_000;
+        s.oneup_reserve = 5_000;
+        s
+    }
+
+    #[test]
+    fn nothing_delivered_undoes_the_swap_and_refunds_the_usdc() {
+        let mut s = pool();
+        callback(near_sdk::PromiseResult::Failed);
+        assert_eq!(s.on_swapped(U128(100), U128(400), Err(near_sdk::PromiseError::Failed)).0, 100);
+        assert_eq!((s.usdc_reserve, s.oneup_reserve), (900, 5_400));
+    }
+
+    #[test]
+    fn a_full_delivery_keeps_the_swap() {
+        let mut s = pool();
+        callback(near_sdk::PromiseResult::Successful(b"\"400\"".to_vec()));
+        assert_eq!(s.on_swapped(U128(100), U128(400), Ok(U128(400))).0, 0);
+        assert_eq!((s.usdc_reserve, s.oneup_reserve), (1_000, 5_000));
+    }
+
+    #[test]
+    fn a_part_delivery_returns_only_the_rest_of_the_output() {
+        let mut s = pool();
+        callback(near_sdk::PromiseResult::Successful(b"\"150\"".to_vec()));
+        assert_eq!(s.on_swapped(U128(100), U128(400), Ok(U128(150))).0, 0);
+        assert_eq!((s.usdc_reserve, s.oneup_reserve), (1_000, 5_250));
     }
 }
