@@ -7,8 +7,8 @@
 
 import { readFileSync, statSync, writeFileSync } from "node:fs";
 import { isAbsolute } from "node:path";
-import { Account, JsonRpcProvider, KeyPair, nearToYocto, teraToGas, type KeyPairString } from "near-api-js";
-import { ONEUP, USDC, type Deployment } from "@oneup/sdk";
+import { Account, KeyPair, nearToYocto, teraToGas, type KeyPairString } from "near-api-js";
+import { FailoverProvider, ONEUP, PacedProvider, USDC, rpcList, type Deployment } from "@oneup/sdk";
 
 const file = process.env.ONEUP_CONFIG;
 if (!file || !isAbsolute(file)) throw Error("Set ONEUP_CONFIG to the absolute path of the testnet operator.json.");
@@ -27,7 +27,8 @@ if (!process.argv.includes("--execute")) {
   process.exit(0);
 }
 
-const provider = new JsonRpcProvider({ url: d.rpcUrl });
+// through every public RPC: one refusing partway must not leave a funded account half set up
+const provider = new PacedProvider(d.rpcUrl, 300, 5, undefined, 240_000, new FailoverProvider(rpcList(d.rpcUrl)));
 if ((await provider.getNetworkId()) !== "testnet") throw Error("RPC network is not testnet.");
 const root = new Account(d.owner.id, provider, d.owner.key as KeyPairString);
 const call = (contractId: string, methodName: string, args: Record<string, unknown>, deposit = 0n) =>

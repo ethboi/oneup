@@ -564,3 +564,44 @@ fn a_lock_untouched_during_a_transfer_call_gets_its_approvals_back() {
     assert!(approved(&v, &id));
     assert!(v.in_flight.get(&id).is_none());
 }
+
+#[test]
+fn a_lock_draws_its_own_picture_from_its_state() {
+    let mut v = setup();
+    let id = lock(&mut v, "bob", 100, 104);
+    let meta = |v: &Ve| v.nft_token(id.clone()).unwrap().metadata.unwrap();
+
+    let full = meta(&v);
+    assert!(full.media.as_ref().unwrap().starts_with("data:image/svg+xml"));
+    assert_eq!(full.title.as_deref(), Some(format!("$1UP Lock #{id}").as_str()));
+    assert!(full.description.unwrap().contains("locked until round"));
+    assert!(full.extra.unwrap().contains(r#""state":"locked""#));
+
+    // the body drains as the unlock nears: fewer gold rows, the same picture otherwise
+    let end = v.lock_info(id.clone()).unwrap().end;
+    let gold = |m: &str| m.matches("f2b705").count();
+    let before = gold(full.media.as_ref().unwrap());
+    checkpoint(&mut v, end - 10);
+    let near = meta(&v);
+    assert!(gold(near.media.as_ref().unwrap()) < before);
+    assert!(near.media.unwrap().contains("7fa9b0"));
+
+    // ready to unlock: full of gold again, with the shackle open
+    checkpoint(&mut v, end);
+    let ready = meta(&v);
+    assert_eq!(gold(ready.media.as_ref().unwrap()), before);
+    assert!(ready.extra.unwrap().contains(r#""state":"ready""#));
+    assert!(ready.description.unwrap().contains("ready to unlock"));
+
+    // listed the same way by the enumeration views
+    let listed = near_contract_standards::non_fungible_token::enumeration::NonFungibleTokenEnumeration::nft_tokens(&v, None, None);
+    assert!(listed[0].metadata.as_ref().unwrap().media.is_some());
+}
+
+#[test]
+fn the_collection_has_a_name_and_an_icon() {
+    use near_contract_standards::non_fungible_token::metadata::NonFungibleTokenMetadataProvider;
+    let m = setup().nft_metadata();
+    assert_eq!(m.name, "OneUp $1UP Lock");
+    assert!(m.icon.unwrap().starts_with("data:image/svg+xml"));
+}

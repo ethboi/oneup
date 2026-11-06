@@ -457,8 +457,8 @@ impl Ve {
             Lock { amount, created: self.epoch, end, from_loss, exited: None, withdrawn: false, merged_from, merged_into: None },
         );
         let metadata = TokenMetadata {
-            title: Some(format!("ve1UP #{id}")),
-            description: Some(format!("{} $1UP locked until epoch {end}", amount / math::ONEUP)),
+            title: Some(format!("$1UP Lock #{id}")),
+            description: Some(format!("{} $1UP locked until round {end}", amount / math::ONEUP)),
             issued_at: Some(env::block_timestamp_ms().to_string()),
             ..Default::default()
         };
@@ -548,7 +548,7 @@ impl NonFungibleTokenCore for Ve {
     }
 
     fn nft_token(&self, token_id: TokenId) -> Option<Token> {
-        self.tokens.nft_token(token_id)
+        self.tokens.nft_token(token_id).map(|t| self.dynamic(t))
     }
 }
 
@@ -610,7 +610,7 @@ impl NonFungibleTokenEnumeration for Ve {
     }
 
     fn nft_tokens(&self, from_index: Option<U128>, limit: Option<u64>) -> Vec<Token> {
-        self.tokens.nft_tokens(from_index, limit)
+        self.tokens.nft_tokens(from_index, limit).into_iter().map(|t| self.dynamic(t)).collect()
     }
 
     fn nft_supply_for_owner(&self, account_id: AccountId) -> U128 {
@@ -618,7 +618,7 @@ impl NonFungibleTokenEnumeration for Ve {
     }
 
     fn nft_tokens_for_owner(&self, account_id: AccountId, from_index: Option<U128>, limit: Option<u64>) -> Vec<Token> {
-        self.tokens.nft_tokens_for_owner(account_id, from_index, limit)
+        self.tokens.nft_tokens_for_owner(account_id, from_index, limit).into_iter().map(|t| self.dynamic(t)).collect()
     }
 }
 
@@ -627,14 +627,110 @@ impl NonFungibleTokenMetadataProvider for Ve {
     fn nft_metadata(&self) -> NFTContractMetadata {
         NFTContractMetadata {
             spec: NFT_METADATA_SPEC.to_string(),
-            name: "ve1UP".to_string(),
-            symbol: "VE1UP".to_string(),
-            icon: None,
+            name: "OneUp $1UP Lock".to_string(),
+            symbol: "1UPLOCK".to_string(),
+            icon: Some(lock_svg(math::VE_MAX_EPOCHS, LockState::Locked)),
             base_uri: None,
             reference: None,
             reference_hash: None,
         }
     }
+}
+
+// Dynamic metadata
+
+const LOCKED: [&[u8; 9]; 9] =
+    [b"..#####..", b".##...##.", b".#.....#.", b".#.....#.", b"GGGGGGGGG", b"GGGGKGGGG", b"GGGKKKGGG", b"GGGGKGGGG", b"GGGGGGGGG"];
+/// The shackle lifted free on its left side.
+const OPEN: [&[u8; 9]; 9] =
+    [b"..#####..", b".##...##.", b".#.....#.", b".......#.", b"GGGGGGGGG", b"GGGGKGGGG", b"GGGKKKGGG", b"GGGGKGGGG", b"GGGGGGGGG"];
+const BODY_ROWS: u64 = 5;
+
+#[derive(Clone, Copy)]
+enum LockState {
+    Locked,
+    Ready,
+    Closed,
+}
+
+impl LockState {
+    fn name(self) -> &'static str {
+        match self {
+            LockState::Locked => "locked",
+            LockState::Ready => "ready",
+            LockState::Closed => "closed",
+        }
+    }
+}
+
+impl Ve {
+    /// The token with its image and description drawn from the lock's state now.
+    fn dynamic(&self, mut t: Token) -> Token {
+        let Some(lock) = self.locks.get(&t.token_id) else { return t };
+        let amount = lock.amount / math::ONEUP;
+        let left = lock.end.saturating_sub(self.epoch);
+        let (state, line) = if lock.withdrawn {
+            (LockState::Closed, format!("Closed: held {amount} $1UP."))
+        } else if left == 0 {
+            (LockState::Ready, format!("{amount} $1UP, ready to unlock."))
+        } else {
+            (LockState::Locked, format!("{amount} $1UP locked until round {}.", lock.end))
+        };
+        let m = t.metadata.get_or_insert_with(TokenMetadata::default);
+        m.title = Some(format!("$1UP Lock #{}", t.token_id));
+        m.media = Some(lock_svg(left, state));
+        m.description = Some(line);
+        m.extra = Some(format!(
+            r#"{{"amount":"{}","end":{},"state":"{}","from_loss":{}}}"#,
+            lock.amount,
+            lock.end,
+            state.name(),
+            lock.from_loss
+        ));
+        t
+    }
+}
+
+/// A pixel padlock on an LCD screen. Its gold body drains from the top as the unlock nears, the shackle opens once
+/// it can be unlocked, and it goes grey once closed. A `data:` URI, so wallets and explorers show it without a server.
+/// The app draws the same picture (app/src/lib/lockArt.ts).
+fn lock_svg(left: u64, state: LockState) -> String {
+    let rows = if matches!(state, LockState::Ready) { &OPEN } else { &LOCKED };
+    let (bg, shackle, gold, drained) = match state {
+        LockState::Locked => ("a8cbd0", "4f5570", "f2b705", "7fa9b0"),
+        LockState::Ready => ("b7c49a", "4f5570", "f2b705", "f2b705"),
+        LockState::Closed => ("c9cbd4", "8a8c99", "a9abb6", "a9abb6"),
+    };
+    let filled = match state {
+        LockState::Locked => (left * BODY_ROWS).div_ceil(math::VE_MAX_EPOCHS).min(BODY_ROWS),
+        _ => BODY_ROWS,
+    };
+    let ink = "1c1b29";
+    let on = |x: i32, y: i32| (0..9).contains(&x) && (0..9).contains(&y) && rows[y as usize][x as usize] != b'.';
+    let mut cells = String::new();
+    // the ink outline: empty cells touching the padlock
+    for y in -1..=9 {
+        for x in -1..=9 {
+            if !on(x, y) && (on(x - 1, y) || on(x + 1, y) || on(x, y - 1) || on(x, y + 1)) {
+                cells.push_str(&format!("<rect x='{}' y='{}' width='1' height='1' fill='%23{ink}'/>", x + 2, y + 2));
+            }
+        }
+    }
+    for (y, row) in rows.iter().enumerate() {
+        for (x, c) in row.iter().enumerate() {
+            let fill = match c {
+                b'.' => continue,
+                b'#' => shackle,
+                b'K' => ink,
+                _ if (9 - y as u64) <= filled => gold,
+                _ => drained,
+            };
+            cells.push_str(&format!("<rect x='{}' y='{}' width='1' height='1' fill='%23{fill}'/>", x + 2, y + 2));
+        }
+    }
+    format!(
+        "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 13' shape-rendering='crispEdges'><rect width='13' height='13' fill='%23{bg}'/>{cells}</svg>"
+    )
 }
 
 #[cfg(test)]

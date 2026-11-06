@@ -204,7 +204,7 @@ impl ExtraLife {
                 fmt_ppm(item.cap_ppm.0),
                 fmt_usdc(item.face.0)
             );
-            self.mint_life(id.clone(), item.owner, life, format!("Extra Life · epoch {epoch}"), description);
+            self.mint_life(id.clone(), item.owner, life, format!("Extra Life · round {epoch}"), description);
             ids.push(id);
         }
         ids
@@ -618,7 +618,7 @@ impl NonFungibleTokenMetadataProvider for ExtraLife {
             spec: NFT_METADATA_SPEC.to_string(),
             name: "OneUp Extra Life".to_string(),
             symbol: "1UPLIFE".to_string(),
-            icon: None,
+            icon: Some(heart_svg(1, 1, HeartState::Healed, false)),
             base_uri: None,
             reference: None,
             reference_hash: None,
