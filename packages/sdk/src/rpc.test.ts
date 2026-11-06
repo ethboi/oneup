@@ -71,6 +71,13 @@ describe("FailoverProvider", () => {
     expect(a.spy).toHaveBeenCalledTimes(1);
   });
 
+  it("recognises a refusal however the RPC words it", async () => {
+    for (const words of ['{"statusCode": 429, "message": "You have exceeded your limit of 5 requests per minute."}', "Rate limit exceeded, retry after 22 seconds", "HTTP 429"]) {
+      const { f } = setup(rpc(() => { throw Error(words); }), rpc(() => "b"));
+      expect(await call(f)).toBe("b");
+    }
+  });
+
   it("moves on when the browser can't reach an RPC", async () => {
     const { f } = setup(rpc(() => { throw new TypeError("Failed to fetch"); }), rpc(() => "b"));
     expect(await call(f)).toBe("b");

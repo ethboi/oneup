@@ -2,7 +2,7 @@ import { JsonRpcProvider } from "near-api-js";
 
 /** A rate-limit refusal. FastNEAR's free tier sends it as a JSON-RPC error (code -429) inside an HTTP 200, which
  *  near-api-js does not retry. */
-export const isRateLimited = (e: unknown) => /-429|rate limits? exceeded|too many requests/i.test(String(e instanceof Error ? e.message : e));
+export const isRateLimited = (e: unknown) => /-429|\b429\b|rate limits? exceeded|exceeded your limit|too many requests/i.test(String(e instanceof Error ? e.message : e));
 
 /**
  * A provider that spaces its requests at least `gapMs` apart and, when the RPC refuses one for its rate limit,
@@ -69,7 +69,6 @@ export const TESTNET_RPCS = [
   "https://testnet-rpc.intea.rs/",
   "https://test.rpc.fastnear.com/",
   "https://near-testnet.drpc.org/",
-  "https://near-testnet.gateway.tatum.io/",
   "https://rpc.testnet.near.org/",
   "https://archival-rpc.testnet.near.org/",
 ];
