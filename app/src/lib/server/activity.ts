@@ -62,7 +62,7 @@ type HistoryEntry = { t: number; tx?: string } & (
   | { kind: "jackpot"; amount: string; tickets: string }
   | { kind: "claim_oneup"; amount: string }
   | { kind: "life" | "lock"; token_id: string }
-  | { kind: "bought" | "sold"; what: "Extra Life" | "$1UP lock"; price: string; other: string }
+  | { kind: "bought" | "sold"; what: "Life NFT" | "$1UP lock"; price: string; other: string }
 );
 
 interface Opened {
@@ -252,21 +252,21 @@ export function toItems(ev: Event, executor: string, t: number, c: Record<string
         t,
         kind: "epoch",
         text: lives
-          ? `Round ${s.epoch} closed: ${lives} Extra Lives, ${usd(s.lives_pot)} paid to lives`
-          : `Round ${s.epoch} closed: the house didn't profit, no Extra Lives`,
+          ? `Round ${s.epoch} closed: ${lives} Life NFTs, ${usd(s.lives_pot)} paid to lives`
+          : `Round ${s.epoch} closed: the house didn't profit, no Life NFTs`,
       });
     } else if (ev.standard === "nep171" && ev.event === "nft_mint" && executor === c.life) {
       const owner = String(d.owner_id);
       const token = String((d.token_ids as string[])[0]);
       if (token.startsWith("0:")) continue; // the seed's life
-      out.feed.push({ t, kind: "life", who: short(owner), text: `${short(owner)} got an Extra Life` });
+      out.feed.push({ t, kind: "life", who: short(owner), text: `${short(owner)} got a Life NFT` });
       mine(owner, { t, kind: "life", token_id: token });
     } else if (ev.standard === "nep171" && ev.event === "nft_mint" && executor === c.ve) {
       const owner = String(d.owner_id);
       out.feed.push({ t, kind: "lock", who: short(owner), text: `${short(owner)} got a $1UP lock` });
       mine(owner, { t, kind: "lock", token_id: String((d.token_ids as string[])[0]) });
     } else if (ev.standard === "oneup_market" && ev.event === "sold") {
-      const what = d.nft_contract === c.life ? "Extra Life" : "$1UP lock";
+      const what = d.nft_contract === c.life ? "Life NFT" : "$1UP lock";
       const buyer = String(d.buyer);
       const seller = String(d.seller);
       out.feed.push({
@@ -473,7 +473,7 @@ export interface Board {
   top: BoardRow[];
   /** The best single trade by return on margin. */
   best: (TradeRecord & { account: string }) | null;
-  /** The biggest single loss: the biggest Extra Life on its way. */
+  /** The biggest single loss: the biggest Life NFT on its way. */
   biggestLoss: (TradeRecord & { account: string }) | null;
   synced: boolean;
 }

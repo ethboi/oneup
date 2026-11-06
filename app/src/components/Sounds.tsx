@@ -1,7 +1,7 @@
 "use client";
 
 // Plays the moments that happen on chain rather than on a click: your order filling, a trade closing (win,
-// loss, liquidation, take-profit, stop), a new Extra Life and a Full Heal. Losses feed the TILT meter and a
+// loss, liquidation, take-profit, stop), a new Life NFT and a Full Heal. Losses feed the TILT meter and a
 // win after a near miss earns Clutch. Also the header's sound menu (effects and music).
 
 import { useEffect, useRef, useState } from "react";
@@ -56,7 +56,7 @@ export function SoundEvents() {
       sfx(tier === 3 ? "jackpot" : kind);
       emitFx({ kind, market, positionId: id, pnl: net.toString(), tier, side, leverage });
       if (v < 0n) {
-        sfx("plusOne"); // a loss is an Extra Life on its way
+        sfx("plusOne"); // a loss is a Life NFT on its way
         if (recordLoss(me)) {
           setTimeout(() => sfx("tilt"), 900);
           addFlag(me, "tilted");

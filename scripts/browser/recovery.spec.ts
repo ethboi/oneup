@@ -8,7 +8,7 @@ const fixture = JSON.parse(readFileSync(process.env.ONEUP_BROWSER_FIXTURE!, "utf
 // This client only reads chain state. Every listing, purchase and claim below is submitted by the rendered app.
 const o = new OneUp({ network: "localnet", rpcUrl: fixture.rpcUrl, contracts: fixture.contracts } as Deployment);
 async function withdrawn() { const life = (await o.lifeInfo(fixture.tokenId))!; return BigInt(life.paid) - BigInt(life.claimable); }
-const lifePath = `/extra-lives#life=${encodeURIComponent(fixture.tokenId)}`;
+const lifePath = `/life-nfts#life=${encodeURIComponent(fixture.tokenId)}`;
 async function switchAccount(page: Page, account: string) {
   await page.getByRole("button", { name: "Demo tools", exact: true }).click();
   await page.getByRole("combobox", { name: "Account", exact: true }).selectOption(account);

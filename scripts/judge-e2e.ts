@@ -61,7 +61,7 @@ assert.ok(BigInt(await o.usdcBalance(buyer.id)) > beforeClaim, "buyer inherits c
 const s = await o.solvency(); assert.ok(BigInt(s.pool) >= BigInt(s.liability));
 assert.equal((await o.quoteOpen("NEAR-USD", "Long", 1000000n * USDC, 50)).allowed, false, "oversized risk refused");
 const hashes = await inspectDeployment(d); assert.ok(hashes.every(h => h.matches));
-// D-20: the Sputnik DAO owns the house, the Extra Lives (which house mints and pays them) and the oracle (who pushes prices)
+// D-20: the Sputnik DAO owns the house, the Life NFTs (which house mints and pays them) and the oracle (who pushes prices)
 assert.ok(d.contracts.dao, "the local deployment has a DAO");
 assert.equal((await o.view<[string, string | null]>(d.contracts.house, "get_owner"))[0], d.contracts.dao);
 assert.equal(await o.view<string>(d.contracts.life, "get_owner"), d.contracts.dao);

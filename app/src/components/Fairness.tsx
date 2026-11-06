@@ -49,7 +49,7 @@ export function Fairness() {
         <span className="num font-bold">{pct(r.y1ShareOfY3.papertrade)}</span> under Papertrade-style rules.
       </p>
       <p className="label mt-1">
-        In this model, Extra Lives can receive payouts for {r.params.lifeExpiryEpochs} rounds after their minting round.
+        In this model, Life NFTs can receive payouts for {r.params.lifeExpiryEpochs} rounds after their minting round.
         Expired Lives receive no new allocations, but recovery can still differ between traders. Each set of rules uses the same trading activity across {r.params.seeds} randomly generated runs,
         and each loss is tracked for {r.params.window} weeks. Weekly losses are assumed to grow from ${r.params.start?.toLocaleString()} to ${r.params.peak?.toLocaleString()}, with a {r.params.edge * 100}% average house edge, {r.params.utilisation * 100}% pool usage and a ${r.params.seed?.toLocaleString()} initial pool backed by a 1× claim. The separate sensitivity report also tests less favorable scenarios using the deployment’s funding amounts. This model does not check whether each trade could actually be accepted, so simulated trading flows can exceed available cash.
       </p>

@@ -1,7 +1,7 @@
 import type { LifeInfo } from "@oneup/sdk";
 import { lifeEconomics } from "./life-economics";
 
-export const lifeHref = (tokenId: string) => `/extra-lives#life=${encodeURIComponent(tokenId)}`;
+export const lifeHref = (tokenId: string) => `/life-nfts#life=${encodeURIComponent(tokenId)}`;
 
 /** A Life's ID is opaque, including ':' and percent characters. Other page anchors stay unrelated. */
 export function lifeFromHash(hash: string): string | null {

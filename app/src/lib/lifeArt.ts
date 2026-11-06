@@ -1,4 +1,4 @@
-// An Extra Life NFT's image, drawn as the contract draws it (heart_svg in contracts/extra-life/src/lib.rs): a pixel
+// A Life NFT's image, drawn as the contract draws it (heart_svg in contracts/extra-life/src/lib.rs): a pixel
 // heart on an LCD tile, filled from the bottom by paid / owed, gold behind a Full Heal or a Backer Life, grey once
 // expired. The same data: URI a wallet shows.
 

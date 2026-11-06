@@ -44,7 +44,7 @@ export function Lives() {
     window.scrollTo({ top: 0 });
   };
   const closeLife = () => {
-    history.pushState(null, "", "/extra-lives");
+    history.pushState(null, "", "/life-nfts");
     setSelected(null);
   };
   const { claimable: ready, earning, finished } = groupLives(lives ?? []);
@@ -58,8 +58,8 @@ export function Lives() {
 
   return (
     <div ref={list} tabIndex={-1} className="flex flex-col gap-5">
-      <Explainer title="Extra Lives" line="View your recovery NFTs, claim USDC or list a Life for sale.">
-        An eligible net loss in a profitable round can earn you an Extra Life. Its face value is based on your share of that round&apos;s house profit. Each round, half the surplus above the reserve forms the payout budget; 60% of that budget is shared among eligible Lives. Payouts depend on available profit and each Life&apos;s remaining limit, and may be zero.
+      <Explainer title="Life NFTs" line="View your recovery NFTs, claim USDC or list a Life for sale.">
+        An eligible net loss in a profitable round can earn you a Life NFT. Its face value is based on your share of that round&apos;s house profit. Each round, half the surplus above the reserve forms the payout budget; 60% of that budget is shared among eligible Lives. Payouts depend on available profit and each Life&apos;s remaining limit, and may be zero.
         {expiry === undefined ? " The contract sets each Life's earning period." : ` A recovery Life is eligible for payouts in the round it is created and up to ${expiry} more rounds. It keeps any unclaimed USDC after that.`}{" "}
         If someone buys your Life, its unclaimed USDC and remaining payout rights transfer to them. The payout limit is not a sale price.
       </Explainer>
@@ -79,7 +79,7 @@ export function Lives() {
           <Stat label="Allocated last round · all Lives" value={last ? money(BigInt(last.lives_pot)) : "–"} />
         </SummaryBar>
         <NextLife epochId={epoch?.id} left={epoch ? epoch.started_at + d.epochLengthS : 0} />
-        {lives === undefined ? <Empty icon="heart">Loading your Extra Lives…</Empty> : <>
+        {lives === undefined ? <Empty icon="heart">Loading your Life NFTs…</Empty> : <>
           {ready.length > 0 && <div className="divide-y divide-[var(--line)]"><PanelHead title={`Ready to claim (${ready.length})`} /><p className="px-4 pb-2 text-sm text-[var(--muted)]">Includes Lives whose earning period has ended. Open a Life to claim its USDC or manage its listing.</p>{rows(ready)}</div>}
           <div className="divide-y divide-[var(--line)]">
             <PanelHead title={`Awaiting future payouts (${earning.length})`} />
@@ -103,7 +103,7 @@ function NextLife({ epochId, left }: { epochId?: number; left: number }) {
   const lost = pending ? BigInt(pending) : 0n;
   let oneup = 0n;
   if (epoch && carry !== undefined && lost > 0n) oneup = previewLossEmission(epoch, BigInt(carry), lost, BigInt(params?.oneup_per_usdc ?? 20));
-  return <div className="flex items-center gap-3 bg-[var(--panel-2)] px-4 py-3"><PixelHeart size={28} fill={lost > 0n ? 0.5 : 0} /><div className="min-w-0 flex-1 text-sm"><b>Possible Extra Life · round {epochId ?? "…"}</b><div className="label num">{pending === undefined ? "Checking unsettled losses for this account…" : lost > 0n ? `$${fmtUsdc(lost)} net loss so far${oneup > 0n ? `, with an estimated ${fmtOneup(oneup.toString())} $1UP reward if the round settled now` : ""}. Round ends in ${fmtClock(Math.max(0, left - now))}; eligibility and payout amounts depend on the round’s final house profit.` : `No net loss this round. It closes in ${fmtClock(Math.max(0, left - now))}.`}</div></div></div>;
+  return <div className="flex items-center gap-3 bg-[var(--panel-2)] px-4 py-3"><PixelHeart size={28} fill={lost > 0n ? 0.5 : 0} /><div className="min-w-0 flex-1 text-sm"><b>Possible Life NFT · round {epochId ?? "…"}</b><div className="label num">{pending === undefined ? "Checking unsettled losses for this account…" : lost > 0n ? `$${fmtUsdc(lost)} net loss so far${oneup > 0n ? `, with an estimated ${fmtOneup(oneup.toString())} $1UP reward if the round settled now` : ""}. Round ends in ${fmtClock(Math.max(0, left - now))}; eligibility and payout amounts depend on the round’s final house profit.` : `No net loss this round. It closes in ${fmtClock(Math.max(0, left - now))}.`}</div></div></div>;
 }
 
 /** One Life as its card; it opens the Life, where it can be claimed or listed. */

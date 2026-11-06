@@ -192,7 +192,7 @@ async function handleEpoch() {
       closeRetries = 0;
       const e = (await oneup.epoch()).id - 1;
       const s = await oneup.epochSummary(e);
-      log(`epoch ${e} closed: house net ${fmt(s?.house_net)}, ${s?.lives_minted} Extra Lives, lives pot ${fmt(s?.lives_pot)}, buyback ${fmt(s?.buyback_pot)}`);
+      log(`epoch ${e} closed: house net ${fmt(s?.house_net)}, ${s?.lives_minted} Life NFTs, lives pot ${fmt(s?.lives_pot)}, buyback ${fmt(s?.buyback_pot)}`);
       return;
     }
     if (!closeCanContinue(r)) {

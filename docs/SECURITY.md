@@ -13,7 +13,7 @@ sequences of opens, closes, fills, liquidations, triggers, backings, expiries an
 ([`conservation_and_solvency`](../contracts/house/src/tests.rs)):
 
 - **No USDC is created or lost.** The house holds exactly pool + free balances + pending and open margins
-  + buyback USDC + pending backing + what it has sent to Extra Lives.
+  + buyback USDC + pending backing + what it has sent to Life NFTs.
 - **The pool covers every open position's max win** (D-1): liability ≤ pool, and the epoch payout never
   takes the pool below 1.2 × liability or below the total seeded.
 - **Liability is the sum of the markets'**, kept in step on every open, fill, expiry and close.
@@ -22,14 +22,14 @@ sequences of opens, closes, fills, liquidations, triggers, backings, expiries an
 The maths crate's property tests cover the rest: PnL is bounded to [−margin, 9 × margin] and rounds
 against the trader; a settlement conserves USDC and the winner's cut rounds up; the epoch payout never
 touches the seed; a Backer Life's cap stays on the curve, falls as the pool grows, and splitting a backing
-gains at most 2 ppm. The Extra Life crate's property test checks that claims never send more than the pots
+gains at most 2 ppm. The Life NFT crate's property test checks that claims never send more than the pots
 received and no life claims more than it was paid.
 
 ## Who can do what
 
 | Role | Account on localnet | Can | Can't |
 |---|---|---|---|
-| Owner | Sputnik DAO (D-20) | House: list, pause and size markets; set the oracle, swap, params, keeper, operator, Intents Verifier; hand over ownership. Extra Lives: point them at another house (`set_house`). Oracle: choose who pushes prices (`set_pusher`). The DAO is also the locks contract's owner, which has no owner-only methods | Touch traders' balances or positions directly |
+| Owner | Sputnik DAO (D-20) | House: list, pause and size markets; set the oracle, swap, params, keeper, operator, Intents Verifier; hand over ownership. Life NFTs: point them at another house (`set_house`). Oracle: choose who pushes prices (`set_pusher`). The DAO is also the locks contract's owner, which has no owner-only methods | Touch traders' balances or positions directly |
 | Operator | root | Run buybacks and retry delivery; fill, take profit at cap, and deploy pool capital through the shared keeper gate | Owner-only configuration |
 | Keeper | `keeper.test.near` | Fill orders, take profit at the 9× cap (D-23); push prices through a separate key that can only call the oracle; deploy pool USDC to the vault up to the contract's limit (D-27) | Pick a fill price older than the order or outside the window; move funds anywhere but the vault |
 | Anyone | – | Liquidate, place a close for a crossed trigger, expire a stale order, close an epoch, back the pool | Fill an order or take profit while a keeper is set |
@@ -52,7 +52,7 @@ trader's and the bots' keys (`/api/config`); the root, keeper and solver keys st
 - **The jackpot draw** uses NEAR's block random seed, which a validator could bias slightly.
 - **The keeper** is trusted to fill promptly (D-23). The contract requires a price published after the order and within its window; it does not establish that the first valid price was used. The keeper can delay within that window or let an order expire. Older prices are rejected.
 - **The owner** can change the oracle, the swap contract and the params, so it can take funds. That's why
-  a DAO owns the house, the Extra Lives and the oracle; on mainnet the DAO's council and voting period are the
+  a DAO owns the house, the Life NFTs and the oracle; on mainnet the DAO's council and voting period are the
   protection. The mocks of outside services (USDC, the swap, the vault) stay with the root account locally.
 
 ## Review findings (21 Oct 2026) and what changed
@@ -79,7 +79,7 @@ off-chain code (API routes, keeper, deploy). Every finding below has a test that
 | 15 | Low | A partial buyback swap could be swapped again | The rest goes back to the pool | `a_partial_buyback_is_not_swapped_twice` |
 | 16 | Low | A refused life pot cleared what lives were owed | Refused = still owed | `a_refused_pot_is_still_owed` |
 | 17 | Low | Changing the solvency rule with pending orders could freeze them | Refused while orders are pending | `solvency_rule_cannot_change_with_pending_orders` |
-| 18 | Low | Extra Life claims could record more than they sent; a failed claim restored the wrong tokens | Record only what's sent; restore each token's own amount; 30 per call | `claim_never_records_more_than_it_sends`, `failed_claim_restores_exactly_its_amounts` |
+| 18 | Low | Life NFT claims could record more than they sent; a failed claim restored the wrong tokens | Record only what's sent; restore each token's own amount; 30 per call | `claim_never_records_more_than_it_sends`, `failed_claim_restores_exactly_its_amounts` |
 | 19 | Low | A second seed from the owner was silently not owed | Backer Lives have their own ids | `the_owner_can_seed_twice`, `one_owner_can_back_twice` |
 | 20 | Low | The solver's fill check allowed a free 1% and odd payloads; the relay had no gas cap or rate limit | Exact checks, one fill at a time; 100 Tgas cap, 10 per 10 s | `app/test/fill.ts`, `app/test/relay.ts` |
 | 21 | Low | The keeper stamped prices after fetching, and one missing market stopped every push | Stamp before the fetch; skip bad markets; drop NaN, zero and isolated >20% jumps (sustained jumps accepted after ten rejected ticks) | `keeper/test/prices.ts` |
@@ -94,7 +94,7 @@ medium-severity issues. None changes a contract's state layout.
 | A | Medium | A buy was bound only to the price: a seller could claim a listed Life's USDC (which drops its approvals) and list it again at the same price, and a purchase already in flight paid for the emptied Life | A buy names the listing's `approval_id` too; a new listing has a new one, so the buyer is refunded | `a_relist_at_the_same_price_under_the_buyer_fails`, `buy_needs_the_approval_id`, sandbox `a_life_claimed_and_listed_again_is_not_sold_to_the_earlier_buyer` |
 | B | Medium | Marketplace fees count as house profit and Lives are sized by share of it, so in a quiet round a $1 loss minted a Life worth all the round's fees, plus the round's whole $1UP release | Lives and $1UP are sized from house profit up to the round's net losses (`recovery_base`); a face is never more than its loss. The rest stays in the pool and the unreleased $1UP carries | `fees_cannot_make_a_life_worth_more_than_its_loss`, `a_quiet_rounds_fees_dont_inflate_its_lives`, SDK previews |
 | C | Medium | A limit order priced through the market could be cancelled at once: a market order with a cancel button, the free option D-30 refuses market orders | A limit order rests for one fill window (30 s) before it can be cancelled, so a marketable one fills first | `limit_cannot_be_cancelled_inside_the_fill_window`, `a_marketable_limit_fills_before_it_can_be_cancelled` |
-| D | Medium | The DAO owned only the house: the root account kept the Extra Lives (`set_house`, which decides who mints and pays them) and the oracle (`set_pusher`) | The local deployment makes the DAO their owner at init, and `test:judge` checks it | `only_the_owner_repoints_the_house`, `once_repointed_the_old_house_cannot_mint`, `pnpm test:judge` (DAO ownership) |
+| D | Medium | The DAO owned only the house: the root account kept the Life NFTs (`set_house`, which decides who mints and pays them) and the oracle (`set_pusher`) | The local deployment makes the DAO their owner at init, and `test:judge` checks it | `only_the_owner_repoints_the_house`, `once_repointed_the_old_house_cannot_mint`, `pnpm test:judge` (DAO ownership) |
 
 Still open from that review: a resting limit order can be pulled once its first 30 seconds are up, so a trader
 who sees the market moving toward it can cancel before the oracle catches up (a cancel that takes effect a fill

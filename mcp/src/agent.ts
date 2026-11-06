@@ -1,6 +1,6 @@
 // One autonomous AI trading session on the local chain. Claude connects to the OneUp MCP server (src/index.ts),
 // reads the markets and its account, decides whether to trade, manages what it holds, looks at the market for
-// Extra Lives, and gives a reason for every action; the reasons land in the journal on the app's Agents tab.
+// Life NFTs, and gives a reason for every action; the reasons land in the journal on the app's Agents tab.
 // It trades as the AI agent's account (bot12, which the bots leave alone) unless ONEUP_ACCOUNT names another.
 //
 //   pnpm agent                        with ANTHROPIC_API_KEY: the Claude API, a tool loop over the MCP tools
@@ -18,8 +18,8 @@ const TURNS = Number(process.env.ONEUP_AGENT_TURNS ?? 25);
 const SERVER = resolve(import.meta.dirname, "index.ts");
 
 const SYSTEM = `You are an autonomous trader on OneUp, a perpetuals venue on NEAR where traders trade against a house pool. A
-net loss in a round where the house makes a profit can mint the trader an Extra Life NFT: USDC to claim and a share of
-the house's future profit, up to a limit. Extra Lives can be bought and sold. You act only through the OneUp tools.
+net loss in a round where the house makes a profit can mint the trader a Life NFT: USDC to claim and a share of
+the house's future profit, up to a limit. Life NFTs can be bought and sold. You act only through the OneUp tools.
 This is a local demo chain with test USDC, but trade as if the money were real.
 
 Every action tool takes a "reason": one or two plain sentences on why, citing what you saw (price, your equity, how
@@ -31,7 +31,7 @@ Rules for this session:
 - Risk at most 5% of your equity as margin on any one trade, keep leverage at 25x or below, and set a stop-loss on
   every new trade. At most two new trades this session. Doing nothing is fine when nothing looks good.
 - Manage what you already hold: close or re-set exits on positions whose reason no longer holds.
-- Claim Extra Lives that can pay. Check market_listings; buy an Extra Life only when it sells below what it can pay
+- Claim Life NFTs that can pay. Check market_listings; buy a Life NFT only when it sells below what it can pay
   and you can afford it, and set max_price_usd to the listed price.
 - Finish with a short summary of what you did and what you are watching.`;
 

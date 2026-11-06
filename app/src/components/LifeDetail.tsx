@@ -20,7 +20,7 @@ export function LifeDetail({ tokenId, onBack }: { tokenId: string; onBack: () =>
   const listings = useListings();
   const title = useRef<HTMLHeadingElement>(null);
   useEffect(() => { title.current?.focus(); }, [tokenId, life === undefined]);
-  const back = <button className="btn btn-ghost self-start" onClick={onBack}>← All Extra Lives</button>;
+  const back = <button className="btn btn-ghost self-start" onClick={onBack}>← All Life NFTs</button>;
   if (life === undefined) return <section className="flex flex-col gap-4">{back}<h1 ref={title} tabIndex={-1} className="page-title">Loading Life…</h1></section>;
   if (!life) return <section className="flex flex-col gap-4">{back}<h1 ref={title} tabIndex={-1} className="page-title">Life not found</h1><p className="text-sm text-[var(--muted)]">No Life with token ID {tokenId} was found on this network.</p></section>;
 

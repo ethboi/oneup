@@ -40,7 +40,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   // Streaks
   { id: "hot3", name: "Hot Streak", how: "Win three trades in a row", detail: "Three for three. Don't look down.", group: "Streaks", rarity: "common" },
   { id: "fire5", name: "On Fire", how: "Win five trades in a row", detail: "Five straight wins. The house is sweating.", group: "Streaks", rarity: "rare" },
-  { id: "cold3", name: "Cold Streak", how: "Lose three trades in a row", detail: "Three consecutive losses. Extra Life eligibility depends on your net result and house profit for the round.", group: "Streaks", rarity: "common" },
+  { id: "cold3", name: "Cold Streak", how: "Lose three trades in a row", detail: "Three consecutive losses. Life NFT eligibility depends on your net result and house profit for the round.", group: "Streaks", rarity: "common" },
   { id: "bottom5", name: "Rock Bottom", how: "Lose five trades in a row", detail: "Five consecutive losses.", group: "Streaks", rarity: "rare" },
   { id: "comeback", name: "Comeback Kid", how: "Win right after losing five in a row", detail: "From Rock Bottom straight to a win.", group: "Streaks", rarity: "epic" },
   // Losses
@@ -51,13 +51,13 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: "revengetrader", name: "Back to Market", how: "Opened a trade within two minutes of a loss", detail: "Opened another position soon after a loss. Review risk before placing a new trade.", group: "Losses", rarity: "common" },
   { id: "clutch", name: "Clutch", how: "Close in profit after nearly being liquidated", detail: "Inches from liquidation, and you still came out ahead.", group: "Losses", rarity: "epic" },
   // Lives & locks
-  { id: "oneup", name: "1UP", how: "Get your first Extra Life", detail: "You received your first Extra Life, with rights to eligible house-profit payouts. Unlocks the Berry skin.", group: "Lives & locks", rarity: "common" },
-  { id: "collector", name: "Collector", how: "Hold five Extra Lives at once", detail: "You hold five active Extra Lives. Their payouts depend on house profit.", group: "Lives & locks", rarity: "rare" },
-  { id: "payback", name: "Payback", how: "Claim USDC from an Extra Life", detail: "You claimed USDC allocated to an Extra Life.", group: "Lives & locks", rarity: "rare" },
-  { id: "fullheal", name: "Full Heal", how: "An Extra Life reaches its payout limit", detail: "An Extra Life received its maximum payout. Unlocks the Gold skin.", group: "Lives & locks", rarity: "legendary" },
+  { id: "oneup", name: "1UP", how: "Get your first Life NFT", detail: "You received your first Life NFT, with rights to eligible house-profit payouts. Unlocks the Berry skin.", group: "Lives & locks", rarity: "common" },
+  { id: "collector", name: "Collector", how: "Hold five Life NFTs at once", detail: "You hold five active Life NFTs. Their payouts depend on house profit.", group: "Lives & locks", rarity: "rare" },
+  { id: "payback", name: "Payback", how: "Claim USDC from a Life NFT", detail: "You claimed USDC allocated to a Life NFT.", group: "Lives & locks", rarity: "rare" },
+  { id: "fullheal", name: "Full Heal", how: "A Life NFT reaches its payout limit", detail: "A Life NFT received its maximum payout. Unlocks the Gold skin.", group: "Lives & locks", rarity: "legendary" },
   { id: "diamond", name: "Diamond Hands", how: "Lock $1UP for 104 rounds", detail: "For the same amount of $1UP, a longer lock gives more reward weight.", group: "Lives & locks", rarity: "epic" },
-  { id: "trader", name: "Trader", how: "Buy or sell on the market", detail: "Extra Lives and locks are NFTs: you've traded one.", group: "Lives & locks", rarity: "common" },
-  { id: "exit", name: "Exit Liquidity", how: "Sell an Extra Life", detail: "Took the cash now instead of waiting for the house's profit.", group: "Lives & locks", rarity: "common" },
+  { id: "trader", name: "Trader", how: "Buy or sell on the market", detail: "Life NFTs and locks are NFTs: you've traded one.", group: "Lives & locks", rarity: "common" },
+  { id: "exit", name: "Exit Liquidity", how: "Sell a Life NFT", detail: "Took the cash now instead of waiting for the house's profit.", group: "Lives & locks", rarity: "common" },
   { id: "backer", name: "Backer", how: "Back the house", detail: "You contributed USDC to the pool and received a Backer Life.", group: "Lives & locks", rarity: "rare" },
 ];
 
@@ -169,7 +169,7 @@ export function badgeStates(history: HistoryItem[], lives: LifeInfo[], locks: Lo
   count("collector", lives.filter((l) => !l.expired && !l.full_heal).length, 5);
   const marketAt = first("bought") ?? first("sold");
   if (marketAt) earn("trader", marketAt);
-  const soldLife = first("sold", (i) => i.kind === "sold" && i.what === "Extra Life");
+  const soldLife = first("sold", (i) => i.kind === "sold" && i.what !== "$1UP lock");
   if (soldLife) earn("exit", soldLife);
   const backed = first("backed");
   if (backed) earn("backer", backed);

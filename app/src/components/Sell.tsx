@@ -1,6 +1,6 @@
 "use client";
 
-// List an Extra Life or a lock on the marketplace, re-price it or take it down. Shared by the Lives, Locks and
+// List a Life NFT or a lock on the marketplace, re-price it or take it down. Shared by the Lives, Locks and
 // Market tabs.
 
 import { parseTokenAmount } from "@oneup/sdk";

@@ -1,5 +1,5 @@
 // A fresh sibling chain every launch. Never deletes, reconfigures or stops the regular demo.
-// Unless --empty is given, it then prepares a sample (judge-prepare.ts): an Extra Life for the demo trader and a
+// Unless --empty is given, it then prepares a sample (judge-prepare.ts): a Life NFT for the demo trader and a
 // listed one to buy, disclosed in prepared.json.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -56,9 +56,9 @@ try {
       // public fields only: the config holds local throwaway keys
       writeFileSync(resolve(dir, "prepared.json"), JSON.stringify({
         source: sourceIdentity(), appUrl, demoLife: p.demoLife, listing: p.listing,
-        preparedState: "Scripted: the demo trader and bot3 were liquidated by a controlled 2% price drop; bot3 claimed its Extra Life's USDC and listed the Life for a fifth of its remaining payout limit. The price is set by this script and says nothing about demand.",
+        preparedState: "Scripted: the demo trader and bot3 were liquidated by a controlled 2% price drop; bot3 claimed its Life NFT's USDC and listed the Life for a fifth of its remaining payout limit. The price is set by this script and says nothing about demand.",
       }, null, 2));
-      console.log(`Ready. The demo trader owns Extra Life ${p.demoLife.token_id} with $${fmtUsdc(BigInt(p.demoLife.claimable))} to claim (Extra Lives tab),\nand ${p.listing.seller}, having claimed its USDC, lists Extra Life ${p.listing.tokenId} for $${fmtUsdc(BigInt(p.listing.priceAtomic))}: up to $${fmtUsdc(BigInt(p.listing.remainingLimitAtomic))} of future payouts (Market tab).\nPrepared state: ${resolve(dir, "prepared.json")}`);
+      console.log(`Ready. The demo trader owns Life NFT ${p.demoLife.token_id} with $${fmtUsdc(BigInt(p.demoLife.claimable))} to claim (Life NFTs tab),\nand ${p.listing.seller}, having claimed its USDC, lists Life NFT ${p.listing.tokenId} for $${fmtUsdc(BigInt(p.listing.priceAtomic))}: up to $${fmtUsdc(BigInt(p.listing.remainingLimitAtomic))} of future payouts (Market tab).\nPrepared state: ${resolve(dir, "prepared.json")}`);
     } catch (error) { console.error(`The sample wasn't prepared (${error instanceof Error ? error.message : error}). The app runs on the empty chain.`); }
   }
   console.log(`\nEnd-to-end check: ONEUP_CONFIG='${env.ONEUP_CONFIG}' pnpm test:judge\nAI agents: ONEUP_CONFIG='${env.ONEUP_CONFIG}' pnpm mcp (an MCP server on stdio). Without ONEUP_CONFIG it uses the newest judge chain when there's no regular demo, so Claude Code in this folder (.mcp.json) finds it. Actions show on the Agents tab.\nCtrl-C stops everything.`);

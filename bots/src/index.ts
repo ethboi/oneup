@@ -1,5 +1,5 @@
 // Demo trading agents: rule-based bots that make real volume on the local chain, so epochs close with
-// winners, losers, Extra Lives, emissions and buybacks. Each bot trades from its own account.
+// winners, losers, Life NFTs, emissions and buybacks. Each bot trades from its own account.
 //
 //   pnpm bots            (needs `pnpm localnet` and `pnpm keeper` running)
 //   ONEUP_CONFIG=/abs/.testnet/<operator>/operator.json pnpm bots   (testnet, after `pnpm testnet:bots`)
@@ -56,7 +56,7 @@ interface Style {
   collector?: boolean;
   /** How it uses the marketplace. */
   market?: {
-    /** Lists its Extra Lives and locks, priced at a share of their value (lives, then locks). */
+    /** Lists its Life NFTs and locks, priced at a share of their value (lives, then locks). */
     sell?: { life: [number, number]; lock: [number, number] };
     /** Now and then locks some $1UP just to sell the lock. */
     makeLocks?: boolean;
@@ -257,7 +257,7 @@ class Bot {
     if (lives.length) {
       const total = lives.reduce((s, l) => s + BigInt(l.claimable), 0n);
       await this.tx.claimLives(lives.map((l) => l.token_id)).then(
-        () => log(this.style.name, `claimed $${fmtUsdc(total)} from ${lives.length} Extra Lives`),
+        () => log(this.style.name, `claimed $${fmtUsdc(total)} from ${lives.length} Life NFTs`),
         (e) => log(this.style.name, `life claim failed: ${short(e)}`),
       );
     }
@@ -346,7 +346,7 @@ class Bot {
     const offers: { nft: string; token: string; price: bigint; what: string }[] = [];
     for (const l of await o.lives(this.id)) {
       const v = lifeValue(l);
-      if (v >= USDC && !l.backer && !l.expired && !up.has(`${life}:${l.token_id}`)) offers.push({ nft: life, token: l.token_id, price: share_(v, share.life), what: "Extra Life" });
+      if (v >= USDC && !l.backer && !l.expired && !up.has(`${life}:${l.token_id}`)) offers.push({ nft: life, token: l.token_id, price: share_(v, share.life), what: "Life NFT" });
     }
     for (const l of await o.locks(this.id)) {
       if (l.withdrawn || up.has(`${ve}:${l.token_id}`)) continue;
@@ -391,11 +391,11 @@ async function valueOf(x: Listing, px: bigint): Promise<bigint> {
     : o.lockInfo(x.token_id).then((l) => (l && !l.withdrawn ? lockValue(l, px) : 0n));
 }
 
-const label = (x: Listing) => (x.nft_contract === d.contracts.life ? `Extra Life ${x.token_id}` : `lock #${x.token_id}`);
+const label = (x: Listing) => (x.nft_contract === d.contracts.life ? `Life NFT ${x.token_id}` : `lock #${x.token_id}`);
 const share_ = (v: bigint, [a, b]: [number, number]) => (v * BigInt(Math.round(between([a, b]) * 1000))) / 1000n;
 const fmtOneup = (x: bigint) => (Number(x / ONEUP)).toLocaleString("en-US");
 
-/** USDC an Extra Life can still earn (0 once it has expired or healed fully). */
+/** USDC a Life NFT can still earn (0 once it has expired or healed fully). */
 function lifeValue(l: LifeInfo): bigint {
   if (l.expired || l.full_heal) return BigInt(l.claimable);
   return BigInt(l.owed) - BigInt(l.paid) + BigInt(l.claimable);

@@ -15,7 +15,7 @@ Claude Code and Codex screen every entry before the human jury (Q-017).
 ```text
 On a perpetuals venue that trades against its users, a trader's loss is the venue's profit, and a liquidated position leaves the trader nothing.
 
-OneUp gives losers part of the house's profit back, as an asset they own. When a round closes with the house in profit, each wallet with a net loss gets an Extra Life: an NFT that collects a share of the house's profit for the next 13 rounds, up to 1.2-2x its face value. Losers also get $1UP, locked for 104 rounds; lockers share the house's buybacks. A Life can be claimed, kept or sold: the buyer gets its unclaimed USDC and future payouts, and the former owner can't claim them. Recovery depends on future house profit and can be zero.
+OneUp gives losers part of the house's profit back, as an asset they own. When a round closes with the house in profit, each wallet with a net loss gets a Life NFT: an NFT that collects a share of the house's profit for the next 13 rounds, up to 1.2-2x its face value. Losers also get $1UP, locked for 104 rounds; lockers share the house's buybacks. A Life can be claimed, kept or sold: the buyer gets its unclaimed USDC and future payouts, and the former owner can't claim them. Recovery depends on future house profit and can be zero.
 
 NEAR makes the Life an NFT that holds money: NEP-171 with on-chain art, claiming NEP-141 USDC, sold on a built-in market. Deposits go through the official NEAR Intents Verifier: one signed intent swaps a bridged token, deposits it and opens a trade, and the house lets it trade only that deposit. A Sputnik DAO owns the house, the Lives and the oracle. One-tap trading uses function-call keys and a NEP-366 relayer. AI agents trade through an MCP server that journals each action with the agent's reason.
 
@@ -33,7 +33,7 @@ post fits 280 characters with its links (X counts a link as 23). The repository 
 ```text
 Got liquidated. Got paid.
 
-On most perps, your loss is the house's profit. On OneUp, a net loss can earn an Extra Life: a NEAR NFT that collects USDC from future house profit. Claim it or sell it.
+On most perps, your loss is the house's profit. On OneUp, a net loss can earn a Life NFT: a NEAR NFT that collects USDC from future house profit. Claim it or sell it.
 
 Built at NEAR HACKATHON
 https://oneup.markets
@@ -54,14 +54,14 @@ How a round works:
 
 1. Go long or short on BTC, ETH or NEAR, up to 1000×
 2. Lose, or get liquidated
-3. If the house ends the 30-minute round in profit, every wallet with a net loss gets an Extra Life
+3. If the house ends the 30-minute round in profit, every wallet with a net loss gets a Life NFT
 
 No entry or funding fees. Winners pay 10–25% of their profit.
 ```
 
 4:
 ```text
-An Extra Life collects a share of house profit for the next 13 rounds, up to 1.2–2× its face value.
+A Life NFT collects a share of house profit for the next 13 rounds, up to 1.2–2× its face value.
 
 Its face value comes from your share of the round's losses, and is never more than your loss.
 
@@ -70,14 +70,14 @@ Payouts can be zero. It's a claim on future profit, not a refund.
 
 5:
 ```text
-It's yours to sell. List your Extra Life on the built-in market, and the buyer gets its unclaimed USDC and every payout after.
+It's yours to sell. List your Life NFT on the built-in market, and the buyer gets its unclaimed USDC and every payout after.
 
 So a bad trade leaves you holding an asset with a price, and someone else can bet on the house's future profit.
 ```
 
 6:
 ```text
-What NEAR does here: each Extra Life is a NEP-171 token that claims NEP-141 USDC from the house.
+What NEAR does here: each Life NFT is a NEP-171 token that claims NEP-141 USDC from the house.
 
 Its picture is drawn on-chain from its balance, so NearBlocks shows the heart filling up as it pays. Sell the NFT and the future payouts go with it.
 ```
@@ -104,7 +104,7 @@ NEAR testnet, test money, with bots providing the flow. The oracle, swap and vau
 
 Code: https://github.com/ethboi/oneup
 
-Would you buy a stranger's Extra Life?
+Would you buy a stranger's Life NFT?
 ```
 
 ## Before submitting

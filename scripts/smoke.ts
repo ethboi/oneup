@@ -37,7 +37,7 @@ const entry = Number(pos.entry_price) / 1e8;
 await fetch(`${CONTROL}/price`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ market: "NEAR-USD", price: entry * 0.98 }) });
 console.log(`steering NEAR-USD to ${(entry * 0.98).toFixed(4)} (−2%); waiting for liquidation`);
 await until("liquidation", async () => !(await o.positions(me)).some((p) => p.id === pos.id));
-console.log(`liquidated. pending Extra Life: ${fmtUsdc(BigInt(await o.pendingLife(me)))} of losses this epoch`);
+console.log(`liquidated. pending Life NFT: ${fmtUsdc(BigInt(await o.pendingLife(me)))} of losses this epoch`);
 
 const s = await o.solvency();
 console.log(`pool ${fmtUsdc(BigInt(s.pool))} · worst case ${fmtUsdc(BigInt(s.liability))} · reserve ${fmtUsdc(BigInt(s.reserve))}`);

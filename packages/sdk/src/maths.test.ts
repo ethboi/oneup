@@ -6,7 +6,7 @@ const usd = (x: number) => BigInt(x) * m.USDC;
 const px = (cents: number) => BigInt(cents) * 1_000_000n;
 
 describe("maths vectors", () => {
-  it("V1 Extra Life sizing", () => {
+  it("V1 Life NFT sizing", () => {
     const face = m.faceValue(usd(100_000), usd(3_000), usd(300_000));
     expect(face).toBe(usd(1_000));
     expect(m.lifeCapPpm(usd(200_000))).toBe(1_840_000n);

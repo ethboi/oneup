@@ -1,5 +1,5 @@
 // OneUp as an MCP server: an AI agent can read the markets, open and close trades, set take-profit and
-// stop-loss, see its Extra Lives and claim them, and buy Extra Lives and locks on the market, on the local
+// stop-loss, see its Life NFTs and claim them, and buy Life NFTs and locks on the market, on the local
 // chain. It signs as one account from the chain's localnet.json: the AI agent's (bot12, which the bots leave
 // alone) by default, or another (ONEUP_ACCOUNT=bot3, or demo). Every action, with the reason the agent gives for
 // it, goes into a journal the app shows (agent-journal.jsonl beside the chain's state). Localnet only: the keys
@@ -169,9 +169,9 @@ server.registerTool(
         `Perpetuals against a USDC house pool. No entry or funding fee; winners pay 10–25% of profit. Each market has its own leverage cap (see markets), at most ${params.leverage_hard_limit}x.`,
         `A fill requires an oracle price published after placement and inside the allowed window. A trusted keeper chooses when to execute; first-price execution is not proven. Minimum voluntary hold: ${params.min_hold_s} seconds.`,
         "Maximum profit before the fee is 9x margin. Liquidation at a 90% loss takes the full margin.",
-        `Positive wallet net loss in a profitable round can earn an Extra Life and token locks. Life face value is a share of house profit, not necessarily the full loss; its total payout cap is 1.2–2x face. Trader Lives earn in the mint round and ${params.life_expiry_epochs} subsequent rounds. Recovery may be zero.`,
+        `Positive wallet net loss in a profitable round can earn a Life NFT and token locks. Life face value is a share of house profit, not necessarily the full loss; its total payout cap is 1.2–2x face. Trader Lives earn in the mint round and ${params.life_expiry_epochs} subsequent rounds. Recovery may be zero.`,
         "Claiming withdraws allocated USDC. Selling a Life transfers its unclaimed cash and remaining conditional rights; expiry stops future allocations but preserves allocated cash. Marketplace sellers pay 2%.",
-        "Extra Lives and locks trade on a market (market_listings, buy_listing): a Life listed below what it can still pay is a discounted claim on future house profit, not a guaranteed return.",
+        "Life NFTs and locks trade on a market (market_listings, buy_listing): a Life listed below what it can still pay is a discounted claim on future house profit, not a guaranteed return.",
         "Token rewards can be locked for up to 104 rounds. Two years applies only to weekly rounds; local rounds are accelerated. Tokens and NFTs have no guaranteed resale value.",
         "Admission reserves capped payout liability, but a refusal may also reflect invalid inputs, a paused market or another contract condition. Read the quote reason; do not automatically retry with smaller trades.",
       ],
@@ -204,7 +204,7 @@ server.registerTool(
   "account",
   {
     title: "Account",
-    description: "This agent's account: wallet USDC, free balance at the house, open positions with live profit, pending orders, and this round's pending Extra Life.",
+    description: "This agent's account: wallet USDC, free balance at the house, open positions with live profit, pending orders, and this round's pending Life NFT.",
     inputSchema: {},
   },
   safe(async () => {
@@ -302,7 +302,7 @@ server.registerTool(
 
 server.registerTool(
   "extra_lives",
-  { title: "Extra Lives", description: "This account's Life snapshots: current owner, claimable USDC, lifetime allocations, conditional remaining limit and earning window. Caps are not expected returns.", inputSchema: {} },
+  { title: "Life NFTs", description: "This account's Life snapshots: current owner, claimable USDC, lifetime allocations, conditional remaining limit and earning window. Caps are not expected returns.", inputSchema: {} },
   safe(async () => {
     const [lives, round, params] = await Promise.all([o.lives(me), o.epoch(), o.params()]);
     return lives.map((life) => describeLife(life, round.id, params.life_expiry_epochs));
@@ -311,7 +311,7 @@ server.registerTool(
 
 server.registerTool(
   "claim_lives",
-  { title: "Claim Extra Lives", description: "Sends the USDC every Extra Life of this account can claim to its wallet.", inputSchema: { reason } },
+  { title: "Claim Life NFTs", description: "Sends the USDC every Life NFT of this account can claim to its wallet.", inputSchema: { reason } },
   logged("claim_lives", async () => {
     const ready = (await o.lives(me)).filter((l) => BigInt(l.claimable) > 0n);
     if (ready.length === 0) return { claimed_usd: 0 };
@@ -352,7 +352,7 @@ server.registerTool(
   {
     title: "Market listings",
     description:
-      "Extra Lives and $1UP locks for sale: price, what each can still pay or is worth today, and the discount. A Life's worth is its remaining payout limit, which depends on future house profit and may never be reached; a lock's is its $1UP after the early-exit penalty at today's swap price.",
+      "Life NFTs and $1UP locks for sale: price, what each can still pay or is worth today, and the discount. A Life's worth is its remaining payout limit, which depends on future house profit and may never be reached; a lock's is its $1UP after the early-exit penalty at today's swap price.",
     inputSchema: {},
   },
   safe(async () => {
@@ -384,7 +384,7 @@ server.registerTool(
   "buy_listing",
   {
     title: "Buy a listing",
-    description: "Buys an Extra Life or a lock from the market at its listed price, paid from this account's wallet USDC (the seller pays a 2% fee). Check market_listings first.",
+    description: "Buys a Life NFT or a lock from the market at its listed price, paid from this account's wallet USDC (the seller pays a 2% fee). Check market_listings first.",
     inputSchema: { nft_contract: z.string(), token_id: z.string(), approval_id: z.number().int().describe("From market_listings: refuses a listing replaced since you looked at it"), max_price_usd: z.number().positive().describe("Refuse if the listing now costs more"), reason },
   },
   logged("buy_listing", async ({ nft_contract, token_id, approval_id, max_price_usd }) => {

@@ -7,7 +7,7 @@ export const BOT_STRATEGIES = ["degen", "trend", "fader", "whale", "scalper", "c
 
 /** What each bot does, in a line. */
 export const BOT_NOTES: Record<(typeof BOT_STRATEGIES)[number], string> = {
-  degen: "Coin-flip side at 50–100×; sells its Extra Lives and locks below value",
+  degen: "Coin-flip side at 50–100×; sells its Life NFTs and locks below value",
   trend: "Follows the 10-tick average; buys listings under 90% of value",
   fader: "Fades the 10-tick average; locks $1UP to sell",
   whale: "Big margin at 2–5×; buys listings under 85% of value",

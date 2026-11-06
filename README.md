@@ -1,9 +1,9 @@
 # OneUp
 
-**Perpetuals on NEAR where a losing trade can leave you an Extra Life: an NFT that holds USDC and a share of
+**Perpetuals on NEAR where a losing trade can leave you a Life NFT: an NFT that holds USDC and a share of
 the house's future profit, which you can claim or sell.**
 
-![A 50× long is liquidated; when the round closes the loss becomes an Extra Life, whose USDC is claimed; then another trader's Life is bought on the market](docs/media/oneup.gif)
+![A 50× long is liquidated; when the round closes the loss becomes a Life NFT, whose USDC is claimed; then another trader's Life is bought on the market](docs/media/oneup.gif)
 
 A NEAR HACKATHON entry for **NFTs That Do Something**, **Unstoppable DeFi** and **Agent Economy**. It is live
 on NEAR testnet at **https://oneup.markets** (the app is at https://app.oneup.markets), and runs as a fuller
@@ -17,7 +17,7 @@ On a perpetuals venue that trades against its users, a trader's loss is the venu
 position leaves the trader nothing to hold, sell or claim.
 
 OneUp gives losers part of the house's profit back, as an asset they own. When a round closes with the house
-in profit, each wallet with a net loss in that round gets an **Extra Life**, an NFT that collects a share of the
+in profit, each wallet with a net loss in that round gets an **Life NFT**, an NFT that collects a share of the
 house's profit for the next 13 rounds, up to a payout limit of 1.2–2× its face value. A round pays out only from
 the surplus above the pool's reserve, so a profitable round can still pay nothing. Losers also get $1UP tokens,
 locked for 104 rounds; lockers share the house's buybacks. A Life can be claimed, kept or sold: the buyer gets
@@ -25,13 +25,13 @@ its unclaimed USDC and its future payouts. Recovery depends on future house prof
 
 ## What NEAR does here
 
-- **NFTs that hold money.** Each Extra Life is a NEP-171 NFT (with NEP-177 metadata and NEP-178 approvals)
+- **NFTs that hold money.** Each Life NFT is a NEP-171 NFT (with NEP-177 metadata and NEP-178 approvals)
   whose owner can claim the USDC (NEP-141) allocated to it; transferring it moves the claim. Its SVG art is
   generated on chain from its state. Events follow NEP-297.
 - **NEAR Intents.** Deposits go through the official Intents Verifier (v0.4.2, unchanged): one signed intent
   swaps a bridged token for USDC, deposits it and opens a trade, and the house checks that an intent can trade
   only the deposit it brings. Locally, PoA tokens stand in for bridged assets and OneUp runs its own solver.
-- **Sputnik DAO.** A DAO running unchanged mainnet Sputnik v2 code owns the house, the Extra Lives and the
+- **Sputnik DAO.** A DAO running unchanged mainnet Sputnik v2 code owns the house, the Life NFTs and the
   oracle: markets, parameters and the keeper change by council vote.
 - **Function-call keys and NEP-366.** One-tap trading uses a session key that can only call the house's
   trading methods, and a relayer pays the gas.
@@ -50,7 +50,7 @@ local demo.
 | 3 | Open the **Market** tab | The Lives and locks the bots have listed |
 | 4 | **Connect wallet** (a NEAR testnet wallet such as Meteor; see [wallet setup](docs/NEAR_WALLET_SETUP.md)), then in the account menu **Register test tokens** and **Get 1,000 test USDC** | Test USDC in your wallet |
 | 5 | Open a 1000× long on NEAR-USD | The order fills on the next price. A small move against it liquidates it, with the LIQUIDATED banner |
-| 6 | Wait for the round to close (the countdown is in the header), then open **Extra Lives** | If the house ended the round in profit, your Extra Life, its picture filling as it pays |
+| 6 | Wait for the round to close (the countdown is in the header), then open **Life NFTs** | If the house ended the round in profit, your Life NFT, its picture filling as it pays |
 | 7 | **Claim** what it has collected, or list it on the **Market** | USDC in your wallet, or your listing |
 
 The testnet contracts are accounts under `oneupmarkets.testnet`, which also owns them; on testnet the keeper and three
@@ -68,10 +68,10 @@ cargo-near 0.22.0, the versions CI uses.
 | 3 | `pnpm build:contracts` | Nine WASM files under `contracts/target/near/` |
 | 4 | `pnpm demo:judge`, and leave it running | After about five minutes `Judge app: http://127.0.0.1:3021`; about a minute later `Ready.`, naming a prepared Life and a listing |
 | 5 | Open http://127.0.0.1:3021 | The Trade screen, as the `demo` trader: the NEAR-USD chart, the order ticket with its potential recovery, and How recovery works |
-| 6 | Open the **Extra Lives** tab | A Life from a prepared loss, with USDC available to claim and a remaining payout limit. **Claim** sends the USDC to the wallet |
-| 7 | Open the **Market** tab | bot3's Life. bot3 claimed its USDC, then listed the Life for a fifth of its remaining payout limit; whatever later rounds have paid it since goes with it. **Buy** moves it to your Extra Lives, where its USDC and its future payouts are yours to claim |
+| 6 | Open the **Life NFTs** tab | A Life from a prepared loss, with USDC available to claim and a remaining payout limit. **Claim** sends the USDC to the wallet |
+| 7 | Open the **Market** tab | bot3's Life. bot3 claimed its USDC, then listed the Life for a fifth of its remaining payout limit; whatever later rounds have paid it since goes with it. **Buy** moves it to your Life NFTs, where its USDC and its future payouts are yours to claim |
 | 8 | In a second terminal: `ONEUP_CONFIG=<path printed in step 4> pnpm test:judge` | Eleven assertions pass in one to two minutes: fills, liquidation, Life minted, USDC claimed, sale, former owner refused, buyer claims, reserve admission, deployed hashes, DAO ownership. `e2e.json` is written beside the config |
-| 9 | On the Trade screen, open a 50× long on NEAR-USD; then `curl -XPOST 127.0.0.1:8887/price -H 'content-type: application/json' -d '{"market":"NEAR-USD","movePct":-2}'` | The keeper liquidates the position; when the 45-second round closes, a new Life appears on the Extra Lives tab |
+| 9 | On the Trade screen, open a 50× long on NEAR-USD; then `curl -XPOST 127.0.0.1:8887/price -H 'content-type: application/json' -d '{"market":"NEAR-USD","movePct":-2}'` | The keeper liquidates the position; when the 45-second round closes, a new Life appears on the Life NFTs tab |
 | 10 | `pnpm agent` (needs `ANTHROPIC_API_KEY` or the `claude` CLI) | An AI agent trades as bot12; the **Agents** tab lists each action and the reason it gave |
 | 11 | `pnpm verify` | About seven minutes: a secret scan, typechecks, Rust unit, property and sandbox tests, TypeScript tests and a production build, ending `Complete verification passed` |
 
@@ -88,9 +88,9 @@ http://127.0.0.1:3020, with state kept in `.localnet/`.
 
 | Claim | Code and regression | Run and see |
 |---|---|---|
-| Selling a Life transfers its payout rights | [Extra Life](contracts/extra-life/src/lib.rs), [market test](contracts/tests/tests/market.rs), [judge journey](scripts/judge-e2e.ts) | `pnpm test:judge`: the buyer owns and claims it; the former owner is refused |
+| Selling a Life transfers its payout rights | [Life NFT](contracts/extra-life/src/lib.rs), [market test](contracts/tests/tests/market.rs), [judge journey](scripts/judge-e2e.ts) | `pnpm test:judge`: the buyer owns and claims it; the former owner is refused |
 | A purchase can't land on a changed listing | [Market](contracts/market/src/lib.rs), sandbox `a_life_claimed_and_listed_again_is_not_sold_to_the_earlier_buyer` | `pnpm test:sandbox`: a Life claimed and listed again at the same price refunds the earlier buyer |
-| An NFT emptied during a transfer call can't sell on its old listing | [Extra Life](contracts/extra-life/src/lib.rs), [ve](contracts/ve/src/lib.rs), tests `a_life_emptied_during_a_transfer_call_returns_without_its_old_approvals` and `a_lock_emptied_…` | `pnpm test`: the token returns without its old approvals; one left untouched keeps them |
+| An NFT emptied during a transfer call can't sell on its old listing | [Life NFT](contracts/extra-life/src/lib.rs), [ve](contracts/ve/src/lib.rs), tests `a_life_emptied_during_a_transfer_call_returns_without_its_old_approvals` and `a_lock_emptied_…` | `pnpm test`: the token returns without its old approvals; one left untouched keeps them |
 | A Life is never sized above its loss | [Maths](contracts/math/src/lib.rs), house `a_quiet_rounds_fees_dont_inflate_its_lives` | `pnpm test`: a quiet round's marketplace fees don't inflate the round's Lives or $1UP |
 | Failed issuance keeps the obligation | [Recovery queue](contracts/house/src/recovery.rs), [receipt test](contracts/tests/tests/recovery.rs) | `pnpm test:sandbox`: a failure and retry keep the recipient and terms without duplicating rewards |
 | Expiry stops future payouts, not allocated cash | [Life tests](contracts/extra-life/src/tests.rs), [UI accounting](app/test/life-economics.ts) | `pnpm test` and `pnpm test:ts`: expired cash stays claimable; the remaining payout limit is zero |
@@ -102,9 +102,9 @@ http://127.0.0.1:3020, with state kept in `.localnet/`.
 
 | Component | State |
 |---|---|
-| House, Extra Life, $1UP token, locks, marketplace | OneUp's own contracts, on testnet and the local chain |
+| House, Life NFT, $1UP token, locks, marketplace | OneUp's own contracts, on testnet and the local chain |
 | NEAR Intents | The official Verifier and PoA token factory (v0.4.2, unchanged binaries); intents signed with the official SDK. OneUp's own solver fills them with `execute_intents`. Bridge deposits are simulated; there is no real Ethereum or Solana deposit and no 1Click integration |
-| Sputnik DAO | Local demo only (an operator account owns the testnet contracts). Unchanged mainnet Sputnik DAO v2 code; owns the house, the Extra Lives and the oracle. The council (the demo trader, bot4 and bot6) votes with disclosed test keys |
+| Sputnik DAO | Local demo only (an operator account owns the testnet contracts). Unchanged mainnet Sputnik DAO v2 code; owns the house, the Life NFTs and the oracle. The council (the demo trader, bot4 and bot6) votes with disclosed test keys |
 | Function-call keys, NEP-366 | Session keys limited to the house's trading methods; a local relayer. A trade-only key can still lose the trading balance |
 | NEAR wallet | NEAR Connect 0.11.4 on testnet, described in [wallet setup](docs/NEAR_WALLET_SETUP.md). The local demo signs with its test accounts |
 | AI agents | The MCP server and `pnpm agent`. The agent signs with a full-access local test key; its limits on margin, leverage and stop-losses are instructions, not enforced in code |
@@ -120,7 +120,7 @@ http://127.0.0.1:3020, with state kept in `.localnet/`.
   by a trusted keeper. A limit order rests up to 24 hours, and can be cancelled after its first 30 seconds.
 - **Admission.** The pool must cover the maximum win of every open position and pending open, longs and shorts
   together, so it can always pay; this doesn't remove oracle, owner, vault or implementation risk.
-- **Extra Lives.** Sized from the round's house profit, up to the round's net losses, by each wallet's share
+- **Life NFTs.** Sized from the round's house profit, up to the round's net losses, by each wallet's share
   of those losses: a Life's face value is never more than its loss. Lives share 60% of half the surplus above
   the reserve each round, two thirds to trader Lives and one third to Backer Lives.
 - **$1UP.** 1B minted once: 900M released to losers over four years, 20 per USDC of the house profit behind

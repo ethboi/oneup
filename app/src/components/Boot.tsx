@@ -2,7 +2,7 @@
 
 // The power-on screen, once a browser session: a handheld with trading keys. The power light comes on, the LCD
 // flickers awake, the logo drops in in pixel steps, the tagline types, then a live price line draws itself behind
-// it and the markets scroll along the bottom while VIEW MARKETS blinks, and Extra Life cards are dealt out from
+// it and the markets scroll along the bottom while VIEW MARKETS blinks, and Life NFT cards are dealt out from
 // behind the console (around it on a wide screen, fanned above it on a tall one); they tilt toward the pointer.
 // Any tap, click or key starts (L and S press the LONG and SHORT keys on the way); with reduced motion it shows
 // already settled. Automated browsers (a reviewer's Playwright or Puppeteer run) go straight to the app.
@@ -30,7 +30,7 @@ export function showBoot() {
 const TAGLINE = "EXPLORE THE MARKETS";
 
 type Card = { id: number; trade?: [market: string, side: "long" | "short", leverage: number]; paid: number; owed: number; state: LifeState };
-/** The cards around the console: sample Extra Lives, each naming the losing trade it came from (no trade: a Backer
+/** The cards around the console: sample Life NFTs, each naming the losing trade it came from (no trade: a Backer
  *  Life). Illustrations drawn as the contract draws a Life, not chain data. Places are in globals.css. */
 const CARDS: Card[] = [
   { id: 127, trade: ["NEAR", "long", 50], paid: 112, owed: 300, state: "earning" },

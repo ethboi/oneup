@@ -70,7 +70,7 @@ open allowed only if   E_after ≤ pool   and   liab_m_after ≤ capacity_m
 capacity_m = cap_m × pool                     # cap_m = 50% by default (D-14)
 ```
 
-`pool` = house-owned USDC: seed + realised trader losses − realised winner payouts − Extra Life payouts −
+`pool` = house-owned USDC: seed + realised trader losses − realised winner payouts − Life NFT payouts −
 buyback spend. Trader margins and free balances are held separately and never count as pool.
 
 Closes and liquidations are never refused. Epoch payouts keep `pool ≥ 1.2 × E` (§6), so they never break
@@ -91,7 +91,7 @@ payout   = M + pnl                            # loser (pnl < 0), the |pnl| goes 
 The implemented size term (`u / 2`) means: a position using 10% of the pool's room pays 15%, one using 30% or
 more pays the 25% hard maximum.
 
-## 5. Epoch result and Extra Life minting
+## 5. Epoch result and Life NFT minting
 
 Per epoch `e`, over positions **closed** in `e` (open positions don't count until they close):
 
@@ -104,7 +104,7 @@ loss_i        = max(0, wallet_i losing closes − wallet_i net winning profits)
 net_losses_e  = Σ loss_i
 ```
 
-If `house_net_e > 0`, each wallet with positive net loss across all markets gets one Extra Life (D-24):
+If `house_net_e > 0`, each wallet with positive net loss across all markets gets one Life NFT (D-24):
 
 ```
 base_e = min(house_net_e, net_losses_e)        # fees never make a Life worth more than its loss
@@ -113,31 +113,31 @@ cap    = 2.0 − 0.8 × min(pool, 1_000_000) / 1_000_000      # pool = pool at e
 owed_i = floor(face_i × cap)
 ```
 
-If `house_net_e ≤ 0`, no Extra Lives are minted for `e`.
+If `house_net_e ≤ 0`, no Life NFTs are minted for `e`.
 
 The seed provider receives a Backer Life with face equal to the deposited seed and cap 1.0.
 Seed and public backing capital enter the spendable pool only after the Backer Life mint succeeds.
 Pending backing reserves its bootstrap allocation and cap position. New backing pauses while closing;
 a failed mint returns its USDC to the sender's free balance and restores its reserved $1UP allocation.
 
-Mid-epoch, the app shows a **pending Extra Life** (the wallet's losses so far); face value is only known at
+Mid-epoch, the app shows a **pending Life NFT** (the wallet's losses so far); face value is only known at
 epoch close. (The demo script says one "drops into the wallet" on liquidation; it drops as pending.)
 
 ## 6. Surplus and payout
 
-At epoch close, after minting `e`'s Extra Lives:
+At epoch close, after minting `e`'s Life NFTs:
 
 ```
 R       = max(1.2 × E, seed)                    # reserve: never below the seed actually deposited
 S       = max(0, pool − R)                      # surplus
 P       = 0.5 × S                               # max payout this epoch
-el_pot  = min(0.6 × P, Σ owed_remaining)        # to unpaid Extra Lives (including ones just minted)
-bb_pot  = 0.3 × P + (0.6 × P − el_pot)          # buybacks get whatever the Extra Lives couldn't use
+el_pot  = min(0.6 × P, Σ owed_remaining)        # to unpaid Life NFTs (including ones just minted)
+bb_pot  = 0.3 × P + (0.6 × P − el_pot)          # buybacks get whatever the Life NFTs couldn't use
                                                 # the remaining 0.1 × P simply stays in the pool
 ```
 
 The pot is split first (D-26): two thirds to losers' lives, one third to Backer Lives; whatever one side can't
-use goes to the other. Within a side, each earning Extra Life `j` is paid the same fraction `δ` of what it was
+use goes to the other. Within a side, each earning Life NFT `j` is paid the same fraction `δ` of what it was
 owed, capped at what it's still owed (D-25):
 
 ```
@@ -194,7 +194,7 @@ exit penalty = ceil(A × 50% × (end − e − 1) / 104)   # leaving in epoch e;
 
 ## Test vectors
 
-### V1 — Extra Life sizing (spec example)
+### V1 — Life NFT sizing (spec example)
 losses_e = 300_000, payouts_e = 200_000 → house_net = 100_000. Alice loss 3_000 → face = 1_000.
 pool = 200_000 → cap = 2.0 − 0.8 × 0.2 = 1.84 → owed = **1_840**.
 

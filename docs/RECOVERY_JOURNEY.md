@@ -1,7 +1,7 @@
 # Recovery journey
 
 The recovery NFT is the primary product story. A Life detail link is
-`/extra-lives#life=<URL-encoded token ID>` and works for NFTs owned by another account.
+`/life-nfts#life=<URL-encoded token ID>` and works for NFTs owned by another account.
 The view polls current ownership and only offers claim or sale to the selected owner.
 
 ## What the numbers mean

@@ -16,8 +16,8 @@ const STEPS: { icon: React.ReactNode; title: string; body: string }[] = [
   },
   {
     icon: <PixelHeart size={22} />,
-    title: "Receive an Extra Life",
-    body: "If you have an eligible net loss in a profitable house round, you receive an Extra Life. This NFT can receive USDC from house profits during its 14-round earning period, up to a payout limit. Payouts are not guaranteed.",
+    title: "Receive a Life NFT",
+    body: "If you have an eligible net loss in a profitable house round, you receive a Life NFT. This NFT can receive USDC from house profits during its 14-round earning period, up to a payout limit. Payouts are not guaranteed.",
   },
   {
     icon: <PixelCoin size={22} />,
@@ -27,7 +27,7 @@ const STEPS: { icon: React.ReactNode; title: string; body: string }[] = [
   {
     icon: <Icon name="store" size={22} />,
     title: "Keep or sell your NFT",
-    body: "Extra Lives and $1UP locks are transferable NFTs. You can list them for USDC on the built-in market. A sale needs a willing buyer, and future payouts are not guaranteed.",
+    body: "Life NFTs and $1UP locks are transferable NFTs. You can list them for USDC on the built-in market. A sale needs a willing buyer, and future payouts are not guaranteed.",
   },
 ];
 
@@ -37,7 +37,7 @@ const LINEAGE: { from: string; idea: string; rows: { topic: string; them: string
     from: "Papertrade",
     idea: "Losses can earn a share of house profits",
     rows: [
-      { topic: "What a loss gets you", them: "PAPER tokens, 100 per $1 lost, staked for a share of profit", oneup: "An Extra Life with a USDC payout limit, plus locked $1UP" },
+      { topic: "What a loss gets you", them: "PAPER tokens, 100 per $1 lost, staked for a share of profit", oneup: "A Life NFT with a USDC payout limit, plus locked $1UP" },
       { topic: "How payouts are covered", them: "Unpaid winnings enter a queue", oneup: "Trades are rejected if their maximum profit payouts exceed available capacity; custody, oracle and contract risks remain" },
       { topic: "How long a claim lasts", them: "Claims do not expire, so early claims continue to compete with later ones", oneup: "The minting round plus 13 more rounds; payouts depend on house profits" },
     ],
@@ -54,7 +54,7 @@ const LINEAGE: { from: string; idea: string; rows: { topic: string; them: string
 ];
 
 const BUILT: { icon: IconName; title: string; body: string }[] = [
-  { icon: "shield", title: "9 Rust contracts", body: "House, Extra Life (NEP-171), $1UP (NEP-141), locks, market (NEP-178 approvals), and mock USDC, oracle, swap and yield vault. Events follow NEP-297." },
+  { icon: "shield", title: "9 Rust contracts", body: "House, Life NFT (NEP-171), $1UP (NEP-141), locks, market (NEP-178 approvals), and mock USDC, oracle, swap and yield vault. Events follow NEP-297." },
   { icon: "check", title: "Tests for failures and recovery", body: "Tests cover contract logic, generated edge cases, SDK flows and integrations with fresh local contracts. Run pnpm verify to check the current version. Review findings and regression coverage are documented in docs/SECURITY.md." },
   { icon: "demo", title: "Keeper and bots", body: "A keeper updates prices, fills orders, liquidates positions, executes take-profit and stop-loss orders, and closes rounds. Only the configured keeper, owner or operator can fill orders. Twelve trading bots exercise the app, and an MCP server lets AI agents trade too." },
   { icon: "scale", title: "Simulations", body: "Models explore how profit, growth and trading across one or several wallets affect recovery. They do not prove market demand, fair outcomes or resistance to abuse through multiple wallets." },
@@ -78,7 +78,7 @@ const NEAR: { title: string; status: Status; body: string; points: string[]; mar
     status: "demo",
     body: "Nine contracts written with near-sdk 5, built with cargo-near.",
     points: [
-      "House, Extra Life, $1UP, ve locks and the market, plus mock USDC, oracle, swap and yield vault",
+      "House, Life NFT, $1UP, ve locks and the market, plus mock USDC, oracle, swap and yield vault",
       "Contract access keys are deleted after deployment. Administrative methods built into the contracts still remain",
       "Payouts, minting and vault withdrawals use cross-contract calls and callbacks",
     ],
@@ -90,7 +90,7 @@ const NEAR: { title: string; status: Status; body: string; points: string[]; mar
     body: "Tokens, NFTs and events use NEAR standards for compatibility with wallets, explorers and indexers.",
     points: [
       "NEP-141 fungible tokens with NEP-145 storage: $1UP and USDC",
-      "NEP-171 NFTs with NEP-177 metadata, NEP-178 approvals and NEP-181 enumeration: Extra Lives and locks",
+      "NEP-171 NFTs with NEP-177 metadata, NEP-178 approvals and NEP-181 enumeration: Life NFTs and locks",
       "NEP-297 events, which the app's feed, history and leaderboard read",
       "NEP-245 multi-token balances inside NEAR Intents",
     ],
@@ -110,7 +110,7 @@ const NEAR: { title: string; status: Status; body: string; points: string[]; mar
     title: "Sputnik DAO",
     marks: [{ name: "dao", label: "Sputnik DAO" }],
     status: "demo",
-    body: "A DAO owns the house, the Extra Lives and the oracle: the same Sputnik DAO v2 code mainnet DAOs run.",
+    body: "A DAO owns the house, the Life NFTs and the oracle: the same Sputnik DAO v2 code mainnet DAOs run.",
     points: [
       "Changes to market listings, pauses, parameters, the keeper and the yield vault require council votes",
       "View proposals and vote on the House tab",
@@ -181,7 +181,7 @@ const NEAR: { title: string; status: Status; body: string; points: string[]; mar
     title: "AI agents (MCP)",
     marks: [{ name: "near", label: "NEAR" }],
     status: "demo",
-    body: "OneUp is built to be traded by AI agents as well as people. An MCP server gives an agent the trader’s tools: markets, quotes, open and close, exit orders, Life claims, and buying Extra Lives and locks on the market. Each action carries the agent’s reason, shown on the Agents tab.",
+    body: "OneUp is built to be traded by AI agents as well as people. An MCP server gives an agent the trader’s tools: markets, quotes, open and close, exit orders, Life claims, and buying Life NFTs and locks on the market. Each action carries the agent’s reason, shown on the Agents tab.",
     points: [
       "pnpm agent runs one autonomous Claude session over these tools; the bots leave its account (bot12) to it",
       "Configured in .mcp.json. On the local demo it signs with a bot account’s full-access key, without a separate spending limit",
@@ -206,13 +206,13 @@ export function About() {
             <h1 className="display mt-2 text-4xl leading-tight sm:text-5xl">Lose a trade, get a life.</h1>
             <p className="mt-3 max-w-xl text-[var(--muted)]">
               OneUp is a perpetuals exchange on NEAR. Trade against a shared USDC pool, with funds reserved for each position’s maximum payout.
-              Eligible losses can earn you an Extra Life: a tradable NFT that shares in house profits. You may recover some of your loss, or nothing.
+              Eligible losses can earn you a Life NFT: a tradable NFT that shares in house profits. You may recover some of your loss, or nothing.
             </p>
           </div>
           <div className="bezel shrink-0 self-start p-4 sm:self-auto">
             <div className="lcd flex h-36 w-52 flex-col items-center justify-center gap-2">
               <PixelHeart size={64} />
-              <span className="display text-lg text-[var(--lcd-ink)]">+1 EXTRA LIFE</span>
+              <span className="display text-lg text-[var(--lcd-ink)]">+1 LIFE NFT</span>
             </div>
           </div>
         </div>
@@ -270,7 +270,7 @@ export function About() {
           <ul className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
             <li>
               <b className="block">A chance to recover losses</b>
-              <span className="text-[var(--muted)]">Eligible losses can earn a share of house profits through an Extra Life. The payout depends on available profit and may be zero.</span>
+              <span className="text-[var(--muted)]">Eligible losses can earn a share of house profits through a Life NFT. The payout depends on available profit and may be zero.</span>
             </li>
             <li>
               <b className="block">A limited earning period</b>

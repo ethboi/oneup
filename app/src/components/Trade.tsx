@@ -899,7 +899,7 @@ function OrderForm({ t }: { t: Ticket }) {
   const { d, viewOnly } = useOneUp();
   const { side, setSide, margin, setMargin, leverage, setLeverage, maxLeverage, m, quote, free, wallet, pool, topUp, blocked, price } = t;
   const liq = quote?.liquidation_price ? BigInt(quote.liquidation_price) : null;
-  // what a full loss would bring: an Extra Life of at most the loss × today's cap, and up to 20 $1UP per $1
+  // what a full loss would bring: a Life NFT of at most the loss × today's cap, and up to 20 $1UP per $1
   const lifeUpTo = owed(m, lifeCapPpm(pool));
   const oneupUpTo = Number(m / USDC) * Number(ONEUP_PER_USDC);
   // "Pay with" stays out of the way until it's wanted, or the wallet can't cover the trade
@@ -1191,7 +1191,7 @@ function OrderForm({ t }: { t: Ticket }) {
           </div>
           {why && (
             <p className="label mt-1.5">
-              If the house makes a profit this round, eligible net losses may earn an Extra Life with a payout limit of up to ${fmtUsdc(lifeUpTo, 0)}, plus up to{" "}
+              If the house makes a profit this round, eligible net losses may earn a Life NFT with a payout limit of up to ${fmtUsdc(lifeUpTo, 0)}, plus up to{" "}
               {oneupUpTo.toLocaleString("en-US")} $1UP locked for 104 rounds. The round&apos;s profit determines how much is issued.
               Net losses also earn one jackpot ticket per $1 lost, whether or not the house makes a profit.
               Life payouts depend on future house profits and may be zero. Trader Lives can earn payouts in their first round and the next 13 rounds.
@@ -1763,7 +1763,7 @@ export function fmtPrice(p: bigint) {
   return v.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
 
-/** Shows the moment a loss turns into a pending Extra Life (liquidation or a losing close). */
+/** Shows the moment a loss turns into a pending Life NFT (liquidation or a losing close). */
 function LossBanner() {
   const { o, d, me } = useOneUp();
   const pending = usePoll(() => o.pendingLife(me), [me]);
@@ -1793,7 +1793,7 @@ function LossBanner() {
         <div className="text-lg font-extrabold leading-tight">Waiting for the round to end</div>
         <div className="label num mt-1">
           Your net loss this round increased by ${fmtUsdc(loss.amount)} to ${fmtUsdc(loss.total)}. The round ends in {fmtClock(left)}.
-          If the house makes a profit, eligible losses may earn an Extra Life and a $1UP lock. The amounts are confirmed when the round settles. Recovery is not guaranteed.
+          If the house makes a profit, eligible losses may earn a Life NFT and a $1UP lock. The amounts are confirmed when the round settles. Recovery is not guaranteed.
         </div>
       </div>
       <button className="btn btn-ghost px-2.5" onClick={() => setLoss(null)} aria-label="Dismiss">

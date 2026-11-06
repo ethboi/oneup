@@ -107,7 +107,7 @@ const SOUNDS: Record<Sfx, () => Tone[]> = {
     ),
   lose: () => run(["G4", "D#4", "C4"], 0.14, "triangle", 1.6),
   liquidated: () => [{ freq: 520, to: 70, at: 0, len: 0.6, gain: 0.8 }],
-  // the hopeful turn after a loss: the Extra Life is on its way
+  // the hopeful turn after a loss: the Life NFT is on its way
   plusOne: () => run(["C6", "G6"], 0.08, "square", 0.8, 0.3),
   life: () => run(["E5", "G5", "C6", "E6", "G6"], 0.08).concat({ note: "C7", at: 0.4, len: 0.3, gain: 0.8 }),
   claim: () => [

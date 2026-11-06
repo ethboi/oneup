@@ -4,12 +4,12 @@ import { Logo, PixelCoin, PixelHeart, PixelLock } from "@/components/Pixel";
 import "./site.css";
 
 // oneup.markets: the website, written like the handheld's instruction booklet. The console is the hero, with the
-// demo video on its screen; then how to play, what an Extra Life is, and what NEAR does. src/proxy.ts serves it at
+// demo video on its screen; then how to play, what a Life NFT is, and what NEAR does. src/proxy.ts serves it at
 // `/` on the site's own hosts; anywhere else it is at /site.
 
 const TITLE = "OneUp: lose a trade, get a life";
 const DESCRIPTION =
-  "A perpetual futures game on NEAR. When the house ends a round in profit, traders with a net loss get an Extra Life: an NFT that collects a share of future house profit. NEAR testnet, test money.";
+  "A perpetual futures game on NEAR. When the house ends a round in profit, traders with a net loss get a Life NFT: an NFT that collects a share of future house profit. NEAR testnet, test money.";
 /** The site's own host, so its preview image links there rather than to the app. */
 const HOST = process.env.ONEUP_SITE_HOSTS?.split(",")[0]?.trim();
 
@@ -37,7 +37,7 @@ export default function Site() {
         </a>
         <nav className="site-nav" aria-label="Sections">
           <a href="#how">How to play</a>
-          <a href="#life">Extra Lives</a>
+          <a href="#life">Life NFTs</a>
           <a href="#near">NEAR</a>
         </nav>
         <a className="btn btn-accent site-bar-cta" href={APP}>
@@ -54,7 +54,7 @@ export default function Site() {
             </h1>
             <p className="site-lede">
               OneUp is a perpetual futures game on NEAR. When the house ends a round in profit, every trader with a net
-              loss gets an Extra Life: an NFT that collects a share of the house’s profit for the next 13 rounds. Claim what
+              loss gets a Life NFT: an NFT that collects a share of the house’s profit for the next 13 rounds. Claim what
               it collects, keep it earning or sell it.
             </p>
             <div className="site-ctas">
@@ -126,8 +126,8 @@ export default function Site() {
               <div className="site-step-art site-step-card" aria-hidden>
                 <LifeCard id="127" paid={0n} owed={300n} state="earning" tone="long" tag="LONG" detail="NEAR 50×" amount="$0 / $300" />
               </div>
-              <h3 className="display">Get an Extra Life</h3>
-              <p>If the house ends the round in profit, each wallet with a net loss gets an Extra Life NFT, and $1UP locked for 104 rounds.</p>
+              <h3 className="display">Get a Life NFT</h3>
+              <p>If the house ends the round in profit, each wallet with a net loss gets a Life NFT, and $1UP locked for 104 rounds.</p>
             </li>
             <li className="panel site-step">
               <div className="site-step-art" aria-hidden>
@@ -148,7 +148,7 @@ export default function Site() {
               width={1200}
               height={675}
               loading="lazy"
-              alt="Chad, a blond trader in sunglasses and red braces, holds up a gold Extra Life card and the handheld, beside a beaming TV host giving a thumbs up"
+              alt="Chad, a blond trader in sunglasses and red braces, holds up a gold Life NFT card and the handheld, beside a beaming TV host giving a thumbs up"
             />
           </figure>
           <div className="site-ad-copy">
@@ -171,11 +171,11 @@ export default function Site() {
             <LifeCard id="311" paid={600n} owed={600n} state="full_heal" tone="short" tag="SHORT" detail="BTC 100×" amount="$600 / $600" />
           </div>
           <div>
-            <h2 className="display site-h2">What’s in an Extra Life</h2>
+            <h2 className="display site-h2">What’s in a Life NFT</h2>
             <dl className="site-facts">
               <div>
                 <dt className="display">USDC as it earns</dt>
-                <dd>Each round, part of the house’s profit above its reserves goes to Extra Lives. What yours collects is there to claim.</dd>
+                <dd>Each round, part of the house’s profit above its reserves goes to Life NFTs. What yours collects is there to claim.</dd>
               </div>
               <div>
                 <dt className="display">13 more rounds</dt>
@@ -201,7 +201,7 @@ export default function Site() {
               <PixelHeart size={28} />
               <span className="site-tag live">On testnet</span>
               <h3 className="display">An NFT that holds money</h3>
-              <p>Each Extra Life is a NEP-171 token that claims NEP-141 USDC from the house. Sell the token and the claim goes with it.</p>
+              <p>Each Life NFT is a NEP-171 token that claims NEP-141 USDC from the house. Sell the token and the claim goes with it.</p>
             </li>
             <li className="panel">
               <PixelCoin size={28} />
@@ -213,7 +213,7 @@ export default function Site() {
               <PixelLock size={28} />
               <span className="site-tag">Local demo</span>
               <h3 className="display">Run by a DAO</h3>
-              <p>A Sputnik DAO owns the house, the Extra Lives and the price oracle, and votes on new markets.</p>
+              <p>A Sputnik DAO owns the house, the Life NFTs and the price oracle, and votes on new markets.</p>
             </li>
             <li className="panel">
               <Logo size={28} />
@@ -223,7 +223,7 @@ export default function Site() {
             </li>
           </ul>
           <p className="label site-caveat">
-            On testnet: trading, Extra Lives, claims, locks and the market, owned by an operator account rather than a DAO.
+            On testnet: trading, Life NFTs, claims, locks and the market, owned by an operator account rather than a DAO.
           </p>
         </section>
 
@@ -235,7 +235,7 @@ export default function Site() {
               width={1100}
               height={619}
               loading="lazy"
-              alt="Chad and the TV host point straight at you, holding up a gold Extra Life card and the handheld"
+              alt="Chad and the TV host point straight at you, holding up a gold Life NFT card and the handheld"
             />
           </figure>
           <p className="display site-end-line">Lost again? Get a life.</p>

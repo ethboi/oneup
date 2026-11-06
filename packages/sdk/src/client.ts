@@ -399,7 +399,7 @@ export class OneUp {
       mergeLocks: (token_ids: string[]) => send<string>({ contractId: c.ve, methodName: "merge", args: { token_ids }, gas: MAX_GAS }),
       unlock: (token_id: string) => send<void>({ contractId: c.ve, methodName: "unlock", args: { token_id } }),
       exitEarly: (token_id: string) => send<U128>({ contractId: c.ve, methodName: "exit_early", args: { token_id } }),
-      /** Lists an Extra Life or a lock: `nft` is the life or ve contract, `price` in USDC units (1e6). */
+      /** Lists a Life NFT or a lock: `nft` is the life or ve contract, `price` in USDC units (1e6). */
       list: (nft: string, token_id: string, price: bigint) =>
         send<void>({
           contractId: nft,

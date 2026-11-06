@@ -100,7 +100,7 @@ export function settle(margin: bigint, p: bigint, ppm: bigint): Settlement {
   return { toTrader: margin + p, cut: 0n, poolPaid: 0n, poolTaken: -p };
 }
 
-// §5 Extra Lives
+// §5 Life NFTs
 
 /** What a round's Lives and $1UP are sized from: house profit, never more than the round's net losses. */
 export const recoveryBase = (houseNet: bigint, netLosses: bigint) => min(houseNet > 0n ? houseNet : 0n, netLosses);

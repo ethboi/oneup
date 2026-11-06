@@ -67,9 +67,9 @@ function summary(e: JournalEntry): string {
     case "set_triggers":
       return `#${a.position_id}: TP ${a.take_profit ?? "–"} / SL ${a.stop_loss ?? "–"}`;
     case "claim_lives":
-      return "USDC from its Extra Lives";
+      return "USDC from its Life NFTs";
     case "buy_listing":
-      return `${String(a.nft_contract ?? "").startsWith("life") ? "an Extra Life" : "a $1UP lock"} #${a.token_id}, up to $${a.max_price_usd}`;
+      return `${String(a.nft_contract ?? "").startsWith("life") ? "a Life NFT" : "a $1UP lock"} #${a.token_id}, up to $${a.max_price_usd}`;
     default:
       return e.tool;
   }
@@ -99,7 +99,7 @@ export function Agents() {
     return (
       <div className="flex flex-col gap-5">
         <Explainer title="Agents" line="OneUp is built to be traded by AI agents as well as people, through its MCP server. Here, rule-based bots keep the market moving.">
-          An agent gets the same tools a trader has: markets, quotes, open and close, Extra Lives and the market. Each action goes in a public journal with
+          An agent gets the same tools a trader has: markets, quotes, open and close, Life NFTs and the market. Each action goes in a public journal with
           the agent&apos;s own reason. That runs in the local demo; on this testnet site there is no AI agent yet, and the bots below provide the flow you see.
         </Explainer>
         <BotTable accounts={rows?.filter((r) => agentOf(r.account, ai)?.kind === "bot").map((r) => r.account) ?? []} rows={rows} ai={ai} note="Rule-based strategies trading around the clock with test money, so the house always has flow. Updated about once a minute." />
@@ -110,10 +110,10 @@ export function Agents() {
     <div className="flex flex-col gap-5">
       <Explainer
         title="Agents"
-        line="OneUp is built to be traded by AI agents as well as people. Through its MCP server an agent reads the markets, sizes a trade, sets its exits and buys Extra Lives on the market. Every action is logged here with the reason it gave."
+        line="OneUp is built to be traded by AI agents as well as people. Through its MCP server an agent reads the markets, sizes a trade, sets its exits and buys Life NFTs on the market. Every action is logged here with the reason it gave."
       >
         The MCP server (mcp/) gives any MCP client, such as Claude, the same tools a trader has: markets, quotes, open and close,
-        take-profit and stop-loss, Extra Lives and claims, and the market for lives and locks. Each action it takes goes into the journal below
+        take-profit and stop-loss, Life NFTs and claims, and the market for lives and locks. Each action it takes goes into the journal below
         with the agent&apos;s own reason, so you can see what it did and why. Beside it, twelve rule-based bots trade around the clock, one
         strategy each, so the house always has flow. On this local demo the agent signs with a development key; a mainnet agent would hold a
         constrained session key instead.
@@ -136,7 +136,7 @@ export function Agents() {
           <Stat label="Profit, all time" value={usd(pnl, true)} tone={pnl > 0n ? "good" : pnl < 0n ? "bad" : undefined} />
           <Stat label="Trades" value={mine ? `${mine.trades}` : "0"} sub={mine && mine.trades ? `${Math.round((mine.wins / mine.trades) * 100)}% won` : undefined} />
           <Stat label="Open positions" value={`${positions.length}`} />
-          <Stat label="Extra Lives held" value={`${held.length}`} sub={held.length ? `can still pay ${usd(held.reduce((s, l) => s + lifeValue(l), 0n))}` : bought ? `${bought} bought on the market` : undefined} />
+          <Stat label="Life NFTs held" value={`${held.length}`} sub={held.length ? `can still pay ${usd(held.reduce((s, l) => s + lifeValue(l), 0n))}` : bought ? `${bought} bought on the market` : undefined} />
         </SummaryBar>
 
         <div>

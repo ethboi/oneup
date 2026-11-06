@@ -1,6 +1,6 @@
 "use client";
 
-// A $1UP lock as a trading card, in the same frame as an Extra Life (LifeCard): its padlock, where it came from, a
+// A $1UP lock as a trading card, in the same frame as a Life NFT (LifeCard): its padlock, where it came from, a
 // bar of the time left, and the amount locked.
 
 import type { PointerEvent, ReactNode } from "react";

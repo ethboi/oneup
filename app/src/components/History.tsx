@@ -1,7 +1,7 @@
 "use client";
 
 // Your history, newest first: closed trades (each with a shareable card), deposits and withdrawals, claims,
-// Extra Lives and locks you got, and market sales. Built from chain events by /api/history.
+// Life NFTs and locks you got, and market sales. Built from chain events by /api/history.
 
 import { useEffect, useState } from "react";
 import { OnExplorer } from "./ui";
@@ -146,7 +146,7 @@ function Row({ i, me }: { i: HistoryItem; me: string }) {
     case "claim_usdc":
       icon = "claim";
       color = "var(--long)";
-      title = "Claimed from Extra Lives";
+      title = "Claimed from Life NFTs";
       amount = <span className="font-extrabold text-[var(--long)]">+${fmtUsdc(BigInt(i.amount))}</span>;
       break;
     case "claim_oneup":
@@ -159,7 +159,7 @@ function Row({ i, me }: { i: HistoryItem; me: string }) {
     case "life":
       icon = "heart";
       color = "var(--heart)";
-      title = "Received an Extra Life";
+      title = "Received a Life NFT";
       detail = `#${i.token_id}`;
       break;
     case "lock":
@@ -172,7 +172,7 @@ function Row({ i, me }: { i: HistoryItem; me: string }) {
     case "sold":
       icon = i.kind === "bought" ? "cart" : "tag";
       color = "var(--primary)";
-      title = `${i.kind === "bought" ? "Bought" : "Sold"} ${i.what === "Extra Life" ? "an Extra Life" : "a $1UP lock"}`;
+      title = `${i.kind === "bought" ? "Bought" : "Sold"} ${i.what !== "$1UP lock" ? "a Life NFT" : "a $1UP lock"}`;
       detail = `${i.kind === "bought" ? "from" : "to"} ${short(i.other)}`;
       amount = <span className="font-extrabold">{i.kind === "bought" ? "−" : "+"}${fmtUsdc(BigInt(i.price))}</span>;
       break;

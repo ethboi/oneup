@@ -62,7 +62,7 @@ export function farmingScenarios() {
   })));
 }
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const result = { limitations: "Synthetic aggregate flows with exogenous edge/utilisation. Negative cash is an infeasible flow assumption, not an executable contract insolvency. No order admission or strategy model. Ranges are min/median/max across seeds, not confidence intervals. Farming excludes capital timing, admission and Extra Life proceeds; lock sale discounts are assumed, not observed.", scenarios: sensitivity(), farming: farmingScenarios() };
+  const result = { limitations: "Synthetic aggregate flows with exogenous edge/utilisation. Negative cash is an infeasible flow assumption, not an executable contract insolvency. No order admission or strategy model. Ranges are min/median/max across seeds, not confidence intervals. Farming excludes capital timing, admission and Life NFT proceeds; lock sale discounts are assumed, not observed.", scenarios: sensitivity(), farming: farmingScenarios() };
   const dir = resolve(import.meta.dirname, "../out"); mkdirSync(dir, {recursive: true});
   writeFileSync(resolve(dir, "sensitivity.json"), JSON.stringify(result, null, 2));
   console.table(result.scenarios.map(r => ({ scenario: r.assumptions.name, recovery: r.recoveryPerDollar.median.toFixed(4), backerRecovery: r.backerRecovery.median.toFixed(4), expiredUnpaid: Math.round(r.expiredUnpaidCaps.median), cashDeficit: Math.round(r.cashDeficit.max) })));

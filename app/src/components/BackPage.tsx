@@ -97,7 +97,7 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
       <div className="grid gap-4 md:grid-cols-3">
         <Card icon={<PixelHeart size={26} />} title="A Backer Life">
           A Backer Life has no expiry date, and its payout limit depends on the pool size when it is created. Backer Lives
-          share one third of the Extra Life payout pool each round; unused funds can move between the backer and trader shares. The full payout limit may never be reached.
+          share one third of the Life NFT payout pool each round; unused funds can move between the backer and trader shares. The full payout limit may never be reached.
         </Card>
         <Card icon={<PixelLock size={24} />} title="$1UP, locked">
           Receive 10 $1UP for each $1 contributed, locked for 104 rounds. The lock receives a weighted share of buyback rewards,
@@ -139,7 +139,7 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
         {recent && recent.length > 0 && (
           <p className="label num mt-3">
             In this demo, the house made ${fmtUsdc(houseNet > 0n ? houseNet : 0n, 0)} over the last {recent.length} round{recent.length === 1 ? "" : "s"}.
-            One third of the Extra Life payout pool for those rounds was approximately ${fmtUsdc(backerPot, 2)}.
+            One third of the Life NFT payout pool for those rounds was approximately ${fmtUsdc(backerPot, 2)}.
           </p>
         )}
       </section>
@@ -148,7 +148,7 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
         <section className="panel p-5">
           <h2 className="text-lg font-extrabold">Your Backer Lives</h2>
           {mine.length === 0 ? (
-            <p className="label mt-2">You have no Backer Lives yet. Any you receive will appear here and under Extra Lives.</p>
+            <p className="label mt-2">You have no Backer Lives yet. Any you receive will appear here and under Life NFTs.</p>
           ) : (
             <ul className="mt-3 flex flex-col gap-3">
               {mine.map((l) => {
@@ -165,7 +165,7 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
                     <div className="mt-1">
                       <HealthBar value={owed > 0n ? Number(paid) / Number(owed) : 0} label={`Paid ${fmtUsdc(paid)} of ${fmtUsdc(owed)}`} />
                     </div>
-                    {BigInt(l.claimable) > 0n && <p className="label mt-1">${fmtUsdc(BigInt(l.claimable))} to claim on the Extra Lives tab</p>}
+                    {BigInt(l.claimable) > 0n && <p className="label mt-1">${fmtUsdc(BigInt(l.claimable))} to claim on the Life NFTs tab</p>}
                   </li>
                 );
               })}

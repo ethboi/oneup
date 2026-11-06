@@ -1,6 +1,6 @@
 // XP and levels, the trading screen's game layer. Worked out from an account's closed trades (its history), so
 // it's the same on every device and needs no storage. It rewards playing and playing well, never risk: every
-// close counts, a win more, a loss too (losing is half the game here: it's how Extra Lives are made), and a
+// close counts, a win more, a loss too (losing is half the game here: it's how Life NFTs are made), and a
 // close by your own take-profit or stop-loss earns a bonus. Leverage earns nothing extra, and nor does a
 // liquidation. Three daily quests add more. Levels unlock console shells.
 

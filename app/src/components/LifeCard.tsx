@@ -1,8 +1,8 @@
 "use client";
 
-// An Extra Life as a trading card: the NFT's own picture (drawn as the contract draws it), the trade or round it
+// A Life NFT as a trading card: the NFT's own picture (drawn as the contract draws it), the trade or round it
 // came from, a payout bar lit row by row like the heart, and paid against owed. The power-on screen deals sample
-// cards around the console; the Extra Lives page shows the account's real ones.
+// cards around the console; the Life NFTs page shows the account's real ones.
 
 import type { CSSProperties, ReactNode } from "react";
 import { lifeImage, lifeRows, type LifeState } from "@/lib/lifeArt";
@@ -49,7 +49,7 @@ export function LifeCard({
   return (
     <div className={`life-card ${state} ${backer ? "backer" : ""} ${className}`} style={style}>
       <div className="life-card-top">
-        <span className="display">EXTRA LIFE</span>
+        <span className="display">LIFE NFT</span>
         <span className="num">{corner ?? `#${id}`}</span>
       </div>
       <span className="life-card-stripes" />

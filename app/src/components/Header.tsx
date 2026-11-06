@@ -90,7 +90,7 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
       {/* the round's clock and your result in it, one strip like the chart's market bar */}
       <div className="flex min-w-0 flex-1 justify-end lg:flex-none">
         <div className="hdr-strip bar-strip num text-sm">
-          <span className="bar-cell" title={`Round ${epoch?.id ?? ""} ends in ${fmtClock(left)}. Eligible losses may earn Extra Lives and $1UP locks if the house makes a profit.`}>
+          <span className="bar-cell" title={`Round ${epoch?.id ?? ""} ends in ${fmtClock(left)}. Eligible losses may earn Life NFTs and $1UP locks if the house makes a profit.`}>
             {/* the label goes on narrow desktops too, where the tabs need the room */}
             <span className="label hidden sm:inline lg:hidden 2xl:inline">Round {epoch?.id ?? "…"}</span>
             <b>{fmtClock(left)}</b>
@@ -100,7 +100,7 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
               className="bar-cell"
               title={
                 round.net < 0n
-                  ? "Your net loss this round. If the house makes a profit, eligible losses may earn an Extra Life and a $1UP lock. Recovery is not guaranteed."
+                  ? "Your net loss this round. If the house makes a profit, eligible losses may earn a Life NFT and a $1UP lock. Recovery is not guaranteed."
                   : "Your net profit this round, after the fee on profits."
               }
             >
@@ -109,7 +109,7 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
                 {round.net < 0n ? "−" : "+"}${fmtUsdc(round.net < 0n ? -round.net : round.net, (round.net < 0n ? -round.net : round.net) < 100n * USDC ? 2 : 0)}
               </b>
               {round.net < 0n && (
-                <span aria-label="An Extra Life may be issued if the house makes a profit this round">
+                <span aria-label="A Life NFT may be issued if the house makes a profit this round">
                   <PixelHeart size={14} />
                 </span>
               )}
@@ -503,7 +503,7 @@ export const fmtOneup = (x?: string, digits = 0) =>
 
 /**
  * Your result this round, or null before your first close in it. A net loss comes from the house itself (the
- * pending Extra Life, exact); a profit from your closes since the round began, after the winner's cut.
+ * pending Life NFT, exact); a profit from your closes since the round began, after the winner's cut.
  */
 function useMyRound(me: string, startedAt?: number) {
   const { o } = useOneUp();

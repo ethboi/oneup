@@ -21,7 +21,7 @@ that gap. This guide prepares those next steps without creating an account or sp
 ## What is deployed
 
 The preparation script creates nine fresh contract subaccounts plus one keeper below a funded operator:
-house, Extra Life, token, locks, marketplace, mock USDC, mock oracle, mock swap and mock vault. The operator
+house, Life NFT, token, locks, marketplace, mock USDC, mock oracle, mock swap and mock vault. The operator
 retains contract administration and runs buybacks; the keeper executes trades and pushes prices. There is
 no DAO, bridge, Intents verifier, solver or bot deployment in this profile. Those local-demo integrations
 must not be represented as public testnet integrations.

@@ -24,11 +24,11 @@ import { EpochResults } from "@/components/EpochResults";
 import { Icon, type IconName } from "@/components/Icon";
 import { Logo } from "@/components/Pixel";
 
-const TABS = ["Trade", "Extra Lives", "Locks", "Market", "Agents", "Leaders", "Backing", "$1UP", "House", "About"] as const;
+const TABS = ["Trade", "Life NFTs", "Locks", "Market", "Agents", "Leaders", "Backing", "$1UP", "House", "About"] as const;
 type Tab = (typeof TABS)[number];
 const TAB_ICONS: Record<Tab, IconName> = {
   Trade: "chart",
-  "Extra Lives": "heart",
+  "Life NFTs": "heart",
   Locks: "lock",
   Market: "store",
   Agents: "agent",
@@ -39,16 +39,21 @@ const TAB_ICONS: Record<Tab, IconName> = {
   About: "info",
 };
 /** Phones: the four you use; the ones you read sit behind More. */
-const PHONE_TABS: Tab[] = ["Trade", "Extra Lives", "Locks", "Market"];
+const PHONE_TABS: Tab[] = ["Trade", "Life NFTs", "Locks", "Market"];
 /** Desktop: the reading tabs sit under More. */
 const MORE_TABS: Tab[] = ["Leaders", "Backing", "$1UP", "House", "About"];
 /** Below 1280px these join them, so the bar fits beside the round strip. */
 const NARROW_MORE_TABS: Tab[] = [];
-const PHONE_LABEL: Partial<Record<Tab, string>> = { "Extra Lives": "Lives" };
+const PHONE_LABEL: Partial<Record<Tab, string>> = { "Life NFTs": "Lives" };
 
-/** Each tab's address: /locks, /extra-lives, /house… (Trade is the root). */
+/** Each tab's address: /locks, /life-nfts, /house… (Trade is the root). */
 const slug = (t: Tab) => (t === "Trade" ? "" : t.toLowerCase().replace(/\$/g, "").replace(/\s+/g, "-"));
-const fromPath = (path: string): Tab => TABS.find((t) => slug(t) === path.replace(/^\/+|\/+$/g, "").toLowerCase()) ?? "Trade";
+/** The tab's earlier address, so links already shared still open it. */
+const OLD_PATHS: Record<string, string> = { "extra-lives": "life-nfts" };
+const fromPath = (path: string): Tab => {
+  const name = path.replace(/^\/+|\/+$/g, "").toLowerCase();
+  return TABS.find((t) => slug(t) === (OLD_PATHS[name] ?? name)) ?? "Trade";
+};
 
 export default function Home() {
   const [tab, setTab] = useState<Tab>("Trade");
@@ -114,7 +119,7 @@ export default function Home() {
         <Header
           tabs={TABS.map((t) => ({
             name: t,
-            badge: t === "Extra Lives" ? ("lives" as const) : undefined,
+            badge: t === "Life NFTs" ? ("lives" as const) : undefined,
             more: MORE_TABS.includes(t),
             moreWhenNarrow: NARROW_MORE_TABS.includes(t),
           }))}
@@ -123,7 +128,7 @@ export default function Home() {
         />
         <div className={tab === "Trade" ? undefined : "mx-auto max-w-[1280px] 2xl:max-w-[1440px]"}>
           {tab === "Trade" && <Trade />}
-          {tab === "Extra Lives" && <Lives />}
+          {tab === "Life NFTs" && <Lives />}
           {tab === "Locks" && <Locks />}
           {tab === "Market" && <Market />}
           {tab === "Agents" && <Agents />}
@@ -194,7 +199,7 @@ function Footer({ go }: { go: (t: Tab, at?: string) => void }) {
           <div>
             <b className="display text-base">OneUp</b>
             <p className="label mt-0.5 max-w-sm">
-              Trade perpetual futures with capped profits. Eligible losses may earn an Extra Life NFT: claim its available USDC or sell it. Recovery depends on house profits and is not guaranteed.
+              Trade perpetual futures with capped profits. Eligible losses may earn a Life NFT: claim its available USDC or sell it. Recovery depends on house profits and is not guaranteed.
             </p>
           </div>
         </div>

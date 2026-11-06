@@ -1,4 +1,4 @@
-// A $1UP lock's picture, in the style of an Extra Life's (lifeArt.ts): a pixel padlock on an LCD tile. Its gold body
+// A $1UP lock's picture, in the style of a Life NFT's (lifeArt.ts): a pixel padlock on an LCD tile. Its gold body
 // drains from the top as the unlock nears, the way a Life's heart fills as it pays. The shackle opens once it can be
 // unlocked, and it goes grey once closed. The same picture the lock contract draws (lock_svg in contracts/ve/src/lib.rs).
 

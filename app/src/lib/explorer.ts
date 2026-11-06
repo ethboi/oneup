@@ -17,7 +17,7 @@ export function explorer(network: Deployment["network"]) {
     tx: (hash: string) => at(`/txns/${hash}`),
     account: (id: string) => at(`/address/${id}`),
     block: (hash: string) => at(`/blocks/${hash}`),
-    /** An NFT collection (Extra Lives, locks): its transfers. */
+    /** An NFT collection (Life NFTs, locks): its transfers. */
     nfts: (contract: string) => at(`/nft-tokens/${contract}`),
     nft: (contract: string, tokenId: string) => at(`/nft-tokens/${contract}/tokens/${encodeURIComponent(tokenId)}`),
   };

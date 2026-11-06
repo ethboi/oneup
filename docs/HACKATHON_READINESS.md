@@ -3,7 +3,7 @@
 This document and executable code supersede the archived `PLAN.md` and historical decision notes.
 All code is in the hackathon window (first commit 20 October 2026, after the 19 October announcement; Q-001),
 so no baseline tag is needed. Making the repository public, posting on X and submitting are the author's
-decisions, still to come. Lead with transferable recovery rights and the behavior of the Extra Life NFT. Native NEAR wallet setup
+decisions, still to come. Lead with transferable recovery rights and the behavior of the Life NFT. Native NEAR wallet setup
 is [documented separately](NEAR_WALLET_SETUP.md); a public testnet deployment must be verified before
 calling that integration live.
 

@@ -6,10 +6,10 @@ Five product contracts plus four mocks, all near-sdk Rust. Amounts are `U128` st
 | Contract | Example local account | Holds |
 |---|---|---|
 | `house` | `house.test.near` | pool + trader USDC, positions, epochs, 900M $1UP for emissions |
-| `extra-life` (`oneup-extra-life`) | `life.test.near` | Extra Life NFTs + USDC paid to them, until claimed |
+| `extra-life` (`oneup-extra-life`) | `life.test.near` | Life NFTs + USDC paid to them, until claimed |
 | `oneup-token` | `oneup.test.near` | $1UP ledger |
 | `ve` | `ve.test.near` | locked $1UP as lock NFTs, buyback $1UP and exit penalties for lockers |
-| `market` (`oneup-market`) | `market.test.near` | listings of Extra Lives and locks; USDC only while a purchase is in flight |
+| `market` (`oneup-market`) | `market.test.near` | listings of Life NFTs and locks; USDC only while a purchase is in flight |
 | `mock-usdc` | `usdc.test.near` | demo collateral with a faucet (D-8) |
 | `mock-oracle` | `oracle.test.near` | Pyth-compatible mock; keeper pushes live, simulated or fixed prices |
 | `mock-swap` | `swap.test.near` | local constant-product USDC → $1UP buybacks |
@@ -49,7 +49,7 @@ buyer  ──ft_transfer_call──▶ usdc ──▶ market ──▶ life|ve.n
 | `liquidate(position_id)` | anyone | latest price; pnl ≤ −0.9M → margin to pool |
 | `take_profit(position_id)` | anyone | latest price; pnl at cap → close |
 | `hit_target(position_id)` / `hit_stop(position_id)` | anyone | latest price past the trader's trigger, after the minimum hold and newer than the trigger → places a close (reason `Target` / `Stop`) that fills using a later valid price within its execution window (D-19); prompt execution trusts the keeper |
-| `close_epoch(limit)` | anyone | resumable: first call freezes epoch `e`, fixes its $1UP release (maths §8), checkpoints `ve` and starts `e+1` ("begun"); then mints Extra Lives and loser locks, `limit` (≤ 10) losers per call ("minting"), retains and retries failed batches ("retrying recovery"), waits for both destinations to confirm ("waiting for mints"), expires lives past their window ("expiring"), pays the pot and sets aside buyback USDC ("closed") |
+| `close_epoch(limit)` | anyone | resumable: first call freezes epoch `e`, fixes its $1UP release (maths §8), checkpoints `ve` and starts `e+1` ("begun"); then mints Life NFTs and loser locks, `limit` (≤ 10) losers per call ("minting"), retains and retries failed batches ("retrying recovery"), waits for both destinations to confirm ("waiting for mints"), expires lives past their window ("expiring"), pays the pot and sets aside buyback USDC ("closed") |
 | `set_keeper(keeper)` / `set_operator(operator)` / `set_owner(owner)` / `set_intents(intents)` | owner | roles (D-20, D-21, D-23) |
 | `buyback(epoch, min_out)` | owner or operator (D-10) | swaps the epoch's buyback USDC; the $1UP goes to `ve` for that epoch's lockers |
 | `add_market(market_id, feed_id, max_leverage)` | owner | new markets get `market_capacity_ppm` of the pool (D-14) |

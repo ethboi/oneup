@@ -148,7 +148,7 @@ export function useCloseFx(market: string) {
     const id = Date.now();
     setFx({ ...e, id });
     // a win holds a little longer so the amount can be read, longer still the bigger it is
-    // a loss holds long enough to read the Extra Life card it may earn
+    // a loss holds long enough to read the Life NFT card it may earn
     setTimeout(() => setFx((f) => (f?.id === id ? null : f)), e.kind === "win" ? WIN[e.tier ?? 1].hold : LIFE_HOLD);
   });
   return fx;
@@ -215,12 +215,12 @@ export function Burst({ fx }: { fx: CloseFx & { id: number } }) {
   const lost = fx.pnl && BigInt(fx.pnl) < 0n ? -BigInt(fx.pnl) : 0n;
   return (
     <div key={fx.id} className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center" aria-hidden>
-      {/* the Extra Life this loss may earn, as a banner like the game's others: its heart empty until the round
+      {/* the Life NFT this loss may earn, as a banner like the game's others: its heart empty until the round
           settles and pays */}
       <span className="life-banner">
         <span className="life-banner-top display">
           {/* a question: whether this loss earns one is only settled when the round closes */}
-          <span>EXTRA LIFE?</span>
+          <span>LIFE NFT?</span>
         </span>
         <img className="life-banner-art" src={lifeImage(0n, 1n, "earning")} alt="" />
         <span className="display life-banner-big">{fx.kind === "liquidated" ? "LIQUIDATED" : "LOSS"}</span>

@@ -1,7 +1,7 @@
 "use client";
 
 // Shareable PnL cards: the console's look (case, slate bezel, stripes, LCD) drawn on a 1200×675 canvas, the
-// size X and most chats preview well. A win shows the return; a loss shows the Extra Life it brings. The
+// size X and most chats preview well. A win shows the return; a loss shows the Life NFT it brings. The
 // dialog offers download, copy, the phone's share sheet and a post on X.
 
 import { useEffect, useRef, useState } from "react";
@@ -182,7 +182,7 @@ export async function drawCard(canvas: HTMLCanvasElement, d: CardData) {
     ctx.fillStyle = C.ink;
     ctx.textAlign = "center";
     ctx.font = `700 30px ${f.pixel}`;
-    ctx.fillText("EXTRA LIFE?", cx, ly + 270);
+    ctx.fillText("LIFE NFT?", cx, ly + 270);
     ctx.font = `500 21px ${f.body}`;
     ctx.fillStyle = C.inkSoft;
     ctx.fillText("recovery is not guaranteed", cx, ly + 302);
@@ -210,23 +210,23 @@ function drawHeal(
   ctx.fillStyle = C.ink;
   ctx.textAlign = "left";
   ctx.font = `700 34px ${f.pixel}`;
-  ctx.fillText(`EXTRA LIFE · ROUND ${heal.epoch}`, px, ly + 64);
+  ctx.fillText(`LIFE NFT · ROUND ${heal.epoch}`, px, ly + 64);
   ctx.font = `700 96px ${f.pixel}`;
   ctx.fillText("FULL HEAL", px - 4, ly + 180);
   ctx.font = `800 54px ${f.body}`;
   ctx.fillText(`+$${fmtUsdc(heal.paid)} back`, px, ly + 258);
   ctx.font = `500 24px ${f.body}`;
   ctx.fillStyle = C.inkSoft;
-  ctx.fillText("This Extra Life reached its full payout limit.", px, ly + 318);
+  ctx.fillText("This Life NFT reached its full payout limit.", px, ly + 318);
   sprite(ctx, HEART, { "#": C.heart, "*": "#fff" }, lx + lw - 290, ly + 40, 21);
 }
 
 export function shareText(d: CardData) {
-  if (d.heal) return `Full Heal: my Extra Life reached its $${fmtUsdc(d.heal.paid, 0)} payout limit on OneUp.`;
+  if (d.heal) return `Full Heal: my Life NFT reached its $${fmtUsdc(d.heal.paid, 0)} payout limit on OneUp.`;
   const r = roe(d);
   return d.pnl >= 0n
     ? `+${r.toFixed(1)}% on ${d.market} ${d.side.toLowerCase()} ${d.leverage}× on OneUp.`
-    : `−$${fmtUsdc(-d.pnl, 0)} on ${d.market} ${d.side.toLowerCase()} ${d.leverage}× on OneUp. Eligible losses may earn an Extra Life; recovery is not guaranteed.`;
+    : `−$${fmtUsdc(-d.pnl, 0)} on ${d.market} ${d.side.toLowerCase()} ${d.leverage}× on OneUp. Eligible losses may earn a Life NFT; recovery is not guaranteed.`;
 }
 
 /** A Share button that opens the card dialog. */

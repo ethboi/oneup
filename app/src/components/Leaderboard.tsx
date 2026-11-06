@@ -1,7 +1,7 @@
 "use client";
 
 // Who's up and who's down: every trader's profit after the winner's cut over a round, a day or all time. The
-// biggest losers get the biggest Extra Lives, so they have a board too.
+// biggest losers get the biggest Life NFTs, so they have a board too.
 
 import { useEffect, useState } from "react";
 import { AgentBadge } from "./ui";
@@ -112,7 +112,7 @@ export function Leaderboard() {
         />
         <Board
           title="Largest losses"
-          note="Eligible net losses can earn Extra Lives, with payouts based on house profits."
+          note="Eligible net losses can earn Life NFTs, with payouts based on house profits."
           icon={<PixelHeart size={20} />}
           rows={losers}
           me={me}

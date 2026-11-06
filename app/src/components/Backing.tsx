@@ -1,7 +1,7 @@
 "use client";
 
 // Backing the house (D-22): anyone adds USDC to the pool during the bootstrap round and gets a Backer Life,
-// an Extra Life that never expires, owed more the earlier the dollar went in (the same 2.0× → 1.2× curve
+// a Life NFT that never expires, owed more the earlier the dollar went in (the same 2.0× → 1.2× curve
 // losers get). The money stays in the pool for good and comes back only from house profit; to leave
 // early, sell the Backer Life on the Market.
 

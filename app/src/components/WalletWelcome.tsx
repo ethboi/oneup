@@ -4,7 +4,7 @@ export function WalletWelcome({ connect, busy, error, watch }: { connect: () => 
   return <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-5 p-6">
     <p className="label">OneUp · NEAR testnet · test money only</p>
     <h1 className="page-title">Connect your NEAR wallet</h1>
-    <p>Trade with test funds, follow an Extra Life and try transferring its payout rights to another account.</p>
+    <p>Trade with test funds, follow a Life NFT and try transferring its payout rights to another account.</p>
     <div className="panel space-y-3 p-5">
       <p>Choose a compatible testnet wallet through NEAR Connect. Meteor is the recommended starting point. You approve transactions in your wallet; OneUp does not receive your wallet’s private key.</p>
       <button className="btn btn-accent w-full" disabled={busy} onClick={() => void connect()}>{busy ? "Waiting for wallet…" : "Connect NEAR testnet wallet"}</button>

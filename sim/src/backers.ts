@@ -2,7 +2,7 @@
 //
 // Same rules as model.ts and the contracts: each epoch the house keeps traders' net losses; the payout is half
 // the pool above its reserve (max of 1.2 × open max wins and the total seeded, so never below what backers put
-// in); 60% of it goes to Extra Lives. Backer Lives share that pot with losers' lives, which are owed their
+// in); 60% of it goes to Life NFTs. Backer Lives share that pot with losers' lives, which are owed their
 // loss × the cap curve and stop earning after 14 epochs; Backer Lives never expire. Plain floats, weekly
 // epochs, 200 seeds per level. Runs both ways of sharing the pot: by what each life was originally owed (D-25,
 // the contracts) and by what each is still owed (before D-25), whose last few percent take years.

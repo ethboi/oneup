@@ -72,8 +72,8 @@ export function Market() {
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_360px] lg:items-start">
       <div className="flex min-w-0 flex-col gap-5">
-        <Explainer title="Market" line={<>Buy or list Extra Lives and $1UP locks for USDC. Your wallet balance: <b className="num text-[var(--text)]">{usd(wallet)}</b>.</>}>
-          Buying an Extra Life transfers its unclaimed USDC and remaining payout rights to you. Compare the asking price with both the USDC available to claim and the remaining payout limit. That limit is the maximum additional USDC it could receive; future payouts may be zero and depend on house profit during its earning period.
+        <Explainer title="Market" line={<>Buy or list Life NFTs and $1UP locks for USDC. Your wallet balance: <b className="num text-[var(--text)]">{usd(wallet)}</b>.</>}>
+          Buying a Life NFT transfers its unclaimed USDC and remaining payout rights to you. Compare the asking price with both the USDC available to claim and the remaining payout limit. That limit is the maximum additional USDC it could receive; future payouts may be zero and depend on house profit during its earning period.
           Buying a lock transfers its locked $1UP and its share of eligible buybacks. You can unlock its tokens when the lock ends. Estimated withdrawal values use the current $1UP price, after any early exit penalty; they are not USDC payouts.
           Payment and NFT transfer are handled together. If the NFT has already been sold, your USDC is refunded. Sellers pay a 2% fee into the house pool. Balances refresh periodically. If a seller claims before a purchase, the listing becomes invalid. Any purchase using that listing is refunded, and the seller must list it again.
         </Explainer>
@@ -84,7 +84,7 @@ export function Market() {
               {(
                 [
                   ["all", `All (${all.length})`],
-                  ["life", `Extra Lives (${lives})`],
+                  ["life", `Life NFTs (${lives})`],
                   ["lock", `Locks (${locks})`],
                 ] as const
               ).map(([k, name]) => (
@@ -131,14 +131,14 @@ export function Market() {
 }
 
 function EmptyMarket({ filter }: { filter: Filter }) {
-  const what = filter === "life" ? "Extra Lives" : filter === "lock" ? "$1UP locks" : "Extra Lives or locks";
+  const what = filter === "life" ? "Life NFTs" : filter === "lock" ? "$1UP locks" : "Life NFTs or locks";
   return (
     <div className="flex flex-col items-start gap-3 p-5 text-sm">
       <span className="flex items-center gap-3">
         {filter === "lock" ? <PixelLock size={28} /> : <PixelHeart size={28} />}
         <span>
           <b className="block">No {what} for sale right now.</b>
-          <span className="label">You can list your Extra Lives and $1UP locks here.</span>
+          <span className="label">You can list your Life NFTs and $1UP locks here.</span>
         </span>
       </span>
       <a href="#sell" className="btn btn-ghost">
@@ -160,7 +160,7 @@ function YourItems({ px, listings, epoch, expiryEpochs }: { px: bigint; listings
   const shownLives = all ? lives : lives.slice(0, 3);
   const shownLocks = all ? locks : locks.slice(0, Math.max(0, 3 - shownLives.length));
   if (total === 0) {
-    return <p className="label px-4 pb-4">You have no Lives or locks to list yet. Eligible net losses in profitable rounds can earn you Extra Lives and $1UP locks.</p>;
+    return <p className="label px-4 pb-4">You have no Lives or locks to list yet. Eligible net losses in profitable rounds can earn you Life NFTs and $1UP locks.</p>;
   }
   return (
     <div className="divide-y divide-[var(--line)]">
@@ -172,7 +172,7 @@ function YourItems({ px, listings, epoch, expiryEpochs }: { px: bigint; listings
           <span className="flex min-w-0 items-center gap-3">
             <PixelHeart size={24} />
             <span className="min-w-0">
-              <b className="block">{l.backer ? "Backer Life" : `Extra Life from round ${l.epoch}`}</b>
+              <b className="block">{l.backer ? "Backer Life" : `Life NFT from round ${l.epoch}`}</b>
               <span className="label num block">{usd(lifeEconomics(l).claimable)} available to claim · up to {usd(lifeEconomics(l).additionalCap)} in future payouts</span>
               <span className="label block">{lifeEarningLabel(l, epoch, expiryEpochs)}</span>
             </span>
@@ -212,7 +212,7 @@ function Row({ x, wallet, epoch, expiryEpochs, totalPower }: { x: Item; wallet: 
   let detail: string;
   if (x.kind === "life") {
     const i = x.info;
-    title = i.backer ? "Backer Life" : `Extra Life from round ${i.epoch}`;
+    title = i.backer ? "Backer Life" : `Life NFT from round ${i.epoch}`;
     detail = lifeEarningLabel(i, epoch, expiryEpochs);
   } else {
     const i = x.info;
@@ -277,7 +277,7 @@ function Sales({ items }: { items: ActivityItem[] }) {
       {items.map((a) => {
         const s = a.sale;
         const ago = Math.max(0, Math.round((now - a.t) / 60_000));
-        // "bot2 bought bot4's Extra Life for $4.30": the price goes in its own column
+        // "bot2 bought bot4's Life NFT for $4.30": the price goes in its own column
         const [, who, price] = a.text.match(/^(.*) for (\$[\d,.]+)$/) ?? [, a.text, null];
         return (
           <li key={a.seq} className="flex items-center gap-3 py-2.5 text-sm">
