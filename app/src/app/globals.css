@@ -621,6 +621,25 @@ body {
       padding-inline: 10px;
     }
   }
+  /* the network: a status light and its name, as tall as the tools beside it */
+  .net-badge {
+    --net: var(--accent);
+    height: 40px;
+    border-color: var(--input-edge);
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--net);
+  }
+  .net-badge[data-network="mainnet"] {
+    --net: var(--long);
+  }
+  .net-led {
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    background: var(--net);
+    box-shadow: 0 0 8px var(--net);
+  }
   .bar-strip {
     overflow-x: auto;
     font-size: 13px;

@@ -119,12 +119,26 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
       {/* the tools: one height, close together */}
       <div className="hdr-tools flex shrink-0 items-center gap-2">
         <MuteButton />
-        {/* phones: the banner above says testnet, and the round clock needs the room */}
-        {d.network === "localnet" ? <DemoMenu /> : <span className="chip hidden text-xs sm:inline-flex">NEAR testnet</span>}
+        {d.network === "localnet" ? <DemoMenu /> : <NetworkBadge network={d.network} />}
         {d.network === "localnet" && <a href="/wallet-setup" className="chip hidden sm:inline-flex">Wallet setup</a>}
         <AccountMenu />
       </div>
     </header>
+  );
+}
+
+/**
+ * Which network this is, the one place the header says so: a status light and its name, the same height as the tools
+ * beside it. Amber is test money; green would be mainnet. Phones keep the light, and the banner above names the network.
+ */
+function NetworkBadge({ network }: { network: string }) {
+  const name = network.charAt(0).toUpperCase() + network.slice(1);
+  const about = network === "testnet" ? "NEAR testnet: test money only. Wallet and test token help" : `NEAR ${network}`;
+  return (
+    <a href="/wallet-setup" className="net-badge bar-pill" data-network={network} title={about} aria-label={about}>
+      <span className="net-led" aria-hidden />
+      <span className="hidden sm:inline">{name}</span>
+    </a>
   );
 }
 

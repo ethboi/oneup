@@ -186,11 +186,11 @@ export default function Home() {
 /** What OneUp is and where to read more, under every tab. */
 function NetworkLabel() {
   const { d } = useOneUp();
-  const where = d.network === "testnet" ? "NEAR testnet" : "local NEAR demo";
   return (
     <>
       <span className="sm:hidden"> · {d.network === "testnet" ? "testnet" : "local demo"}, test money</span>
-      <span className="hidden sm:inline"> · {where} · test money only</span>
+      {/* wider screens: the header's badge names a public network */}
+      <span className="hidden sm:inline">{d.network === "testnet" ? "" : " · local NEAR demo"} · test money only</span>
     </>
   );
 }
