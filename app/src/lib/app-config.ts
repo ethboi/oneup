@@ -10,7 +10,7 @@ export type AppDeployment = Pick<Deployment, "network" | "rpcUrl" | "epochLength
 
 const CONTRACTS = ["house", "life", "oneup", "ve", "usdc", "oracle", "swap", "market"] as const;
 const OPTIONAL_CONTRACTS = ["vault", "dao"] as const;
-const TESTNET_RPC_HOSTS = new Set(["rpc.testnet.near.org", "test.rpc.fastnear.com"]);
+const TESTNET_RPC_HOSTS = new Set(["rpc.testnet.near.org", "test.rpc.fastnear.com", "testnet-rpc.intea.rs"]);
 const accountPattern = /^[a-z0-9]+(?:[-_][a-z0-9]+)*(?:\.[a-z0-9]+(?:[-_][a-z0-9]+)*)*\.testnet$/;
 function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Expected a configuration object");
