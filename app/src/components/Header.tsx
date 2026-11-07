@@ -57,7 +57,7 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
   }, []);
 
   return (
-    <header className="mb-4 flex items-center gap-2 border-b border-[var(--line)] py-3 sm:gap-4 lg:mb-5">
+    <header className="mb-2 flex items-center gap-2 border-b border-[var(--line)] py-1.5 sm:mb-4 sm:gap-4 sm:py-3 lg:mb-5">
       {/* the way back to the website */}
       <a href={process.env.ONEUP_SITE_URL} className="flex shrink-0 items-center gap-2" title="OneUp website" aria-label="OneUp website">
         <Logo size={34} />

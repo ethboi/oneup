@@ -3253,6 +3253,11 @@ kbd {
   .bar-cell {
     padding: 0 6px;
   }
+  /* a short chart has no room for scenery: on a phone it only competes with the price and its labels */
+  .lcd-scenery {
+    display: none;
+  }
+  /* the market's numbers: one line, each name beside its value */
   .mkt-stats {
     flex-wrap: nowrap;
     justify-content: space-between;
@@ -3260,14 +3265,71 @@ kbd {
     width: 100%;
     padding: 0 4px;
   }
+  .mkt-stats > div:not(.hidden) {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+  }
   .mkt-stats dt {
     font-size: 11px;
   }
   .mkt-stats dd {
-    font-size: 13px;
+    font-size: 12.5px;
   }
   .game-hud {
     gap: 6px 10px;
     margin: 0 0 6px;
+  }
+  /* the order form: side, type, margin, leverage and the button together on the first screen */
+  .ticket .chip-track:empty {
+    display: none;
+  }
+  .ticket .segmented {
+    padding: 3px;
+  }
+  .ticket .segmented > button {
+    min-height: 36px;
+    font-size: 15px;
+  }
+  .ticket-head {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .ticket-head > [role="tablist"] {
+    border-bottom: 0;
+  }
+  .ticket-head .ticket-row > .label {
+    display: none;
+  }
+  .ticket-head .ticket-row {
+    font-size: 13px;
+  }
+  .ticket .btn-big,
+  .pinned-cta .btn-big {
+    min-height: 44px;
+    font-size: 16px;
+  }
+  /* what the order would do, in three columns rather than six rows */
+  .ticket-facts {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px 10px;
+    padding-top: 8px;
+    font-size: 12.5px;
+  }
+  .ticket-facts .ticket-row {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 1px;
+  }
+  .ticket-facts .label {
+    font-size: 11px;
+    line-height: 1.2;
+  }
+  .ticket-facts dd {
+    text-align: left;
   }
 }

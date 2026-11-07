@@ -162,7 +162,8 @@ function MarketBar(props: {
       </div>
       {/* the market's numbers, each named above its value as a trading terminal prints them */}
       <dl className="mkt-stats num order-3 w-full lg:order-2 lg:w-auto" aria-label={`${market} stats`}>
-        <div>
+        {/* phones: the chart's readout already prints the change */}
+        <div className="hidden sm:block">
           <dt>Change, {windowName}</dt>
           <dd style={{ color: tone(me.ch) }}>{pct(me.ch)}</dd>
         </div>
@@ -933,7 +934,7 @@ function OrderForm({ t }: { t: Ticket }) {
 
   return (
     <div
-      className="panel ticket flex flex-col gap-3.5 p-4"
+      className="panel ticket flex flex-col gap-2 p-3 sm:gap-3.5 sm:p-4"
       onPointerEnter={() => t.setPreviewHeld(true)}
       onPointerLeave={() => t.setPreviewHeld(false)}
       onFocus={() => t.setPreviewHeld(true)}
@@ -959,6 +960,8 @@ function OrderForm({ t }: { t: Ticket }) {
       </div>
 
       {/* D-30: fill at the next price, or rest until the price reaches yours */}
+      {/* phones: order type and what's available share one row */}
+      <div className="ticket-head flex flex-col gap-3.5">
       <div className="flex border-b border-[var(--line)]" role="tablist" aria-label="Order type">
         {(["market", "limit"] as const).map((k) => (
           <button
@@ -981,6 +984,7 @@ function OrderForm({ t }: { t: Ticket }) {
       <div className="ticket-row">
         <span className="label">Available</span>
         <span className="num font-bold">${fmtUsdc(spendable, spendable < 1_000n * USDC ? 2 : 0)} USDC</span>
+      </div>
       </div>
 
       {t.orderType === "limit" && (
@@ -1113,7 +1117,7 @@ function OrderForm({ t }: { t: Ticket }) {
 
       {quote && !quote.allowed && <p className="text-sm text-[var(--short)]">{quote.reason}</p>}
       {viewOnly ? (
-        <p className="label">Connect a NEAR testnet wallet to trade. Your first trade asks for it.</p>
+        <p className="label hidden sm:block">Connect a NEAR testnet wallet to trade. Your first trade asks for it.</p>
       ) : (
         topUp > wallet && (
           <div className="flex flex-col gap-2">
@@ -1133,7 +1137,7 @@ function OrderForm({ t }: { t: Ticket }) {
       )}
 
       {/* what the order would do, as a terminal lists it */}
-      <dl className="num flex flex-col gap-1.5 border-t border-[var(--line)] pt-3 text-sm">
+      <dl className="ticket-facts num flex flex-col gap-1.5 border-t border-[var(--line)] pt-3 text-sm">
         <div className="ticket-row">
           <dt className="label">Liquidation price</dt>
           <dd className="font-bold">
@@ -1802,7 +1806,7 @@ function OrderButton({ side, blocked, label, submit }: { side: Side; blocked: bo
   const [inView, setInView] = useState(true);
   useEffect(() => {
     if (!ref.current || typeof IntersectionObserver === "undefined") return;
-    const seen = new IntersectionObserver(([e]) => setInView(e.isIntersecting), { rootMargin: "0px 0px -68px 0px" });
+    const seen = new IntersectionObserver(([e]) => setInView(e.isIntersecting), { rootMargin: "0px 0px -68px 0px", threshold: 1 });
     seen.observe(ref.current);
     return () => seen.disconnect();
   }, []);
