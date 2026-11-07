@@ -1,17 +1,19 @@
-/* oneup.markets: the handheld's instruction booklet. Same plastic, LCD and pixel print as the app; the console is
-   the one big element, everything else stays quiet. */
+/* oneup.markets: flat night, one pink, and pixels where they say something, like the link preview. Same fonts and
+   print as the app; the logo is the one big element, everything else stays quiet. */
 
 .site {
   --site-w: 1180px;
   min-height: 100dvh;
+  /* flat, without the app's speaker-grille dots: the pixel fields are the only texture */
+  background: var(--bg);
   /* the tilted console and fanned cards may poke past a narrow phone, without widening the page */
   overflow-x: clip;
 }
 .site main {
   display: flex;
   flex-direction: column;
-  gap: clamp(72px, 10vw, 128px);
-  padding-bottom: 64px;
+  gap: clamp(88px, 11vw, 144px);
+  padding-bottom: 72px;
 }
 .site a:focus-visible {
   outline: 3px solid var(--info);
@@ -61,61 +63,117 @@
   }
 }
 
-/* the hero: the promise on the left, the console with the demo on its screen on the right */
+/* the hero, as in the link preview: the logo, one line, and a price falling away behind them in pink pixels */
 .site-hero {
-  display: grid;
-  gap: 40px;
-  align-items: center;
-  max-width: var(--site-w);
-  margin: 0 auto;
-  padding: clamp(24px, 6vw, 72px) 16px 0;
-}
-@media (min-width: 980px) {
-  .site-hero {
-    grid-template-columns: 1fr 1.05fr;
-    gap: 56px;
-  }
-}
-.site-hero-copy {
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 22px;
+  min-height: min(82dvh, 760px);
+  /* on phones the pixels sit below the buttons, not behind them */
+  margin-bottom: calc(clamp(88px, 11vw, 144px) * -0.5);
+  padding: 32px 16px 56px;
+  text-align: center;
 }
-.site-title {
-  font-size: clamp(32px, 5.4vw, 76px);
-  line-height: 0.98;
+.site-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: url("/site/dots-hero.svg") center / cover no-repeat;
+  mask-image: linear-gradient(to bottom, #000 78%, transparent);
+  -webkit-mask-image: linear-gradient(to bottom, #000 78%, transparent);
+}
+.site-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(14px, 2.4vw, 36px);
+  font-size: clamp(64px, 12vw, 164px);
+  font-weight: 700;
+  line-height: 1;
   letter-spacing: -0.01em;
+}
+.site-mark-heart {
+  position: relative;
+  flex: none;
+  width: 0.92em;
+}
+.site-mark-heart img {
+  display: block;
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+}
+.site-mark-heart span {
+  position: absolute;
+  top: -0.1em;
+  right: -0.14em;
+  padding: 0.03em 0.08em;
+  border: 0.02em solid var(--bg);
+  border-radius: 0.07em;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 0.2em;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+.site-tagline {
+  font-size: clamp(24px, 3.4vw, 42px);
+  font-weight: 500;
+  line-height: 1.2;
+  color: #d9d9ee;
+  text-wrap: balance;
 }
 .site-lede {
   max-width: 34em;
-  font-size: clamp(16px, 1.6vw, 18px);
+  font-size: clamp(16px, 1.5vw, 18px);
   line-height: 1.6;
-  color: color-mix(in srgb, var(--text) 86%, transparent);
+  color: var(--muted);
+  text-wrap: balance;
 }
 .site-ctas {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 12px;
+  margin-top: 6px;
+}
+.site-live {
+  padding: 6px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--accent);
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+@media (max-width: 700px) {
+  .site-hero {
+    padding-bottom: 200px;
+  }
+  .site-hero::before {
+    background: url("/site/dots-hero-phone.svg") center bottom / 100% auto no-repeat;
+    mask-image: linear-gradient(to bottom, #000 88%, transparent);
+    -webkit-mask-image: linear-gradient(to bottom, #000 88%, transparent);
+  }
+}
+.site-demo {
+  display: flex;
+  justify-content: center;
+  scroll-margin-top: 80px;
 }
 
 /* the handheld: the app's own case, bezel and LCD, standing a little tilted */
 .site-console {
   width: 100%;
-  max-width: 620px;
+  max-width: 720px;
   margin: 0 auto;
   padding: 16px 22px 26px;
-  transform: rotate(-1.5deg);
-}
-@media (prefers-reduced-motion: no-preference) {
-  .site-console {
-    animation: site-console-in 0.7s cubic-bezier(0.2, 0.9, 0.3, 1.1) both;
-  }
-}
-@keyframes site-console-in {
-  from {
-    opacity: 0;
-    transform: translateY(24px) rotate(-1.5deg);
-  }
 }
 .site-console-top {
   display: flex;
@@ -256,16 +314,37 @@
   color: color-mix(in srgb, var(--text) 88%, transparent);
   line-height: 1.5;
 }
-/* each step is a bright little screen, edge to edge across the top of its card */
-.site-step-art {
+/* a flat panel, and each picture a dark window with the pink pixels fading up behind it */
+.site .panel {
+  border: 1px solid var(--line);
+  background: #1b1c35;
+  box-shadow: none;
+}
+.site-step-art,
+.site-near-art {
   position: relative;
+  isolation: isolate;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  height: 290px;
+  height: 300px;
   overflow: hidden;
-  border-bottom: 4px solid var(--bezel);
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+}
+.site-step-art::before,
+.site-near-art::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: url("/site/dots-tile.svg");
+  opacity: 0.5;
+  mask-image: linear-gradient(to top, #000, transparent 62%);
+  -webkit-mask-image: linear-gradient(to top, #000, transparent 62%);
+}
+.site-step-art {
+  gap: 16px;
 }
 .site-art-line {
   position: absolute;
@@ -277,12 +356,9 @@
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
 }
-.site-art-sky {
-  background: linear-gradient(#8fd3ff, #e4f6ff);
-}
-.site-art-sky .site-art-line {
-  stroke: #2f4bd0;
-  opacity: 0.45;
+.site-art-line {
+  stroke: var(--heart);
+  opacity: 0.55;
 }
 .site-art-tag {
   position: absolute;
@@ -290,7 +366,8 @@
   left: 18px;
   padding: 6px 12px;
   border-radius: 8px;
-  background: var(--bezel);
+  border: 1px solid var(--line);
+  background: var(--panel);
   color: #fff;
   font: 800 16px var(--font-body);
 }
@@ -310,11 +387,6 @@
 .site-art-loss {
   flex-direction: column;
   gap: 14px;
-  background: linear-gradient(#ff5a5f, #a81c36);
-}
-.site-art-loss .site-art-line {
-  stroke: #fff;
-  opacity: 0.3;
 }
 .site-art-amount {
   position: relative;
@@ -322,30 +394,22 @@
   font-weight: 800;
   line-height: 1;
   color: #fff;
-  text-shadow: 0 4px 0 rgb(90 8 28 / 0.55);
 }
 .site-liquidated {
   position: relative;
   padding: 10px 16px;
   border-radius: 8px;
-  background: var(--bezel);
-  color: #fff;
-  font-size: 24px;
+  background: var(--heart);
+  color: var(--bg);
+  font-size: 22px;
   letter-spacing: 0.04em;
-  transform: rotate(-4deg);
-  box-shadow: 0 5px 0 rgb(0 0 0 / 0.35);
-}
-.site-art-life {
-  background: linear-gradient(#b4f7c8, #6fe29a);
 }
 .site-step-card .life-card {
   width: 158px;
-  transform: rotate(-3deg);
-  box-shadow: 0 14px 24px -10px rgb(10 60 40 / 0.6);
+  box-shadow: 0 14px 24px -10px rgb(0 0 0 / 0.7);
 }
 .site-art-gold {
   gap: 12px;
-  background: linear-gradient(#ffd84d, #f2a705);
 }
 .site-art-choice {
   display: flex;
@@ -354,9 +418,9 @@
   gap: 10px;
   width: clamp(92px, 7.4vw, 116px);
   padding: 18px 8px 14px;
-  border-radius: 16px;
-  background: var(--bezel);
-  box-shadow: 0 6px 0 rgb(90 55 0 / 0.5);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
 }
 .site-art-choice b {
   color: #fff;
@@ -364,7 +428,7 @@
   letter-spacing: 0.06em;
 }
 .site-art-or {
-  color: #4a3200;
+  color: var(--muted);
   font-size: 22px;
 }
 
@@ -449,25 +513,14 @@
   align-self: flex-start;
   margin: 8px 20px 0;
 }
-/* each job NEAR does, as a bright scene like the steps above */
+/* each job NEAR does, in the same dark window as the steps above */
 .site-near-art {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   gap: 18px;
-  height: 290px;
-  overflow: hidden;
-  border-bottom: 4px solid var(--bezel);
-}
-.site-art-money {
-  background: linear-gradient(#8b6cff, #4d33c9);
 }
 .site-art-money .life-card {
   width: 140px;
   flex: none;
-  transform: rotate(-3deg);
-  box-shadow: 0 14px 24px -10px rgb(20 8 70 / 0.7);
+  box-shadow: 0 14px 24px -10px rgb(0 0 0 / 0.7);
 }
 .site-art-payouts {
   display: flex;
@@ -480,15 +533,12 @@
   gap: 8px;
   padding: 8px 12px;
   border-radius: 12px;
-  background: var(--bezel);
+  border: 1px solid var(--line);
+  background: var(--panel);
   color: #fff;
   font-size: 15px;
   font-weight: 800;
   white-space: nowrap;
-  box-shadow: 0 4px 0 rgb(20 8 70 / 0.5);
-}
-.site-art-chains {
-  background: linear-gradient(#58c2ff, #1d6fd8);
 }
 .site-art-tokens {
   display: flex;
@@ -500,10 +550,10 @@
   place-items: center;
   width: 66px;
   height: 66px;
-  border: 4px solid var(--bezel);
+  border: 1px solid var(--line);
   border-radius: 999px;
-  background: #fff;
-  color: var(--bezel);
+  background: var(--panel);
+  color: #fff;
   font-size: 17px;
   font-weight: 800;
 }
@@ -519,8 +569,8 @@
   width: 170px;
   padding: 16px;
   border-radius: 16px;
-  background: var(--bezel);
-  box-shadow: 0 6px 0 rgb(4 40 96 / 0.55);
+  border: 1px solid var(--line);
+  background: var(--panel);
 }
 .site-art-intent small,
 .site-art-ballot small,
@@ -539,9 +589,6 @@
 .site-art-intent b:last-child {
   background: var(--long-fill);
 }
-.site-art-dao {
-  background: linear-gradient(#ff8bd0, #d6247f);
-}
 .site-art-ballot {
   position: relative;
   display: flex;
@@ -550,8 +597,8 @@
   width: min(300px, 80%);
   padding: 18px;
   border-radius: 16px;
-  background: var(--bezel);
-  box-shadow: 0 6px 0 rgb(90 8 50 / 0.55);
+  border: 1px solid var(--line);
+  background: var(--panel);
 }
 .site-art-ballot b {
   color: #fff;
@@ -586,9 +633,6 @@
   font-style: normal;
   transform: rotate(-3deg);
 }
-.site-art-agent {
-  background: linear-gradient(#ffb15c, #ef6a2a);
-}
 .site-art-tap {
   display: flex;
   flex: none;
@@ -602,7 +646,7 @@
   font-size: 16px;
 }
 .site-art-tap small {
-  color: #3e1a00;
+  color: var(--text);
   font-size: 14px;
   font-weight: 800;
 }
@@ -613,8 +657,8 @@
   width: 170px;
   padding: 14px;
   border-radius: 16px 16px 16px 4px;
-  background: var(--bezel);
-  box-shadow: 0 6px 0 rgb(90 40 0 / 0.5);
+  border: 1px solid var(--line);
+  background: var(--panel);
 }
 .site-art-chat b {
   color: #fff;
@@ -675,7 +719,7 @@
   color: var(--long);
 }
 
-/* the ad's two characters, on a set from the commercial: the one place the booklet goes live-action */
+/* the ad's two characters, on a set from the commercial */
 .site-ad {
   display: grid;
   gap: 32px;
@@ -690,28 +734,13 @@
 .site-tv {
   position: relative;
   overflow: hidden;
-  border: 10px solid var(--bezel);
-  border-radius: 22px;
-  box-shadow:
-    0 6px 0 var(--panel-lip),
-    0 24px 40px -24px rgb(0 0 0 / 0.8);
+  border: 1px solid var(--line);
+  border-radius: 16px;
 }
 .site-tv img {
   display: block;
   width: 100%;
   height: auto;
-}
-.site-tv::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: repeating-linear-gradient(to bottom, rgb(0 0 0 / 0.1) 0 1px, transparent 1px 4px);
-  box-shadow: inset 0 0 60px rgb(0 0 0 / 0.35);
-}
-.site-tv-end {
-  width: 100%;
-  max-width: 620px;
 }
 .site-ad-copy {
   display: flex;

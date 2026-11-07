@@ -3,8 +3,8 @@ import { LifeCard } from "@/components/LifeCard";
 import { Logo, PixelCoin, PixelHeart } from "@/components/Pixel";
 import "./site.css";
 
-// oneup.markets: the website, written like the handheld's instruction booklet. The console is the hero, with the
-// demo video on its screen; then how it works, what a Life NFT is, and what NEAR does. src/proxy.ts serves it at
+// oneup.markets: the website. The logo and one line open it, over a pixel chart; then the console with the demo on
+// its screen, how it works, what a Life NFT is, and what NEAR does. src/proxy.ts serves it at
 // `/` on the site's own hosts; anywhere else it is at /site.
 
 const TITLE = "OneUp: lose a trade, get a life";
@@ -47,26 +47,30 @@ export default function Site() {
 
       <main id="top">
         <section className="site-hero">
-          <div className="site-hero-copy">
-            <h1 className="display site-title">
-              <span>Lose a trade.</span>
-              <span>Get a life.</span>
-            </h1>
-            <p className="site-lede">
-              Perps on NEAR where a loss can pay you back. Lose in a round the house wins, and you can get a Life NFT that
-              collects USDC from its future profit.
-            </p>
-            <div className="site-ctas">
-              <a className="btn btn-accent btn-big" href={APP}>
-                Open the app
-              </a>
-              <a className="btn btn-ghost btn-big" href="#demo">
-                Watch the demo
-              </a>
-            </div>
-            <p className="label">NEAR testnet, test money. No wallet needed to look around.</p>
+          <h1 className="site-mark">
+            <span className="site-mark-heart">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/icon.svg" alt="" width={110} height={100} />
+              <span className="display" aria-hidden>+1</span>
+            </span>
+            <span className="display">OneUp</span>
+          </h1>
+          <p className="site-tagline">Perps where a loss can pay you back</p>
+          <p className="site-lede">
+            Lose in a round the house wins, and you can get a Life NFT that collects USDC from its future profit.
+          </p>
+          <div className="site-ctas">
+            <a className="btn btn-accent btn-big" href={APP}>
+              Open the app
+            </a>
+            <a className="btn btn-ghost btn-big" href="#demo">
+              Watch the demo
+            </a>
           </div>
+          <p className="site-live">Live on NEAR testnet, with test money</p>
+        </section>
 
+        <section className="site-section site-demo">
           <figure id="demo" className="site-console case">
             <div className="site-console-top" aria-hidden>
               <span className="site-led" />
@@ -281,24 +285,14 @@ export default function Site() {
         </section>
 
         <section className="site-section site-end">
-          <figure className="site-tv site-tv-end">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/site/press-start.webp"
-              width={1100}
-              height={619}
-              loading="lazy"
-              alt="Chad and the TV host point straight at you, holding up a gold Life NFT card and the handheld"
-            />
-          </figure>
           <p className="display site-end-line">Lost again? Get a life.</p>
           <h2 className="display site-h2">Try it</h2>
           <a className="btn btn-accent btn-big" href={APP}>
             Open the app
           </a>
           <p className="label">
-            A NEAR HACKATHON 2026 prototype on testnet. Test USDC, and a mock oracle, swap and vault. The contracts haven’t been
-            audited. Don’t use real funds.
+            No wallet needed to look around. A NEAR HACKATHON 2026 prototype on testnet: test USDC, and a mock oracle, swap and
+            vault. The contracts haven’t been audited. Don’t use real funds.
           </p>
         </section>
       </main>
