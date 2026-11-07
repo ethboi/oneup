@@ -3,6 +3,9 @@
 **Perpetuals on NEAR where a losing trade can leave you a Life NFT: an NFT that holds USDC and a share of
 the house's future profit, which you can claim or sell.**
 
+When one sells, the buyer gets its unclaimed USDC and every payout still to come. A purchase names the listing
+the buyer saw, so one the seller claimed or repriced in the meantime fails and refunds the buyer.
+
 ![A 50× long is liquidated; when the round closes the loss becomes a Life NFT, whose USDC is claimed](docs/media/oneup.gif)
 
 A NEAR HACKATHON entry for **NFTs That Do Something**, **Unstoppable DeFi** and **Agent Economy**. It is live

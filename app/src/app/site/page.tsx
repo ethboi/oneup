@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { LifeCard } from "@/components/LifeCard";
 import { Logo, PixelCoin, PixelHeart } from "@/components/Pixel";
+import { liveStats } from "./live-stats";
 import "./site.css";
 
 // oneup.markets: the website. The logo and one line open it, over a pixel chart; then the console with the demo on
@@ -24,10 +25,14 @@ export const metadata: Metadata = {
 const APP = process.env.ONEUP_APP_URL ?? "/";
 /** The demo video (an mp4 URL); until it's set, the screen shows a recording of the app. */
 const VIDEO = process.env.ONEUP_DEMO_VIDEO;
-/** The public repository, once it is public. */
-const REPO = process.env.ONEUP_REPO_URL;
+/** The public repository. */
+const REPO = process.env.ONEUP_REPO_URL ?? "https://github.com/ethboi/oneup";
 
-export default function Site() {
+/** The live numbers are read again at most every five minutes. */
+export const revalidate = 300;
+
+export default async function Site() {
+  const stats = await liveStats();
   return (
     <div className="site">
       <header className="site-bar">
@@ -69,6 +74,40 @@ export default function Site() {
           </div>
           <p className="site-live">Live on NEAR testnet, with test money</p>
         </section>
+
+        {stats && (
+          <section className="site-section site-stats" aria-label="Live on NEAR testnet">
+            <dl>
+              <div>
+                <dt>Rounds closed</dt>
+                <dd className="display num">{stats.roundsClosed.toLocaleString("en-US")}</dd>
+              </div>
+              <div>
+                <dt>Life NFTs earned</dt>
+                <dd className="display num">{stats.livesMinted.toLocaleString("en-US")}</dd>
+              </div>
+              <div>
+                <dt>Paid to Life NFTs</dt>
+                <dd className="display num">${stats.paidUsdc.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd>
+              </div>
+              <div>
+                <dt>Life NFTs resold</dt>
+                <dd className="display num">{stats.resold.toLocaleString("en-US")}</dd>
+              </div>
+            </dl>
+            <p className="label">
+              Read from the testnet contracts every few minutes, in test USDC. Most trading so far is by our demo bots.
+              {REPO && (
+                <>
+                  {" "}
+                  <a href={`${REPO}#check-the-claims`} target="_blank" rel="noreferrer">
+                    Check them yourself
+                  </a>
+                </>
+              )}
+            </p>
+          </section>
+        )}
 
         <section className="site-section site-demo">
           <figure id="demo" className="site-console case">
@@ -203,7 +242,7 @@ export default function Site() {
               </div>
               <div>
                 <dt className="display">Yours to sell</dt>
-                <dd>It’s an NFT. List it on the market, with a 2% seller fee: the buyer gets its unclaimed USDC and every payout after.</dd>
+                <dd>It’s an NFT. List it on the market, with a 2% seller fee: the buyer gets its unclaimed USDC and every payout after. A purchase names the listing the buyer saw, so if the seller claims first or changes the price, it fails and the USDC goes back.</dd>
               </div>
               <div>
                 <dt className="display">Its picture is its balance</dt>
