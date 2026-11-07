@@ -561,9 +561,9 @@ export function PriceChart({
         {ghost &&
           (
             [
-              ["liq", ghost.liq, "var(--lcd-down)", "IF OPENED: LIQ"],
-              ["target", ghost.target, "var(--lcd-up)", "IF OPENED: MAX WIN"],
-              ["entry", ghost.entry, "var(--lcd-3)", "ENTRY"],
+              ["liq", ghost.liq, "var(--lcd-down)", "Liquidation if opened"],
+              ["target", ghost.target, "var(--lcd-up)", "Max win if opened"],
+              ["entry", ghost.entry, "var(--lcd-3)", "Entry"],
             ] as const
           ).map(([k, price, color, name]) => {
             // off the scale: the label waits at the top or bottom edge with an arrow, on the left clear of the
@@ -573,7 +573,7 @@ export function PriceChart({
             return (
               <g key={`ghost-${k}`} className="ghost-line" pointerEvents="none">
                 {!edge && <line x1={PAD.l} x2={plotR} y1={gy} y2={gy} stroke={color} strokeWidth="2" strokeDasharray="3 4" />}
-                <text x={edge ? PAD.l + 4 : plotR - 6} y={edge ? gy : gy - 5} fontSize="10" fontWeight="800" textAnchor={edge ? "start" : "end"} fill={color} stroke="var(--lcd)" strokeWidth="3" paintOrder="stroke" className="num">
+                <text x={edge ? PAD.l + 4 : plotR - 6} y={edge ? gy : gy - 5} fontSize="11" fontWeight="700" textAnchor={edge ? "start" : "end"} fill={color} stroke="var(--lcd)" strokeWidth="3" paintOrder="stroke" className="num">
                   {edge === "up" ? "▲ " : edge === "down" ? "▼ " : ""}
                   {name} {price.toFixed(digits)}
                 </text>

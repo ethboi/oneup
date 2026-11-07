@@ -28,7 +28,6 @@ import { fmtClock, useNow } from "./Header";
 import { PixelCoin, PixelHeart } from "./Pixel";
 import { Icon } from "./Icon";
 import { Popover } from "./Popover";
-import { useTilt } from "@/lib/tilt";
 import { reservedMargin } from "@/lib/account";
 import { priceInput as toPrice, triggerValues, editablePrice } from "@/lib/triggers";
 import { payFromChain } from "@/lib/intents";
@@ -717,7 +716,6 @@ function Console({
 }) {
   const { prices, history, me, o, tx, run } = useOneUp();
   const mood = useMood(mine, prices[market]);
-  const tilt = useTilt(me);
   useTensionSound(mood);
   const fx = useCloseFx(market);
   const streak = useStreak(me);
@@ -822,7 +820,7 @@ function Console({
       <div className="bezel px-2 pb-2.5 pt-2 sm:px-5 sm:pb-5 sm:pt-3">
         <div className="faceplate mb-3 hidden sm:flex" aria-hidden>
           <span className="stripes" />
-          <span className="faceplate-print">NEAR · BTC · ETH MARKETS · NEAR HACKATHON 2026</span>
+          <span className="faceplate-print">NEAR · BTC · ETH MARKETS</span>
           <span className="stripes" />
         </div>
         <GameHud jackpot={jackpotLine} score={pos && mark ? <PnlHero value={afterCut(pnl(pos.side, BigInt(pos.margin), pos.leverage, BigInt(pos.entry_price), mark), pos.cut_ppm)} margin={BigInt(pos.margin)} /> : undefined} />
@@ -858,16 +856,8 @@ function Console({
             gauge={mood.state !== "none" && mood.gauge ? <Gauge mood={mood} /> : undefined}
           />
           <MoodGlow mood={mood} />
-          <GameFx market={market} pos={pos} mark={mark} pts={pts} />
+          <GameFx />
           {fx && <Burst fx={fx} />}
-          {tilt > 0 && (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center" role="status">
-              {/* a pinball machine's TILT */}
-              <span className="tilt display">
-                <span className="tilt-word">TILT</span>
-              </span>
-            </div>
-          )}
         </div>
       </div>
 
@@ -1242,30 +1232,31 @@ function GetTestUsdc({ short, className }: { short: bigint; className: string })
 function TradeBar({ t }: { t: Ticket }) {
   const { d, viewOnly } = useOneUp();
   const needsUsdc = !viewOnly && d.testUsdcFaucet && t.payWith === "wallet" && t.topUp > t.wallet;
+  // as on other exchanges' phone screens: Long and Short side by side; each picks its side and opens the order form
+  const pick = (side: Side) => {
+    t.setSide(side);
+    document.getElementById("order-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
   return (
-    <div className="fixed inset-x-0 bottom-[60px] z-30 border-t border-[var(--panel-edge)] bg-[var(--panel)] px-4 py-2.5 lg:hidden">
-      <div className="mx-auto flex max-w-[1280px] items-center gap-3">
-        <a href="#order-form" className="num min-w-0 flex-1 text-sm">
-          <span className="block truncate font-extrabold">
-            {t.side} {t.leverage}× · ${t.margin}
-          </span>
-          <span className="label">Edit order</span>
-        </a>
-        {needsUsdc ? (
-          <GetTestUsdc short={t.topUp - t.wallet} className="btn btn-accent shrink-0 px-4 py-2.5" />
-        ) : (
-          <button
-            className="btn shrink-0 px-5 py-2.5"
-            style={{ "--btn-bg": t.side === "Long" ? "var(--long-fill)" : "var(--short-fill)", color: "var(--on-fill)" } as React.CSSProperties}
-            disabled={t.blocked}
-            onClick={t.submit}
-          >
-            <Icon name={t.side === "Long" ? "up" : "down"} />
-            {t.topUp > 0n ? "Deposit & " : ""}
-            {t.side}
-          </button>
-        )}
-      </div>
+    <div className="fixed inset-x-0 bottom-[60px] z-30 border-t border-[var(--panel-edge)] bg-[var(--bg)] px-3 py-2 lg:hidden">
+      {needsUsdc ? (
+        <GetTestUsdc short={t.topUp - t.wallet} className="btn btn-accent w-full py-2.5" />
+      ) : (
+        <div className="mx-auto grid max-w-[1280px] grid-cols-2 gap-2">
+          {(["Long", "Short"] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              className="btn py-2.5"
+              style={{ "--btn-bg": s === "Long" ? "var(--long-fill)" : "var(--short-fill)", color: "var(--on-fill)" } as React.CSSProperties}
+              onClick={() => pick(s)}
+            >
+              <Icon name={s === "Long" ? "up" : "down"} />
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

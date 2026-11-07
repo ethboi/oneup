@@ -7,7 +7,7 @@
 import { useEffect, useState } from "react";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { ACHIEVEMENTS, GROUPS, SKINS, badgeStates, readFlags, skinNeed, skinUnlocked, type BadgeState, type Rarity } from "@/lib/achievements";
-import { useLevel } from "./Level";
+import { LevelBar, useLevel } from "./Level";
 import { sfx } from "@/lib/sound";
 import { useHistory } from "./History";
 import { Icon } from "./Icon";
@@ -173,6 +173,8 @@ export function BadgesDialog() {
             <Icon name="x" />
           </button>
         </div>
+        {/* your trader tier and points: off the trading screen, here with the badges */}
+        <LevelBar lv={lv} />
         <div className="flex flex-wrap gap-3 text-sm">
           {(Object.keys(RARITY) as Rarity[]).map((r) => {
             const all = ACHIEVEMENTS.filter((a) => a.rarity === r);
