@@ -53,8 +53,9 @@ local demo.
 | 6 | Wait for the round to close (the countdown is in the header), then open **Life NFTs** | If the house ended the round in profit, your Life NFT, its picture filling as it pays |
 | 7 | **Claim** what it has collected, or list it on the **Market** | USDC in your wallet, or your listing |
 
-The testnet contracts are accounts under `oneupmarkets.testnet`, which also owns them; on testnet the keeper and three
-bots run from the author's machine. History and leaderboards need the local demo's indexer.
+The testnet contracts are accounts under `v5.oneupmarkets.testnet`. Nobody holds a key to them and none can deploy new
+code, but that account owns them and can still change settings such as the oracle and market limits. The keeper and
+bots run from the author's machine, along with an indexer that feeds the app's history and leaderboards.
 
 ## Try it locally
 
@@ -85,6 +86,23 @@ stops everything.
 http://127.0.0.1:3020, with state kept in `.localnet/`.
 
 ## Check the claims
+
+**On the live deployment, in about a minute.** You need Node 18 or newer and nothing else: no install, no wallet and no
+keys, and it sends no transactions.
+
+```bash
+git clone https://github.com/ethboi/oneup && cd oneup
+node scripts/check-live.mjs
+```
+
+It reads the contracts on NEAR testnet and prints `PASS` or `FAIL` for each claim, with the numbers behind it: nobody
+holds a key to the nine contracts, prices are fresh, rounds keep closing, every open position's worst case fits inside
+the pool, Lives come only from house profit, the USDC Lives received matches the rounds exactly, unclaimed USDC is
+really in the contract, Lives have been sold and the buyer collected, and the pictures are on chain. It ends with what
+it can't prove, including that the money is test money, the oracle is a mock and the traders are the author's bots. A
+`FAIL` on prices or rounds usually means the keeper on the author's machine has stopped.
+
+**In the code, by running the tests.**
 
 | Claim | Code and regression | Run and see |
 |---|---|---|
