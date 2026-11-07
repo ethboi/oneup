@@ -423,8 +423,8 @@ export function PriceChart({
             <feGaussianBlur stdDeviation="2 1" />
           </filter>
           <linearGradient id="lcd-fill" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0" stopColor="var(--lcd-2)" stopOpacity="0.7" />
-            <stop offset="1" stopColor="var(--lcd-2)" stopOpacity="0.1" />
+            <stop offset="0" stopColor="var(--lcd-fill, var(--lcd-2))" stopOpacity="0.7" />
+            <stop offset="1" stopColor="var(--lcd-fill, var(--lcd-2))" stopOpacity="0.1" />
           </linearGradient>
         </defs>
         {ticks.map((v) => (

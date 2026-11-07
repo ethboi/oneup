@@ -9,7 +9,7 @@
 // Without KV_REST_API_URL it only reports what it would publish.
 
 import { readFileSync } from "node:fs";
-import { FailoverProvider, OneUp, rpcList, type Deployment } from "@oneup/sdk";
+import { FailoverProvider, OneUp, normalizePrice, rpcList, type Deployment } from "@oneup/sdk";
 import {
   boardBetween,
   eventLogs,
@@ -161,6 +161,33 @@ async function publish(values: Map<string, unknown>) {
   return changed.length;
 }
 
+// The last 30 minutes of oracle prices per market, so the hosted chart opens full instead of empty (the local
+// demo's server keeps the same in lib/server/prices.ts). A point is kept only when a new price is published.
+const PRICE_MS = 5_000;
+const PRICE_KEEP_MS = 30 * 60_000;
+const prices = new Map<string, { t: number; p: number }[]>();
+const priceTimes = new Map<string, number>();
+async function samplePrices() {
+  const markets = await oneup.markets();
+  const t = Date.now();
+  await Promise.all(
+    markets.map(async (m) => {
+      const q = await oneup.price(m.feed_id).catch(() => null);
+      const v = q && normalizePrice(BigInt(q.price), q.expo);
+      if (!v || priceTimes.get(m.id) === q.publish_time) return;
+      priceTimes.set(m.id, q.publish_time);
+      const kept = (prices.get(m.id) ?? []).concat({ t, p: Number(v) / 1e8 }).filter((x) => x.t >= t - PRICE_KEEP_MS);
+      prices.set(m.id, kept);
+    }),
+  );
+}
+(async () => {
+  for (;;) {
+    await samplePrices().catch(() => {});
+    await new Promise((done) => setTimeout(done, PRICE_MS));
+  }
+})();
+
 function parseCursor(): readonly [number, number] | null {
   const m = /^(\d+):(\d+)$/.exec(indexerCursor() ?? "");
   return m ? [Number(m[1]), Number(m[2])] : null;
@@ -178,6 +205,7 @@ async function tick() {
     ["standings:all", standings(0, now)],
     ["standings:day", standings(now - 86_400_000, now)],
     ["standings:round", standings(epoch.started_at * 1000, now)],
+    ["prices", Object.fromEntries(prices)],
   ]);
   for (const account of indexedAccounts()) values.set(`history:${account}`, historyFor(account));
   for (const { from, to } of closed) values.set(`board:${from}`, boardBetween(from, to));

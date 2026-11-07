@@ -2337,7 +2337,7 @@ kbd {
 }
 
 /* ===== Colour screen =====
-   The screen has colour: a plain backlit LCD with green and red candles and a blue price line. The shell comes in the GBC's colours. Classic (and the badge skins Arcade, Midnight
+   The screen has colour: a plain backlit LCD with green and red candles and a pink price line. The shell comes in the GBC's colours. Classic (and the badge skins Arcade, Midnight
    and Gold) keep a one-colour screen by setting the colour tokens back to its shades. */
 :root {
   --lcd: #eef3e4;
@@ -2346,8 +2346,11 @@ kbd {
   --lcd-ink: #1a2148;
   --lcd-up: #23b25d;
   --lcd-down: #e5443b;
-  --lcd-line: #2a3db0;
-  --lcd-tag: #2a3db0;
+  /* the price line and its tag in OneUp's pink, deep enough to read on the pale screen */
+  --lcd-line: #c81e6c;
+  --lcd-tag: #c81e6c;
+  /* the area under the price line, a pale tint of that pink (the one-colour screens keep their second shade) */
+  --lcd-fill: #f4bcd5;
   --lcd-pill-up: #16894a;
   --lcd-pill-down: #c9302a;
   --lcd-grid: rgb(42 61 176 / 0.06);
@@ -2364,6 +2367,7 @@ kbd {
 :root[data-skin="gold"] {
   --lcd-up: var(--lcd);
   --lcd-down: var(--lcd-ink);
+  --lcd-fill: var(--lcd-2);
   --lcd-line: var(--lcd-ink);
   --lcd-tag: var(--lcd-ink);
   --lcd-pill-up: var(--lcd-ink);
@@ -2389,6 +2393,7 @@ kbd {
   --lcd-tag: #c81e6c;
   --lcd-pill-up: #1b7f47;
   --lcd-pill-down: #c43636;
+  --lcd-fill: #5c2246;
   --lcd-grid: rgb(255 255 255 / 0.025);
   --lcd-glow: 0 0 0 1px rgb(255 79 163 / 0.22), 0 0 26px -8px rgb(255 79 163 / 0.45);
 }

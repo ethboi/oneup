@@ -142,8 +142,10 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
         </table>
         {recent && recent.length > 0 && (
           <p className="label num mt-3">
-            In this demo, the house made ${fmtUsdc(houseNet > 0n ? houseNet : 0n, 0)} over the last {recent.length} round{recent.length === 1 ? "" : "s"}.
-            One third of the Life NFT payout pool for those rounds was approximately ${fmtUsdc(backerPot, 2)}.
+            Here, the house made ${fmtUsdc(houseNet > 0n ? houseNet : 0n, 0)} over the last {recent.length} round{recent.length === 1 ? "" : "s"}.{" "}
+            {backerPot > 0n
+              ? `About $${fmtUsdc(backerPot, 2)} of it went to Backer Life NFTs, their third of the Life NFT payouts.`
+              : "None of it was above the pool's reserve, so Backer Life NFTs received nothing from those rounds."}
           </p>
         )}
       </section>
@@ -212,7 +214,8 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
             </span>
           </li>
           <li>
-            <b>A proof of concept.</b> <span className="text-[var(--muted)]">These contracts haven&apos;t been audited. This demo runs on a local chain with test money.</span>
+            <b>A proof of concept.</b> <span className="text-[var(--muted)]">These contracts haven&apos;t been audited.{" "}
+              {d.network === "testnet" ? "It runs on NEAR testnet with test money." : "This demo runs on a local chain with test money."}</span>
           </li>
         </ul>
       </section>

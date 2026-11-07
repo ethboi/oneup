@@ -175,7 +175,7 @@ export function PoolAtWork({ pool, liability }: { pool: bigint; liability: bigin
                 <span className="text-sm font-semibold">Mock vault · {(rate * 100).toFixed(0)}% simulated annual rate</span>
                 <Tag kind="simulated" />
               </div>
-              <p className="label mt-1 text-xs">This local simulation treats 52 rounds as one year, so interest accrues at the demo&apos;s accelerated pace.</p>
+              <p className="label mt-1 text-xs">The simulation treats 52 rounds as one year, as rounds are weekly at launch, so interest builds faster here.</p>
             </div>
           </div>
         </Step>

@@ -226,8 +226,8 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
       });
     };
     const stop = pollSerial(tick, () => {}, 1000 * pollFactor(d.network));
-    // the server has been watching too: start the chart from its last 30 minutes rather than empty
-    if (d.network === "localnet") fetch("/api/prices")
+    // the server (or, on testnet, the indexer) has been watching too: start the chart from its last 30 minutes
+    fetch("/api/prices")
       .then((r) => (r.ok ? r.json() : {}))
       .then((past: Record<string, { t: number; p: number }[]>) => {
         if (!live) return;
