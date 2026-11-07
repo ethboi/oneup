@@ -1521,133 +1521,6 @@ kbd {
 
 
 
-/* the LCD's scenery (components/PriceChart.tsx): pixel landscape along the bottom and clouds up top, in the
-   screen's second shade and faint, drifting slowly left */
-.lcd-scenery {
-  position: absolute;
-  overflow: hidden;
-  pointer-events: none;
-  opacity: 0.32;
-}
-.lcd-scenery > div {
-  position: absolute;
-  left: 0;
-  right: 0;
-  background: var(--lcd-2);
-  mask-repeat: repeat-x;
-  -webkit-mask-repeat: repeat-x;
-}
-/* the screen's background, OneUp's own: flat clouds, rolling hills, floating hearts, palms and
-   grass on plain ground, each a fill and its outline (public/scene/, on a 2px grid). The near layers run half an
-   hour before they repeat, at their own paces. */
-.lcd-cloud {
-  top: 2px;
-  height: 110px;
-  mask-image: url("/scene/cloud.svg");
-  -webkit-mask-image: url("/scene/cloud.svg");
-  animation: lcd-drift-7200 1800s linear infinite;
-}
-.lcd-cloud-line {
-  top: 2px;
-  height: 110px;
-  mask-image: url("/scene/cloud-line.svg");
-  -webkit-mask-image: url("/scene/cloud-line.svg");
-  animation: lcd-drift-7200 1800s linear infinite;
-}
-.lcd-hill {
-  bottom: 32px;
-  height: 150px;
-  mask-image: url("/scene/hill.svg");
-  -webkit-mask-image: url("/scene/hill.svg");
-  animation: lcd-drift-9600 3600s linear infinite;
-}
-.lcd-hill-line {
-  bottom: 32px;
-  height: 150px;
-  mask-image: url("/scene/hill-line.svg");
-  -webkit-mask-image: url("/scene/hill-line.svg");
-  animation: lcd-drift-9600 3600s linear infinite;
-}
-.lcd-heart {
-  bottom: 32px;
-  height: 230px;
-  mask-image: url("/scene/heart.svg");
-  -webkit-mask-image: url("/scene/heart.svg");
-  animation: lcd-drift-12800 1920s linear infinite;
-}
-.lcd-heart-line {
-  bottom: 32px;
-  height: 230px;
-  mask-image: url("/scene/heart-line.svg");
-  -webkit-mask-image: url("/scene/heart-line.svg");
-  animation: lcd-drift-12800 1920s linear infinite;
-}
-.lcd-grass {
-  bottom: 32px;
-  height: 110px;
-  mask-image: url("/scene/grass.svg");
-  -webkit-mask-image: url("/scene/grass.svg");
-  animation: lcd-drift-12800 1920s linear infinite;
-}
-.lcd-grass-line {
-  bottom: 32px;
-  height: 110px;
-  mask-image: url("/scene/grass-line.svg");
-  -webkit-mask-image: url("/scene/grass-line.svg");
-  animation: lcd-drift-12800 1920s linear infinite;
-}
-.lcd-palm {
-  bottom: 32px;
-  height: 110px;
-  mask-image: url("/scene/palm.svg");
-  -webkit-mask-image: url("/scene/palm.svg");
-  animation: lcd-drift-12800 1920s linear infinite;
-}
-.lcd-palm-line {
-  bottom: 32px;
-  height: 110px;
-  mask-image: url("/scene/palm-line.svg");
-  -webkit-mask-image: url("/scene/palm-line.svg");
-  animation: lcd-drift-12800 1920s linear infinite;
-}
-.lcd-ground {
-  bottom: 0;
-  height: 32px;
-  mask-image: url("/scene/ground.svg");
-  -webkit-mask-image: url("/scene/ground.svg");
-  animation: lcd-drift-3200 480s linear infinite;
-}
-.lcd-ground-line {
-  bottom: 0;
-  height: 32px;
-  mask-image: url("/scene/ground-line.svg");
-  -webkit-mask-image: url("/scene/ground-line.svg");
-  animation: lcd-drift-3200 480s linear infinite;
-}
-@keyframes lcd-drift-3200 {
-  to {
-    mask-position: -3200px 0;
-    -webkit-mask-position: -3200px 0;
-  }
-}
-@keyframes lcd-drift-7200 {
-  to {
-    mask-position: -7200px 0;
-    -webkit-mask-position: -7200px 0;
-  }
-}
-@keyframes lcd-drift-9600 {
-  to {
-    mask-position: -9600px 0;
-    -webkit-mask-position: -9600px 0;
-  }
-}
-@keyframes lcd-drift-12800 {
-  to {
-    mask-position: -12800px 0;
-    -webkit-mask-position: -12800px 0;
-  }
-}
 /* a pixel coin turning, by the jackpot on the LCD; quicker as the draw nears */
 .coin-spin {
   display: inline-flex;
@@ -1665,7 +1538,6 @@ kbd {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .lcd-scenery > div,
   .coin-spin {
     animation: none;
   }
@@ -1721,13 +1593,8 @@ kbd {
   gap: 16px;
   padding: 16px;
   overflow: hidden;
-  background-color: var(--bg);
-  background-image:
-    radial-gradient(ellipse at center, color-mix(in srgb, var(--primary) 16%, transparent), transparent 60%),
-    radial-gradient(var(--grille) 1.2px, transparent 1.6px);
-  background-size:
-    100% 100%,
-    9px 9px;
+  /* the falling price from the website and link preview, in pink pixels */
+  background: url("/site/dots-hero.svg") center / cover no-repeat var(--bg);
   cursor: pointer;
 }
 /* the console with its cards: the cards are sized and placed in the console's own width (cqw) */
@@ -2143,8 +2010,9 @@ kbd {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 16px;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 14px 0 34px;
   aspect-ratio: 10 / 8;
   overflow: hidden;
   /* the screen lighting up: dark, then a flicker, then on */
@@ -2152,24 +2020,44 @@ kbd {
 }
 /* a price line drawing itself behind the logo, from the chain's own history */
 /* in the screen's lower half, under the logo, so it runs behind the words rather than through the heart */
-.boot-line {
-  position: absolute;
-  left: 0;
-  top: 52%;
+/* a small chart on the screen: the candles come in one by one, left to right, then the price line */
+.boot-chart {
+  position: relative;
+  flex: 1;
   width: 100%;
-  height: 30%;
-  overflow: visible;
+  min-height: 0;
+  shape-rendering: crispEdges;
 }
-.boot-line path {
-  fill: none;
-  stroke: var(--lcd-2);
-  opacity: 0.7;
-  stroke-width: 3px;
+.boot-grid {
+  fill: var(--lcd-2);
+  opacity: 0.35;
+}
+.boot-candle.up rect {
+  fill: var(--lcd-up);
+}
+.boot-candle.down rect {
+  fill: var(--lcd-down);
+}
+:root:is([data-skin="classic"], [data-skin="arcade"], [data-skin="midnight"], [data-skin="gold"]) .boot-candle.up rect {
+  stroke: var(--lcd-ink);
+  stroke-width: 1px;
   vector-effect: non-scaling-stroke;
-  stroke-linejoin: round;
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-  animation: boot-draw 1.6s ease-out 2.8s forwards;
+}
+.boot-candle {
+  animation: boot-candle 0.12s steps(2) calc(2s + var(--i) * 0.07s) both;
+}
+@keyframes boot-candle {
+  from {
+    opacity: 0;
+  }
+}
+.boot-now {
+  fill: none;
+  stroke: var(--lcd-line);
+  stroke-width: 1.5px;
+  stroke-dasharray: 4 4;
+  vector-effect: non-scaling-stroke;
+  animation: boot-fade 0.3s steps(2) 3.8s both;
 }
 .boot-logo {
   position: relative;
@@ -2183,28 +2071,6 @@ kbd {
   font-size: clamp(38px, 9vw, 54px);
   line-height: 1;
   color: var(--lcd-ink);
-}
-.boot-tag,
-.boot-start {
-  position: relative;
-  color: var(--lcd-ink);
-  letter-spacing: 0.1em;
-}
-.boot-tag {
-  min-height: 18px;
-  font-size: clamp(11px, 2.8vw, 14px);
-}
-.boot-caret {
-  animation: blink 0.5s steps(1) infinite;
-}
-.boot-start {
-  font-size: clamp(14px, 3.4vw, 18px);
-  letter-spacing: 0.16em;
-  opacity: 0;
-}
-.boot-start.on {
-  opacity: 1;
-  animation: blink 1s steps(1) infinite;
 }
 /* the markets scrolling along the bottom of the screen */
 .boot-ticker {
@@ -2411,11 +2277,6 @@ kbd {
     transform: translateY(-220px);
   }
 }
-@keyframes boot-draw {
-  to {
-    stroke-dashoffset: 0;
-  }
-}
 @keyframes boot-tape {
   to {
     transform: translateX(-50%);
@@ -2465,12 +2326,6 @@ kbd {
   .boot *::after {
     animation: none !important;
   }
-  .boot-start.on {
-    opacity: 1;
-  }
-  .boot-line path {
-    stroke-dashoffset: 0;
-  }
   .boot-led {
     background: #ff3b5c;
   }
@@ -2481,8 +2336,7 @@ kbd {
 }
 
 /* ===== Colour screen =====
-   The screen has colour: a backlit LCD with a sky behind the chart, green and red candles, a blue price line
-   and coloured scenery. The shell comes in the GBC's colours. Classic (and the badge skins Arcade, Midnight
+   The screen has colour: a plain backlit LCD with green and red candles and a blue price line. The shell comes in the GBC's colours. Classic (and the badge skins Arcade, Midnight
    and Gold) keep a one-colour screen by setting the colour tokens back to its shades. */
 :root {
   --lcd: #eef3e4;
@@ -2496,24 +2350,8 @@ kbd {
   --lcd-pill-up: #16894a;
   --lcd-pill-down: #c9302a;
   --lcd-grid: rgb(42 61 176 / 0.06);
-  --lcd-sky: linear-gradient(180deg, #b9dcff 0%, #ddefff 42%, #f2f6e4 100%);
   --lcd-glow: 0 0 0 1px rgb(255 255 255 / 0.4), 0 0 26px -6px rgb(150 205 255 / 0.55);
   /* the landscape, a little paler than a game's so the price stays on top */
-  --sc-cloud: #ffffff;
-  --sc-cloud-line: #9db4d4;
-  --sc-hill: #b9e3b0;
-  --sc-hill-line: #74ad74;
-  --sc-bush: #a3db98;
-  --sc-bush-line: #5f9e5e;
-  --sc-pipe: #8fd283;
-  --sc-pipe-line: #4e8c52;
-  --sc-ground: #e6c194;
-  --sc-ground-line: #b48555;
-  --sc-brick: #ecd2b2;
-  --sc-brick-line: #c9a27a;
-  --sc-qblock: #f2dea0;
-  --sc-qblock-line: #cfae62;
-  --sc-opacity: 0.85;
   /* text printed straight on the shell (the market's numbers above the chart) */
   --case-ink: var(--text);
   --case-muted: var(--muted);
@@ -2530,24 +2368,7 @@ kbd {
   --lcd-pill-up: var(--lcd-ink);
   --lcd-pill-down: var(--lcd-ink);
   --lcd-grid: rgb(30 42 22 / 0.07);
-  --lcd-sky: none;
   --lcd-glow: 0 0 0 0 transparent;
-  /* the mono screen: shapes in the screen's own colour, outlined in its next shade */
-  --sc-cloud: var(--lcd);
-  --sc-cloud-line: var(--lcd-2);
-  --sc-hill: var(--lcd);
-  --sc-hill-line: var(--lcd-2);
-  --sc-bush: color-mix(in srgb, var(--lcd-2) 30%, var(--lcd));
-  --sc-bush-line: var(--lcd-2);
-  --sc-pipe: color-mix(in srgb, var(--lcd-2) 45%, var(--lcd));
-  --sc-pipe-line: var(--lcd-3);
-  --sc-ground: color-mix(in srgb, var(--lcd-2) 40%, var(--lcd));
-  --sc-ground-line: var(--lcd-2);
-  --sc-brick: var(--lcd);
-  --sc-brick-line: var(--lcd-2);
-  --sc-qblock: var(--lcd);
-  --sc-qblock-line: var(--lcd-2);
-  --sc-opacity: 0.7;
 }
 :root[data-skin="classic"] {
   --lcd: #b7c49a;
@@ -2602,57 +2423,15 @@ kbd {
   --case-ink: #2a2206;
   --case-muted: #5c4a10;
 }
-/* the screen: sky behind, the pixel grid and glass on top, lit from within on a colour skin */
+/* the screen: plain, the pixel grid and glass on top, lit from within on a colour skin */
 .lcd {
   background-image:
     linear-gradient(150deg, rgb(255 255 255 / 0.22), rgb(255 255 255 / 0) 38%),
     repeating-linear-gradient(0deg, var(--lcd-grid) 0 1px, transparent 1px 3px),
-    repeating-linear-gradient(90deg, var(--lcd-grid) 0 1px, transparent 1px 3px),
-    var(--lcd-sky, none);
+    repeating-linear-gradient(90deg, var(--lcd-grid) 0 1px, transparent 1px 3px);
   box-shadow:
     inset 0 3px 0 rgb(0 0 0 / 0.18),
     var(--lcd-glow);
-}
-.lcd-scenery {
-  opacity: var(--sc-opacity, 0.32);
-}
-.lcd-scenery > .lcd-cloud {
-  background: var(--sc-cloud);
-}
-.lcd-scenery > .lcd-cloud-line {
-  background: var(--sc-cloud-line);
-}
-.lcd-scenery > .lcd-hill {
-  background: var(--sc-hill);
-}
-.lcd-scenery > .lcd-hill-line {
-  background: var(--sc-hill-line);
-}
-.lcd-scenery > .lcd-grass {
-  background: var(--sc-bush);
-}
-.lcd-scenery > .lcd-grass-line {
-  background: var(--sc-bush-line);
-}
-.lcd-scenery > .lcd-palm {
-  background: var(--sc-pipe);
-}
-.lcd-scenery > .lcd-palm-line {
-  background: var(--sc-pipe-line);
-}
-.lcd-scenery > .lcd-ground {
-  background: var(--sc-ground);
-}
-.lcd-scenery > .lcd-ground-line {
-  background: var(--sc-ground-line);
-}
-.lcd-scenery > .lcd-heart {
-  background: var(--sc-qblock);
-  opacity: 0.7;
-}
-.lcd-scenery > .lcd-heart-line {
-  background: var(--sc-qblock-line);
-  opacity: 0.7;
 }
 .case .mkt-stats dt {
   color: var(--case-muted);
@@ -2788,6 +2567,17 @@ kbd {
   border-color: #b7c49a;
   background: #b7c49a;
   color: #1e2a16;
+}
+.hud-jackpot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  color: #b4b8ce;
+}
+.hud-jackpot b {
+  color: var(--accent);
 }
 .game-hud .level-xp {
   color: #9ba0b9;
@@ -3026,52 +2816,6 @@ kbd {
   }
 }
 
-/* while a position is open the landscape fades back, so the chart is all you see */
-.lcd[data-busy] .lcd-scenery {
-  opacity: calc(var(--sc-opacity, 0.32) * 0.5);
-  transition: opacity 0.6s;
-}
-/* phones: the landscape at half scale, so it stays behind a small chart (the drifts are whole tiles either way) */
-@media (max-width: 520px) {
-  .lcd-cloud,
-  .lcd-cloud-line {
-    height: 55px;
-    mask-size: 3600px 55px;
-    -webkit-mask-size: 3600px 55px;
-  }
-  .lcd-hill,
-  .lcd-hill-line {
-    bottom: 16px; height: 75px;
-    mask-size: 4800px 75px;
-    -webkit-mask-size: 4800px 75px;
-  }
-  .lcd-candle,
-    .lcd-heart,
-  .lcd-heart-line {
-    bottom: 16px; height: 115px;
-    mask-size: 6400px 115px;
-    -webkit-mask-size: 6400px 115px;
-  }
-  .lcd-grass,
-  .lcd-grass-line {
-    bottom: 16px; height: 55px;
-    mask-size: 6400px 55px;
-    -webkit-mask-size: 6400px 55px;
-  }
-  .lcd-palm,
-  .lcd-palm-line {
-    bottom: 16px; height: 55px;
-    mask-size: 6400px 55px;
-    -webkit-mask-size: 6400px 55px;
-  }
-  .lcd-ground,
-  .lcd-ground-line {
-    height: 16px;
-    mask-size: 1600px 16px;
-    -webkit-mask-size: 1600px 16px;
-  }
-}
-
 /* agents (components/ui.tsx AgentBadge, components/Agents.tsx) */
 .agent-badge {
   display: inline-block;
@@ -3253,10 +2997,6 @@ kbd {
   .bar-cell {
     padding: 0 6px;
   }
-  /* a short chart has no room for scenery: on a phone it only competes with the price and its labels */
-  .lcd-scenery {
-    display: none;
-  }
   /* the market's numbers: one line, each name beside its value */
   .mkt-stats {
     flex-wrap: nowrap;
@@ -3331,5 +3071,26 @@ kbd {
   }
   .ticket-facts dd {
     text-align: left;
+  }
+}
+
+/* the loading message waits, so a normal load shows only the background */
+.splash-text {
+  animation: boot-fade 0.3s ease-out 2s both;
+}
+/* phones: the power-on screen is the console alone, without the fan of NFTs behind it */
+@media (max-width: 639px) {
+  .boot-nfts {
+    display: none;
+  }
+  .boot {
+    background: url("/site/dots-hero-phone.svg") center bottom / 100% auto no-repeat var(--bg);
+  }
+  /* the hint sits over the pixels here, so it gets its own plate */
+  .boot-hint {
+    position: relative;
+    padding: 4px 10px;
+    border-radius: 8px;
+    background: var(--bg);
   }
 }

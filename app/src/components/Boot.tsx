@@ -27,7 +27,6 @@ export function showBoot() {
   } catch {}
   location.reload();
 }
-const TAGLINE = "EXPLORE THE MARKETS";
 
 type Card = { id: number; trade?: [market: string, side: "long" | "short", leverage: number]; paid: number; owed: number; state: LifeState };
 /** The cards around the console: sample Life NFTs, each naming the losing trade it came from (no trade: a Backer
@@ -61,11 +60,31 @@ function SampleCard({ card, i }: { card: Card; i: number }) {
   );
 }
 
+/** The rise on the power-on screen until real prices have history: each number is a close, higher up the screen is lower. */
+const SAMPLE = [66, 60, 63, 54, 58, 49, 52, 44, 48, 55, 47, 40, 44, 35, 39, 47, 41, 32, 36, 27, 31, 22, 26, 18];
+
+/** Up to 24 candles from a market's recent prices, in the chart's 0 to 100, with 0 at the top. */
+function toCandles(points: { p: number }[]) {
+  const size = Math.max(1, Math.floor(points.length / 24));
+  const buckets: number[][] = [];
+  for (let i = Math.max(0, points.length - 24 * size); i < points.length; i += size) buckets.push(points.slice(i, i + size).map((x) => x.p));
+  if (buckets.length < 12 || new Set(points.slice(-48).map((x) => x.p)).size < 4) {
+    return SAMPLE.map((c, i) => {
+      const o = SAMPLE[i - 1] ?? c + 5;
+      return { o, c, h: Math.min(o, c) - 3 - (i % 3) * 2, l: Math.max(o, c) + 3 + (i % 2) * 3 };
+    });
+  }
+  const all = buckets.flat();
+  const lo = Math.min(...all);
+  const hi = Math.max(...all);
+  const y = (p: number) => 90 - ((p - lo) / (hi - lo)) * 80;
+  return buckets.map((b) => ({ o: y(b[0]), c: y(b[b.length - 1]), h: y(Math.max(...b)), l: y(Math.min(...b)) }));
+}
+
 export function Boot() {
   const { prices, history } = useOneUp();
   // shown until we know this session hasn't seen it, so the app never flashes underneath first
   const [state, setState] = useState<"boot" | "leaving" | "gone">("boot");
-  const [typed, setTyped] = useState(0);
   const [pressed, setPressed] = useState<"long" | "short" | "start" | null>(null);
   const root = useRef<HTMLDivElement>(null);
 
@@ -92,21 +111,6 @@ export function Boot() {
       if (sessionStorage.getItem(KEY) === "1" && !forced()) return setState("gone");
     } catch {}
     if (automated() && !forced()) return setState("gone");
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return setTyped(TAGLINE.length);
-    // the logo lands at 1.5 s, then the tagline types a letter every 45 ms
-    let i = 0;
-    let tick: ReturnType<typeof setInterval>;
-    const start = setTimeout(() => {
-      tick = setInterval(() => {
-        i += 1;
-        setTyped(i);
-        if (i >= TAGLINE.length) clearInterval(tick);
-      }, 45);
-    }, 1700);
-    return () => {
-      clearTimeout(start);
-      clearInterval(tick);
-    };
   }, []);
 
   useEffect(() => {
@@ -139,14 +143,9 @@ export function Boot() {
   }, [state]);
 
   if (state === "gone") return null;
-  // the line behind the logo: the market with the most history so far, scaled to the screen
-  const pts = Object.values(history).sort((a, b) => b.length - a.length)[0]?.slice(-60) ?? [];
-  const lo = Math.min(...pts.map((x) => x.p));
-  const hi = Math.max(...pts.map((x) => x.p));
-  const line =
-    pts.length > 2
-      ? pts.map((x, i) => `${i ? "L" : "M"}${((i / (pts.length - 1)) * 100).toFixed(2)} ${(88 - ((x.p - lo) / (hi - lo || 1)) * 70).toFixed(2)}`).join(" ")
-      : "M0 70 L15 62 L28 66 L42 48 L55 54 L68 38 L80 44 L100 26";
+  // the market with the most history so far, as candles; a made-up rise until there's enough of it
+  const candles = toCandles(Object.values(history).sort((a, b) => b.length - a.length)[0] ?? []);
+  const last = candles[candles.length - 1];
   const ticker = Object.entries(prices).map(([m, p]) => `${m.split("-")[0]} ${fmtPrice(p)}`);
   const tape = ticker.length ? ticker.join("   ·   ") : "NEAR   ·   BTC   ·   ETH";
 
@@ -171,18 +170,28 @@ export function Boot() {
               <span className="stripes" />
             </div>
             <div className="lcd boot-screen">
-              <svg className="boot-line" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
-                <path d={line} pathLength={1} />
-              </svg>
               <div className="boot-logo">
                 <Logo size={64} />
                 <span className="display boot-word">OneUp</span>
               </div>
-              <div className="display boot-tag" aria-hidden>
-                {TAGLINE.slice(0, typed)}
-                <span className="boot-caret">{typed < TAGLINE.length ? "▌" : ""}</span>
-              </div>
-              <div className={`display boot-start ${typed >= TAGLINE.length ? "on" : ""}`}>VIEW MARKETS</div>
+              <svg className="boot-chart" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
+                {[25, 50, 75].map((y) => (
+                  <rect key={y} className="boot-grid" x={0} y={y} width={100} height={0.8} />
+                ))}
+                {candles.map((c, i) => {
+                  const w = 100 / candles.length;
+                  const up = c.c <= c.o;
+                  const top = Math.min(c.o, c.c);
+                  return (
+                    <g key={i} className={`boot-candle ${up ? "up" : "down"}`} style={{ "--i": i } as React.CSSProperties}>
+                      <rect x={i * w + w * 0.44} y={c.h} width={w * 0.12} height={c.l - c.h} />
+                      <rect x={i * w + w * 0.18} y={top} width={w * 0.64} height={Math.max(2, Math.abs(c.c - c.o))} />
+                    </g>
+                  );
+                })}
+                {/* the price now, once the last candle is in */}
+                <path className="boot-now" d={`M0 ${last.c} H100`} />
+              </svg>
               <div className="boot-ticker display" aria-hidden>
                 <span>
                   {tape}   ·   {tape}   ·   

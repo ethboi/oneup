@@ -48,7 +48,7 @@ function ScreenSwitch() {
   );
 }
 
-export function GameHud({ score }: { score?: React.ReactNode }) {
+export function GameHud({ score, jackpot }: { score?: React.ReactNode; jackpot?: React.ReactNode }) {
   const { me } = useOneUp();
   const lv = useLevel();
   const streak = useStreak(me);
@@ -74,10 +74,11 @@ export function GameHud({ score }: { score?: React.ReactNode }) {
         </span>
       )}
       <ScreenSwitch />
+      {jackpot}
       {house && (
         <span className="house-pnl" title="What traders lost to the house this round, less what it paid winners">
           <span className="display house-name">
-            <span className="hidden sm:inline">ROUND {house.round} · </span>HOUSE P&amp;L
+            <span className="hidden sm:inline">ROUND {house.round} · </span>HOUSE<span className="hidden sm:inline"> P&amp;L</span>
           </span>
           <b className="num" style={{ color: house.net > 0n ? "var(--hp-good)" : house.net < 0n ? "#ff5a4f" : "#d6d7e6" }}>
             {house.net > 0n ? "+" : house.net < 0n ? "−" : ""}${fmtUsdc(house.net < 0n ? -house.net : house.net, (house.net < 0n ? -house.net : house.net) < 1_000n * USDC ? 2 : 0)}

@@ -724,19 +724,20 @@ function Console({
   const [range, setRange] = useChartRange();
   const [style, setStyle] = useChartStyle();
   const now = useNow();
-  // with no position on the chart, its top row shows the jackpot
+  // the jackpot, on the console's frame above the screen, once there's something in it
   const { o: one, d: dep } = useOneUp();
   const treasury = usePoll(() => one.treasury(), [], 5000);
   const ep = usePoll(() => one.epoch(), [], 10_000);
   const drawIn = treasury && ep ? Math.max(0, (treasury.draw_epoch - ep.id) * dep.epochLengthS + ep.started_at + dep.epochLengthS - now) : null;
   const jackpotLine =
-    treasury?.vault && drawIn !== null ? (
-      <span className="flex items-center gap-1.5 text-sm">
+    treasury?.vault && drawIn !== null && BigInt(treasury.jackpot) > 0n ? (
+      <span className="hud-jackpot" title={`Jackpot draws in ${fmtDuration(drawIn)}`}>
         {/* the coin turns faster in the last round before the draw */}
         <span className={`coin-spin ${drawIn < dep.epochLengthS ? "fast" : ""}`} aria-hidden>
           <PixelCoin size={16} />
         </span>
-        Jackpot ${fmtUsdc(BigInt(treasury.jackpot), 0)} · draws in {fmtDuration(drawIn)}
+        Jackpot <b>${fmtUsdc(BigInt(treasury.jackpot), 0)}</b>
+        <span className="hidden sm:inline">· draws in {fmtDuration(drawIn)}</span>
       </span>
     ) : undefined;
   // the window, plus the last price before it so the line runs in from the left edge
@@ -824,7 +825,7 @@ function Console({
           <span className="faceplate-print">NEAR · BTC · ETH MARKETS · NEAR HACKATHON 2026</span>
           <span className="stripes" />
         </div>
-        <GameHud score={pos && mark ? <PnlHero value={afterCut(pnl(pos.side, BigInt(pos.margin), pos.leverage, BigInt(pos.entry_price), mark), pos.cut_ppm)} margin={BigInt(pos.margin)} /> : undefined} />
+        <GameHud jackpot={jackpotLine} score={pos && mark ? <PnlHero value={afterCut(pnl(pos.side, BigInt(pos.margin), pos.leverage, BigInt(pos.entry_price), mark), pos.cut_ppm)} margin={BigInt(pos.margin)} /> : undefined} />
         <div className="relative">
           <PriceChart
             fill
@@ -854,7 +855,7 @@ function Console({
                 )}
               </span>
             }
-            gauge={mood.state !== "none" && mood.gauge ? <Gauge mood={mood} /> : jackpotLine}
+            gauge={mood.state !== "none" && mood.gauge ? <Gauge mood={mood} /> : undefined}
           />
           <MoodGlow mood={mood} />
           <GameFx market={market} pos={pos} mark={mark} pts={pts} />

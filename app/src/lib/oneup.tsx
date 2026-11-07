@@ -102,10 +102,10 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
   );
   const wallet = useNearWallet(d);
   // a visitor can look around before connecting a wallet; remembered for this browser
-  const [watching, setWatching] = useState(false);
-  useEffect(() => {
-    try { setWatching(localStorage.getItem(WATCH_KEY) === "1"); } catch {}
-  }, []);
+  // read straight away (this only renders in the browser), so the wallet screen doesn't flash for someone already looking around
+  const [watching, setWatching] = useState(() => {
+    try { return localStorage.getItem(WATCH_KEY) === "1"; } catch { return false; }
+  });
   const watch = useCallback(() => {
     setWatching(true);
     try { localStorage.setItem(WATCH_KEY, "1"); } catch {}
@@ -270,18 +270,11 @@ function cleanError(e: unknown): string {
   return (m?.[1] ?? s.split("\n")[0]).slice(0, 160);
 }
 
-/** The start-up screen: the logo drops into a green LCD, like an old handheld booting. */
+/** While the deployment loads: the plain background, so nothing flashes before the power-on screen. A slow connection gets its message after a moment. */
 function Splash({ text }: { text: string }) {
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
-      <div className="case w-full max-w-sm p-4">
-        <div className="bezel p-3 pb-6">
-          <div className="lcd flex h-48 flex-col items-center justify-center gap-3 overflow-hidden">
-            <span className="boot-logo display text-4xl italic text-[var(--lcd-ink)]">OneUp</span>
-            <span className="boot-text display text-sm text-[var(--lcd-3)]">{text}</span>
-          </div>
-        </div>
-      </div>
+      <span className="splash-text label" role="status">{text}</span>
     </div>
   );
 }
