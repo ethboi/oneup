@@ -200,7 +200,7 @@ export function PriceChart({
   const marks = allMarks.filter((m) => !m.faint);
   const faint = allMarks.filter((m) => m.faint);
   const narrow = W < 480;
-  const H = narrow ? 300 : Math.max(420, tall ?? 0);
+  const H = narrow ? 250 : Math.max(420, tall ?? 0);
   const [hover, setHover] = useState<number | null>(null);
   // a trigger being dragged: its kind once known (a drag from the entry line picks it by direction), the price
   // under the pointer, and whether it's being saved

@@ -113,7 +113,7 @@ function MarketBar(props: {
 
   return (
     // desktop: market, stats, chart controls in one row; phones: market and controls, then the stats
-    <div className="mb-3 flex flex-wrap items-center gap-2">
+    <div className="mb-2 flex flex-wrap items-center gap-1.5 sm:mb-3 sm:gap-2">
       <div ref={ref} className="relative min-w-0 flex-1 lg:flex-none">
         <button type="button" className="bar-pill num w-full lg:w-auto" aria-expanded={open} aria-haspopup="listbox" onClick={() => setOpen(!open)}>
           <b className="text-[15px] sm:text-base">{market.split("-")[0]}</b>
@@ -806,7 +806,7 @@ function Console({
       </>
     ) : undefined;
   return (
-    <div key={fx?.kind === "liquidated" || (fx?.kind === "win" && fx.tier === 3) ? fx.id : "case"} id="chart" className={`case order-2 min-w-0 scroll-mt-4 p-3 sm:p-5 ${fx?.kind === "liquidated" || (fx?.kind === "win" && fx.tier === 3) ? "shake" : ""}`}>
+    <div key={fx?.kind === "liquidated" || (fx?.kind === "win" && fx.tier === 3) ? fx.id : "case"} id="chart" className={`case order-2 min-w-0 scroll-mt-4 p-2 sm:p-5 ${fx?.kind === "liquidated" || (fx?.kind === "win" && fx.tier === 3) ? "shake" : ""}`}>
       <MarketBar
         market={market}
         setMarket={setMarket}
@@ -817,7 +817,7 @@ function Console({
         range={range}
         setRange={setRange}
       />
-      <div className="bezel px-3 pb-5 pt-3 sm:px-5">
+      <div className="bezel px-2 pb-2.5 pt-2 sm:px-5 sm:pb-5 sm:pt-3">
         <div className="faceplate mb-3 hidden sm:flex" aria-hidden>
           <span className="stripes" />
           <span className="faceplate-print">NEAR · BTC · ETH MARKETS · NEAR HACKATHON 2026</span>

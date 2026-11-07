@@ -659,7 +659,12 @@ body {
   }
   .bar-strip {
     overflow-x: auto;
+    /* it fits on a phone; no scrollbar drawn along its bottom edge where a small screen makes it scroll */
+    scrollbar-width: none;
     font-size: 13px;
+  }
+  .bar-strip::-webkit-scrollbar {
+    display: none;
   }
   .bar-cell {
     display: flex;
@@ -3225,4 +3230,44 @@ kbd {
 .rounds-table th + th,
 .rounds-table td + td {
   padding-left: 12px;
+}
+
+/* phones: the console closes up around the chart, so more of the order form is on the first screen */
+@media (max-width: 639px) {
+  .case {
+    border-radius: 16px 16px 36px 16px;
+  }
+  .bezel {
+    border-radius: 10px 10px 26px 10px;
+  }
+  .bar-strip {
+    min-height: 36px;
+  }
+  .bar-opt {
+    padding: 0 7px;
+  }
+  .bar-opt[aria-pressed="true"]::after {
+    left: 7px;
+    right: 7px;
+  }
+  .bar-cell {
+    padding: 0 6px;
+  }
+  .mkt-stats {
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    padding: 0 4px;
+  }
+  .mkt-stats dt {
+    font-size: 11px;
+  }
+  .mkt-stats dd {
+    font-size: 13px;
+  }
+  .game-hud {
+    gap: 6px 10px;
+    margin: 0 0 6px;
+  }
 }
