@@ -72,6 +72,7 @@ export const SKINS: Skin[] = [
   { id: "night", name: "Night", unlock: null },
   { id: "atomic", name: "Atomic Purple", unlock: null },
   { id: "classic", name: "Classic (mono)", unlock: null },
+  { id: "dark", name: "Dark screen", unlock: null },
   { id: "kiwi", name: "Kiwi", unlock: { level: 2 } },
   { id: "teal", name: "Teal", unlock: { level: 3 } },
   { id: "dandelion", name: "Dandelion", unlock: { level: 4 } },

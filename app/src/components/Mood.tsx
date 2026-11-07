@@ -112,22 +112,27 @@ export function Gauge({ mood }: { mood: Mood }) {
   const g = mood.gauge;
   if (!g) return null;
   const pct = (to: number) => `${((Math.abs(to - g.mark) / g.mark) * 100).toFixed(1)}%`;
-  const hp = hpOf(g.liq, g.entry, g.mark);
+  // one track from liquidation (left) to the take-profit or profit cap (right), with the price on it; the same
+  // sum works for a short, whose liquidation is above its entry
+  const along = (p: number) => `${Math.min(100, Math.max(0, ((p - g.liq) / (g.target - g.liq)) * 100))}%`;
   const hot = mood.state === "hot";
+  const goal = g.capped ? "Max win" : "Take profit";
   return (
     <span
-      // phones: the bar takes what the two readings leave, so a long one never runs off the screen
-      className="display num flex w-full items-center gap-2 text-sm text-[var(--lcd-ink)] sm:w-auto"
+      // phones: the track takes what the two readings leave, so a long one never runs off the screen
+      className="gauge num flex w-full items-center gap-2 text-[var(--lcd-ink)] sm:w-auto"
       role="img"
-      aria-label={`Margin health ${Math.round(hp * 100)}%: liquidation ${pct(g.liq)} away, ${g.capped ? "profit cap" : "take profit"} ${pct(g.target)} away`}
+      aria-label={`Price between liquidation, ${pct(g.liq)} away, and ${goal.toLowerCase()}, ${pct(g.target)} away`}
     >
-      <span className="whitespace-nowrap" title={`Liquidation ${pct(g.liq)} away`}>
-        Margin
+      <span className="gauge-end gauge-liq" title={`Liquidation ${pct(g.liq)} away`}>
+        Liq. {pct(g.liq)}
       </span>
-      <HpBar hp={hp} label={`Margin health, liquidation ${pct(g.liq)} away`} />
-      <span className="whitespace-nowrap" style={hot ? { color: "#b07a00" } : undefined}>
-        {g.capped ? "Max win" : "TP"} {pct(g.target)}
-        <span className="hidden sm:inline"> away</span>
+      <span className="gauge-track" aria-hidden>
+        <span className="gauge-entry" style={{ left: along(g.entry) }} title="Entry" />
+        <span className="gauge-dot" style={{ left: along(g.mark) }} />
+      </span>
+      <span className="gauge-end gauge-win" style={hot ? { color: "#b07a00" } : undefined} title={`${goal} ${pct(g.target)} away`}>
+        {goal} {pct(g.target)}
       </span>
     </span>
   );

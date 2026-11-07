@@ -25,22 +25,33 @@ function useHouseRound() {
 
 /** The HUD printed on the console's bezel, above the screen. `score`: the position on screen's PnL. */
 /** The original one-colour screen, on the console's bezel, with or without a wallet. */
+const SCREENS = [
+  ["light", "Light", "The colour screen"],
+  ["dark", "Dark", "A dark screen with a pink price line"],
+  ["classic", "Classic", "The original one-colour screen"],
+] as const;
+
 function ScreenSwitch() {
   const [skin, setSkin] = useSkin();
-  const classic = skin === "classic";
-  const toggle = () => {
+  // "light" is whichever colour shell they had, such as one they unlocked
+  const now = skin === "classic" || skin === "dark" ? skin : "light";
+  const choose = (next: (typeof SCREENS)[number][0]) => {
+    if (next === now) return;
     try {
-      // coming back returns to the shell they had, such as one they unlocked
-      if (!classic) localStorage.setItem("oneup.colourSkin", skin);
-      setSkin(classic ? (localStorage.getItem("oneup.colourSkin") ?? "night") : "classic");
+      if (now === "light") localStorage.setItem("oneup.colourSkin", skin);
+      setSkin(next === "light" ? (localStorage.getItem("oneup.colourSkin") ?? "night") : next);
     } catch {
-      setSkin(classic ? "night" : "classic");
+      setSkin(next === "light" ? "night" : next);
     }
   };
   return (
-    <button type="button" className="screen-switch" aria-pressed={classic} title="The original one-colour screen" onClick={toggle}>
-      Classic
-    </button>
+    <span className="screen-modes" role="group" aria-label="Screen">
+      {SCREENS.map(([id, name, title]) => (
+        <button key={id} type="button" className="screen-switch" aria-pressed={now === id} title={title} onClick={() => choose(id)}>
+          {name}
+        </button>
+      ))}
+    </span>
   );
 }
 
@@ -56,7 +67,8 @@ export function GameHud({ score, jackpot }: { score?: React.ReactNode; jackpot?:
           <span className="display house-name">
             <span className="hidden sm:inline">ROUND {house.round} · </span>HOUSE<span className="hidden sm:inline"> P&amp;L</span>
           </span>
-          <b className="num" style={{ color: house.net > 0n ? "var(--hp-good)" : house.net < 0n ? "#ff5a4f" : "#d6d7e6" }}>
+          {/* the frame stays dark on every screen, so its colours don't follow the screen's (Classic's "good" is its ink) */}
+          <b className="num" style={{ color: house.net > 0n ? "var(--long)" : house.net < 0n ? "#ff5a4f" : "#d6d7e6" }}>
             {house.net > 0n ? "+" : house.net < 0n ? "−" : ""}${fmtUsdc(house.net < 0n ? -house.net : house.net, (house.net < 0n ? -house.net : house.net) < 1_000n * USDC ? 2 : 0)}
           </b>
         </span>
