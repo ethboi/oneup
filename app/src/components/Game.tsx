@@ -17,6 +17,7 @@ import { useStreak } from "./Streaks";
 import { useHistory } from "./History";
 import { fmtDuration } from "./Jackpot";
 import { useNow } from "./Header";
+import { useSkin } from "./Achievements";
 
 /** The house's P&L this round: what traders lost to it less what it paid winners. */
 function useHouseRound() {
@@ -27,6 +28,26 @@ function useHouseRound() {
 }
 
 /** The HUD printed on the console's bezel, above the screen. `score`: the position on screen's PnL. */
+/** The original one-colour screen, on the console's bezel, with or without a wallet. */
+function ScreenSwitch() {
+  const [skin, setSkin] = useSkin();
+  const classic = skin === "classic";
+  const toggle = () => {
+    try {
+      // coming back returns to the shell they had, such as one they unlocked
+      if (!classic) localStorage.setItem("oneup.colourSkin", skin);
+      setSkin(classic ? (localStorage.getItem("oneup.colourSkin") ?? "night") : "classic");
+    } catch {
+      setSkin(classic ? "night" : "classic");
+    }
+  };
+  return (
+    <button type="button" className="screen-switch display" aria-pressed={classic} title="The original one-colour screen" onClick={toggle}>
+      Classic
+    </button>
+  );
+}
+
 export function GameHud({ score }: { score?: React.ReactNode }) {
   const { me } = useOneUp();
   const lv = useLevel();
@@ -52,6 +73,7 @@ export function GameHud({ score }: { score?: React.ReactNode }) {
           WIN STREAK ×{combo}
         </span>
       )}
+      <ScreenSwitch />
       {house && (
         <span className="house-pnl" title="What traders lost to the house this round, less what it paid winners">
           <span className="display house-name">

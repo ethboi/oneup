@@ -117,6 +117,12 @@ export function useSkin(): [string, (s: string) => void] {
   useEffect(() => {
     document.documentElement.dataset.skin = skin;
   }, [skin]);
+  // the screen switch and the badges dialog each hold the choice, so a change in one reaches the other
+  useEffect(() => {
+    const follow = (e: Event) => set((e as CustomEvent<string>).detail);
+    window.addEventListener("oneup-skin", follow);
+    return () => window.removeEventListener("oneup-skin", follow);
+  }, []);
   return [
     skin,
     (s: string) => {
@@ -124,6 +130,7 @@ export function useSkin(): [string, (s: string) => void] {
       try {
         localStorage.setItem("oneup.skin", s);
       } catch {}
+      window.dispatchEvent(new CustomEvent("oneup-skin", { detail: s }));
     },
   ];
 }

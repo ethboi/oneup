@@ -53,8 +53,8 @@ export default function Site() {
               <span>Get a life.</span>
             </h1>
             <p className="site-lede">
-              Perps on NEAR. Lose in a round the house wins, and you can get a Life NFT that collects USDC from its future
-              profit.
+              Perps on NEAR where a loss can pay you back. Lose in a round the house wins, and you can get a Life NFT that
+              collects USDC from its future profit.
             </p>
             <div className="site-ctas">
               <a className="btn btn-accent btn-big" href={APP}>

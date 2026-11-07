@@ -2750,6 +2750,22 @@ kbd {
   font-weight: 800;
   color: #d6d7e6;
 }
+.screen-switch {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid #3a3b58;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #9ba0b9;
+}
+.screen-switch:hover {
+  color: #fff;
+}
+.screen-switch[aria-pressed="true"] {
+  border-color: #b7c49a;
+  background: #b7c49a;
+  color: #1e2a16;
+}
 .game-hud .level-xp {
   color: #9ba0b9;
 }
