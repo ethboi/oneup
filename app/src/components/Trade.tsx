@@ -183,24 +183,55 @@ function MarketBar(props: {
           <dd>{info ? `${info.max_leverage}×` : "…"}</dd>
         </div>
       </dl>
-      {/* phones: a row of its own, so the market pill keeps its price */}
-      <div className="bar-strip num order-2 w-full justify-between lg:order-3 lg:ml-auto lg:w-auto lg:justify-start" role="group" aria-label="Chart">
-        {/* laid out, not folded into menus: one tap to switch, as on a trading screen */}
+      {/* phones: beside the market pill, so the chart gets the room; desktops: its own place at the end of the row */}
+      <div className="bar-strip num order-2 lg:order-3 lg:ml-auto" role="group" aria-label="Chart">
+        {/* laid out, not folded into menus: one tap to switch, as on a trading screen. Phones show only Candles,
+            which turns candles on and off */}
         <span className="bar-cell !px-1" role="group" aria-label="Chart style">
           {(["line", "candles"] as const).map((k) => (
-            <button key={k} type="button" className="bar-opt" aria-pressed={style === k} onClick={() => setStyle(k)}>
-              {k === "line" ? "Line" : "Candles"}
+            <button
+              key={k}
+              type="button"
+              className={`bar-opt ${k === "line" ? "hidden sm:inline-block" : ""}`}
+              aria-pressed={style === k}
+              aria-label={k === "line" ? "Line" : "Candles"}
+              onClick={() => setStyle(k === "candles" && style === "candles" && window.matchMedia("(max-width: 639px)").matches ? "line" : k)}
+            >
+              {k === "line" ? (
+                "Line"
+              ) : (
+                <>
+                  {/* phones: a candlestick icon, so the market pill keeps room for its price */}
+                  <Icon name="candles" size={18} className="sm:hidden" />
+                  <span className="hidden sm:inline">Candles</span>
+                </>
+              )}
             </button>
           ))}
         </span>
-        <span className="bar-cell !px-1" role="group" aria-label="Chart window">
+        <span className="bar-cell !px-1 hidden sm:flex" role="group" aria-label="Chart window">
           {RANGES.map(([name, ms]) => (
             <button key={name} type="button" className="bar-opt num" aria-pressed={range === ms} onClick={() => setRange(ms)}>
               {name}
             </button>
           ))}
         </span>
-        <span className="bar-cell" title={live ? "Prices are updating" : "No recent price updates"}>
+        {/* phones: one button that steps through the windows, so the market pill keeps room for its price */}
+        <span className="bar-cell !px-1 sm:hidden">
+          <button
+            type="button"
+            className="bar-opt num flex items-center gap-1"
+            aria-label={`Chart window: ${RANGES.find(([, ms]) => ms === range)?.[0]}. Tap for the next`}
+            onClick={() => {
+              const i = RANGES.findIndex(([, ms]) => ms === range);
+              setRange(RANGES[(i + 1) % RANGES.length][1]);
+            }}
+          >
+            {RANGES.find(([, ms]) => ms === range)?.[0]}
+            <Icon name="chevron" size={12} />
+          </button>
+        </span>
+        <span className="bar-cell hidden sm:flex" title={live ? "Prices are updating" : "No recent price updates"}>
           <span className={`h-1.5 w-1.5 rounded-full ${live ? "live-dot" : ""}`} style={{ background: live ? "var(--long)" : "var(--muted)" }} />
           <b className="hidden text-xs sm:inline" style={{ color: live ? "var(--long)" : "var(--muted)" }}>
             {live ? "Live" : "Paused"}
@@ -297,11 +328,29 @@ export function Trade() {
   const formRef = useRef<HTMLDivElement>(null);
   const [formVisible, setFormVisible] = useState(true);
   useEffect(() => {
-    const el = formRef.current;
-    if (!el) return;
-    const io = new IntersectionObserver(([e]) => setFormVisible(e.isIntersecting), { threshold: 0.15 });
-    io.observe(el);
-    return () => io.disconnect();
+    // the phone's Long and Short bar stands in for the form's own Long/Short switch, so it shows only while that
+    // switch is off screen (above the bottom nav and the bar itself), never both at once. Read on scroll, resize
+    // and once a second, as the form renders after the prices and can move as the page fills in.
+    let frame = 0;
+    const check = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const el = formRef.current?.querySelector(".ticket .segmented");
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        setFormVisible(r.bottom > 0 && r.top < window.innerHeight - 130);
+      });
+    };
+    check();
+    window.addEventListener("scroll", check, { passive: true });
+    window.addEventListener("resize", check);
+    const tick = setInterval(check, 1000);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", check);
+      window.removeEventListener("resize", check);
+      clearInterval(tick);
+    };
   }, []);
 
   // the chart details one position: the one picked below, or the top one in this market; the rest show faintly
@@ -734,7 +783,8 @@ function Console({
         <span className={`coin-spin ${drawIn < dep.epochLengthS ? "fast" : ""}`} aria-hidden>
           <PixelCoin size={16} />
         </span>
-        Jackpot <b>${fmtUsdc(BigInt(treasury.jackpot), 0)}</b>
+        {/* phones: the coin stands for the word, so the row fits on one line */}
+        <span className="hidden sm:inline">Jackpot</span> <b>${fmtUsdc(BigInt(treasury.jackpot), 0)}</b>
         <span className="hidden sm:inline">· draws in {fmtDuration(drawIn)}</span>
       </span>
     ) : undefined;
@@ -806,7 +856,7 @@ function Console({
       </>
     ) : undefined;
   return (
-    <div key={fx?.kind === "liquidated" || (fx?.kind === "win" && fx.tier === 3) ? fx.id : "case"} id="chart" className={`case order-2 min-w-0 scroll-mt-4 p-2 sm:p-5 ${fx?.kind === "liquidated" || (fx?.kind === "win" && fx.tier === 3) ? "shake" : ""}`}>
+    <div key={fx?.kind === "liquidated" || (fx?.kind === "win" && fx.tier === 3) ? fx.id : "case"} id="chart" className={`case order-2 min-w-0 scroll-mt-4 p-1.5 sm:p-5 ${fx?.kind === "liquidated" || (fx?.kind === "win" && fx.tier === 3) ? "shake" : ""}`}>
       <MarketBar
         market={market}
         setMarket={setMarket}
@@ -817,7 +867,7 @@ function Console({
         range={range}
         setRange={setRange}
       />
-      <div className="bezel px-2 pb-2.5 pt-2 sm:px-5 sm:pb-5 sm:pt-3">
+      <div className="bezel px-1.5 pb-1.5 pt-1.5 sm:px-5 sm:pb-5 sm:pt-3">
         <div className="faceplate mb-3 hidden sm:flex" aria-hidden>
           <span className="stripes" />
           <span className="faceplate-print">NEAR · BTC · ETH MARKETS</span>
@@ -1232,6 +1282,13 @@ function GetTestUsdc({ short, className }: { short: bigint; className: string })
 function TradeBar({ t }: { t: Ticket }) {
   const { d, viewOnly } = useOneUp();
   const needsUsdc = !viewOnly && d.testUsdcFaucet && t.payWith === "wallet" && t.topUp > t.wallet;
+  // while this bar is up, the order form's pinned button stays hidden: the two would stack in the same place
+  useEffect(() => {
+    document.body.dataset.tradeBar = "1";
+    return () => {
+      delete document.body.dataset.tradeBar;
+    };
+  }, []);
   // as on other exchanges' phone screens: Long and Short side by side; each picks its side and opens the order form
   const pick = (side: Side) => {
     t.setSide(side);

@@ -121,11 +121,11 @@ export function PixelBadge({ id, size = 32, locked }: { id: string; size?: numbe
   return <Sprite rows={def.rows} colors={colors} size={size} fill={locked ? 1 : (def.fill ?? 1)} edge={locked ? "var(--muted)" : undefined} />;
 }
 
-/** An amount in the pixel font, `height` px tall, in coin gold with a highlight row, outlined in ink. Shrinks
- *  to fit narrow screens. */
-export function PixelAmount({ text, height }: { text: string; height: number }) {
+/** A big amount, `height` px tall. On a screen it takes the screen's ink, so it reads on Light, Dark and Classic
+ *  alike; anywhere else pass the colour it needs. */
+export function PixelAmount({ text, height, color = "var(--lcd-ink)" }: { text: string; height: number; color?: string }) {
   return (
-    <span className="num block whitespace-nowrap font-extrabold" style={{ fontSize: height * 0.82, lineHeight: 1.1, color: "#1c1b29" }}>
+    <span className="num block whitespace-nowrap font-extrabold" style={{ fontSize: height * 0.82, lineHeight: 1.1, color }}>
       {text}
     </span>
   );

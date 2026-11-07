@@ -61,6 +61,8 @@ export function GameHud({ score, jackpot }: { score?: React.ReactNode; jackpot?:
     <div className="game-hud num" aria-label="Round and position">
       {score}
       <ScreenSwitch />
+      {/* the jackpot and the house stay together: on a narrow phone they move to the next line as a pair */}
+      <span className="hud-pair">
       {jackpot}
       {house && (
         <span className="house-pnl" title="What traders lost to the house this round, less what it paid winners">
@@ -73,6 +75,7 @@ export function GameHud({ score, jackpot }: { score?: React.ReactNode; jackpot?:
           </b>
         </span>
       )}
+      </span>
     </div>
   );
 }

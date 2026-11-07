@@ -3214,3 +3214,67 @@ kbd {
     transition: none;
   }
 }
+
+/* phones: the Long and Short bar replaces the pinned order button while the order form is off screen */
+body[data-trade-bar] .pinned-cta {
+  display: none;
+}
+
+/* the frame row's jackpot and house: one unit that fills the rest of the row, jackpot first and house at the end */
+.hud-pair {
+  display: inline-flex;
+  flex: 1 1 auto;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+@media (max-width: 639px) {
+  .game-hud {
+    gap: 6px 8px;
+  }
+  .screen-modes .screen-switch {
+    padding: 0 6px;
+    font-size: 11px;
+  }
+  .hud-pair {
+    gap: 8px;
+  }
+  .hud-pair .house-pnl {
+    gap: 5px;
+  }
+}
+
+/* phones: the chart is the focus; what sits around it gets smaller */
+@media (max-width: 639px) {
+  /* the market's numbers are on the desktop only; the chart's readout carries the change */
+  .mkt-stats {
+    display: none;
+  }
+  .bar-strip .bar-opt {
+    padding: 0 5px;
+    font-size: 12.5px;
+  }
+  .bar-strip .bar-opt[aria-pressed="true"]::after {
+    left: 5px;
+    right: 5px;
+  }
+  .bar-strip .bar-cell {
+    padding: 0 3px;
+  }
+  /* the market pill keeps its price: a little less padding around it */
+  .bar-pill {
+    gap: 6px;
+    padding: 0 8px;
+  }
+  .game-hud {
+    margin: 0 0 4px;
+  }
+  .screen-modes .screen-switch {
+    min-height: 24px;
+  }
+  .house-pnl,
+  .hud-jackpot {
+    font-size: 12px;
+  }
+}

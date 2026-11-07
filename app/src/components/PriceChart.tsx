@@ -130,6 +130,18 @@ function spread(ys: number[], gap: number, top: number, bottom: number) {
  *  positions' tabs. Measured from the page top, so scrolling doesn't change it. */
 const FILL_BELOW = 120;
 const FILL_MAX = 1000;
+/** The window's height, following rotation and the browser bar; 0 until the page has loaded. */
+function useViewportHeight() {
+  const [h, setH] = useState(0);
+  useEffect(() => {
+    const read = () => setH(window.innerHeight);
+    read();
+    window.addEventListener("resize", read);
+    return () => window.removeEventListener("resize", read);
+  }, []);
+  return h;
+}
+
 function useFillHeight(el: HTMLElement | null) {
   const [h, setH] = useState<number | null>(null);
   useEffect(() => {
@@ -200,7 +212,9 @@ export function PriceChart({
   const marks = allMarks.filter((m) => !m.faint);
   const faint = allMarks.filter((m) => m.faint);
   const narrow = W < 480;
-  const H = narrow ? 200 : Math.max(420, tall ?? 0);
+  // phones: the chart is the screen's focus, about 45% of the screen's height; desktops fill the column
+  const vh = useViewportHeight();
+  const H = narrow ? Math.round(Math.min(440, Math.max(280, vh * 0.45))) : Math.max(420, tall ?? 0);
   const [hover, setHover] = useState<number | null>(null);
   // a trigger being dragged: its kind once known (a drag from the entry line picks it by direction), the price
   // under the pointer, and whether it's being saved
@@ -218,7 +232,7 @@ export function PriceChart({
 
   if (points.length < 2) {
     return (
-      <div ref={ref} className="lcd relative flex h-[300px] items-center justify-center sm:h-[420px]">
+      <div ref={ref} className="lcd relative flex items-center justify-center" style={{ height: H }}>
         {header}
         <span className="display text-[var(--lcd-3)]">Waiting for prices…</span>
       </div>
