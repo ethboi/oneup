@@ -42,7 +42,7 @@ function ScreenSwitch() {
     }
   };
   return (
-    <button type="button" className="screen-switch display" aria-pressed={classic} title="The original one-colour screen" onClick={toggle}>
+    <button type="button" className="screen-switch" aria-pressed={classic} title="The original one-colour screen" onClick={toggle}>
       Classic
     </button>
   );

@@ -1,18 +1,17 @@
 "use client";
 
+import { Logo } from "./Pixel";
+
 export function WalletWelcome({ connect, busy, error, watch }: { connect: () => Promise<void>; busy: boolean; error: string | null; watch: () => void }) {
-  return <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-5 p-6">
-    <p className="label">OneUp · NEAR testnet · test money only</p>
+  return <main className="pixel-field mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-5 p-6 text-center">
+    <Logo size={56} />
     <h1 className="page-title">Connect your NEAR wallet</h1>
-    <p>Trade with test funds, follow a Life NFT and try transferring its payout rights to another account.</p>
-    <div className="panel space-y-3 p-5">
-      <p>Choose a compatible testnet wallet through NEAR Connect. Meteor is the recommended starting point. You approve transactions in your wallet; OneUp does not receive your wallet’s private key.</p>
+    <p>Testnet only, with test money. You approve every transaction.</p>
+    <div className="flex w-full flex-col gap-3">
       <button className="btn btn-accent w-full" disabled={busy} onClick={() => void connect()}>{busy ? "Waiting for wallet…" : "Connect NEAR testnet wallet"}</button>
       {error && <p role="alert" className="text-sm text-[var(--short)]">{error}</p>}
       <button className="btn btn-ghost w-full" onClick={watch}>Look around first</button>
-      <p className="label">See live prices, open trades and the marketplace without a wallet. You’ll connect one when you trade.</p>
-      <p className="label">Use a browser supported by your chosen wallet and allow its connection window. Use test NEAR for gas. Reconnect after a page reload. Rabby and Phantom are not supported by this integration.</p>
     </div>
-    <a className="underline" href="/wallet-setup">Testnet setup and supported features</a>
+    <a className="label underline" href="/wallet-setup">Need a testnet wallet?</a>
   </main>;
 }
