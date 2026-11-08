@@ -3215,11 +3215,6 @@ kbd {
   }
 }
 
-/* phones: the Long and Short bar replaces the pinned order button while the order form is off screen */
-body[data-trade-bar] .pinned-cta {
-  display: none;
-}
-
 /* the frame row's jackpot and house: one unit that fills the rest of the row, jackpot first and house at the end */
 .hud-pair {
   display: inline-flex;

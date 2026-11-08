@@ -324,35 +324,6 @@ export function Trade() {
   }, [top?.id]);
   const orders = usePoll(() => o.orders(me), [me]) ?? [];
   const ticket = useTicket(market, markets.find((m) => m.id === market)?.max_leverage ?? 100);
-  // the phone trade bar only shows while the form itself is scrolled away
-  const formRef = useRef<HTMLDivElement>(null);
-  const [formVisible, setFormVisible] = useState(true);
-  useEffect(() => {
-    // the phone's Long and Short bar stands in for the form's own Long/Short switch, so it shows only while that
-    // switch is off screen (above the bottom nav and the bar itself), never both at once. Read on scroll, resize
-    // and once a second, as the form renders after the prices and can move as the page fills in.
-    let frame = 0;
-    const check = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        const el = formRef.current?.querySelector(".ticket .segmented");
-        if (!el) return;
-        const r = el.getBoundingClientRect();
-        setFormVisible(r.bottom > 0 && r.top < window.innerHeight - 130);
-      });
-    };
-    check();
-    window.addEventListener("scroll", check, { passive: true });
-    window.addEventListener("resize", check);
-    const tick = setInterval(check, 1000);
-    return () => {
-      cancelAnimationFrame(frame);
-      window.removeEventListener("scroll", check);
-      window.removeEventListener("resize", check);
-      clearInterval(tick);
-    };
-  }, []);
-
   // the chart details one position: the one picked below, or the top one in this market; the rest show faintly
   const [focus, setFocus] = useState<number | null>(null);
   useEffect(() => {
@@ -420,7 +391,7 @@ export function Trade() {
           <Onboarding />
         </div>
       </div>
-      <div ref={formRef} id="order-form" className="order-3 flex flex-col gap-4">
+      <div id="order-form" className="order-3 flex flex-col gap-4">
         <OrderForm t={ticket} />
         <Account t={ticket} positions={positions} orders={orders} />
         <Quests />
@@ -430,7 +401,6 @@ export function Trade() {
           <div className="mt-3"><Jackpot compact /></div>
         </details>
       </div>
-      {!formVisible && <TradeBar t={ticket} />}
     </div>
   );
 }
@@ -1275,46 +1245,6 @@ function GetTestUsdc({ short, className }: { short: bigint; className: string })
       <Icon name="faucet" />
       {label}
     </button>
-  );
-}
-
-/** Phones: the ticket's main action stays in reach while you scroll the chart and positions. */
-function TradeBar({ t }: { t: Ticket }) {
-  const { d, viewOnly } = useOneUp();
-  const needsUsdc = !viewOnly && d.testUsdcFaucet && t.payWith === "wallet" && t.topUp > t.wallet;
-  // while this bar is up, the order form's pinned button stays hidden: the two would stack in the same place
-  useEffect(() => {
-    document.body.dataset.tradeBar = "1";
-    return () => {
-      delete document.body.dataset.tradeBar;
-    };
-  }, []);
-  // as on other exchanges' phone screens: Long and Short side by side; each picks its side and opens the order form
-  const pick = (side: Side) => {
-    t.setSide(side);
-    document.getElementById("order-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-  return (
-    <div className="fixed inset-x-0 bottom-[60px] z-30 border-t border-[var(--panel-edge)] bg-[var(--bg)] px-3 py-2 lg:hidden">
-      {needsUsdc ? (
-        <GetTestUsdc short={t.topUp - t.wallet} className="btn btn-accent w-full py-2.5" />
-      ) : (
-        <div className="mx-auto grid max-w-[1280px] grid-cols-2 gap-2">
-          {(["Long", "Short"] as const).map((s) => (
-            <button
-              key={s}
-              type="button"
-              className="btn py-2.5"
-              style={{ "--btn-bg": s === "Long" ? "var(--long-fill)" : "var(--short-fill)", color: "var(--on-fill)" } as React.CSSProperties}
-              onClick={() => pick(s)}
-            >
-              <Icon name={s === "Long" ? "up" : "down"} />
-              {s}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
   );
 }
 
