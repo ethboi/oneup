@@ -224,6 +224,10 @@ Licences for these are in [third-party notices](THIRD_PARTY_NOTICES.md).
   [decisions](docs/decisions.md), [states](docs/STATES.md), [the recovery journey](docs/RECOVERY_JOURNEY.md),
   [hackathon readiness](docs/HACKATHON_READINESS.md), [submission draft](docs/SUBMISSION.md).
 
+## Also by this author
+
+**CONSUME** (https://github.com/ethboi/consume), a memecoin that eats other memecoins, is a separate NEAR HACKATHON entry by the same builder. The two projects are independent and share no code.
+
 ## Licence
 
 Original OneUp code and documentation are **AGPL-3.0-only**: see [LICENSE](LICENSE) and [NOTICE](NOTICE).
