@@ -52,6 +52,28 @@ const RANGES = [
 ] as const;
 
 const MIN_HOLD_S = 60;
+
+/** Each market's price 24 hours ago (/api/change24h), refreshed every minute: null where there's no such thing (the
+ *  local demo), undefined until it arrives. */
+function useOpen24h(enabled: boolean): Record<string, number> | null | undefined {
+  const [open, setOpen] = useState<Record<string, number>>();
+  useEffect(() => {
+    if (!enabled) return;
+    let live = true;
+    const get = () =>
+      fetch("/api/change24h")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j: Record<string, number> | null) => live && j && setOpen(j))
+        .catch(() => {});
+    get();
+    const i = setInterval(get, 60_000);
+    return () => {
+      live = false;
+      clearInterval(i);
+    };
+  }, [enabled]);
+  return enabled ? open : null;
+}
 /** A limit order rests this long before it can be cancelled, so one priced through the market fills like a market order. */
 const FILL_WINDOW_S = 30;
 
@@ -88,11 +110,17 @@ function MarketBar(props: {
     };
   }, [open]);
 
-  // change over the last 5 minutes, and the latest tick's direction
+  // testnet: the 24-hour change, as exchanges list it (the oracle follows real prices); the local demo's simulated
+  // prices have no day behind them, so there it's the change over the chart's window
+  const day = useOpen24h(d.network === "testnet");
+  // each market's change, its recent prices for the sparkline, and the latest tick's direction
   const stat = (m: string) => {
-    // over the chart's window, so the bar and the chart agree
     const h = (history[m] ?? []).filter((x) => x.t >= now * 1000 - range);
-    const ch = h.length > 1 ? (h[h.length - 1].p / h[0].p - 1) * 100 : null;
+    const open = day?.[m];
+    const ch =
+      day === null
+        ? h.length > 1 ? (h[h.length - 1].p / h[0].p - 1) * 100 : null
+        : open && prices[m] ? (Number(prices[m]) / 1e8 / open - 1) * 100 : null;
     const down = h.length > 1 && h[h.length - 1].p < h[h.length - 2].p;
     return { h, ch, down };
   };
@@ -163,7 +191,7 @@ function MarketBar(props: {
       <dl className="mkt-stats num order-3 w-full lg:order-2 lg:w-auto" aria-label={`${market} stats`}>
         {/* phones: the chart's readout already prints the change */}
         <div className="hidden sm:block">
-          <dt>Change, {windowName}</dt>
+          <dt>{day === null ? `Change, ${windowName}` : "Change, 24h"}</dt>
           <dd style={{ color: tone(me.ch) }}>{pct(me.ch)}</dd>
         </div>
         <div title="Share of the market's maximum profit payouts reserved for longs and shorts">
