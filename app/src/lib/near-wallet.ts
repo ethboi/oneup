@@ -6,7 +6,7 @@ import { FailoverProvider, rpcList } from "@oneup/sdk";
 import { JsonRpcProvider } from "near-api-js";
 import type { AppDeployment } from "./app-config";
 import { assertTestnetWallet, walletOptions, signedInAccount } from "./wallet-config";
-import { walletSender, type SendPhase } from "./wallet-send";
+import { untilFinal, walletSender, type SendPhase } from "./wallet-send";
 
 /**
  * What the wallet is doing:
@@ -130,14 +130,21 @@ export function useNearWallet(d: AppDeployment) {
     new Set(Object.values(d.contracts).filter((x): x is string => !!x)),
     {
       accountId, lock: signingLock.current, onPhase: setRequest,
-      confirm: (hash, signer) => provider.viewTransactionStatusWithReceipts({ txHash: hash, accountId: signer, waitUntil: "FINAL" }),
+      // keep asking while the RPC hasn't seen it yet: the wallet may have sent it through another one
+      confirm: (hash, signer) => untilFinal(() => provider.viewTransactionStatusWithReceipts({ txHash: hash, accountId: signer, waitUntil: "FINAL" })),
     },
   ), [d.contracts, accountId, provider]);
   const send = useCallback<typeof boundSend>(async call => {
     if (signingLock.current.busy) return boundSend(call);
     // checking the account comes first, then the wallet's approval: "signing" covers both
     setRequest("signing");
-    try { return await boundSend(call); } finally { setRequest(null); }
+    try { return await boundSend(call); }
+    catch (e) {
+      // which wallet, for the error report (lib/report.ts)
+      const wallet = chosenWallet.current?.manifest.id;
+      throw e instanceof Error ? Object.assign(e, { wallet }) : e;
+    }
+    finally { setRequest(null); }
   }, [boundSend]);
   const status: WalletStatus = !enabled ? "unavailable" : request ?? (accountId ? "connected" : "disconnected");
   /** A wallet request is under way: connect, disconnect and other requests wait for it. */

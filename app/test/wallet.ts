@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { walletSender, walletResult, type SigningWallet, type WalletSendOptions } from "../src/lib/wallet-send.ts";
+import { sendFailure, untilFinal, walletSender, walletResult, type SigningWallet, type WalletSendOptions } from "../src/lib/wallet-send.ts";
 
 const alice = "alice.testnet";
 const bob = "bob.testnet";
@@ -182,4 +182,30 @@ test("a request reports signing while the wallet asks, then confirming while NEA
   const unknown = walletSender(async () => wallet, () => alice, allowed, options({ onPhase: phase => refused.push(phase) }));
   await assert.rejects(unknown({ ...call, contractId: "elsewhere.testnet" }), /not part of the configured OneUp deployment/);
   assert.deepEqual(refused, []);
+});
+
+test("confirmation keeps asking while the RPC hasn't seen the transaction, and stops at any other error", async () => {
+  let asked = 0;
+  const notYet = () => { asked++; if (asked < 3) throw new Error("[-32000] Server error: Transaction 9xY doesn't exist"); return "final"; };
+  assert.equal(await untilFinal(async () => notYet(), 30, 0, async () => {}), "final");
+  assert.equal(asked, 3);
+
+  let panics = 0;
+  await assert.rejects(untilFinal(async () => { panics++; throw new Error("Smart contract panicked: Not enough margin"); }, 30, 0, async () => {}), /panicked/);
+  assert.equal(panics, 1);
+
+  let tries = 0;
+  await assert.rejects(untilFinal(async () => { tries++; throw new Error("Timeout"); }, 4, 0, async () => {}), /Timeout/);
+  assert.equal(tries, 4);
+});
+
+test("a failed request says at which step it failed, with the hash once the wallet sent it", async () => {
+  const refused = walletSender(async () => fakeWallet(async () => { throw new Error("User rejected"); }), () => alice, allowed, options());
+  const e1 = await refused(call).catch(e => e);
+  assert.deepEqual(sendFailure(e1), { step: "signing", method: call.methodName, hash: undefined });
+
+  const lost = walletSender(async () => fakeWallet(async () => success("optimistic")), () => alice, allowed, options({ confirm: async () => { throw new Error("RPC down"); } }));
+  const e2 = await lost(call).catch(e => e);
+  assert.deepEqual(sendFailure(e2), { step: "confirming", method: call.methodName, hash: "transaction-1" });
+  assert.match(e2.message, /RPC down/);
 });

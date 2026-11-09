@@ -7,6 +7,7 @@ import { Account, type KeyPairString } from "near-api-js";
 import type { AppDeployment } from "./app-config";
 import { useNearWallet } from "./near-wallet";
 import { accessOf, type Access } from "./access";
+import { reportFailure } from "./report";
 import { WalletWelcome } from "@/components/WalletWelcome";
 import { sfx } from "./sound";
 import { pollSerial } from "./poll";
@@ -188,9 +189,11 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
     } catch (e) {
       sfx("error");
       done("error", `${label}: ${cleanError(e)}`);
+      // testnet: to OneUp's server, so a failure someone sees can be looked into (lib/report.ts)
+      if (d.network === "testnet") reportFailure(label, e, me);
       return false;
     }
-  }, [viewOnly, connect]);
+  }, [viewOnly, connect, d.network, me]);
 
   // Prices: poll the oracle every second and keep the last 1,800 updates (30 minutes) per market. A point is added only
   // when the oracle publishes a new price, at the moment it arrives, so the chart moves with real updates
