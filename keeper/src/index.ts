@@ -33,7 +33,7 @@ import { HermesSource, LiveSource, SimSource, priceDue, sane, type PriceSource, 
 import { validSteer } from "./control.ts";
 import { processOrders } from "./orders.ts";
 import { reconcileBuybacks, restoreBuybacks } from "./buybacks.ts";
-import { FailoverProvider, PacedProvider, rpcList } from "@oneup/sdk";
+import { FailoverProvider, PacedProvider, roundPhase, rpcList } from "@oneup/sdk";
 import { TOP_UP_BY, closeCanContinue, marketsToPrice, spareNear, topUpsDue } from "./upkeep.ts";
 import { crossesThreshold } from "./thresholds.ts";
 
@@ -180,8 +180,9 @@ let closeRetries = 0;
 async function handleEpoch() {
   if (nowS() < epochEndsAt) return;
   const [epoch, closing] = await Promise.all([oneup.epoch(), oneup.closing()]);
-  if (!closing && nowS() < epoch.started_at + d.epochLengthS) {
-    epochEndsAt = epoch.started_at + d.epochLengthS;
+  const round = roundPhase(epoch, d.epochLengthS, nowS());
+  if (!closing && round.phase === "open") {
+    epochEndsAt = round.endsAt;
     return;
   }
   epochEndsAt = 0;

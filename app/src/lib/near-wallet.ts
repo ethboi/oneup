@@ -6,11 +6,23 @@ import { FailoverProvider, rpcList } from "@oneup/sdk";
 import { JsonRpcProvider } from "near-api-js";
 import type { AppDeployment } from "./app-config";
 import { assertTestnetWallet, walletOptions, signedInAccount } from "./wallet-config";
-import { walletSender } from "./wallet-send";
+import { walletSender, type SendPhase } from "./wallet-send";
+
+/**
+ * What the wallet is doing:
+ *
+ *   unavailable (local demo: it signs with dev keys, not a wallet)
+ *   disconnected ─connect─> connecting ─> connected ─send─> signing ─> confirming ─> connected
+ *   connected ─disconnect─> disconnecting ─> disconnected
+ *
+ * Any request can fail back to where it started, with `error` set. One request at a time (the signing lock).
+ */
+export type WalletStatus = "unavailable" | "disconnected" | "connecting" | "connected" | SendPhase | "disconnecting";
+type Request = "connecting" | "disconnecting" | SendPhase;
 
 export function useNearWallet(d: AppDeployment) {
   const [accountId, setAccountId] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [request, setRequest] = useState<Request | null>(null);
   const [error, setError] = useState<string | null>(null);
   const selected = useRef("");
   const chosenWallet = useRef<NearWalletBase | null>(null);
@@ -85,7 +97,7 @@ export function useNearWallet(d: AppDeployment) {
   const connect = useCallback(async () => {
     if (signingLock.current.busy) { setError("Finish the pending wallet request first."); return; }
     signingLock.current.busy = true;
-    setBusy(true); setError(null);
+    setRequest("connecting"); setError(null);
     try {
       const c = await connector();
       // Account-only connection: no signed message, access key or transaction is requested by OneUp.
@@ -94,18 +106,18 @@ export function useNearWallet(d: AppDeployment) {
       const message = e instanceof Error ? e.message : String(e);
       setError(message === "User rejected" ? "Wallet connection cancelled." : message);
     }
-    finally { signingLock.current.busy = false; setBusy(false); }
+    finally { signingLock.current.busy = false; setRequest(null); }
   }, [connector]);
   const disconnect = useCallback(async () => {
     if (signingLock.current.busy) { setError("Finish the pending wallet request first."); return; }
     signingLock.current.busy = true;
-    setBusy(true); setError(null);
+    setRequest("disconnecting"); setError(null);
     try {
       const c = await connector();
       if (chosenWallet.current) await c.disconnect(chosenWallet.current);
       clearAccount();
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
-    finally { signingLock.current.busy = false; setBusy(false); }
+    finally { signingLock.current.busy = false; setRequest(null); }
   }, [connector, clearAccount]);
   const boundSend = useMemo(() => walletSender(
     async () => {
@@ -116,12 +128,19 @@ export function useNearWallet(d: AppDeployment) {
     },
     () => selected.current,
     new Set(Object.values(d.contracts).filter((x): x is string => !!x)),
-    { accountId, lock: signingLock.current, confirm: (hash, signer) => provider.viewTransactionStatusWithReceipts({ txHash: hash, accountId: signer, waitUntil: "FINAL" }) },
+    {
+      accountId, lock: signingLock.current, onPhase: setRequest,
+      confirm: (hash, signer) => provider.viewTransactionStatusWithReceipts({ txHash: hash, accountId: signer, waitUntil: "FINAL" }),
+    },
   ), [d.contracts, accountId, provider]);
   const send = useCallback<typeof boundSend>(async call => {
     if (signingLock.current.busy) return boundSend(call);
-    setBusy(true);
-    try { return await boundSend(call); } finally { setBusy(false); }
+    // checking the account comes first, then the wallet's approval: "signing" covers both
+    setRequest("signing");
+    try { return await boundSend(call); } finally { setRequest(null); }
   }, [boundSend]);
-  return { accountId, busy, error, connect, disconnect, send };
+  const status: WalletStatus = !enabled ? "unavailable" : request ?? (accountId ? "connected" : "disconnected");
+  /** A wallet request is under way: connect, disconnect and other requests wait for it. */
+  const busy = request !== null;
+  return { accountId, status, busy, error, connect, disconnect, send };
 }

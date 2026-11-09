@@ -4,6 +4,7 @@
 import { Account, JsonRpcProvider, base64Encode, teraToGas } from "near-api-js";
 import type { Deployment } from "./config.ts";
 import type { Side } from "./maths.ts";
+import type { CloseStep } from "./round.ts";
 
 /** U128 / I128 values arrive as decimal strings. */
 export type U128 = string;
@@ -386,7 +387,8 @@ export class OneUp {
         send<void>({ contractId: c.dao!, methodName: "act_proposal", args: { id, action, proposal }, gas: MAX_GAS }),
       hitTarget: (position_id: number) => house<boolean>("hit_target", { position_id }),
       hitStop: (position_id: number) => house<boolean>("hit_stop", { position_id }),
-      closeEpoch: (limit = 10) => house<string>("close_epoch", { limit }, MAX_GAS),
+      /** One step of closing the finished round; repeat until "closed" (see CloseStep). */
+      closeEpoch: (limit = 10) => house<CloseStep>("close_epoch", { limit }, MAX_GAS),
       buyback: (epoch: number, min_out: bigint) => house<void>("buyback", { epoch, min_out: min_out.toString() }, MAX_GAS),
       retryBuybackDelivery: (epoch: number) => house<void>("retry_buyback_delivery", { epoch }, MAX_GAS),
       /** At most 30 lives per call. */

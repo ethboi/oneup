@@ -10,7 +10,11 @@ export interface WalletSendOptions {
   lock: { busy: boolean };
   /** Query the configured RPC with waitUntil: "FINAL"; do not broadcast again. */
   confirm?: (transactionHash: string, signerId: string) => Promise<unknown>;
+  /** Where the request is, for the UI: "signing" while the wallet asks you to approve it, "confirming" while NEAR
+   *  finalises it. The request ends (resolves or throws) after either. */
+  onPhase?: (phase: SendPhase) => void;
 }
+export type SendPhase = "signing" | "confirming";
 interface Outcome {
   status?: unknown;
   final_execution_status?: unknown;
@@ -76,6 +80,7 @@ export function walletSender(
       const accounts = await wallet.getAccounts({ network: "testnet" });
       assertAccount();
       if (!accounts.some(a => a.accountId === accountId)) throw new Error("Your wallet account changed. Review the action and try again.");
+      options.onPhase?.("signing");
       const outcome = await wallet.signAndSendTransaction({
         network: "testnet",
         signerId: accountId,
@@ -94,6 +99,7 @@ export function walletSender(
       const hash = checkTransaction(outcome, accountId, call.contractId);
       if (!options.confirm) return walletResult<T>(outcome);
       if (!hash) throw new Error("The wallet returned no transaction hash to confirm. Check your wallet before trying again.");
+      options.onPhase?.("confirming");
       const confirmed = await options.confirm(hash, accountId);
       assertAccount();
       checkTransaction(confirmed, accountId, call.contractId, hash);

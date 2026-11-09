@@ -24,7 +24,7 @@ import {
 } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { PriceChart, type Mark } from "./PriceChart";
-import { fmtClock, useNow } from "./Header";
+import { roundEnds, useNow, useRound } from "./Header";
 import { PixelCoin, PixelHeart } from "./Pixel";
 import { Icon } from "./Icon";
 import { Popover } from "./Popover";
@@ -1741,10 +1741,9 @@ export function fmtPrice(p: bigint) {
 
 /** Shows the moment a loss turns into a pending Life NFT (liquidation or a losing close). */
 function LossBanner() {
-  const { o, d, me } = useOneUp();
+  const { o, me } = useOneUp();
   const pending = usePoll(() => o.pendingLife(me), [me]);
-  const epoch = usePoll(() => o.epoch(), []);
-  const now = useNow();
+  const { round } = useRound();
   const prev = useRef<{ me: string; v: bigint } | null>(null);
   const [loss, setLoss] = useState<{ amount: bigint; total: bigint } | null>(null);
 
@@ -1758,7 +1757,6 @@ function LossBanner() {
   }, [pending, me]);
 
   if (!loss) return null;
-  const left = epoch ? Math.max(0, epoch.started_at + d.epochLengthS - now) : 0;
   return (
     <div className="panel flex items-center gap-4 p-4" role="status" style={{ borderColor: "var(--heart)" }}>
       {/* keyed by the running total so the pop replays on every new loss */}
@@ -1768,7 +1766,7 @@ function LossBanner() {
       <div className="flex-1">
         <div className="text-lg font-extrabold leading-tight">Waiting for the round to end</div>
         <div className="label num mt-1">
-          Your net loss this round increased by ${fmtUsdc(loss.amount)} to ${fmtUsdc(loss.total)}. The round ends in {fmtClock(left)}.
+          Your net loss this round increased by ${fmtUsdc(loss.amount)} to ${fmtUsdc(loss.total)}. The round {roundEnds(round)}.
           If the house makes a profit, eligible losses may earn a Life NFT and a $1UP lock. The amounts are confirmed when the round settles. Recovery is not guaranteed.
         </div>
       </div>

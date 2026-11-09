@@ -27,7 +27,9 @@ import {
   maxLiability,
   normalizePrice,
   pnl,
+  roundPhase,
   type Deployment,
+  type Epoch,
   type JournalEntry,
   type LifeInfo,
   type LockInfo,
@@ -223,11 +225,21 @@ server.registerTool(
       free_at_house_usd: dollars(free),
       positions: positions.map((p) => describe(p, px.get(p.market_id))),
       pending_orders: orders.map((x) => ({ order_id: x.id, market: x.market_id, kind: "Open" in x.kind ? "open" : "close" })),
-      round: { id: epoch.id, ends: new Date((epoch.started_at + d.epochLengthS) * 1000).toISOString() },
+      round: describeRound(epoch),
       net_loss_this_round_usd: dollars(pending),
     };
   }),
 );
+
+/** The round as an agent needs it: once its time is up it is "ending", and trades still count towards it until the
+ *  keeper starts the next round (usually within seconds). */
+function describeRound(epoch: Epoch) {
+  const r = roundPhase(epoch, d.epochLengthS, Math.floor(Date.now() / 1000));
+  const ends = new Date(r.endsAt * 1000).toISOString();
+  return r.phase === "open"
+    ? { id: r.id, phase: r.phase, ends, seconds_left: r.secondsLeft }
+    : { id: r.id, phase: r.phase, ends, note: "Time is up. Trades still count towards this round until the keeper starts the next one, usually within seconds." };
+}
 
 const tradeArgs = {
   market: z.string().describe('Market id, e.g. "BTC-USD"'),
@@ -332,6 +344,7 @@ server.registerTool(
       worst_case_payout_usd: dollars(s.liability),
       round: e.id,
       round_ends: new Date((e.started_at + d.epochLengthS) * 1000).toISOString(),
+      round_phase: describeRound(e).phase,
       house_this_round_usd: dollars(BigInt(e.losses) - BigInt(e.payouts)),
     };
   }),

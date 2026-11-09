@@ -6,6 +6,7 @@
 import { Account, type KeyPairString } from "near-api-js";
 import type { AppDeployment } from "./app-config";
 import { useNearWallet } from "./near-wallet";
+import { accessOf, type Access } from "./access";
 import { WalletWelcome } from "@/components/WalletWelcome";
 import { sfx } from "./sound";
 import { pollSerial } from "./poll";
@@ -44,7 +45,10 @@ interface Ctx {
   version: number;
   /** Testnet without a connected wallet: everything shows, and any action asks for a wallet first. */
   viewOnly: boolean;
+  /** Who's using the app (see Access). */
+  access: Access;
 }
+
 
 /** What an account-specific read answers for no account (view-only), without asking the chain. */
 const NOBODY: Record<string, unknown> = {
@@ -74,19 +78,21 @@ export function useOneUp() {
   return c;
 }
 
+/** Loading the deployment: loading ─> ready, or failed with the reason. */
+type Load = { status: "loading" } | { status: "failed"; error: string } | { status: "ready"; d: AppDeployment };
+
 export function OneUpProvider({ children }: { children: ReactNode }) {
-  const [d, setD] = useState<AppDeployment | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [load, setLoad] = useState<Load>({ status: "loading" });
 
   useEffect(() => {
     fetch("/api/config")
-      .then(async (r) => (r.ok ? setD(viaProxy(await r.json())) : setError((await r.json()).error)))
-      .catch((e) => setError(String(e)));
+      .then(async (r) => setLoad(r.ok ? { status: "ready", d: viaProxy(await r.json()) } : { status: "failed", error: (await r.json()).error }))
+      .catch((e) => setLoad({ status: "failed", error: String(e) }));
   }, []);
 
-  if (error) return <Splash text={error} />;
-  if (!d) return <Splash text="Connecting to OneUp…" />;
-  return <Loaded d={d}>{children}</Loaded>;
+  if (load.status === "failed") return <Splash text={load.error} />;
+  if (load.status === "loading") return <Splash text="Connecting to OneUp…" />;
+  return <Loaded d={load.d}>{children}</Loaded>;
 }
 
 /** Off this machine (a phone on the LAN), the chain's 127.0.0.1 RPC is unreachable: go through /api/rpc. */
@@ -116,7 +122,8 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
   );
   const [localMe, setMeState] = useState(d.demo?.id ?? "");
   const me = d.network === "localnet" ? localMe : wallet.accountId;
-  const viewOnly = d.network === "testnet" && !me;
+  const access = accessOf(d.network, me, watching);
+  const viewOnly = access === "welcome" || access === "watching";
   useEffect(() => {
     try {
       const saved = localStorage.getItem("oneup.account");
@@ -192,7 +199,8 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
   const [history, setHistory] = useState<Record<string, { t: number; p: number }[]>>({});
   const [publishedAt, setPublishedAt] = useState<Record<string, number>>({});
   useEffect(() => {
-    if (d.network === "testnet" && !me && !watching) return;
+    // the connect screen shows no prices
+    if (access === "welcome") return;
     let live = true;
     const published = new Map<string, number>();
     const tick = async () => {
@@ -246,10 +254,10 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
       live = false;
       stop();
     };
-  }, [o, d.network, me, watching]);
+  }, [o, d.network, access]);
 
-  const value: Ctx = { d, o, accounts, me, setMe, tx, main, mainKey, session, wallet, run, toasts, prices, history, publishedAt, version, viewOnly };
-  return <OneUpContext.Provider value={value}>{viewOnly && !watching ? <WalletWelcome connect={wallet.connect} busy={wallet.busy} error={wallet.error} watch={watch} /> : children}</OneUpContext.Provider>;
+  const value: Ctx = { d, o, accounts, me, setMe, tx, main, mainKey, session, wallet, run, toasts, prices, history, publishedAt, version, viewOnly, access };
+  return <OneUpContext.Provider value={value}>{access === "welcome" ? <WalletWelcome connect={wallet.connect} busy={wallet.busy} error={wallet.error} watch={watch} /> : children}</OneUpContext.Provider>;
 }
 
 /** Polls `f` every `ms` and whenever `deps` or the transaction version change. */

@@ -221,7 +221,7 @@ Licences for these are in [third-party notices](THIRD_PARTY_NOTICES.md).
 - `app/`: the Next.js app. `bots/`: synthetic demo traders. `mcp/`: the MCP server and `pnpm agent`.
 - `sim/`: economic models. `scripts/`: chain, deploy, judge demo and verification.
 - Docs: [security](docs/SECURITY.md), [maths](docs/maths.md), [interfaces](docs/interfaces.md),
-  [decisions](docs/decisions.md), [the recovery journey](docs/RECOVERY_JOURNEY.md),
+  [decisions](docs/decisions.md), [states](docs/STATES.md), [the recovery journey](docs/RECOVERY_JOURNEY.md),
   [hackathon readiness](docs/HACKATHON_READINESS.md), [submission draft](docs/SUBMISSION.md).
 
 ## Licence

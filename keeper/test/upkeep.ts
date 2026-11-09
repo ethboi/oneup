@@ -32,8 +32,8 @@ test("a paused market keeps its prices while anything is open on it", () => {
 });
 
 test("a round close that's waiting or retrying gives way to the rest of the tick", () => {
-  for (const step of ["waiting for mints", "waiting for recall", "waiting for expiry", "waiting for backing", "waiting for pot", "retrying recovery"]) assert.equal(closeCanContinue(step), false, step);
-  for (const step of ["begun", "minting", "expiring", "recalling", "drawing jackpot"]) assert.equal(closeCanContinue(step), true, step);
+  for (const step of ["waiting for mints", "waiting for recall", "waiting for expiry", "waiting for backing", "waiting for pot", "retrying recovery"] as const) assert.equal(closeCanContinue(step), false, step);
+  for (const step of ["begun", "minting", "expiring", "recalling", "drawing jackpot"] as const) assert.equal(closeCanContinue(step), true, step);
 });
 
 test("a round still closing isn't scanned past, so its buyback isn't missed", async () => {

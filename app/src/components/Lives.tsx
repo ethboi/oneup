@@ -5,7 +5,7 @@ import { fmtUsdc, previewLossEmission, type LifeInfo, type Listing } from "@oneu
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { lifeEconomics, lifeEarningLabel } from "@/lib/life-economics";
 import { groupLives, lifeClaimBatch, lifeFromHash, lifeHref } from "@/lib/recovery-journey";
-import { fmtClock, fmtOneup, fmtUsd as money, useNow } from "./Header";
+import { fmtOneup, fmtUsd as money, roundEnds, useRound } from "./Header";
 import { Icon } from "./Icon";
 import { PixelHeart } from "./Pixel";
 import { useListings } from "./Sell";
@@ -14,7 +14,7 @@ import { LifeDetail } from "./LifeDetail";
 import { Empty, Explainer, PanelHead, Stat, SummaryBar } from "./ui";
 
 export function Lives() {
-  const { o, d, me, tx, run } = useOneUp();
+  const { o, me, tx, run } = useOneUp();
   const lives = usePoll(() => o.lives(me), [me]);
   const expiry = usePoll(() => o.params(), [], 60_000)?.life_expiry_epochs;
   const epoch = usePoll(() => o.epoch(), []);
@@ -78,7 +78,7 @@ export function Lives() {
           <Stat label="Lifetime USDC allocated" value={lives ? money(allocated) : "…"} sub="Across these Life NFTs, including previous owners" />
           <Stat label="Allocated last round · all Life NFTs" value={last ? money(BigInt(last.lives_pot)) : "–"} />
         </SummaryBar>
-        <NextLife epochId={epoch?.id} left={epoch ? epoch.started_at + d.epochLengthS : 0} />
+        <NextLife />
         {lives === undefined ? <Empty icon="heart">Loading your Life NFTs…</Empty> : <>
           {ready.length > 0 && <div className="divide-y divide-[var(--line)]"><PanelHead title={`Ready to claim (${ready.length})`} /><p className="px-4 pb-2 text-sm text-[var(--muted)]">Includes Life NFTs whose earning period has ended. Open a Life to claim its USDC or manage its listing.</p>{rows(ready)}</div>}
           <div className="divide-y divide-[var(--line)]">
@@ -93,17 +93,16 @@ export function Lives() {
 }
 
 /** This round's loss is only a candidate entitlement until final settlement. */
-function NextLife({ epochId, left }: { epochId?: number; left: number }) {
+function NextLife() {
   const { o, me } = useOneUp();
   const pending = usePoll(() => o.pendingLife(me), [me]);
   const carry = usePoll(() => o.emissionCarry(), []);
-  const epoch = usePoll(() => o.epoch(), []);
+  const { epoch, round } = useRound();
   const params = usePoll(() => o.params(), []);
-  const now = useNow();
   const lost = pending ? BigInt(pending) : 0n;
   let oneup = 0n;
   if (epoch && carry !== undefined && lost > 0n) oneup = previewLossEmission(epoch, BigInt(carry), lost, BigInt(params?.oneup_per_usdc ?? 20));
-  return <div className="flex items-center gap-3 bg-[var(--panel-2)] px-4 py-3"><PixelHeart size={28} fill={lost > 0n ? 0.5 : 0} /><div className="min-w-0 flex-1 text-sm"><b>Possible Life NFT · round {epochId ?? "…"}</b><div className="label num">{pending === undefined ? "Checking unsettled losses for this account…" : lost > 0n ? `$${fmtUsdc(lost)} net loss so far${oneup > 0n ? `, with an estimated ${fmtOneup(oneup.toString())} $1UP reward if the round settled now` : ""}. Round ends in ${fmtClock(Math.max(0, left - now))}; eligibility and payout amounts depend on the round’s final house profit.` : `No net loss this round. It closes in ${fmtClock(Math.max(0, left - now))}.`}</div></div></div>;
+  return <div className="flex items-center gap-3 bg-[var(--panel-2)] px-4 py-3"><PixelHeart size={28} fill={lost > 0n ? 0.5 : 0} /><div className="min-w-0 flex-1 text-sm"><b>Possible Life NFT · round {epoch?.id ?? "…"}</b><div className="label num">{pending === undefined ? "Checking unsettled losses for this account…" : lost > 0n ? `$${fmtUsdc(lost)} net loss so far${oneup > 0n ? `, with an estimated ${fmtOneup(oneup.toString())} $1UP reward if the round settled now` : ""}. The round ${roundEnds(round)}; eligibility and payout amounts depend on the round’s final house profit.` : `No net loss this round. It ${roundEnds(round)}.`}</div></div></div>;
 }
 
 /** One Life as its card; it opens the Life, where it can be claimed or listed. */

@@ -1,4 +1,4 @@
-import type { Market, Order, Position } from "@oneup/sdk";
+import type { CloseStep, Market, Order, Position } from "@oneup/sdk";
 
 /** Each byte a NEAR account stores locks up this much of its balance. */
 const YOCTO_PER_BYTE = 10n ** 19n;
@@ -35,4 +35,4 @@ export function marketsToPrice<M extends Pick<Market, "id" | "live">>(markets: M
 
 /** Whether close_epoch has more to do straight away; otherwise it's waiting on something and the next tick asks again.
  *  A retry that keeps failing mustn't take the whole tick: fills and liquidations come after it. */
-export const closeCanContinue = (step: string) => !/^(waiting|retrying)/.test(step);
+export const closeCanContinue = (step: CloseStep) => !/^(waiting|retrying)/.test(step);

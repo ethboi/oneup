@@ -162,3 +162,24 @@ test("wallet cancellation and failed or unfinished receipts cannot report succes
   assert.throws(() => walletResult({ status: { Failure: { ActionError: "Not your token" } } }), /Not your token/);
   assert.throws(() => walletResult({ ...success(null), receipts_outcome: [{ outcome: { status: { Failure: "Receiver failed" } } }] }), /Receiver failed/);
 });
+
+test("a request reports signing while the wallet asks, then confirming while NEAR finalises, and nothing once refused", async () => {
+  const phases: string[] = [];
+  const signed = deferred<unknown>();
+  const wallet = fakeWallet(async () => { phases.push("wallet asked"); return signed.promise; });
+  const send = walletSender(async () => wallet, () => alice, allowed, options({
+    onPhase: phase => phases.push(phase),
+    confirm: async () => { phases.push("rpc asked"); return success("final result"); },
+  }));
+  const pending = send(call);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(phases, ["signing", "wallet asked"]);
+  signed.resolve(success("optimistic"));
+  assert.equal(await pending, "final result");
+  assert.deepEqual(phases, ["signing", "wallet asked", "confirming", "rpc asked"]);
+
+  const refused: string[] = [];
+  const unknown = walletSender(async () => wallet, () => alice, allowed, options({ onPhase: phase => refused.push(phase) }));
+  await assert.rejects(unknown({ ...call, contractId: "elsewhere.testnet" }), /not part of the configured OneUp deployment/);
+  assert.deepEqual(refused, []);
+});

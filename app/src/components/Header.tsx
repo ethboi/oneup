@@ -5,7 +5,7 @@ import { SKINS } from "@/lib/achievements";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { previewTilt } from "@/lib/tilt";
 import { showBoot } from "./Boot";
-import { USDC, fmtUsdc, ONEUP } from "@oneup/sdk";
+import { USDC, fmtUsdc, ONEUP, roundPhase, type RoundPhase } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { Logo, PixelCoin, PixelHeart } from "./Pixel";
 import { Icon } from "./Icon";
@@ -32,12 +32,10 @@ export interface NavTab {
  *  your account. */
 export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string; go: (t: string) => void }) {
   const { o, d, me } = useOneUp();
-  const epoch = usePoll(() => o.epoch(), []);
+  const { epoch, round } = useRound();
   const lives = usePoll(() => o.lives(me), [me]);
-  const now = useNow();
-  const left = epoch ? Math.max(0, epoch.started_at + d.epochLengthS - now) : 0;
   const alive = lives?.filter((l) => !l.expired && !l.full_heal).length ?? 0;
-  const round = useMyRound(me, epoch?.started_at);
+  const result = useMyRound(me, epoch?.started_at);
   // tabs that don't fit beside the strip fold into More from the end, one at a time until the bar fits
   const nav = useRef<HTMLElement>(null);
   const bar = tabs.filter((t) => !t.more);
@@ -90,28 +88,28 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
       {/* the round's clock and your result in it, one strip like the chart's market bar */}
       <div className="flex min-w-0 flex-1 justify-end lg:flex-none">
         <div className="hdr-strip bar-strip num text-sm">
-          <span className="bar-cell" title={`Round ${epoch?.id ?? ""} ends in ${fmtClock(left)}. Eligible losses may earn Life NFTs and $1UP locks if the house makes a profit.`}>
+          <span className="bar-cell" title={`Round ${epoch?.id ?? ""} ${roundEnds(round)}. Eligible losses may earn Life NFTs and $1UP locks if the house makes a profit.`}>
             {/* the label goes on narrow desktops too, where the tabs need the room */}
             <span className="label hidden sm:inline lg:hidden 2xl:inline">Round {epoch?.id ?? "…"}</span>
             <span className="flex flex-col items-center">
               <span className="hdr-clock-label">Round</span>
-              <b>{fmtClock(left)}</b>
+              <b>{roundClock(round)}</b>
             </span>
           </span>
-          {round && (
+          {result && (
             <span
               className="bar-cell"
               title={
-                round.net < 0n
+                result.net < 0n
                   ? "Your net loss this round. If the house makes a profit, eligible losses may earn a Life NFT and a $1UP lock. Recovery is not guaranteed."
                   : "Your net profit this round, after the fee on profits."
               }
             >
               <span className="label hidden sm:inline">You</span>
-              <b style={{ color: round.net < 0n ? "var(--short)" : "var(--long)" }}>
-                {round.net < 0n ? "−" : "+"}${fmtUsdc(round.net < 0n ? -round.net : round.net, (round.net < 0n ? -round.net : round.net) < 100n * USDC ? 2 : 0)}
+              <b style={{ color: result.net < 0n ? "var(--short)" : "var(--long)" }}>
+                {result.net < 0n ? "−" : "+"}${fmtUsdc(result.net < 0n ? -result.net : result.net, (result.net < 0n ? -result.net : result.net) < 100n * USDC ? 2 : 0)}
               </b>
-              {round.net < 0n && (
+              {result.net < 0n && (
                 <span aria-label="A Life NFT may be issued if the house makes a profit this round">
                   <PixelHeart size={14} />
                 </span>
@@ -502,6 +500,20 @@ export const fmtUsd = (x: bigint, signed = false) => {
   return `${x < 0n ? "−" : signed && x > 0n ? "+" : ""}$${fmtUsdc(a, a < 1_000n * USDC ? 2 : 0)}`;
 };
 export const fmtClock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+
+/** The current round and where it is: loading, open (counting down) or ending (time up, the keeper starts the next
+ *  round within seconds). One definition for every clock: packages/sdk/src/round.ts. */
+export function useRound() {
+  const { o, d } = useOneUp();
+  const epoch = usePoll(() => o.epoch(), []);
+  const now = useNow();
+  return { epoch, round: roundPhase(epoch, d.epochLengthS, now) };
+}
+/** The round's clock: "12:34", "Ending" once time is up, "…" until it has loaded. */
+export const roundClock = (r: RoundPhase) => (r.phase === "open" ? fmtClock(r.secondsLeft) : r.phase === "ending" ? "Ending" : "…");
+/** Finishes "The round …": "ends in 12:34", "is ending: trades still count towards it until the next round starts". */
+export const roundEnds = (r: RoundPhase) =>
+  r.phase === "open" ? `ends in ${fmtClock(r.secondsLeft)}` : r.phase === "ending" ? "is ending: trades still count towards it until the next round starts" : "ends in …";
 export const fmtOneup = (x?: string, digits = 0) =>
   x === undefined ? "…" : (Number(BigInt(x) / (ONEUP / 1000n)) / 1000).toLocaleString("en-US", { maximumFractionDigits: digits });
 
