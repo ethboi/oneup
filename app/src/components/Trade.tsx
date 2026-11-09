@@ -23,6 +23,7 @@ import {
   type Side,
 } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
+import { EpochResults } from "./EpochResults";
 import { PriceChart, type Mark } from "./PriceChart";
 import { roundEnds, useNow, useRound } from "./Header";
 import { PixelCoin, PixelHeart } from "./Pixel";
@@ -395,7 +396,9 @@ export function Trade() {
     // Desktop: chart over positions and activity on the left, the form on the right.
     <div className="flex flex-col gap-4 pb-24 lg:grid lg:grid-cols-[1fr_340px] lg:items-start lg:pb-0 2xl:grid-cols-[1fr_380px]">
       <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
-        <div className="order-1 empty:hidden">
+        {/* notices about the round: the result of the one that just ended, and a loss in this one */}
+        <div className="order-1 flex flex-col gap-4 empty:hidden">
+          <EpochResults />
           <LossBanner />
         </div>
         {/* very wide screens: the market's trades run beside the chart, where an exchange keeps its book */}

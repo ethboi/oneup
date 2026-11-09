@@ -20,7 +20,6 @@ import { SoundEvents } from "@/components/Sounds";
 import { AchievementWatcher, BadgesDialog } from "@/components/Achievements";
 import { FullHeal } from "@/components/FullHeal";
 import { JackpotWin } from "@/components/JackpotWin";
-import { EpochResults } from "@/components/EpochResults";
 import { Icon, type IconName } from "@/components/Icon";
 import { Logo } from "@/components/Pixel";
 
@@ -170,7 +169,6 @@ export default function Home() {
       <BadgesDialog />
       <FullHeal automatic={tab === "Trade"} />
       <JackpotWin automatic={tab === "Trade"} />
-      <EpochResults automatic={tab === "Trade"} />
       <Boot />
     </OneUpProvider>
   );

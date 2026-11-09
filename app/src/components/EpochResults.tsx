@@ -1,8 +1,9 @@
 "use client";
 
-// "Round over": when an epoch closes, a results screen: the house's result, the Life NFTs it minted, how
-// you did, and the epoch's leaderboard (top traders, the best trade, the biggest loss). Shown once per epoch
-// while the app is open, but not to automated browsers; it can be turned off from the screen itself.
+// "Round over": when an epoch closes, a card in the trading screen's notice slot (components/Trade.tsx), not a popup:
+// the house's result and the Life NFTs it minted, how you did, and, behind Details, the round's numbers and
+// leaderboard. Trading stays usable around it. Shown once per epoch while Trade is open, not to automated browsers,
+// and not at all with "Show results after each round" off (the account menu).
 
 import { useEffect, useRef, useState } from "react";
 import { fmtUsdc, type EpochSummary } from "@oneup/sdk";
@@ -15,24 +16,18 @@ import { PixelHeart } from "./Pixel";
 import { Icon } from "./Icon";
 
 const OFF = "oneup.rounds.off";
-const short = (a: string) => a.replace(/\.test\.near$/, "");
+/** "bot1.v5.oneupmarkets.testnet" → "bot1"; a 64-character implicit account → its ends. */
+const short = (a: string) => (/^[0-9a-f]{64}$/.test(a) ? `${a.slice(0, 6)}…${a.slice(-4)}` : a.split(".")[0]);
 const signed = (x: bigint) => `${x >= 0n ? "+" : "−"}$${fmtUsdc(x < 0n ? -x : x)}`;
 
-export function EpochResults({ automatic }: { automatic: boolean }) {
+export function EpochResults() {
   const { o, me, d } = useOneUp();
   const epoch = usePoll(() => o.epoch(), []);
   const last = useRef<number | null>(null);
-  const [round, setRound] = useState<{ s: EpochSummary; board: Board | null; preview: boolean } | null>(null);
+  const [round, setRound] = useState<{ s: EpochSummary; board: Board | null } | null>(null);
+  const [details, setDetails] = useState(false);
   const history = useHistory(me);
-  // Leaving Trade invalidates an in-flight automatic summary, even if the user returns before it loads.
-  const automaticSession = useRef(0);
-  useEffect(() => {
-    if (!automatic) {
-      automaticSession.current += 1;
-      setRound(current => current?.preview ? current : null);
-    }
-  }, [automatic]);
-  // Polls must not cancel summary loading; unmount and leaving Trade invalidate automatic work.
+  // leaving Trade unmounts this: a summary still loading then never shows
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -41,61 +36,55 @@ export function EpochResults({ automatic }: { automatic: boolean }) {
     };
   }, []);
 
+  const show = (s: EpochSummary, board: Board | null) => {
+    sfx("round");
+    setDetails(false);
+    setRound({ s, board });
+  };
+  const leaderboard = (s: EpochSummary) =>
+    fetch(`/api/leaderboard?from=${s.started_at * 1000}&to=${s.ended_at * 1000}`)
+      .then((r) => (r.ok ? (r.json() as Promise<Board>) : null))
+      .catch(() => null);
+
   useEffect(() => {
     if (!epoch) return;
     const prev = last.current;
     last.current = epoch.id;
-    if (prev === null || epoch.id <= prev || !automatic || automated()) return;
+    if (prev === null || epoch.id <= prev || automated()) return;
     try {
       if (localStorage.getItem(OFF) === "1") return;
     } catch {}
-    const session = automaticSession.current;
-    const cancelled = () => !mounted.current || session !== automaticSession.current;
     (async () => {
       // the summary lands with the close; give the indexer a few seconds to catch the last trades
       let s: EpochSummary | null = null;
-      for (let i = 0; i < 10 && !s && !cancelled(); i++) {
+      for (let i = 0; i < 10 && !s && mounted.current; i++) {
         s = await o.epochSummary(epoch.id - 1).catch(() => null);
         if (!s) await new Promise((r) => setTimeout(r, 1500));
       }
-      if (!s || cancelled()) return;
+      if (!s || !mounted.current) return;
       // testnet: the indexer reads a round's trades a little behind the chain
       await new Promise((r) => setTimeout(r, d.network === "localnet" ? 6000 : 75_000));
-      if (cancelled()) return;
-      const board = await fetch(`/api/leaderboard?from=${s.started_at * 1000}&to=${s.ended_at * 1000}`)
-        .then((r) => (r.ok ? (r.json() as Promise<Board>) : null))
-        .catch(() => null);
-      if (cancelled()) return;
-      sfx("round");
-      setRound({ s, board, preview: false });
+      if (!mounted.current) return;
+      const board = await leaderboard(s);
+      if (mounted.current) show(s, board);
     })();
-  }, [epoch, o, automatic, d.network]);
-
-  // the Demo menu's preview: the last finished round's screen, now
-  useEffect(() => {
-    if (d.network !== "localnet") return;
-    const show = async () => {
-      if (!epoch || epoch.id < 2) return;
-      const s = await o.epochSummary(epoch.id - 1).catch(() => null);
-      if (!s) return;
-      const board = await fetch(`/api/leaderboard?from=${s.started_at * 1000}&to=${s.ended_at * 1000}`)
-        .then((r) => (r.ok ? (r.json() as Promise<Board>) : null))
-        .catch(() => null);
-      sfx("round");
-      setRound({ s, board, preview: true });
-    };
-    window.addEventListener("oneup-preview-round", show);
-    return () => window.removeEventListener("oneup-preview-round", show);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [epoch, o, d.network]);
 
+  // the Demo menu's preview: the last finished round's card, now
   useEffect(() => {
-    if (!round) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setRound(null);
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [round]);
+    if (d.network !== "localnet") return;
+    const preview = async () => {
+      if (!epoch || epoch.id < 2) return;
+      const s = await o.epochSummary(epoch.id - 1).catch(() => null);
+      if (s && mounted.current) show(s, await leaderboard(s));
+    };
+    window.addEventListener("oneup-preview-round", preview);
+    return () => window.removeEventListener("oneup-preview-round", preview);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [epoch, o, d.network]);
 
-  if (!round || (!automatic && !round.preview)) return null;
+  if (!round) return null;
   const { s, board } = round;
   const net = BigInt(s.house_net);
   const mine = (history?.items ?? []).filter((i) => i.kind === "trade" && i.t >= s.started_at * 1000 && i.t <= s.ended_at * 1000);
@@ -103,99 +92,91 @@ export function EpochResults({ automatic }: { automatic: boolean }) {
   const lost = myPnl < 0n;
 
   return (
-    <div className="fixed inset-0 z-[62] flex items-center justify-center bg-black/55 p-4" onMouseDown={(e) => e.target === e.currentTarget && setRound(null)}>
-      <div role="dialog" aria-label={`Round ${s.epoch} results`} className="case round-in relative flex max-h-[92vh] w-full max-w-[560px] flex-col gap-4 overflow-y-auto p-5 sm:p-6">
-        <div className="bezel p-4">
-          <div className="lcd px-4 py-3 text-[var(--lcd-ink)]">
-            <div className="display text-sm">ROUND {s.epoch}</div>
-            <div className="display text-4xl leading-tight">ROUND OVER</div>
-            <div className="display num mt-1 text-base">
-              {net > 0n ? `HOUSE +$${fmtUsdc(net, 0)} · ${s.lives_minted} LIFE NFTS` : "NO HOUSE PROFIT · NO NEW LIVES"}
-            </div>
+    <section className="panel round-in flex flex-col gap-3 p-3 sm:p-4" aria-label={`Round ${s.epoch} results`} role="status">
+      <div className="flex items-start gap-3">
+        <div className="lcd min-w-0 flex-1 px-3 py-2 text-[var(--lcd-ink)] sm:flex-none sm:pr-6">
+          <div className="display text-lg leading-tight sm:text-xl">ROUND {s.epoch} OVER</div>
+          <div className="display num text-xs sm:text-sm">
+            {net > 0n ? `HOUSE +$${fmtUsdc(net, 0)} · ${s.lives_minted} LIFE NFT${s.lives_minted === 1 ? "" : "S"}` : "NO HOUSE PROFIT · NO NEW LIFE NFTS"}
           </div>
         </div>
-
-        <section className="flex items-center gap-3">
-          {lost ? <PixelHeart size={36} /> : <Icon name={mine.length ? "up" : "chart"} size={28} />}
-          <div className="min-w-0 flex-1">
-            <div className="label">Your round result</div>
-            <div className="num text-xl font-extrabold" style={{ color: mine.length ? (lost ? "var(--short)" : "var(--long)") : undefined }}>
-              {mine.length ? `${signed(myPnl)} on ${mine.length} trade${mine.length === 1 ? "" : "s"}` : "No completed trades"}
-            </div>
-            {lost && net > 0n && <div className="label">The house made a profit this round. Check Life NFTs to see whether your net loss qualified for a recovery NFT.</div>}
-            {lost && net === 0n && <div className="label">The house made no profit this round, so no new Life NFTs were issued.</div>}
-          </div>
-        </section>
-
-        <section className="grid grid-cols-3 gap-3 border-y border-[var(--line)] py-3 text-sm">
-          <div>
-            <div className="label">Traders lost</div>
-            <div className="num font-extrabold">${fmtUsdc(BigInt(s.losses), 0)}</div>
-          </div>
-          <div>
-            <div className="label">Life NFT payouts</div>
-            <div className="num font-extrabold">${fmtUsdc(BigInt(s.lives_pot), 0)}</div>
-          </div>
-          <div>
-            <div className="label">Buyback</div>
-            <div className="num font-extrabold">${fmtUsdc(BigInt(s.buyback_pot), 0)}</div>
-          </div>
-        </section>
-
-        {board && board.top.length > 0 && (
-          <section>
-            <h3 className="font-extrabold">Leaderboard</h3>
-            <ol className="mt-2 flex flex-col">
-              {board.top.map((r, i) => (
-                <li key={r.account} className="num flex items-center gap-3 border-b border-[var(--line)] py-1.5 text-sm last:border-0" style={r.account === me ? { fontWeight: 800 } : undefined}>
-                  <span className="display w-6 text-[var(--muted)]">{i + 1}</span>
-                  <span className="flex-1">{short(r.account)}{r.account === me ? " (you)" : ""}</span>
-                  <span className="label">
-                    {r.trades} trade{r.trades === 1 ? "" : "s"}
-                  </span>
-                  <span className="w-24 text-right" style={{ color: BigInt(r.pnl) >= 0n ? "var(--long)" : "var(--short)" }}>
-                    {signed(BigInt(r.pnl))}
-                  </span>
-                </li>
-              ))}
-            </ol>
-            <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-              {board.best && (
-                <div className="rounded-lg bg-[var(--panel-2)] p-2.5">
-                  <div className="label">Best trade</div>
-                  <b>{short(board.best.account)}</b>{" "}
-                  <span className="num">
-                    {board.best.side} {board.best.market_id} {board.best.leverage}×, {Math.round((Number(BigInt(board.best.pnl) - BigInt(board.best.cut ?? 0)) / Number(board.best.margin)) * 100)}%
-                  </span>
-                </div>
-              )}
-              {board.biggestLoss && (
-                <div className="rounded-lg bg-[var(--panel-2)] p-2.5">
-                  <div className="label">Biggest single-trade loss</div>
-                  <b>{short(board.biggestLoss.account)}</b> <span className="num">{signed(BigInt(board.biggestLoss.pnl))}</span>
-                </div>
-              )}
-            </div>
-          </section>
-        )}
-
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <button
-            className="label underline decoration-dotted underline-offset-2"
-            onClick={() => {
-              try {
-                localStorage.setItem(OFF, "1");
-              } catch {}
-              setRound(null);
-            }}
-          >
-            Don&apos;t show round results
-          </button>
-          <button className="btn btn-accent" onClick={() => setRound(null)}>
-            Continue
-          </button>
-        </div>
+        <button className="btn btn-ghost ml-auto shrink-0 px-2.5" onClick={() => setRound(null)} aria-label="Dismiss round results">
+          <Icon name="x" />
+        </button>
       </div>
-    </div>
+
+      <div className="flex items-center gap-3">
+        {lost ? <PixelHeart size={28} /> : <Icon name={mine.length ? "up" : "chart"} size={22} />}
+        <div className="min-w-0 flex-1">
+          <div className="num font-extrabold" style={{ color: mine.length ? (lost ? "var(--short)" : "var(--long)") : undefined }}>
+            {mine.length ? `You: ${signed(myPnl)} on ${mine.length} trade${mine.length === 1 ? "" : "s"}` : "You didn't close a trade this round"}
+          </div>
+          {lost && net > 0n && <div className="label">The house made a profit, so your net loss may have earned a Life NFT. Check Life NFTs.</div>}
+          {lost && net === 0n && <div className="label">The house made no profit this round, so no Life NFTs were issued.</div>}
+        </div>
+        <button className="chip shrink-0" onClick={() => setDetails(!details)} aria-expanded={details}>
+          {details ? "Hide" : "Details"}
+        </button>
+      </div>
+
+      {details && (
+        <>
+          <dl className="num grid grid-cols-3 gap-2 border-t border-[var(--line)] pt-3 text-sm">
+            <div>
+              <dt className="label">Traders lost</dt>
+              <dd className="font-extrabold">${fmtUsdc(BigInt(s.losses), 0)}</dd>
+            </div>
+            <div>
+              <dt className="label">To Life NFTs</dt>
+              <dd className="font-extrabold">${fmtUsdc(BigInt(s.lives_pot), 0)}</dd>
+            </div>
+            <div>
+              <dt className="label">Buyback</dt>
+              <dd className="font-extrabold">${fmtUsdc(BigInt(s.buyback_pot), 0)}</dd>
+            </div>
+          </dl>
+          {board && board.top.length > 0 && (
+            <div className="border-t border-[var(--line)] pt-3">
+              <h3 className="text-sm font-extrabold">Top traders this round</h3>
+              <ol className="mt-1 flex flex-col">
+                {board.top.slice(0, 5).map((r, i) => (
+                  <li key={r.account} className="num flex items-center gap-2 py-1 text-sm" style={r.account === me ? { fontWeight: 800 } : undefined}>
+                    <span className="display w-4 shrink-0 text-[var(--muted)]">{i + 1}</span>
+                    <span className="min-w-0 flex-1 truncate" title={r.account}>
+                      {short(r.account)}
+                      {r.account === me ? " (you)" : ""}
+                    </span>
+                    <span className="label shrink-0">
+                      {r.trades} trade{r.trades === 1 ? "" : "s"}
+                    </span>
+                    <span className="w-20 shrink-0 text-right" style={{ color: BigInt(r.pnl) >= 0n ? "var(--long)" : "var(--short)" }}>
+                      {signed(BigInt(r.pnl))}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+              <div className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
+                {board.best && (
+                  <div className="rounded-lg bg-[var(--panel-2)] p-2.5">
+                    <div className="label">Best trade</div>
+                    <b>{short(board.best.account)}</b>{" "}
+                    <span className="num">
+                      {board.best.side} {board.best.market_id.split("-")[0]} {board.best.leverage}×,{" "}
+                      {Math.round((Number(BigInt(board.best.pnl) - BigInt(board.best.cut ?? 0)) / Number(board.best.margin)) * 100)}%
+                    </span>
+                  </div>
+                )}
+                {board.biggestLoss && (
+                  <div className="rounded-lg bg-[var(--panel-2)] p-2.5">
+                    <div className="label">Biggest single-trade loss</div>
+                    <b>{short(board.biggestLoss.account)}</b> <span className="num">{signed(BigInt(board.biggestLoss.pnl))}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </section>
   );
 }

@@ -460,7 +460,7 @@ function FastTrading() {
   );
 }
 
-/** Whether the "round over" screen shows after each epoch (remembered in this browser). */
+/** Whether the "round over" card shows after each round (remembered in this browser). */
 function RoundsToggle() {
   const [on, setOn] = useState(true);
   useEffect(() => {
