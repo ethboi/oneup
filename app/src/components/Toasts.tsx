@@ -6,7 +6,8 @@ import type { WalletStatus } from "@/lib/near-wallet";
 
 /** What a transaction in progress is waiting on, once a wallet is involved (lib/near-wallet.ts). */
 const WAITING_ON: Partial<Record<WalletStatus, string>> = {
-  signing: "Approve it in your wallet",
+  // some wallets also send the transaction before they return, so this can last past your approval
+  signing: "Waiting for your wallet",
   confirming: "Waiting for NEAR to confirm",
 };
 

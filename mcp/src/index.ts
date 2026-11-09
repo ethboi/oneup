@@ -28,11 +28,13 @@ import {
   normalizePrice,
   pnl,
   roundPhase,
+  orderStage,
   type Deployment,
   type Epoch,
   type JournalEntry,
   type LifeInfo,
   type LockInfo,
+  type Order,
   type Position,
   type Side,
   aiAgents,
@@ -210,7 +212,7 @@ server.registerTool(
     inputSchema: {},
   },
   safe(async () => {
-    const [wallet, free, positions, orders, pending, epoch, px] = await Promise.all([
+    const [wallet, free, positions, orders, pending, epoch, px, params] = await Promise.all([
       o.usdcBalance(me),
       o.balance(me),
       o.positions(me),
@@ -218,27 +220,41 @@ server.registerTool(
       o.pendingLife(me),
       o.epoch(),
       prices(),
+      o.params(),
     ]);
     return {
       account: me,
       wallet_usd: dollars(wallet),
       free_at_house_usd: dollars(free),
       positions: positions.map((p) => describe(p, px.get(p.market_id))),
-      pending_orders: orders.map((x) => ({ order_id: x.id, market: x.market_id, kind: "Open" in x.kind ? "open" : "close" })),
+      pending_orders: orders.map((x) => describeOrder(x, params)),
       round: describeRound(epoch),
       net_loss_this_round_usd: dollars(pending),
     };
   }),
 );
 
-/** The round as an agent needs it: once its time is up it is "ending", and trades still count towards it until the
- *  keeper starts the next round (usually within seconds). */
+const nowS = () => Math.floor(Date.now() / 1000);
+const iso = (s: number) => new Date(s * 1000).toISOString();
+
+/** The round as an agent needs it, by this server's clock: once its time is up it is "ending", and trades still count
+ *  towards it until the keeper starts the next round (usually within seconds). */
 function describeRound(epoch: Epoch) {
-  const r = roundPhase(epoch, d.epochLengthS, Math.floor(Date.now() / 1000));
-  const ends = new Date(r.endsAt * 1000).toISOString();
+  const r = roundPhase(epoch, d.epochLengthS, nowS());
+  const ends = iso(r.endsAt);
   return r.phase === "open"
     ? { id: r.id, phase: r.phase, ends, seconds_left: r.secondsLeft }
     : { id: r.id, phase: r.phase, ends, note: "Time is up. Trades still count towards this round until the keeper starts the next one, usually within seconds." };
+}
+
+/** A pending order and its stage (packages/sdk/src/orders.ts): waiting for a price, resting at a limit, or expiring. */
+function describeOrder(x: Order, params: { fill_window_s: number; limit_expiry_s: number }) {
+  const s = orderStage(x, nowS(), params);
+  const base = { order_id: x.id, market: x.market_id, kind: "Open" in x.kind ? "open" : "close", stage: s.stage };
+  if (s.stage === "expiring")
+    return { ...base, expired: iso(s.expiredAt), note: "Not filled in time. It is expired next: an open's margin returns to free_at_house_usd; a close leaves the position open." };
+  const limit = "Open" in x.kind && x.kind.Open.limit ? { limit_price: num(BigInt(x.kind.Open.limit)) } : {};
+  return { ...base, ...limit, expires: iso(s.expiresAt) };
 }
 
 const tradeArgs = {

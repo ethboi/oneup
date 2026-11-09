@@ -1,7 +1,7 @@
 "use client";
 
 import { createPortal } from "react-dom";
-import { parseTokenAmount } from "@oneup/sdk";
+import { orderStage, parseTokenAmount } from "@oneup/sdk";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ONEUP_PER_USDC,
@@ -1395,16 +1395,20 @@ function Positions({ positions, orders, focused, pick }: { positions: Position[]
 
 /** An open waiting for its fill: a market order for the next price, or a resting limit you can take down. */
 function PendingOpen({ x }: { x: Order }) {
-  const { tx, run, prices } = useOneUp();
+  const { o, tx, run, prices } = useOneUp();
   const now = useNow();
+  const params = usePoll(() => o.params(), [], 60_000);
   if (!("Open" in x.kind)) return null;
   const { side, leverage, margin, limit } = x.kind.Open;
   const what = `${side} ${x.market_id} ${leverage}× · $${fmtUsdc(BigInt(margin), 0)}`;
+  // waiting, resting or expiring (packages/sdk/src/orders.ts), by the house's own windows once read
+  const expiring = orderStage(x, now, params ?? { fill_window_s: FILL_WINDOW_S, limit_expiry_s: 24 * 3600 }).stage === "expiring";
+  const refund = "it expires and your margin returns to your free balance";
   if (!limit)
     return (
       <p className="mt-2 flex items-center gap-2 text-sm text-[var(--muted)]">
         <Icon name="spinner" />
-        {what}: waiting for the next eligible price update
+        {what}: {expiring ? `no eligible price in time, so ${refund}` : "waiting for the next eligible price update"}
       </p>
     );
   const mark = prices[x.market_id];
@@ -1414,7 +1418,7 @@ function PendingOpen({ x }: { x: Order }) {
       <span className="font-bold">Limit {what}</span>
       <span className="label">
         at {fmtPrice(BigInt(limit))}
-        {mark ? ` · ${away(mark, BigInt(limit))} away` : ""} · waiting to fill
+        {mark ? ` · ${away(mark, BigInt(limit))} away` : ""} · {expiring ? `not filled in time: ${refund}` : "waiting to fill"}
       </span>
       <button
         type="button"

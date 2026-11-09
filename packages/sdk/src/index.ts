@@ -4,3 +4,4 @@ export * from "./client.ts";
 export * from "./agents.ts";
 export * from "./rpc.ts";
 export * from "./round.ts";
+export * from "./orders.ts";

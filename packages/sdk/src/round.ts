@@ -18,7 +18,8 @@ export type RoundPhase =
 
 type RoundRead = Pick<Epoch, "id" | "started_at">;
 
-/** Where round `epoch` is at `nowS` (seconds). A round that has been read is never "loading". */
+/** Where round `epoch` is at `nowS` (seconds): the caller's clock, not block time, so an estimate to within a few
+ *  seconds. A round that has been read is never "loading". */
 export function roundPhase(epoch: RoundRead, epochLengthS: number, nowS: number): Exclude<RoundPhase, { phase: "loading" }>;
 export function roundPhase(epoch: RoundRead | null | undefined, epochLengthS: number, nowS: number): RoundPhase;
 export function roundPhase(epoch: RoundRead | null | undefined, epochLengthS: number, nowS: number): RoundPhase {

@@ -75,7 +75,13 @@ export function Backing() {
               </button>
             </>
           ) : (
-            <p className="text-sm font-bold">The initial funding round is closed. You can check the Market for Backer Life NFTs offered for sale.</p>
+            // closed for good once less than the minimum is left; otherwise only paused (a round settling, or a backing
+            // still being processed: get_backing in contracts/house/src/views.rs)
+            backed + min > target ? (
+              <p className="text-sm font-bold">The initial funding round is closed. You can check the Market for Backer Life NFTs offered for sale.</p>
+            ) : (
+              <p className="text-sm font-bold">Backing is paused for a moment while the house settles a round or another backing. It reopens by itself.</p>
+            )
           )}
           {mine.length > 0 && (
             <p className="label num">
