@@ -34,7 +34,7 @@ import { validSteer } from "./control.ts";
 import { processOrders } from "./orders.ts";
 import { reconcileBuybacks, restoreBuybacks } from "./buybacks.ts";
 import { FailoverProvider, PacedProvider, roundPhase, rpcList } from "@oneup/sdk";
-import { TOP_UP_BY, closeCanContinue, marketsToPrice, spareNear, topUpsDue } from "./upkeep.ts";
+import { GAS_TOP_UP, TOP_UP_BY, closeCanContinue, marketsToPrice, spareNear, topUpsDue } from "./upkeep.ts";
 import { crossesThreshold } from "./thresholds.ts";
 
 const { values: args } = parseArgs({
@@ -389,7 +389,9 @@ async function tick() {
 }
 
 // the host only: a private RPC URL carries its key
-/** Testnet: keeps the contracts able to store what they mint, from the operator's balance, every ten minutes. */
+/** Testnet: keeps the contracts able to store what they mint and the bots able to pay for gas, from the operator's
+ *  balance, every ten minutes. The contracts come first: a bot out of gas stops trading, a contract out of storage
+ *  stops the round. */
 let lastUpkeep = 0;
 async function handleStorage() {
   if (d.network !== "testnet" || Date.now() - lastUpkeep < 600_000) return;
@@ -397,13 +399,19 @@ async function handleStorage() {
   const contracts = Object.values(d.contracts).filter((id): id is string => typeof id === "string");
   const spare = async (accountId: string) => spareNear(await oneup.provider.viewAccount({ accountId }));
   const accounts = await Promise.all(contracts.map(async (id) => ({ id, spare: await spare(id) })));
-  const { due, short } = topUpsDue(accounts, await spare(d.owner.id));
+  const operatorSpare = await spare(d.owner.id);
+  const { due, short } = topUpsDue(accounts, operatorSpare);
+  const bots = await Promise.all(d.bots.map(async (b) => ({ id: b.id, spare: await spare(b.id) })));
+  const gas = topUpsDue(bots, operatorSpare - BigInt(due.length) * TOP_UP_BY, GAS_TOP_UP);
   const operator = new Account(d.owner.id, oneup.provider, d.owner.key as KeyPairString);
-  for (const id of due) {
-    await operator.signAndSendTransaction({ receiverId: id, actions: [actions.transfer(TOP_UP_BY)] });
-    log(`storage: topped up ${id}`);
+  for (const [ids, amount] of [[due, TOP_UP_BY], [gas.due, GAS_TOP_UP.by]] as const) {
+    for (const id of ids) {
+      await operator.signAndSendTransaction({ receiverId: id, actions: [actions.transfer(amount)] });
+      log(`storage: topped up ${id}`);
+    }
   }
-  if (short.length) log(`storage: LOW and the operator can't cover it: ${short.join(", ")}`);
+  const low = [...short, ...gas.short];
+  if (low.length) log(`storage: LOW and the operator can't cover it: ${low.join(", ")}`);
 }
 
 log(`keeper ${d.keeper.id} on ${new URL(d.rpcUrl).host}, ${args.prices} prices, ${d.markets.length} markets`);

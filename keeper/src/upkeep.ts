@@ -7,21 +7,28 @@ const NEAR = 10n ** 24n;
  *  6 Nov. Low enough that a contract that barely stores anything, such as the oracle, is left alone. */
 export const TOP_UP_BELOW = NEAR;
 export const TOP_UP_BY = 5n * NEAR;
+/** A trading bot only pays for gas, so it needs less: below this it soon can't send a trade, as three of the eight
+ *  couldn't on 10 Nov. */
+export const GAS_TOP_UP = { below: NEAR / 2n, by: 2n * NEAR };
 /** What the operator keeps back for itself. */
 export const OPERATOR_KEEPS = 5n * NEAR;
 
 export const spareNear = (a: { amount: bigint; storage_usage: number }) => a.amount - BigInt(a.storage_usage) * YOCTO_PER_BYTE;
 
 /** Which accounts to send NEAR to, lowest first, as far as the operator can afford. */
-export function topUpsDue(accounts: { id: string; spare: bigint }[], operatorSpare: bigint): { due: string[]; short: string[] } {
-  const low = accounts.filter((a) => a.spare < TOP_UP_BELOW).sort((a, b) => (a.spare < b.spare ? -1 : a.spare > b.spare ? 1 : 0));
+export function topUpsDue(
+  accounts: { id: string; spare: bigint }[],
+  operatorSpare: bigint,
+  { below, by }: { below: bigint; by: bigint } = { below: TOP_UP_BELOW, by: TOP_UP_BY },
+): { due: string[]; short: string[] } {
+  const low = accounts.filter((a) => a.spare < below).sort((a, b) => (a.spare < b.spare ? -1 : a.spare > b.spare ? 1 : 0));
   const due: string[] = [];
   const short: string[] = [];
   let left = operatorSpare;
   for (const a of low) {
-    if (left - TOP_UP_BY >= OPERATOR_KEEPS) {
+    if (left - by >= OPERATOR_KEEPS) {
       due.push(a.id);
-      left -= TOP_UP_BY;
+      left -= by;
     } else short.push(a.id);
   }
   return { due, short };

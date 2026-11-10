@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { closeCanContinue, marketsToPrice, spareNear, topUpsDue } from "../src/upkeep.ts";
+import { GAS_TOP_UP, closeCanContinue, marketsToPrice, spareNear, topUpsDue } from "../src/upkeep.ts";
 import { reconcileBuybacks, type BuybackPort } from "../src/buybacks.ts";
 
 const NEAR = 10n ** 24n;
@@ -18,6 +18,17 @@ test("contracts running low get topped up, lowest first, while the operator can 
   assert.deepEqual(topUpsDue(accounts, 100n * NEAR), { due: ["lowest", "low"], short: [] });
   assert.deepEqual(topUpsDue(accounts, 11n * NEAR), { due: ["lowest"], short: ["low"] });
   assert.deepEqual(topUpsDue(accounts, NEAR), { due: [], short: ["lowest", "low"] });
+});
+
+test("bots get a smaller gas top-up from what the contracts leave the operator", () => {
+  const bots = [
+    { id: "trading", spare: NEAR },
+    { id: "dry", spare: NEAR / 10n },
+    { id: "nearly", spare: (NEAR * 4n) / 10n },
+  ];
+  assert.deepEqual(topUpsDue(bots, 100n * NEAR, GAS_TOP_UP), { due: ["dry", "nearly"], short: [] });
+  // 8 NEAR spare: one 2 NEAR top-up leaves 6, a second would leave the operator under its 5
+  assert.deepEqual(topUpsDue(bots, 8n * NEAR, GAS_TOP_UP), { due: ["dry"], short: ["nearly"] });
 });
 
 test("a paused market keeps its prices while anything is open on it", () => {
