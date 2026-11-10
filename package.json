@@ -29,7 +29,6 @@
     "verify": "tsx scripts/verify.ts",
     "check:secrets": "tsx scripts/check-secrets.ts",
     "check:live": "node scripts/check-live.mjs",
-    "errors": "tsx scripts/errors.ts",
     "preflight": "tsx scripts/preflight.ts",
     "test:judge:ci": "tsx scripts/judge-ci.ts",
     "test:economics": "tsx scripts/economic-report.ts",

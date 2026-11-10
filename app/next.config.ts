@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs/config";
 import { networkInterfaces } from "node:os";
 import { readFileSync, writeFileSync } from "node:fs";
 
@@ -23,7 +24,7 @@ if (process.env.ONEUP_NEXT_DIST) {
 // where the app links back to the website: its own host when it has one (ONEUP_SITE_HOSTS), otherwise /site
 const siteHost = process.env.ONEUP_SITE_HOSTS?.split(",")[0]?.trim();
 const config: NextConfig = {
-  env: { ONEUP_SITE_URL: siteHost ? `https://${siteHost}` : "/site" },
+  env: { ONEUP_SITE_URL: siteHost ? `https://${siteHost}` : "/site", ONEUP_ENV: process.env.VERCEL_ENV ?? "development" },
   typescript: { tsconfigPath: isolatedTsconfig },
   distDir: process.env.ONEUP_NEXT_DIST ?? ".next",
   transpilePackages: ["@oneup/sdk"],
@@ -33,4 +34,15 @@ const config: NextConfig = {
   devIndicators: false,
 };
 
-export default config;
+// Error tracking (src/lib/sentry.ts). Readable stack traces need the build to upload its source maps, which it does
+// only where SENTRY_AUTH_TOKEN is set (Vercel); everywhere else the build is unchanged.
+export default withSentryConfig(config, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+  silent: true,
+  telemetry: false,
+  // errors reach Sentry through OneUp's own address, so an ad blocker doesn't drop them
+  tunnelRoute: "/monitoring",
+});

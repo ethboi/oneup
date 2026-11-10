@@ -179,7 +179,7 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
     } catch (e) {
       sfx("error");
       done("error", `${label}: ${cleanError(e)}`);
-      // testnet: to OneUp's server, so a failure someone sees can be looked into (lib/report.ts)
+      // testnet: to Sentry, so a failure someone sees can be looked into (lib/report.ts)
       if (d.network === "testnet") reportFailure(label, e, me);
       return false;
     }

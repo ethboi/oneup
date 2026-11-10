@@ -15,7 +15,8 @@ export function proxy(request: NextRequest) {
   if (!siteHosts.includes(host)) return NextResponse.next();
   const { pathname, search } = request.nextUrl;
   if (pathname === "/") return NextResponse.rewrite(new URL("/site", request.url));
-  if (pathname === "/site" || pathname.startsWith("/site/")) return NextResponse.next();
+  // /monitoring carries the website's errors to Sentry (next.config.ts): a redirect to the app's host would lose them
+  if (pathname === "/site" || pathname.startsWith("/site/") || pathname === "/monitoring") return NextResponse.next();
   if (!appUrl) return NextResponse.next();
   return NextResponse.redirect(new URL(`${pathname}${search}`, appUrl), 308);
 }
