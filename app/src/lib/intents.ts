@@ -7,7 +7,7 @@
 //   5. the solver signs the other side and executes both (/api/intents/fill).
 
 import { createIntentSignerNEP413, VersionedNonceBuilder } from "@defuse-protocol/intents-sdk";
-import type { AppDeployment } from "./app-config";
+import type { AppDeployment } from "./app-config.ts";
 import { KeyPair, teraToGas, type Account, type KeyPairString } from "near-api-js";
 import type { BridgedAsset, OneUp, Side } from "@oneup/sdk";
 
@@ -51,19 +51,22 @@ export async function payFromChain(opts: {
   usdc: bigint;
   then: Then;
   onStep?: (s: string) => void;
+  /** Where the bridge and solver routes are. The browser leaves it out; a script gives the app's address. */
+  api?: string;
 }) {
   const { o, d, main, asset, usdc, then } = opts;
   if (d.network !== "localnet" || !main || !opts.keyString) throw new Error("Simulated bridge deposits are available only in the local demo");
   const step = opts.onStep ?? (() => {});
   const i = d.intents!;
   const key = KeyPair.fromString(opts.keyString as KeyPairString);
+  const api = opts.api ?? "";
 
   step("Quote from the solver");
-  const { amountIn } = await post<{ amountIn: string }>("/api/intents/quote", { token: asset.token, usdcOut: usdc.toString() });
+  const { amountIn } = await post<{ amountIn: string }>(`${api}/api/intents/quote`, { token: asset.token, usdcOut: usdc.toString() });
 
   step(`Bridge ${asset.symbol} from ${asset.chain} (simulated)`);
   const have = (await intentsBalances(o, d, main.accountId))[asset.token] ?? 0n;
-  if (have < BigInt(amountIn)) await post("/api/intents/bridge", { account: main.accountId, token: asset.token, amount: (BigInt(amountIn) - have).toString() });
+  if (have < BigInt(amountIn)) await post(`${api}/api/intents/bridge`, { account: main.accountId, token: asset.token, amount: (BigInt(amountIn) - have).toString() });
 
   step("Register this device with NEAR Intents");
   await ensureKey(o, d, main, key);
@@ -112,5 +115,5 @@ export async function payFromChain(opts: {
   } as never);
 
   step("Solver fills it on the Verifier");
-  return post<{ tx: string; logs: string[] }>("/api/intents/fill", { signed, token: asset.token, usdcOut: usdc.toString() });
+  return post<{ tx: string; logs: string[] }>(`${api}/api/intents/fill`, { signed, token: asset.token, usdcOut: usdc.toString() });
 }

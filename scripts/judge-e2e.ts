@@ -5,6 +5,7 @@ import { resolve, dirname } from "node:path";
 import { Account, type KeyPairString } from "near-api-js";
 import { OneUp, USDC, accountSender, type Deployment } from "@oneup/sdk";
 import { inspectDeployment, sourceIdentity, verifyBuildManifest, appInputHash, ROOT } from "./artifacts.ts";
+import { intentsBalances, payFromChain } from "../app/src/lib/intents.ts";
 const config = process.env.ONEUP_CONFIG;
 assert.ok(config && resolve(config).includes('/.judge/'), "Use only the isolated judge configuration printed by pnpm demo:judge");
 const d: Deployment = JSON.parse(readFileSync(config, "utf8"));
@@ -66,7 +67,39 @@ assert.ok(d.contracts.dao, "the local deployment has a DAO");
 assert.equal((await o.view<[string, string | null]>(d.contracts.house, "get_owner"))[0], d.contracts.dao);
 assert.equal(await o.view<string>(d.contracts.life, "get_owner"), d.contracts.dao);
 assert.equal(await o.view<string>(d.contracts.oracle, "get_owner"), d.contracts.dao);
-const report = {build:verifyBuildManifest(), scope:"SDK/chain/keeper E2E plus app config API; browser inspection is separate", source:sourceIdentity(), checkedAt:new Date().toISOString(), elapsedSeconds:(Date.now()-start)/1000, assertions:["orders filled", "isolated app API", "controlled liquidation", "settled NFT", "USDC recovery", "market ownership transfer", "former owner denied", "buyer claim", "reserve admission", "deployed hashes", "DAO ownership"], mocked:["USDC", "oracle", "swap", "vault", "bridge"], contracts:hashes};
+// D-21: paying from another chain with NEAR Intents, through the same code the app runs in the browser. The
+// bridge is simulated; the Verifier is the official build, the intent is signed with the official SDK and
+// the app's solver fills it.
+assert.ok(d.intents, "the local deployment has NEAR Intents");
+const payer = d.bots[6], payerAccount = new Account(payer.id, o.provider, payer.key as KeyPairString);
+const eth = d.intents.assets.find(x => x.symbol === "ETH")!;
+const held = async (account: string, token: string) => (await intentsBalances(o, d, account))[token] ?? 0n;
+// USDC the Verifier holds: it falls only when a withdrawal pays the house (the house's own USDC also moves to and from its vault)
+const inVerifier = async () => BigInt(await o.usdcBalance(d.intents!.verifier));
+const pay = (usdc: bigint, margin: bigint) => payFromChain({ o, d, main: payerAccount, keyString: payer.key, asset: eth, usdc, api: profile.appUrl,
+  then: { kind: "open", market_id: "NEAR-USD", side: "Long", margin, leverage: 5 } });
+// a trade can't be closed in its first minute, so each run leaves its small trade open and tells its own apart by id
+const priorTrades = new Set((await o.positions(payer.id)).map(x => x.id));
+assert.equal((await o.orders(payer.id)).length, 0, "the paying account has no order waiting");
+const free = BigInt(await o.balance(payer.id)), verifierUsdc = await inVerifier(), solverUsdc = await held(d.intents.solver.id, d.contracts.usdc), solverEth = await held(d.intents.solver.id, eth.token);
+const paid = await pay(200n * USDC, 200n * USDC);
+assert.ok(paid.tx, "the solver's transaction is on the chain");
+assert.equal(await held(payer.id, eth.token), 0n, "all the bridged ETH was paid");
+const ethPaid = await held(d.intents.solver.id, eth.token) - solverEth;
+assert.ok(ethPaid > 0n, "the solver received the ETH");
+assert.equal(solverUsdc - await held(d.intents.solver.id, d.contracts.usdc), 200n * USDC, "the solver paid exactly the USDC");
+assert.equal(verifierUsdc - await inVerifier(), 200n * USDC, "the USDC left the Verifier for the house");
+const paidFor = await until("trade opened by the intent", async () => (await o.positions(payer.id)).find(x => !priorTrades.has(x.id)));
+assert.equal(BigInt(paidFor.margin), 200n * USDC); assert.equal(paidFor.leverage, 5); assert.equal(paidFor.side, "Long");
+assert.equal(BigInt(await o.balance(payer.id)), free, "the trade took only what the intent brought");
+// An intent that asks for a bigger trade than it pays for: the house keeps the deposit for the account and places no order.
+const refused = await pay(50n * USDC, 100n * USDC);
+assert.ok(refused.logs.some(l => l.includes("Order not placed: margin above the deposit")), "the house says why it placed no order");
+assert.equal((await o.orders(payer.id)).length, 0, "no order for more than the deposit");
+assert.equal((await o.positions(payer.id)).length, priorTrades.size + 1);
+assert.equal(BigInt(await o.balance(payer.id)) - free, 50n * USDC, "the deposit is in the free balance");
+assert.equal(verifierUsdc - await inVerifier(), 250n * USDC);
+const report = {build:verifyBuildManifest(), scope:"SDK/chain/keeper E2E plus app config API; browser inspection is separate", source:sourceIdentity(), checkedAt:new Date().toISOString(), elapsedSeconds:(Date.now()-start)/1000, assertions:["orders filled", "isolated app API", "controlled liquidation", "settled NFT", "USDC recovery", "market ownership transfer", "former owner denied", "buyer claim", "reserve admission", "deployed hashes", "DAO ownership", "Intents payment opens a trade", "Intents trade above its deposit refused"], mocked:["USDC", "oracle", "swap", "vault", "bridge"], contracts:hashes};
 if (browserSeller) {
   const browserLife = await until("prepared browser Life with allocated USDC", async () => (await o.lives(browserSeller.id)).find(l => !priorBrowserLives.has(l.token_id) && !l.backer && BigInt(l.claimable) > 0n));
   // Public fields only. Never serialize d: it includes local throwaway private keys.
