@@ -67,5 +67,22 @@ The official rules (Q-017) say Claude Code and Codex screen every entry first: a
 feature verification, a structured report and a preliminary score; humans decide. The README is written for
 that reader: the problem, what's built, and numbered do-and-see steps. A local-only demo needs a public
 repository, a reproducible README and an X post with a video (Q-012); the README lists libraries and
-AI-written code (Q-005). Follow the [submission draft](SUBMISSION.md) and recheck the official instructions
-before publishing.
+AI-written code (Q-005). The [submission draft](SUBMISSION.md) has the text; the entry was submitted on
+7 November 2026.
+
+Loops House, which co-hosts the hackathon, says entries are also evaluated with its Agentic Judging: an AI judge
+that reads the repository, the pitch and the demo video together and scores claim by claim with citations
+([announcement](https://x.com/LoopsHouse/status/2118016064051437939)). Its
+[hackathon page](https://www.loops.house/near-hackathon), read on 10 November 2026, lists four criteria:
+Technical Implementation (30%), Innovation & Creativity (25%), Sponsor / Track Fit (25%) and Execution &
+Completeness (20%). Where the README answers each:
+
+| Criterion | README section |
+|---|---|
+| Technical Implementation | The path through the code; Check the claims |
+| Innovation & Creativity | What is new, and what is borrowed |
+| Sponsor / Track Fit | What NEAR does here; By track |
+| Execution & Completeness | Try it live; Try it locally; What is real and what is mocked |
+
+The track-fit criterion says an integration is credited only if it exists in the code and is used correctly, so
+each row of What NEAR does here names the file, the function and the test, and says where the integration runs.

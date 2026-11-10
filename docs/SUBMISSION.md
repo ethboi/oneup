@@ -1,8 +1,11 @@
-# NEAR HACKATHON submission: working draft, not submitted
+# NEAR HACKATHON submission: the draft kept in the repository
+
+The entry was submitted on 7 November 2026. This file is the working draft of its text and of the demo thread,
+not a record of what was sent; changes after submission go through the hackathon's request-changes form.
 
 All of OneUp was written in the hackathon window: the first commit is 20 October 2026, after the 19 October
 announcement (Q-001), so there is no pre-event baseline to separate. Making the repository public, posting
-the demo on X and submitting are the author's decisions; nothing here has been sent.
+the demo on X and submitting were the author's decisions.
 
 Tracks: `nfts` (lead), `defi`, `agents`, `open`. Recheck the [official site](https://nearhackathon.com/) and
 [submission instructions](https://nearhackathon.com/HACKATHON.md) before submitting. As read on 31 October
@@ -107,15 +110,17 @@ Code: https://github.com/ethboi/oneup
 Would you buy a stranger's Life NFT?
 ```
 
-## Before submitting
+## Before submitting (done on 7 November 2026)
 
-- [ ] Lead name, email and team size.
-- [ ] The mainnet NEAR account for a prize, chosen by the author.
+- [x] Lead name, email and team size (kept out of this repository).
+- [x] The mainnet NEAR account for a prize, chosen by the author.
 - [x] Licence: AGPL-3.0-only for original code; third-party notices kept.
-- [ ] The final revision passes `pnpm verify` and `pnpm test:judge`; CI has run on the public repository.
-- [ ] Repository public; demo video recorded and posted on X; its link is the `demoUrl`.
-- [ ] The description above rechecked against what's built and the 2,000-character limit.
-- [ ] The author approves the exact payload before it's sent.
+- [x] Repository public; demo video recorded and posted on X; its link is the `demoUrl`.
+- [x] The description rechecked against what's built and the 2,000-character limit.
+- [x] The author approved the exact payload before it was sent.
+
+Still to hold until the code freeze on 14 November 2026: the last revision passes `pnpm verify`, and CI
+(`.github/workflows/verify.yml`) passes on the public repository.
 
 No bot, test balance or prepared sale should be described as a user, fundraising or demand. A session key's
 method limits don't limit what allowed trading can lose.

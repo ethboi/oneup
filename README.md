@@ -14,6 +14,14 @@ local demo, both with test USDC; nothing is on mainnet. All of it was written in
 hackathon window: the first commit is 20 October 2026, the day after the announcement
 (`git log --reverse --format=%ad | head -1`).
 
+To review it:
+
+- **In a minute, with nothing installed:** `node scripts/check-live.mjs` reads the live contracts and prints
+  `PASS` or `FAIL` for each claim. See [Check the claims](#check-the-claims).
+- **Where each NEAR integration is in the code, and where it runs:** [What NEAR does here](#what-near-does-here).
+- **How the parts fit:** [The path through the code](#the-path-through-the-code).
+- **What is a mock or runs only locally:** [What is real and what is mocked](#what-is-real-and-what-is-mocked).
+
 ## The problem
 
 On a perpetuals venue that trades against its users, a trader's loss is the venue's profit, and a liquidated
@@ -26,23 +34,69 @@ the surplus above the pool's reserve, so a profitable round can still pay nothin
 locked for 104 rounds; lockers share the house's buybacks. A Life can be claimed, kept or sold: the buyer gets
 its unclaimed USDC and its future payouts. Recovery depends on future house profit and can be zero.
 
+## What is new, and what is borrowed
+
+- **A loss becomes an asset with a price.** The claim on the house's profit is an NFT, so a trader who would
+  rather have cash now can sell it, and a buyer can price it against the USDC it can still pay. See
+  [the Life NFT](contracts/extra-life/src/lib.rs) and [the market](contracts/market/src/lib.rs).
+- **The claim can't be emptied under a buyer.** Claiming a Life's USDC drops its approvals, and a purchase
+  names the `approval_id` and price the buyer saw, so a Life claimed or repriced after the buyer looked fails
+  with `Listing changed` and the payment is refunded (`claim` in the Life NFT, `ft_on_transfer` in the market).
+- **Recovery is paid from surplus only.** Lives are sized from the round's house profit, never above the
+  wallet's loss, and paid only from what the pool holds above its reserve
+  ([maths](docs/maths.md), `face_value` and `reserve` in [contracts/math](contracts/math/src/lib.rs)).
+- **An agent can trade the claims, not only the perps.** The MCP server's `market_listings`, `buy_listing` and
+  `claim_lives` let an agent buy a Life listed below what it can still pay, then collect it.
+
+Borrowed: loss-linked claims from Papertrade and revenue-sharing locks from Aerodrome. Trading against a
+pooled house with capped profit is an existing design; OneUp doesn't claim it.
+
 ## What NEAR does here
 
-- **NFTs that hold money.** Each Life NFT is a NEP-171 NFT (with NEP-177 metadata and NEP-178 approvals)
-  whose owner can claim the USDC (NEP-141) allocated to it; transferring it moves the claim. Its SVG art is
-  generated on chain from its state. Events follow NEP-297.
-- **NEAR Intents.** Deposits go through the official Intents Verifier (v0.4.2, unchanged): one signed intent
-  swaps a bridged token for USDC, deposits it and opens a trade, and the house checks that an intent can trade
-  only the deposit it brings. Locally, PoA tokens stand in for bridged assets and OneUp runs its own solver.
-- **Sputnik DAO.** A DAO running unchanged mainnet Sputnik v2 code owns the house, the Life NFTs and the
-  oracle: markets, parameters and the keeper change by council vote.
-- **Function-call keys and NEP-366.** One-tap trading uses a session key that can only call the house's
-  trading methods, and a relayer pays the gas.
-- **AI agents.** An MCP server gives an agent the trader's tools, including buying Lives on the market; every
-  action is journalled, with the agent's stated reason when it gives one, and shown on the app's Agents tab.
+| NEAR feature | What OneUp does with it | Code | Checked by | Runs on |
+|---|---|---|---|---|
+| NEP-171 NFT, NEP-177 metadata, NEP-178 approvals | A Life NFT carries a USDC claim; transferring it moves the claim. Its picture is an SVG built from its state on every read | [contracts/extra-life/src/lib.rs](contracts/extra-life/src/lib.rs): `mint_batch`, `claim`, `heart_svg`. Locks: [contracts/ve/src/lib.rs](contracts/ve/src/lib.rs), `lock_svg` | [extra-life tests](contracts/extra-life/src/tests.rs), [ve tests](contracts/ve/src/tests.rs), sandbox [market.rs](contracts/tests/tests/market.rs) | Testnet, local |
+| NEP-141 `ft_transfer_call` | Every USDC movement into a contract is a transfer call with a JSON message: a deposit, a deposit that opens a trade, a round's pot to the Lives, a purchase | `ft_on_transfer` in [house/trading.rs](contracts/house/src/trading.rs), [extra-life](contracts/extra-life/src/lib.rs) and [market](contracts/market/src/lib.rs) | Sandbox tests on built WASM in [contracts/tests/tests](contracts/tests/tests) | Testnet, local |
+| NEP-178 `nft_approve` with a message | Listing for sale is one approval; the market records the `approval_id` it was given and sells only on that one | `nft_on_approve` and `ft_on_transfer` in [contracts/market/src/lib.rs](contracts/market/src/lib.rs) | Sandbox `a_life_claimed_and_listed_again_is_not_sold_to_the_earlier_buyer` | Testnet, local |
+| NEP-297 events | The house logs every trade, round and payout as `standard: "oneup"` events; the indexers build history from them and ignore an event whose contract doesn't own its standard | [house/events.rs](contracts/house/src/events.rs), [app/src/lib/server/activity.ts](app/src/lib/server/activity.ts) | [app/test/activity.ts](app/test/activity.ts) | Testnet, local |
+| NEAR Intents (Verifier v0.4.2, unchanged binary) | One signed intent swaps a bridged token for USDC, deposits it and opens a trade. The house accepts a named account only from the Verifier, and lets such a deposit trade only the USDC it brought | House: `set_intents`, `DepositMsg::For` and `DepositMsg::Open` in [house/trading.rs](contracts/house/src/trading.rs). Client: [app/src/lib/intents.ts](app/src/lib/intents.ts). Solver and simulated bridge: [app/src/lib/server/intents.ts](app/src/lib/server/intents.ts) | House tests `intents_open_trades_only_the_deposit`, `intents_refused_open_keeps_the_deposit`, `intents_dust_cannot_open_a_balance`. The Verifier leg is exercised by hand in the local demo; it has no automated end-to-end test | Local |
+| Sputnik DAO v2 (unchanged mainnet code) | The DAO owns the house, the Life NFTs and the oracle; markets, parameters and the keeper change by council vote | [scripts/deploy.ts](scripts/deploy.ts) deploys it; `add_proposal` and `act_proposal` in [packages/sdk/src/client.ts](packages/sdk/src/client.ts) | [scripts/judge-e2e.ts](scripts/judge-e2e.ts) asserts `get_owner` on all three | Local |
+| Function-call access keys, NEP-366 meta transactions | One-tap trading: a session key that can call only `place_open`, `place_close` and `set_triggers` on the house, relayed so the trader pays no gas. The keeper also signs with keys limited to the methods each job needs | [app/src/lib/session.ts](app/src/lib/session.ts), [app/src/app/api/relay/route.ts](app/src/app/api/relay/route.ts), [app/src/lib/server/relay.ts](app/src/lib/server/relay.ts), [keeper/src/index.ts](keeper/src/index.ts) | [app/test/session.ts](app/test/session.ts), [app/test/relay.ts](app/test/relay.ts) | Session keys and relayer: local. Keeper keys: testnet, local |
+| Block randomness | The jackpot draw picks the winning ticket from `env::random_seed()` | `draw_jackpot` in [house/treasury.rs](contracts/house/src/treasury.rs) | House test `losers_get_tickets_and_one_takes_the_jackpot` | Testnet, local |
+| Wallets | NEAR Connect (`@hot-labs/near-connect`) for testnet wallets | [app/src/lib/near-wallet.ts](app/src/lib/near-wallet.ts) | [app/test/wallet.ts](app/test/wallet.ts) | Testnet |
+| MCP agents | Thirteen tools over the same SDK the app uses; each action is journalled with the agent's stated reason | [mcp/src/index.ts](mcp/src/index.ts), [mcp/src/agent.ts](mcp/src/agent.ts) | `pnpm agent`, then the app's Agents tab | Local |
 
-The NFTs, USDC claims, locks and market run on testnet; Intents, the DAO, one-tap trading and agents run in the
-local demo.
+Not used: Chain Signatures, NEAR AI and a real cross-chain deposit (the bridge is simulated; see
+[what is mocked](#what-is-real-and-what-is-mocked)). A Life is not a NEAR account of its own: the Life
+contract holds the USDC and keeps each token's share.
+
+### By track
+
+| Track | What OneUp does for it | What it doesn't do |
+|---|---|---|
+| NFTs That Do Something (`nfts`) | An NFT that owns money: a Life collects USDC from the house's profit for 13 rounds, pays its owner on `claim`, redraws its picture as it fills, and sells with its unclaimed USDC and future payouts attached. Locks are NFTs too, earning buybacks | No sub-account per NFT, no royalties |
+| Unstoppable DeFi (`defi`) | A perpetuals house whose pool must cover every open position's maximum win before an order is accepted; deposits through NEAR Intents; on testnet nobody holds a key to the nine contracts | The cross-chain leg is simulated, a trusted keeper fills orders, the oracle is a mock, and the parent account can still change settings |
+| Agent Economy (`agents`) | An agent that earns and spends: it trades, buys Lives on the market and claims them, paying in USDC, with a journal of what it did and why | Local demo only; the agent doesn't hire other agents or pay for APIs, and its risk limits are instructions, not code |
+
+## The path through the code
+
+How a losing trade becomes a Life, and where each step lives.
+
+| Step | What happens | Where |
+|---|---|---|
+| 1. Deposit | USDC arrives by `ft_transfer_call`; an empty message credits the free balance, `{"open":…}` also places an order | `ft_on_transfer` in [house/trading.rs](contracts/house/src/trading.rs) |
+| 2. Order | `place_open` moves the margin into a pending order and reserves the position's maximum win; it is refused unless the pool covers all of them and the market has room | `internal_place_open` in [house/trading.rs](contracts/house/src/trading.rs), `change_liability` in [house/lib.rs](contracts/house/src/lib.rs), `max_liability` in [math](contracts/math/src/lib.rs) |
+| 3. Fill and liquidation | The keeper pushes prices and calls `fill` or `liquidate`; an order fills only at a price published after it was placed | [keeper/src/orders.ts](keeper/src/orders.ts), [keeper/src/prices.ts](keeper/src/prices.ts), `fill` and `liquidate` in [house/trading.rs](contracts/house/src/trading.rs), [house/oracle.rs](contracts/house/src/oracle.rs) |
+| 4. Round close | Anyone can call `close_epoch`; it works in bounded steps (begin, mint, wait, expire, pay) while trading continues | [house/epochs.rs](contracts/house/src/epochs.rs) |
+| 5. Issuance | Each wallet with a net loss gets a Life (`face_value`) and a $1UP lock. A batch is removed only when both contracts confirm it, and a failed receipt is retried without duplicating | [house/recovery.rs](contracts/house/src/recovery.rs), `mint_batch` in [extra-life](contracts/extra-life/src/lib.rs), [ve](contracts/ve/src/lib.rs), [house/emissions.rs](contracts/house/src/emissions.rs) |
+| 6. Payout | Each later close sends the surplus above the reserve to the Life contract, which shares it across the Lives still earning; `claim` pays the owner and drops the token's approvals | `ft_on_transfer` and `claim` in [extra-life](contracts/extra-life/src/lib.rs) |
+| 7. Sale | The owner approves the market with a price; a buyer's USDC transfer names the price and `approval_id` | [contracts/market/src/lib.rs](contracts/market/src/lib.rs) |
+| 8. Buybacks and jackpot | Part of the surplus buys $1UP for lockers; interest on idle pool USDC funds a jackpot drawn among the period's losers | [house/buyback.rs](contracts/house/src/buyback.rs), [house/treasury.rs](contracts/house/src/treasury.rs) |
+| 9. Reads | The app reads contract views directly. History and leaderboards come from the events: an indexer on the author's machine writes them to Redis, and the hosted app's API routes read from there | [packages/sdk/src/client.ts](packages/sdk/src/client.ts), [scripts/testnet-indexer.ts](scripts/testnet-indexer.ts), [app/src/lib/server/published.ts](app/src/lib/server/published.ts), [app/src/app/api](app/src/app/api) |
+
+The integer maths is one crate, [contracts/math](contracts/math/src/lib.rs), used by the contracts and mirrored in
+[packages/sdk/src/maths.ts](packages/sdk/src/maths.ts) for previews. States and their transitions are listed in
+[docs/STATES.md](docs/STATES.md).
 
 ## Try it live
 
@@ -50,7 +104,7 @@ local demo.
 |---|---|---|
 | 1 | Open https://oneup.markets, then **Open the app** | What OneUp is, then the app's power-on screen (any key skips it) |
 | 2 | Look around before connecting | The Trade screen with no wallet: the live chart and the long/short split. Any action asks for a wallet |
-| 3 | Open the **Market** tab | The Lives and locks the bots have listed |
+| 3 | Open the **Market** and **Jackpot** tabs | The Lives and locks the bots have listed; the jackpot's prize, its countdown and every past draw |
 | 4 | **Connect wallet** (a NEAR testnet wallet such as Meteor; see [wallet setup](docs/NEAR_WALLET_SETUP.md)), then in the account menu **Register test tokens** and **Get 1,000 test USDC** | Test USDC in your wallet |
 | 5 | Open a 1000× long on NEAR-USD | The order fills on the next price. A small move against it liquidates it, with the LIQUIDATED banner |
 | 6 | Wait for the round to close (the countdown is in the header), then open **Life NFTs** | If the house ended the round in profit, your Life NFT, its picture filling as it pays |
@@ -58,7 +112,8 @@ local demo.
 
 The testnet contracts are accounts under `v5.oneupmarkets.testnet`. Nobody holds a key to them and none can deploy new
 code, but that account owns them and can still change settings such as the oracle and market limits. The keeper and
-bots run from the author's machine, along with an indexer that feeds the app's history and leaderboards.
+bots run from the author's machine, along with an indexer that feeds the app's history and leaderboards. The keeper
+also tops up the contracts' storage and the bots' gas.
 
 ## Try it locally
 
@@ -151,9 +206,11 @@ it can't prove, including that the money is test money, the oracle is a mock and
   Lives that never expire. These are prepared state, not users or traction.
 - **Market.** Lives and locks are NFTs listed for USDC; sellers pay a 2% fee to the house. No price or buyer
   is guaranteed.
+- **Jackpot.** The interest the idle pool earns in the vault (a mock), drawn every four rounds on testnet among
+  wallets with a net loss since the last draw. Each dollar of net loss is a ticket, one ticket takes the whole
+  prize, and with no tickets it rolls over.
 
-The design borrows from Papertrade (loss-linked claims) and Aerodrome (revenue-sharing locks). The maths is in
-[docs/maths.md](docs/maths.md) and every decision in [docs/decisions.md](docs/decisions.md).
+The maths is in [docs/maths.md](docs/maths.md) and every decision in [docs/decisions.md](docs/decisions.md).
 
 ## AI agents
 
@@ -207,7 +264,8 @@ is prepared, with no results yet.
   Sputnik DAO v2; sources and hashes in [contracts/vendor](contracts/vendor/README.md).
 - **App.** Next.js 16.4.3, React 19.2.9, Tailwind CSS 4.3.3, near-api-js 7.3.1, NEAR Connect
   (`@hot-labs/near-connect` 0.11.4), the NEAR Intents SDK (`@defuse-protocol/intents-sdk` 0.92.0), borsh 2.0.0,
-  and the Pixelify Sans and M PLUS Rounded 1c fonts from Google Fonts.
+  and the Pixelify Sans and M PLUS Rounded 1c fonts from Google Fonts. Errors on the hosted site and app are
+  reported to Sentry (`@sentry/nextjs` 11.11.0); the local demo sends nothing.
 - **SDK, keeper and bots.** near-api-js 7.3.1. Live prices come from Binance's and Coinbase's public APIs.
 - **MCP server and agent.** `@modelcontextprotocol/sdk` 1.30.1, zod 4.6.5, `@anthropic-ai/sdk` 1.3.0.
 - **Tooling.** TypeScript 6.0.3, tsx, Vitest, Playwright 1.64.1, near-sandbox 0.3.4, cargo-near 0.22.0.
