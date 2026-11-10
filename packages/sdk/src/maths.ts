@@ -50,6 +50,13 @@ export function normalizePrice(price: bigint, expo: number): bigint | null {
 
 // §1 Positions
 
+/**
+ * What the house made or lost on trading in a round: losses and the marketplace's cut, less what it paid winners.
+ * The contract's `house_net` is this floored at zero, because it is what Life NFTs and $1UP are sized from; a page
+ * that shows the house's result must show the losing rounds as losses.
+ */
+export const houseResult = (r: { losses: string; payouts: string; fees?: string }) => BigInt(r.losses) + BigInt(r.fees ?? 0) - BigInt(r.payouts);
+
 export const notional = (margin: bigint, leverage: number) => margin * BigInt(leverage);
 export const maxLiability = (margin: bigint) => margin * PROFIT_CAP;
 

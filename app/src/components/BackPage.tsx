@@ -4,10 +4,10 @@
 // your Backer Lives, the exit, and the risks in plain words.
 
 import { JumpLinks, RoundPace } from "./ui";
-import { USDC, fmtUsdc, lifeCapPpm, ppmToNumber } from "@oneup/sdk";
+import { USDC, fmtUsdc, houseResult, lifeCapPpm, ppmToNumber } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { Backing } from "./Backing";
-import { fmtOneup } from "./Header";
+import { fmtOneup, fmtUsd } from "./Header";
 import { HealthBar, PixelHeart, PixelLock } from "./Pixel";
 import { Icon } from "./Icon";
 import { useListings } from "./Sell";
@@ -44,7 +44,9 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
   const pct = Number((backed * 1000n) / target) / 10;
   const capNow = pool ? ppmToNumber(lifeCapPpm(BigInt(pool))) : null;
   const perDollar = round ? BigInt(round.oneup) : 0n; // quoted for $1
-  const houseNet = (recent ?? []).reduce((s, x) => s + BigInt(x!.house_net), 0n);
+  // every round's result, the losing ones too: `house_net` alone would add up only the profitable rounds
+  const houseNet = (recent ?? []).reduce((s, x) => s + houseResult(x!), 0n);
+  const losingRounds = (recent ?? []).filter((x) => houseResult(x!) < 0n).length;
   const backerPot = (recent ?? []).reduce((s, x) => s + BigInt(x!.lives_pot), 0n) / 3n;
 
   return (
@@ -143,10 +145,11 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
         </table>
         {recent && recent.length > 0 && (
           <p className="label num mt-3">
-            Here, the house made ${fmtUsdc(houseNet > 0n ? houseNet : 0n, 0)} over the last {recent.length} round{recent.length === 1 ? "" : "s"}.{" "}
+            Here, the house&apos;s trading result over the last {recent.length} round{recent.length === 1 ? "" : "s"} was {fmtUsd(houseNet, true)}
+            {losingRounds > 0 && `, with a loss in ${losingRounds} of them`}.{" "}
             {backerPot > 0n
-              ? `About $${fmtUsdc(backerPot, 2)} of it went to Backer Life NFTs, their third of the Life NFT payouts.`
-              : "None of it was above the pool's reserve, so Backer Life NFTs received nothing from those rounds."}
+              ? `About $${fmtUsdc(backerPot, 2)} went to Backer Life NFTs, their third of the Life NFT payouts from the profitable rounds.`
+              : "Nothing was allocated to Life NFTs in those rounds, so Backer Life NFTs received nothing from them."}
           </p>
         )}
       </section>

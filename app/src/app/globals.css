@@ -467,6 +467,23 @@ body {
     color: var(--on-fill);
     background: var(--primary);
   }
+  .lev-stops {
+    position: relative;
+    height: 20px;
+  }
+  /* fingers: taller stops with bigger numbers. Each is drawn up to 6px towards the middle of the track, so the
+     wider 1000× at the end stays inside the card. */
+  @media (pointer: coarse) {
+    .lev-stops {
+      height: 32px;
+    }
+    .lev-stop {
+      min-height: 32px;
+      padding: 0 4px;
+      font-size: 12.5px;
+      transform: translateX(calc(-50% + 9px - var(--at, 0) * 18px + (0.5 - var(--at, 0)) * 12px));
+    }
+  }
   /* the stepped slider's thumb: a square key, like the console's buttons */
   .slider-steps::-webkit-slider-thumb {
     width: 18px;
@@ -3229,8 +3246,8 @@ kbd {
     gap: 6px 8px;
   }
   .screen-modes .screen-switch {
-    padding: 0 6px;
-    font-size: 11px;
+    padding: 0 7px;
+    font-size: 12px;
   }
   .hud-pair {
     gap: 8px;
@@ -3266,7 +3283,7 @@ kbd {
     margin: 0 0 4px;
   }
   .screen-modes .screen-switch {
-    min-height: 24px;
+    min-height: 30px;
   }
   .house-pnl,
   .hud-jackpot {

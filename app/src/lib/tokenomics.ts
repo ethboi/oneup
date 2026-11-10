@@ -42,9 +42,10 @@ export class TokenomicsReader {
       const row = this.records.get(id);
       return !row || id === lastEpoch || !row.settled;
     });
-    // Bound fanout when opening a long-lived deployment for the first time.
-    for (let i = 0; i < missing.length; i += 20) {
-      await Promise.all(missing.slice(i, i + 20).map(async id => {
+    // Bound fanout when opening a long-lived deployment for the first time: five rounds at a time (ten calls),
+    // because a wider burst gets a browser rate-limited by the public RPCs.
+    for (let i = 0; i < missing.length; i += 5) {
+      await Promise.all(missing.slice(i, i + 5).map(async id => {
         const [emissions, buyback] = await Promise.all([this.source.emissions(id), this.source.buyback(id)]);
         const summary = buyback === null ? await this.source.epochSummary(id) : null;
         const settled = buyback?.status === "Done" || (summary !== null && BigInt(summary.buyback_pot) === 0n);

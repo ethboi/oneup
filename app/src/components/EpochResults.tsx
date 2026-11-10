@@ -6,7 +6,7 @@
 // and not at all with "Show results after each round" off (the account menu).
 
 import { useEffect, useRef, useState } from "react";
-import { fmtUsdc, type EpochSummary } from "@oneup/sdk";
+import { fmtUsdc, houseResult, type EpochSummary } from "@oneup/sdk";
 import { automated } from "@/lib/automation";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { sfx } from "@/lib/sound";
@@ -86,7 +86,9 @@ export function EpochResults() {
 
   if (!round) return null;
   const { s, board } = round;
+  // the profit Life NFTs are sized from (zero in a losing round), and the round's real result
   const net = BigInt(s.house_net);
+  const result = houseResult(s);
   const mine = (history?.items ?? []).filter((i) => i.kind === "trade" && i.t >= s.started_at * 1000 && i.t <= s.ended_at * 1000);
   const myPnl = mine.reduce((a, i) => a + (i.kind === "trade" ? BigInt(i.trade.pnl) - BigInt(i.trade.cut ?? 0) : 0n), 0n);
   const lost = myPnl < 0n;
@@ -97,7 +99,7 @@ export function EpochResults() {
         <div className="lcd min-w-0 flex-1 px-3 py-2 text-[var(--lcd-ink)] sm:flex-none sm:pr-6">
           <div className="display text-lg leading-tight sm:text-xl">ROUND {s.epoch} OVER</div>
           <div className="display num text-xs sm:text-sm">
-            {net > 0n ? `HOUSE +$${fmtUsdc(net, 0)} · ${s.lives_minted} LIFE NFT${s.lives_minted === 1 ? "" : "S"}` : "NO HOUSE PROFIT · NO NEW LIFE NFTS"}
+            {net > 0n ? `HOUSE +$${fmtUsdc(net, 0)} · ${s.lives_minted} LIFE NFT${s.lives_minted === 1 ? "" : "S"}` : result < 0n ? `HOUSE −$${fmtUsdc(-result, 0)} · NO NEW LIFE NFTS` : "NO HOUSE PROFIT · NO NEW LIFE NFTS"}
           </div>
         </div>
         <button className="btn btn-ghost ml-auto shrink-0 px-2.5" onClick={() => setRound(null)} aria-label="Dismiss round results">
@@ -112,7 +114,7 @@ export function EpochResults() {
             {mine.length ? `You: ${signed(myPnl)} on ${mine.length} trade${mine.length === 1 ? "" : "s"}` : "You didn't close a trade this round"}
           </div>
           {lost && net > 0n && <div className="label">The house made a profit, so your net loss may have earned a Life NFT. Check Life NFTs.</div>}
-          {lost && net === 0n && <div className="label">The house made no profit this round, so no Life NFTs were issued.</div>}
+          {lost && net === 0n && <div className="label">The house {result < 0n ? "lost money" : "made no profit"} this round, so no Life NFTs were issued.</div>}
         </div>
         <button className="chip shrink-0" onClick={() => setDetails(!details)} aria-expanded={details}>
           {details ? "Hide" : "Details"}

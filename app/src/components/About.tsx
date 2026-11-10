@@ -93,7 +93,7 @@ const NEAR: { title: string; status: Status; body: string; points: string[]; mar
       "NEP-141 fungible tokens with NEP-145 storage: $1UP and USDC",
       "NEP-171 NFTs with NEP-177 metadata, NEP-178 approvals and NEP-181 enumeration: Life NFTs and locks",
       "NEP-297 events, which the app's feed, history and leaderboard read",
-      "NEP-245 multi-token balances inside NEAR Intents",
+      "NEP-245 multi-token balances inside NEAR Intents (local demo only)",
     ],
   },
   {

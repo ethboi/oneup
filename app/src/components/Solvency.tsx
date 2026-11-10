@@ -3,7 +3,7 @@
 // "Can't go bust": the pool against the worst case it must cover (every open position's max win, both
 // sides, decision D-1), per-market liability against its cap (half the pool, D-14), and the epoch history.
 
-import { fmtUsdc, ppmToNumber, type EpochSummary } from "@oneup/sdk";
+import { fmtUsdc, houseResult, ppmToNumber, type EpochSummary } from "@oneup/sdk";
 import { Fairness } from "./Fairness";
 import { fmtUsd } from "./Header";
 import { useOneUp, usePoll } from "@/lib/oneup";
@@ -180,7 +180,7 @@ export function Solvency() {
                     <td className="text-right">{fmtUsd(big(e.losses))}</td>
                     <td className="hidden text-right sm:table-cell">{fmtUsd(big(e.payouts))}</td>
                     <td className="hidden text-right md:table-cell">{fmtUsd(big(e.fees))}</td>
-                    <td className="text-right">{fmtUsd(big(e.house_net))}</td>
+                    <td className="text-right" style={houseResult(e) < 0n ? { color: "var(--short)" } : undefined}>{fmtUsd(houseResult(e))}</td>
                     <td className="hidden text-right md:table-cell">{e.lives_minted}</td>
                     <td className="hidden text-right lg:table-cell">{ppmToNumber(big(e.cap_ppm)).toFixed(2)}×</td>
                     <td className="text-right">{fmtUsd(big(e.lives_pot))}</td>

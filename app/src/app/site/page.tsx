@@ -62,7 +62,8 @@ export default async function Site() {
           </h1>
           <p className="site-tagline">Perps where a loss can pay you back</p>
           <p className="site-lede">
-            Lose in a round the house wins, and you can get a Life NFT that collects USDC from its future profit.
+            Perps are leveraged trades on a price going up or down. Lose in a round the house wins, and you can get a Life NFT
+            that collects USDC from the house’s future profit.
           </p>
           <div className="site-ctas">
             <a className="btn btn-accent btn-big" href={APP}>
@@ -91,8 +92,8 @@ export default async function Site() {
                 <dd className="display num">${stats.paidUsdc.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd>
               </div>
               <div>
-                <dt>Life NFTs resold</dt>
-                <dd className="display num">{stats.resold.toLocaleString("en-US")}</dd>
+                <dt>Life NFTs held by a new owner</dt>
+                <dd className="display num">{stats.newOwner.toLocaleString("en-US")}</dd>
               </div>
             </dl>
             <p className="label">
@@ -161,7 +162,7 @@ export default async function Site() {
                 </div>
               </div>
               <h3 className="display">Pick a side</h3>
-              <p>Go long or short on BTC, ETH or NEAR, up to 1000×. There are no entry or funding fees; winning trades pay 10–25% of their profit.</p>
+              <p>Go long if you think BTC, ETH or NEAR will rise, short if you think it will fall. Leverage, up to 1000×, multiplies the move for and against you. There are no entry or funding fees; winning trades pay 10–25% of their profit.</p>
             </li>
             <li className="panel site-step">
               <div className="site-step-art site-art-loss" aria-hidden>
@@ -172,7 +173,7 @@ export default async function Site() {
                 <span className="site-liquidated display">LIQUIDATED</span>
               </div>
               <h3 className="display">Lose it</h3>
-              <p>Get liquidated, or close at a loss. On most venues that’s the end of it: your loss is the house’s profit.</p>
+              <p>Get liquidated (the price moves far enough against you that the trade is closed and what you put in is gone), or close at a loss. On most venues that’s the end of it: your loss is the house’s profit.</p>
             </li>
             <li className="panel site-step">
               <div className="site-step-art site-step-card site-art-life" aria-hidden>

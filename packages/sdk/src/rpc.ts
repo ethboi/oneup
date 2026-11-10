@@ -84,7 +84,7 @@ export const rpcList = (primary: string) => {
 };
 
 /** The RPC couldn't answer, as opposed to answering with an error such as a contract panic. */
-const isUnavailable = (e: unknown) =>
+export const isUnavailable = (e: unknown) =>
   e instanceof TypeError || isRateLimited(e) || /retries|attempts|bad gateway|unavailable|timeout|no answer|internal server error|fetch/i.test(String(e instanceof Error ? e.message : e));
 
 /**

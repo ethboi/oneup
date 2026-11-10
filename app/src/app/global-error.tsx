@@ -14,7 +14,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
       <body style={{ margin: 0, minHeight: "100vh", display: "grid", placeItems: "center", background: "#15162a", color: "#fff", fontFamily: "system-ui, sans-serif", textAlign: "center", padding: 24 }}>
         <main>
           <h1 style={{ fontSize: 22 }}>OneUp stopped working</h1>
-          <p style={{ opacity: 0.8 }}>Something on this page failed. Your funds and positions are on chain and unaffected.</p>
+          <p style={{ opacity: 0.8 }}>Something on this page failed. Your positions and balances are held by the contracts on chain, not by this page, and the keeper keeps running.</p>
           <button type="button" onClick={reset} style={{ marginTop: 12, padding: "10px 18px", borderRadius: 10, border: 0, background: "#c81e6c", color: "#fff", fontWeight: 700, cursor: "pointer" }}>
             Reload OneUp
           </button>

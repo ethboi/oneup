@@ -6,6 +6,7 @@ import { scrollToAnchorWhenReady } from "@/lib/anchors";
 import { Boot } from "@/components/Boot";
 import { OneUpProvider, useOneUp } from "@/lib/oneup";
 import { Header } from "@/components/Header";
+import { ReadsNotice } from "@/components/ReadsNotice";
 import { Trade } from "@/components/Trade";
 import { Lives } from "@/components/Lives";
 import { Locks } from "@/components/Locks";
@@ -123,6 +124,7 @@ export default function Home() {
           tab={tab}
           go={(t) => go(t as Tab)}
         />
+        <ReadsNotice />
         <div className={tab === "Trade" ? undefined : "mx-auto max-w-[1280px] 2xl:max-w-[1440px]"}>
           {tab === "Trade" && <Trade />}
           {tab === "Life NFTs" && <Lives />}

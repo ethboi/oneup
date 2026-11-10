@@ -10,6 +10,7 @@ import { useState } from "react";
 import { fmtUsdc, lifeCapPpm, ppmToNumber, LIFE_CAP_POOL, USDC } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { fmtOneup } from "./Header";
+import { useWidth } from "@/lib/useWidth";
 
 export function Backing() {
   const { o, me, tx, run, viewOnly } = useOneUp();
@@ -98,7 +99,8 @@ export function Backing() {
 
 /** The cap curve over pool size, with the round so far shaded and this backing's slice highlighted. */
 function Curve({ pool, amount }: { pool: bigint; amount: bigint }) {
-  const W = 600;
+  // drawn at the width it has, so its labels stay 11 to 12px on a phone instead of shrinking with the picture
+  const [ref, W] = useWidth(600);
   const H = 150;
   const max = LIFE_CAP_POOL + LIFE_CAP_POOL / 5n;
   const x = (p: bigint) => Number((p * BigInt(W)) / max);
@@ -109,13 +111,14 @@ function Curve({ pool, amount }: { pool: bigint; amount: bigint }) {
     `M${x(a)},${H - 18} L${x(a)},${y(lifeCapPpm(a))} L${x(clamp(b))},${y(lifeCapPpm(clamp(b)))} L${x(clamp(b))},${H - 18} Z`;
   const here = clamp(pool);
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label={`Maximum payout multiplier: ${ppmToNumber(lifeCapPpm(pool)).toFixed(2)}× at the current pool size`}>
+    <div ref={ref} className="min-w-0">
+    <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} className="block" role="img" aria-label={`Maximum payout multiplier: ${ppmToNumber(lifeCapPpm(pool)).toFixed(2)}× at the current pool size`}>
       <path d={area(0n, here)} fill="var(--panel-2)" />
       {amount > 0n && <path d={area(here, pool + amount)} fill="var(--accent)" opacity="0.35" />}
       <polyline points={pts} fill="none" stroke="var(--accent)" strokeWidth="2" />
       <line x1="0" x2={W} y1={H - 18} y2={H - 18} stroke="var(--line)" />
       <line x1={x(here)} x2={x(here)} y1="8" y2={H - 18} stroke="var(--text)" strokeDasharray="3 3" />
-      <text x={Math.min(x(here) + 6, W - 120)} y="18" className="label" fill="var(--text)" fontSize="12">
+      <text x={Math.max(4, Math.min(x(here) + 6, W - 170))} y="18" className="label" fill="var(--text)" fontSize="12">
         Pool now ${Number(pool / USDC / 1000n).toLocaleString("en-US")}K · {ppmToNumber(lifeCapPpm(pool)).toFixed(2)}×
       </text>
       <text x="4" y={y(2_000_000n) - 6} fontSize="11" fill="var(--muted)">2.0×</text>
@@ -123,5 +126,6 @@ function Curve({ pool, amount }: { pool: bigint; amount: bigint }) {
       <text x="4" y={H - 4} fontSize="11" fill="var(--muted)">$0</text>
       <text x={x(LIFE_CAP_POOL) - 20} y={H - 4} fontSize="11" fill="var(--muted)">$1M</text>
     </svg>
+    </div>
   );
 }

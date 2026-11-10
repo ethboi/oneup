@@ -1151,7 +1151,7 @@ function OrderForm({ t }: { t: Ticket }) {
           style={{ "--fill": `${levPos}%`, ...(hot ? { "--primary": "var(--short)" } : {}) } as React.CSSProperties}
         />
         {/* the stops, each where it sits on the track */}
-        <div className="relative h-5" role="group" aria-label="Leverage presets">
+        <div className="lev-stops" role="group" aria-label="Leverage presets">
           {LEVERAGE_STOPS.filter((x) => x <= maxLeverage).map((x) => (
             <button
               key={x}
@@ -1193,7 +1193,7 @@ function OrderForm({ t }: { t: Ticket }) {
       {/* what the order would do, as a terminal lists it */}
       <dl className="ticket-facts num flex flex-col gap-1.5 border-t border-[var(--line)] pt-3 text-sm">
         <div className="ticket-row">
-          <dt className="label">Liquidation price</dt>
+          <dt className="label" title="If the price reaches this, the trade is closed and what you risked is lost">Liquidation price</dt>
           <dd className="font-bold">
             {liq ? fmtPrice(liq) : "…"}
             {liq && price && (
@@ -1234,7 +1234,7 @@ function OrderForm({ t }: { t: Ticket }) {
           <div className="flex items-center gap-2">
             <PixelHeart size={18} className="shrink-0" />
             <span className="min-w-0 flex-1">
-              Potential recovery: up to <b className="num">${fmtUsdc(lifeUpTo, 0)}</b> and up to <b className="num">{oneupUpTo.toLocaleString("en-US")} $1UP</b>
+              If you lose: possible recovery of <b className="num">$0 to ${fmtUsdc(lifeUpTo, 0)}</b> and up to <b className="num">{oneupUpTo.toLocaleString("en-US")} $1UP</b>. It can be nothing.
             </span>
             <button type="button" className="label shrink-0 underline decoration-dotted underline-offset-2" aria-expanded={why} onClick={() => setWhy(!why)}>
               {why ? "Hide" : "Details"}

@@ -6,7 +6,8 @@ export interface LiveStats {
   roundsClosed: number;
   livesMinted: number;
   paidUsdc: number;
-  resold: number;
+  /** Life NFTs whose owner is no longer the account that earned them: sold or transferred. */
+  newOwner: number;
 }
 
 async function view<T>(rpc: string, account: string, method: string, args: object = {}): Promise<T> {
@@ -47,7 +48,7 @@ export async function liveStats(): Promise<LiveStats | null> {
       roundsClosed: Math.max(0, epoch.id - 1),
       livesMinted: earned.length,
       paidUsdc: Number(BigInt(lives.lives_paid)) / 1e6,
-      resold: earned.filter((t) => t.token_id.slice(t.token_id.indexOf(":") + 1) !== t.owner_id).length,
+      newOwner: earned.filter((t) => t.token_id.slice(t.token_id.indexOf(":") + 1) !== t.owner_id).length,
     };
   } catch {
     return null;

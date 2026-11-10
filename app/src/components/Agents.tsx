@@ -303,15 +303,18 @@ function BotTable({ accounts, rows, ai, note }: { accounts: string[]; rows: Stan
                 const r = rows?.find((x) => x.account === id);
                 const p = r ? BigInt(r.pnl) : 0n;
                 const strategy = BOT_STRATEGIES[Number(short(id).replace(/\D/g, "")) - 1];
+                const note = a?.kind === "ai" ? "Driven by the AI agent" : strategy ? BOT_NOTES[strategy] : "";
                 return (
                   <tr key={id} className="border-t border-[var(--line)]">
                     <td className="py-2">
                       <b>{strategy ?? short(id)}</b>
                       <span className="label"> · {short(id)}</span>
                       {a?.kind === "ai" && <span className="agent-badge ai">AI</span>}
+                      {/* phones have no Strategy column: what the bot does goes under its name */}
+                      {note && <span className="label block md:hidden">{note}</span>}
                     </td>
-                    <td className="hidden py-2 text-[var(--muted)] md:table-cell">{a?.kind === "ai" ? "Driven by the AI agent" : strategy ? BOT_NOTES[strategy] : ""}</td>
-                    <td className="py-2 text-right font-bold" style={{ color: p > 0n ? "var(--long)" : p < 0n ? "var(--short)" : undefined }}>
+                    <td className="hidden py-2 text-[var(--muted)] md:table-cell">{note}</td>
+                    <td className="whitespace-nowrap py-2 pl-2 text-right font-bold" style={{ color: p > 0n ? "var(--long)" : p < 0n ? "var(--short)" : undefined }}>
                       {r ? usd(p, true) : "–"}
                     </td>
                     <td className="py-2 text-right">{r?.trades ?? 0}</td>

@@ -19,7 +19,7 @@ const M = 1_000_000n * ONEUP;
 const SPLIT = [
   { name: "Trader loss rewards", amount: 900n * M, color: "var(--heart)", note: "Released under a 208-round schedule as house profit allows, to wallets with eligible net losses. Each reward is locked for 104 rounds." },
   { name: "Liquidity seed", amount: 50n * M, color: "var(--info)", note: "Paired with USDC in the buyback pool. A real Rhea integration is planned." },
-  { name: "Treasury", amount: 42_500_000n * ONEUP, color: "var(--muted)", note: "Run by the DAO that owns the house" },
+  { name: "Treasury", amount: 42_500_000n * ONEUP, color: "var(--muted)", note: "Held by the account that deployed the contracts, in the local demo and on testnet. A DAO is planned to run it on mainnet." },
   { name: "Backers", amount: 7_500_000n * ONEUP, color: "var(--accent)", note: "10 $1UP per $1 contributed during initial funding, locked for 104 rounds" },
 ];
 
@@ -100,8 +100,8 @@ export function Tokenomics() {
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card icon={<PixelHeart size={24} />} title="Released as the house profits">
-          Each round can release up to {fmtOneup(perRound.toString())} $1UP (900M over 208 rounds), but only {ONEUP_PER_USDC.toString()} per $1 the
-          house actually made. What isn&apos;t released carries to later rounds{carry ? `: ${fmtOneup(carry)} now` : ""}.
+          Each round adds {fmtOneup(perRound.toString())} $1UP to what can be released (900M over 208 rounds). A round releases {ONEUP_PER_USDC.toString()} per $1
+          the house actually made, up to everything available. What isn&apos;t released carries to later rounds{carry ? `: ${fmtOneup(carry)} carried now` : ""}.
         </Card>
         <Card icon={<PixelLock size={22} />} title="Locked rewards for eligible losses">
           Each round&apos;s $1UP rewards are split among wallets with eligible net losses, in proportion to those losses. Rewards

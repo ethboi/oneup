@@ -10,6 +10,7 @@ import { accessOf, type Access } from "./access";
 import { reportFailure } from "./report";
 import { sfx } from "./sound";
 import { pollSerial } from "./poll";
+import { readFailed, readGone, readOk } from "./read-health";
 import { loadSession, saveSession, sessionExists, sessionSender, type Session } from "./session";
 import { FailoverProvider, OneUp, accountSender, normalizePrice, rpcList } from "@oneup/sdk";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -267,7 +268,13 @@ export function usePoll<T>(f: () => Promise<T>, deps: unknown[], baseMs = 2000):
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const identity = useMemo(() => ({}), deps);
   const [snapshot, setSnapshot] = useState<{ identity: object; value: T }>();
-  useEffect(() => pollSerial(f, value => setSnapshot({ identity, value }), ms), [identity, version, ms]);
+  useEffect(() => {
+    // each read tells lib/read-health.ts how it went, so the app can say when the chain isn't answering
+    const poll = {};
+    const load = () => f().then((value) => (readOk(poll), value), (e: unknown) => { readFailed(poll, e); throw e; });
+    const stop = pollSerial(load, value => setSnapshot({ identity, value }), ms);
+    return () => { stop(); readGone(poll); };
+  }, [identity, version, ms]);
   return snapshot?.identity === identity ? snapshot.value : undefined;
 }
 

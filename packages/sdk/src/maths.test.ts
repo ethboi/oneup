@@ -21,6 +21,14 @@ describe("maths vectors", () => {
     expect(m.previewLossEmission(quiet, 0n, usd(1), 20n)).toBe(20n * m.ONEUP);
   });
 
+  it("a losing round is a loss, not zero", () => {
+    // winners were paid more than losers and fees brought in
+    const losing = { losses: String(usd(400)), payouts: String(usd(500)), fees: String(usd(17)) };
+    expect(m.houseResult(losing)).toBe(-usd(83));
+    expect(m.houseResult({ losses: String(usd(500)), payouts: String(usd(400)), fees: String(usd(17)) })).toBe(usd(117));
+    expect(m.houseResult({ losses: String(usd(5)), payouts: "0" })).toBe(usd(5));
+  });
+
   it("V2 pnl and liquidation", () => {
     expect(m.pnl("Long", usd(1_000), 50, px(500), px(540))).toBe(usd(4_000));
     expect(m.pnl("Long", usd(1_000), 50, px(500), px(600))).toBe(usd(9_000));
