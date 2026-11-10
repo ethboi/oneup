@@ -268,7 +268,7 @@ export class OneUp {
   emissions = (epoch: number) => this.house<EpochEmissions | null>("get_emissions", { epoch });
   emissionCarry = () => this.house<U128>("get_emission_carry");
   params = () =>
-    this.house<{ life_expiry_epochs: number; market_capacity_ppm: U128; oneup_per_usdc: number; min_hold_s: number; fill_window_s: number; limit_expiry_s: number; leverage_hard_limit: number }>("get_params");
+    this.house<{ life_expiry_epochs: number; market_capacity_ppm: U128; oneup_per_usdc: number; min_hold_s: number; fill_window_s: number; limit_expiry_s: number; leverage_hard_limit: number; jackpot_epochs?: number }>("get_params");
   quoteOpen = (market_id: string, side: Side, margin: bigint, leverage: number, price?: bigint) =>
     this.house<Quote>("quote_open", {
       market_id,

@@ -1,4 +1,31 @@
-import type { EpochEmissions } from "@oneup/sdk";
+import type { EpochEmissions, EpochSummary } from "@oneup/sdk";
+
+/** Closed rounds, as the testnet indexer publishes them (scripts/testnet-indexer.ts, /api/rounds), so a page asks
+ *  once instead of asking the chain about every round. Amounts are the contracts' integers, as strings. */
+export interface PublishedRounds {
+  /** The last closed round. */
+  epoch: number;
+  /** $1UP released as trader loss rewards, over every round. */
+  released: string;
+  /** USDC spent on buybacks, over every round. */
+  buybacks: string;
+  /** The newest rounds' releases, oldest first. */
+  emissions: EpochEmissions[];
+  /** The newest rounds' results, newest first. */
+  summaries: EpochSummary[];
+}
+export const PUBLISHED_EMISSIONS = 24;
+export const PUBLISHED_SUMMARIES = 12;
+
+export function publishedRounds(epoch: number, totals: { history: EpochEmissions[]; buybacks: bigint }, summaries: EpochSummary[]): PublishedRounds {
+  return {
+    epoch,
+    released: totals.history.reduce((sum, row) => sum + BigInt(row.released), 0n).toString(),
+    buybacks: totals.buybacks.toString(),
+    emissions: totals.history.slice(-PUBLISHED_EMISSIONS),
+    summaries: summaries.slice(0, PUBLISHED_SUMMARIES),
+  };
+}
 
 interface Source {
   emissions: (epoch: number) => Promise<EpochEmissions | null>;

@@ -124,7 +124,7 @@ export default async function Site() {
               </div>
               <div className="lcd site-screen">
                 {VIDEO ? (
-                  <video src={VIDEO} controls playsInline preload="metadata" poster="/site/testimonial.webp" />
+                  <video src={VIDEO} controls playsInline preload="metadata" poster="/site/app-preview-still.webp" />
                 ) : (
                   // eslint-disable-next-line @next/next/no-img-element
                   <picture>

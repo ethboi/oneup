@@ -49,7 +49,7 @@ local demo.
 | Step | Do | See |
 |---|---|---|
 | 1 | Open https://oneup.markets, then **Open the app** | What OneUp is, then the app's power-on screen (any key skips it) |
-| 2 | On the wallet screen choose **Look around first** | The Trade screen with no wallet: the live chart and the long/short split. Any action asks for a wallet |
+| 2 | Look around before connecting | The Trade screen with no wallet: the live chart and the long/short split. Any action asks for a wallet |
 | 3 | Open the **Market** tab | The Lives and locks the bots have listed |
 | 4 | **Connect wallet** (a NEAR testnet wallet such as Meteor; see [wallet setup](docs/NEAR_WALLET_SETUP.md)), then in the account menu **Register test tokens** and **Get 1,000 test USDC** | Test USDC in your wallet |
 | 5 | Open a 1000× long on NEAR-USD | The order fills on the next price. A small move against it liquidates it, with the LIQUIDATED banner |

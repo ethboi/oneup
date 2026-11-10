@@ -10,7 +10,7 @@ The list is what has been named so far, not a proof that nothing else has stages
 | Closing a finished round (keeper) | `CloseStep`: `waiting for backing`/`waiting for pot` → `begun` → `minting`, `expiring`, `recalling`, `drawing jackpot` and their `waiting`/`retrying` steps → `closed` | `CloseStep`, the same file; the contract is `close_epoch` in [contracts/house/src/epochs.rs](../contracts/house/src/epochs.rs) |
 | A pending order | `waiting` (market open or close) or `resting` (limit open) → filled, or `expiring` once its window is over | `orderStage`, [packages/sdk/src/orders.ts](../packages/sdk/src/orders.ts) |
 | Loading the app | `loading` → `ready`, or `failed` | `Load`, [app/src/lib/oneup.tsx](../app/src/lib/oneup.tsx) |
-| Who's using the app | `local`, `welcome`, `watching`, `connected` | `accessOf`, [app/src/lib/access.ts](../app/src/lib/access.ts) |
+| Who's using the app | `local`, `watching`, `connected` | `accessOf`, [app/src/lib/access.ts](../app/src/lib/access.ts) |
 | The NEAR wallet | `unavailable`, `disconnected` → `connecting` → `connected` → `signing` → `confirming` → `connected`; `disconnecting` | `WalletStatus`, [app/src/lib/near-wallet.ts](../app/src/lib/near-wallet.ts); the steps of a request come from `walletSender` in [wallet-send.ts](../app/src/lib/wallet-send.ts) |
 | A transaction's toast | `pending` → `ok` or `error` | `Toast`, [app/src/lib/oneup.tsx](../app/src/lib/oneup.tsx) |
 | A Life NFT | `earning` → `expired`, `fully-allocated` or `awaiting-settlement` | [app/src/lib/life-economics.ts](../app/src/lib/life-economics.ts) |

@@ -3,7 +3,7 @@
 // Initial pool funding in full (D-22, D-26): what backing gets you, the form and the curve, when it pays back,
 // your Backer Lives, the exit, and the risks in plain words.
 
-import { JumpLinks } from "./ui";
+import { JumpLinks, RoundPace } from "./ui";
 import { USDC, fmtUsdc, lifeCapPpm, ppmToNumber } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { Backing } from "./Backing";
@@ -59,6 +59,7 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
             and receive a Backer Life, which can share in future house profit up to a limit. You also receive $1UP
             locked for 104 rounds, with a share of buyback rewards.
           </p>
+          <RoundPace rounds={104} className="mt-2 max-w-2xl" />
           <div className="mt-5 max-w-2xl">
             <div className="num flex items-baseline justify-between text-sm">
               <span>

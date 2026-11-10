@@ -1,4 +1,5 @@
-// Feeds the hosted app's Leaderboard, History, Activity, past jackpots, round results and Agents page on testnet.
+// Feeds the hosted app's Leaderboard, History, Activity, recent sales, past jackpots, round results, the $1UP and
+// House pages' closed rounds, and the Agents page on testnet.
 // It follows the contracts' transactions through FastNEAR's public transaction API, runs their events through the
 // same code as the local indexer (app/src/lib/server/activity.ts), and writes the results to Redis every 30 seconds.
 // The app's API routes read them from there (app/src/lib/server/published.ts), so visitors never reach this machine.
@@ -9,7 +10,7 @@
 // Without KV_REST_API_URL it only reports what it would publish.
 
 import { readFileSync } from "node:fs";
-import { FailoverProvider, OneUp, normalizePrice, rpcList, type Deployment } from "@oneup/sdk";
+import { FailoverProvider, OneUp, normalizePrice, rpcList, type Deployment, type EpochSummary } from "@oneup/sdk";
 import {
   boardBetween,
   eventLogs,
@@ -21,11 +22,13 @@ import {
   markSynced,
   recordBlock,
   recentActivity,
+  recentSales,
   saveIndexerState,
   setIndexerCursor,
   standings,
   valueSales,
 } from "../app/src/lib/server/activity.ts";
+import { PUBLISHED_SUMMARIES, TokenomicsReader, publishedRounds } from "../app/src/lib/tokenomics.ts";
 
 const API = "https://tx.test.fastnear.com";
 const TICK_MS = 30_000;
@@ -188,6 +191,15 @@ async function samplePrices() {
   }
 })();
 
+// Closed rounds for the $1UP and House pages: what each released and bought back, and the newest results. The reader
+// keeps settled rounds, so after the first pass a tick asks about the newest round and any buyback still under way.
+const tokenomics = new TokenomicsReader(oneup);
+async function closedRounds(last: number) {
+  const ids = Array.from({ length: Math.min(PUBLISHED_SUMMARIES, last) }, (_, i) => last - i);
+  const [totals, summaries] = await Promise.all([tokenomics.read(last), Promise.all(ids.map((id) => oneup.epochSummary(id)))]);
+  return publishedRounds(last, totals, summaries.filter((s): s is EpochSummary => s !== null));
+}
+
 function parseCursor(): readonly [number, number] | null {
   const m = /^(\d+):(\d+)$/.exec(indexerCursor() ?? "");
   return m ? [Number(m[1]), Number(m[2])] : null;
@@ -201,12 +213,16 @@ async function tick() {
   const epoch = await oneup.epoch();
   const values = new Map<string, unknown>([
     ["feed", { items: recentActivity() }],
+    ["sales", { items: recentSales() }],
     ["jackpots", { items: jackpotDraws() }],
     ["standings:all", standings(0, now)],
     ["standings:day", standings(now - 86_400_000, now)],
     ["standings:round", standings(epoch.started_at * 1000, now)],
     ["prices", Object.fromEntries(prices)],
   ]);
+  // a pass that fails leaves the last published rounds in place, and never holds up the feed
+  const rounds = await closedRounds(epoch.id - 1).catch(() => null);
+  if (rounds) values.set("rounds", rounds);
   for (const account of indexedAccounts()) values.set(`history:${account}`, historyFor(account));
   for (const { from, to } of closed) values.set(`board:${from}`, boardBetween(from, to));
   const written = await publish(values);

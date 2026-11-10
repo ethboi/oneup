@@ -2,7 +2,7 @@
 
 // The marketplace keeps the asking price separate from current funds and conditional future entitlements.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { type LifeInfo, type Listing, type LockInfo } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { lockValue, useOneupPrice } from "@/lib/value";
@@ -12,7 +12,7 @@ import { lifeHref } from "@/lib/recovery-journey";
 import { fmtOneup, fmtUsd } from "./Header";
 import { PixelHeart, PixelLock } from "./Pixel";
 import { Sell, useListings } from "./Sell";
-import { useActivity, type ActivityItem } from "./Activity";
+import type { ActivityItem } from "./Activity";
 import { Explainer, PanelHead } from "./ui";
 import { Icon } from "./Icon";
 
@@ -27,13 +27,13 @@ type Sort = AskingPriceOrder;
 const usd = (x: bigint) => fmtUsd(x);
 
 export function Market() {
-  const { o, d, me } = useOneUp();
+  const { o, d, me, viewOnly } = useOneUp();
   const listings = useListings();
   const px = useOneupPrice();
   const wallet = BigInt(usePoll(() => o.usdcBalance(me), [me]) ?? "0");
   const epoch = usePoll(() => o.epoch(), [], 10_000);
   const params = usePoll(() => o.params(), [], 60_000);
-  const sales = useActivity(100).filter((a) => a.kind === "sold");
+  const sales = useSales();
   const [filter, setFilter] = useState<Filter>("all");
   const [sort, setSort] = useState<Sort>("cheap");
 
@@ -72,7 +72,7 @@ export function Market() {
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_360px] lg:items-start">
       <div className="flex min-w-0 flex-col gap-5">
-        <Explainer title="Market" line={<>Buy or list Life NFTs and $1UP locks for USDC. Your wallet balance: <b className="num text-[var(--text)]">{usd(wallet)}</b>.</>}>
+        <Explainer title="Market" line={<>Buy or list Life NFTs and $1UP locks for USDC. {viewOnly ? "Connect a wallet to buy or list." : <>Your wallet balance: <b className="num text-[var(--text)]">{usd(wallet)}</b>.</>}</>}>
           Buying a Life NFT transfers its unclaimed USDC and remaining payout rights to you. Compare the asking price with both the USDC available to claim and the remaining payout limit. That limit is the maximum additional USDC it could receive; future payouts may be zero and depend on house profit during its earning period.
           Buying a lock transfers its locked $1UP and its share of eligible buybacks. You can unlock its tokens when the lock ends. Estimated withdrawal values use the current $1UP price, after any early exit penalty; they are not USDC payouts.
           Payment and NFT transfer are handled together. If the NFT has already been sold, your USDC is refunded. Sellers pay a 2% fee into the house pool. Balances refresh periodically. If a seller claims before a purchase, the listing becomes invalid. Any purchase using that listing is refunded, and the seller must list it again.
@@ -123,11 +123,33 @@ export function Market() {
         </div>
         <div className="panel">
           <PanelHead title="Recent sales" />
-          <Sales items={sales.slice(0, 10)} />
+          <Sales items={sales?.slice(0, 10)} />
         </div>
       </div>
     </div>
   );
+}
+
+/** The newest sales (/api/sales), newest first; not yet known while they load. The activity feed only reaches back a
+ *  few hours, and a quiet market's last sale is older than that. */
+function useSales(): ActivityItem[] | undefined {
+  const { d } = useOneUp();
+  const [items, setItems] = useState<ActivityItem[]>();
+  useEffect(() => {
+    let live = true;
+    const tick = () =>
+      fetch("/api/sales")
+        .then((r) => (r.ok ? r.json() : Promise.reject()))
+        .then((j: { items?: ActivityItem[] }) => live && setItems(j.items ?? []))
+        .catch(() => {});
+    void tick();
+    const timer = setInterval(tick, d.network === "localnet" ? 5000 : 30_000);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, [d.network]);
+  return items;
 }
 
 function EmptyMarket({ filter }: { filter: Filter }) {
@@ -151,7 +173,7 @@ function EmptyMarket({ filter }: { filter: Filter }) {
 
 /** What you could sell (lives that can still pay, locks not yet withdrawn), each with its Sell control. */
 function YourItems({ px, listings, epoch, expiryEpochs }: { px: bigint; listings: Listing[]; epoch?: number; expiryEpochs?: number }) {
-  const { o, d, me } = useOneUp();
+  const { o, d, me, viewOnly, wallet } = useOneUp();
   const lives = (usePoll(() => o.lives(me), [me]) ?? []).filter((l) => lifeEconomics(l).hasRecoverableFunds);
   const locks = (usePoll(() => o.locks(me), [me]) ?? []).filter((l) => !l.withdrawn);
   // the first three, so Recent sales stays in view; the rest on request
@@ -159,6 +181,17 @@ function YourItems({ px, listings, epoch, expiryEpochs }: { px: bigint; listings
   const total = lives.length + locks.length;
   const shownLives = all ? lives : lives.slice(0, 3);
   const shownLocks = all ? locks : locks.slice(0, Math.max(0, 3 - shownLives.length));
+  if (viewOnly) {
+    return (
+      <div className="flex flex-col items-start gap-3 px-4 pb-4">
+        <p className="label">Connect a wallet to list your Life NFTs and $1UP locks. Eligible net losses in profitable rounds can earn you both.</p>
+        <button type="button" className="btn btn-ghost" disabled={wallet.busy} onClick={() => void wallet.connect()}>
+          <Icon name="wallet" size={16} />
+          Connect wallet
+        </button>
+      </div>
+    );
+  }
   if (total === 0) {
     return <p className="label px-4 pb-4">You have no Life NFTs or locks to list yet. Eligible net losses in profitable rounds can earn you Life NFTs and $1UP locks.</p>;
   }
@@ -202,11 +235,12 @@ function YourItems({ px, listings, epoch, expiryEpochs }: { px: bigint; listings
 }
 
 function Row({ x, wallet, epoch, expiryEpochs, totalPower }: { x: Item; wallet: bigint; epoch?: number; expiryEpochs?: number; totalPower: bigint }) {
-  const { me, tx, run } = useOneUp();
+  const { me, tx, run, viewOnly } = useOneUp();
   const price = BigInt(x.l.price);
   const askingPrice = listingPriceLabel(x.l);
   const mine = x.l.seller === me;
-  const short = wallet < price;
+  // without a wallet there is no balance to fall short: the button asks for one
+  const short = !viewOnly && wallet < price;
 
   let title: string;
   let detail: string;
@@ -257,7 +291,7 @@ function Row({ x, wallet, epoch, expiryEpochs, totalPower }: { x: Item; wallet: 
             onClick={() => run(`Buy for ${askingPrice}`, () => tx.buy(x.l))}
           >
             <Icon name="cart" size={15} />
-            {short ? "Not enough USDC" : "Buy"}
+            {viewOnly ? "Connect to buy" : short ? "Not enough USDC" : "Buy"}
           </button>
         )}
       </div>
@@ -269,7 +303,8 @@ function Row({ x, wallet, epoch, expiryEpochs, totalPower }: { x: Item; wallet: 
 const lifeProgress = (i: LifeInfo) => (BigInt(i.owed) > 0n ? Math.max(0.12, Number((BigInt(i.paid) * 10_000n) / BigInt(i.owed)) / 10_000) : 0.12);
 
 /** Observed sale prices. Historical cap snapshots are not valuations. */
-function Sales({ items }: { items: ActivityItem[] }) {
+function Sales({ items }: { items?: ActivityItem[] }) {
+  if (items === undefined) return <p className="label px-4 pb-4" role="status">Loading sales…</p>;
   if (items.length === 0) return <p className="label px-4 pb-4">No sales yet.</p>;
   const now = Date.now();
   return (
@@ -288,7 +323,7 @@ function Sales({ items }: { items: ActivityItem[] }) {
             </span>
             <span className="shrink-0 text-right">
               {price && <b className="num block">{price}</b>}
-              <span className="label num">{ago < 1 ? "now" : ago < 60 ? `${ago}m ago` : `${Math.round(ago / 60)}h ago`}</span>
+              <span className="label num">{ago < 1 ? "now" : ago < 60 ? `${ago}m ago` : ago < 48 * 60 ? `${Math.round(ago / 60)}h ago` : `${Math.round(ago / 1440)}d ago`}</span>
             </span>
           </li>
         );

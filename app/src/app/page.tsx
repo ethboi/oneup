@@ -14,6 +14,8 @@ import { Solvency } from "@/components/Solvency";
 import { About } from "@/components/About";
 import { BackPage } from "@/components/BackPage";
 import { Leaderboard } from "@/components/Leaderboard";
+import { JackpotPage } from "@/components/Jackpot";
+import { TABS, slug, tabAt, tabTitle, type Tab } from "@/lib/tabs";
 import { Tokenomics } from "@/components/Tokenomics";
 import { Toasts } from "@/components/Toasts";
 import { SoundEvents } from "@/components/Sounds";
@@ -23,8 +25,6 @@ import { JackpotWin } from "@/components/JackpotWin";
 import { Icon, type IconName } from "@/components/Icon";
 import { Logo } from "@/components/Pixel";
 
-const TABS = ["Trade", "Life NFTs", "Locks", "Market", "Agents", "Leaders", "Backing", "$1UP", "House", "About"] as const;
-type Tab = (typeof TABS)[number];
 const TAB_ICONS: Record<Tab, IconName> = {
   Trade: "chart",
   "Life NFTs": "heart",
@@ -32,6 +32,7 @@ const TAB_ICONS: Record<Tab, IconName> = {
   Market: "store",
   Agents: "agent",
   Leaders: "trophy",
+  Jackpot: "coin",
   Backing: "deposit",
   $1UP: "claim",
   House: "shield",
@@ -40,19 +41,12 @@ const TAB_ICONS: Record<Tab, IconName> = {
 /** Phones: the four you use; the ones you read sit behind More. */
 const PHONE_TABS: Tab[] = ["Trade", "Life NFTs", "Locks", "Market"];
 /** Desktop: the reading tabs sit under More. */
-const MORE_TABS: Tab[] = ["Leaders", "Backing", "$1UP", "House", "About"];
+const MORE_TABS: Tab[] = ["Leaders", "Jackpot", "Backing", "$1UP", "House", "About"];
 /** Below 1280px these join them, so the bar fits beside the round strip. */
 const NARROW_MORE_TABS: Tab[] = [];
 const PHONE_LABEL: Partial<Record<Tab, string>> = {};
-
-/** Each tab's address: /locks, /life-nfts, /house… (Trade is the root). */
-const slug = (t: Tab) => (t === "Trade" ? "" : t.toLowerCase().replace(/\$/g, "").replace(/\s+/g, "-"));
-/** The tab's earlier address, so links already shared still open it. */
-const OLD_PATHS: Record<string, string> = { "extra-lives": "life-nfts" };
-const fromPath = (path: string): Tab => {
-  const name = path.replace(/^\/+|\/+$/g, "").toLowerCase();
-  return TABS.find((t) => slug(t) === (OLD_PATHS[name] ?? name)) ?? "Trade";
-};
+/** Phones: everything that isn't in the bottom bar. */
+const PHONE_MORE_TABS = TABS.filter((t) => !PHONE_TABS.includes(t));
 
 export default function Home() {
   const [tab, setTab] = useState<Tab>("Trade");
@@ -63,7 +57,7 @@ export default function Home() {
     const previousRestoration = history.scrollRestoration;
     history.scrollRestoration = "manual";
     const read = () => {
-      setTab(fromPath(location.pathname));
+      setTab(tabAt(location.pathname) ?? "Trade");
       setAnchor(location.hash.slice(1));
       if (!location.hash) window.scrollTo({ top: 0 });
     };
@@ -87,6 +81,10 @@ export default function Home() {
       },
     });
   }, [tab, anchor]);
+  // moving between tabs doesn't load a page, so the browser tab's title follows here (a fresh load gets it from the route)
+  useEffect(() => {
+    document.title = tabTitle(tab);
+  }, [tab]);
   /** Opens a tab at its top, or follows its section through asynchronous loading. */
   const go = (t: Tab, at?: string) => {
     setTab(t);
@@ -131,7 +129,8 @@ export default function Home() {
           {tab === "Locks" && <Locks />}
           {tab === "Market" && <Market />}
           {tab === "Agents" && <Agents />}
-          {tab === "Leaders" && <Leaderboard />}
+          {tab === "Leaders" && <Leaderboard go={(t) => go(t as Tab)} />}
+          {tab === "Jackpot" && <JackpotPage />}
           {tab === "Backing" && <BackPage go={(t) => go(t as Tab)} />}
           {tab === "$1UP" && <Tokenomics />}
           {tab === "House" && <Solvency />}
@@ -144,7 +143,7 @@ export default function Home() {
       <nav className="bottom-nav lg:hidden" aria-label="Sections">
         {more && (
           <div className="absolute inset-x-3 bottom-[68px] flex flex-col gap-1 rounded-xl border border-[var(--panel-edge)] bg-[var(--panel)] p-2 shadow-[var(--panel-shadow)]">
-            {(["Agents", "Leaders", "Backing", "$1UP", "House", "About"] as const).map((t) => (
+            {PHONE_MORE_TABS.map((t) => (
               <button key={t} className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-left font-bold hover:bg-[var(--panel-2)]" onClick={() => go(t)}>
                 <Icon name={TAB_ICONS[t]} />
                 {t}
@@ -158,7 +157,7 @@ export default function Home() {
             {PHONE_LABEL[t] ?? t}
           </button>
         ))}
-        <button aria-current={tab === "Agents" || tab === "Leaders" || tab === "Backing" || tab === "$1UP" || tab === "House" || tab === "About" ? "page" : undefined} aria-expanded={more} onClick={() => setMore(!more)}>
+        <button aria-current={PHONE_MORE_TABS.includes(tab) ? "page" : undefined} aria-expanded={more} onClick={() => setMore(!more)}>
           <Icon name="more" size={20} />
           More
         </button>

@@ -102,6 +102,7 @@ export function Agents() {
           An agent gets the same tools a trader has: markets, quotes, open and close, Life NFTs and the market. Each action goes in a public journal with
           the agent&apos;s own reason. That runs in the local demo; on this testnet site there is no AI agent yet, and the bots below provide the flow you see.
         </Explainer>
+        <ConnectAgent local={false} />
         <BotTable accounts={rows?.filter((r) => agentOf(r.account, ai)?.kind === "bot").map((r) => r.account) ?? []} rows={rows} ai={ai} note="Rule-based strategies trading around the clock with test money, so the house always has flow. Updated about once a minute." />
       </div>
     );
@@ -172,26 +173,102 @@ export function Agents() {
         </div>
       </section>
 
-      <section className="panel p-4">
-        <h2 className="font-extrabold">Connect your own agent</h2>
-        <p className="label mt-1 max-w-3xl">
-          Any MCP client can trade here. In this repo, Claude Code picks the server up from .mcp.json; anywhere else, run it over stdio. It trades
-          as the AI agent&apos;s account unless you name another.
-        </p>
-        <pre className="agent-code">
-          {`# the MCP server over stdio, as ${short(agentId)}
+      <ConnectAgent local agent={short(agentId)} />
+
+      <BotTable accounts={d.bots.map((b) => b.id)} rows={rows} ai={ai} note="Rule-based strategies trading around the clock, so the house always has flow." />
+    </div>
+  );
+}
+
+/** The MCP server's tools (mcp/src/index.ts), by what they do: the first group only reads. */
+const MCP_TOOLS: { name: string; does: string; acts?: boolean }[] = [
+  { name: "how_it_works", does: "The rules in a few lines. An agent reads this first." },
+  { name: "markets", does: "Each market's price, maximum leverage, long and short exposure, and the room left." },
+  { name: "account", does: "Wallet and trading balances, open positions with live profit, pending orders and this round's possible Life NFT." },
+  { name: "quote_trade", does: "Whether the house would take a trade, with its fee on a win, maximum win and liquidation price. Places nothing." },
+  { name: "extra_lives", does: "Its Life NFTs: USDC to claim, the remaining payout limit and the earning period." },
+  { name: "market_listings", does: "Life NFTs and $1UP locks for sale, each with its price and what it can still pay or is worth today." },
+  { name: "house", does: "The pool, what it would owe if every position hit its maximum win, and the round so far." },
+  { name: "open_trade", does: "Places an order to open a position, with optional take-profit and stop-loss. A keeper fills it at a later oracle price.", acts: true },
+  { name: "close_trade", does: "Places a close for a position held at least 60 seconds. A keeper settles it.", acts: true },
+  { name: "set_triggers", does: "Sets or clears a position's take-profit and stop-loss.", acts: true },
+  { name: "claim_lives", does: "Sends the USDC its Life NFTs can claim to its wallet.", acts: true },
+  { name: "buy_listing", does: "Buys a Life NFT or a lock at its listed price, paid in wallet USDC.", acts: true },
+  { name: "faucet", does: "Mints test USDC to its wallet. Local chain only.", acts: true },
+];
+
+const MCP_CLIENT_CONFIG = `{
+  "mcpServers": {
+    "oneup": {
+      "command": "pnpm",
+      "args": ["--silent", "--filter", "@oneup/mcp", "start"]
+    }
+  }
+}`;
+
+/** How to point an MCP client at OneUp, and what it can then do. The server signs with the local demo's keys, so on
+ *  the testnet site the steps start from the repository. */
+function ConnectAgent({ local, agent = "bot12" }: { local: boolean; agent?: string }) {
+  const steps = local
+    ? `# the MCP server over stdio, as ${agent}
 pnpm mcp
 # as another account
 ONEUP_ACCOUNT=bot3 pnpm mcp
 # one autonomous AI session
 # (Claude API key, or the claude CLI)
-pnpm agent`}
-        </pre>
-        <p className="label mt-2">Tools: how_it_works, markets, account, quote_trade, open_trade, close_trade, set_triggers, extra_lives, claim_lives, market_listings, buy_listing, house, faucet.</p>
-      </section>
-
-      <BotTable accounts={d.bots.map((b) => b.id)} rows={rows} ai={ai} note="Rule-based strategies trading around the clock, so the house always has flow." />
-    </div>
+pnpm agent`
+    : `git clone https://github.com/ethboi/oneup && cd oneup
+pnpm install --frozen-lockfile
+pnpm build:contracts
+# a local chain with live prices and bots,
+# at http://127.0.0.1:3020; leave it running
+pnpm demo
+# in a second terminal: the MCP server over stdio
+pnpm mcp
+# or one autonomous AI session
+# (Claude API key, or the claude CLI)
+pnpm agent`;
+  const group = (acts: boolean) => (
+    <dl className="mt-1.5 flex flex-col text-sm">
+      {MCP_TOOLS.filter((t) => Boolean(t.acts) === acts).map((t) => (
+        <div key={t.name} className="grid gap-x-4 border-t border-[var(--line)] py-2 first:border-0 sm:grid-cols-[150px_1fr]">
+          <dt className="font-bold" style={{ fontFamily: "ui-monospace, monospace", fontSize: "12.5px" }}>{t.name}</dt>
+          <dd className="text-[var(--muted)]">{t.does}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+  return (
+    <section className="panel p-4" id="connect">
+      <h2 className="font-extrabold">Connect your own agent</h2>
+      <p className="label mt-1 max-w-3xl">
+        {local
+          ? "Any MCP client can trade here. In this repo, Claude Code picks the server up from .mcp.json; anywhere else, run it over stdio. It trades as the AI agent's account unless you name another."
+          : "The MCP server signs with the local demo's test keys, so an agent trades on a chain you run yourself, not on this testnet deployment. Three commands start that chain; a fourth starts the server."}
+      </p>
+      <div className="mt-2 grid gap-x-5 lg:grid-cols-2">
+        <div className="min-w-0">
+          <pre className="agent-code">{steps}</pre>
+        </div>
+        <div className="min-w-0">
+          <pre className="agent-code">{MCP_CLIENT_CONFIG}</pre>
+          <p className="label mt-2">
+            The same entry is in the repository&apos;s .mcp.json, which Claude Code loads on its own. For another MCP client, add it to the client&apos;s configuration and start the client from the repository folder.
+          </p>
+        </div>
+      </div>
+      <div className="mt-4 grid gap-x-8 gap-y-4 lg:grid-cols-2">
+        <div>
+          <h3 className="font-extrabold">Tools that read</h3>
+          {group(false)}
+        </div>
+        <div>
+          <h3 className="font-extrabold">Tools that act</h3>
+          <p className="label">Trades, claims and purchases take the agent&apos;s reason, which goes into its journal.</p>
+          {group(true)}
+        </div>
+      </div>
+    </section>
   );
 }
 

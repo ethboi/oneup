@@ -3,7 +3,7 @@
 // About: what OneUp is, how it works, what's built on NEAR and what's mocked, for judges and first-time
 // visitors. The app's entry for NEAR HACKATHON.
 
-import { JumpLinks } from "./ui";
+import { JumpLinks, RoundPace } from "./ui";
 import { PixelCoin, PixelHeart, PixelMark } from "./Pixel";
 import type { MarkName } from "@/lib/marks";
 import { Icon, type IconName } from "./Icon";
@@ -235,6 +235,7 @@ export function About() {
               </li>
             ))}
           </ol>
+          <RoundPace rounds={104} className="mt-4" />
         </section>
 
         <section id="about-origin" className="scroll-mt-4 p-5">

@@ -12,7 +12,7 @@ import { useOneUp, usePoll } from "@/lib/oneup";
 import { fmtOneup } from "./Header";
 
 export function Backing() {
-  const { o, me, tx, run } = useOneUp();
+  const { o, me, tx, run, viewOnly } = useOneUp();
   const [amount, setAmount] = useState("1000");
   const amt = parseTokenAmount(amount, 6);
   const round = usePoll(() => o.backing(amt > 0n ? amt : undefined), [amount], 4000);
@@ -26,7 +26,8 @@ export function Backing() {
   const min = BigInt(round.min);
   const left = target > backed ? target - backed : 0n;
   const tooBig = amt > left;
-  const short = wallet !== undefined && amt > BigInt(wallet);
+  // without a wallet there is no balance to fall short: the button asks for one
+  const short = !viewOnly && wallet !== undefined && amt > BigInt(wallet);
   const owedMine = mine.reduce((s, l) => s + BigInt(l.owed), 0n);
   const paidMine = mine.reduce((s, l) => s + BigInt(l.paid), 0n);
 
@@ -71,7 +72,7 @@ export function Backing() {
                 disabled={amt < min || tooBig || short}
                 onClick={() => run(`Back the house with $${fmtUsdc(amt, 0)}`, () => tx.back(amt))}
               >
-                {amt < min ? `Back at least $${fmtUsdc(min, 0)}` : tooBig ? "Amount exceeds remaining capacity" : short ? "Not enough USDC in your wallet" : `Back $${fmtUsdc(amt, 0)}`}
+                {amt < min ? `Back at least $${fmtUsdc(min, 0)}` : tooBig ? "Amount exceeds remaining capacity" : short ? "Not enough USDC in your wallet" : viewOnly ? `Connect wallet to back $${fmtUsdc(amt, 0)}` : `Back $${fmtUsdc(amt, 0)}`}
               </button>
             </>
           ) : (

@@ -14,12 +14,12 @@ import { fmtOneup, fmtUsd } from "./Header";
 import { Icon } from "./Icon";
 import { LockCard } from "./LockCard";
 import { Sell, useListings } from "./Sell";
-import { Empty, Explainer, OnExplorer, PanelHead, Stat, SummaryBar } from "./ui";
+import { ConnectPrompt, Empty, Explainer, OnExplorer, PanelHead, RoundPace, Stat, SummaryBar } from "./ui";
 
 const MAX = Number(VE_MAX_EPOCHS);
 
 export function Locks() {
-  const { o, me, tx, run } = useOneUp();
+  const { o, me, tx, run, viewOnly } = useOneUp();
   const locks = usePoll(() => o.locks(me), [me]) ?? [];
   const epoch = usePoll(() => o.epoch(), []);
   const pending = usePoll(() => o.pendingPower(), []);
@@ -73,7 +73,16 @@ export function Locks() {
             Each round, 30% of the house&apos;s payout budget is used to buy back $1UP. These rewards are shared by weight: the locked amount × remaining rounds ÷ {MAX}. A new lock starts earning from the next round, and its weight decreases each round.
             Early withdrawal costs up to 50% of the locked amount; the penalty decreases over time and is shared among the remaining locks. $1UP awarded for eligible trading losses is locked for {MAX} rounds. Each lock is an NFT that you can list for sale.
           </Explainer>
+          <RoundPace rounds={MAX} className="mt-1.5" />
         </div>
+        {viewOnly ? (
+        <div className="panel order-3 min-w-0">
+          <ConnectPrompt icon="lock" also={<a className="btn btn-ghost" href="/market">See locks for sale</a>}>
+            <b className="text-[var(--text)]">Connect a wallet to see your locks.</b>{" "}
+            {recent ? `The last two rounds bought back ${fmtOneup(recent.toString())} $1UP for lock holders.` : "Locks share each round's $1UP buyback."}
+          </ConnectPrompt>
+        </div>
+        ) : (
         <div className="panel order-3 min-w-0 divide-y divide-[var(--line)]">
           <SummaryBar
             action={
@@ -139,6 +148,7 @@ export function Locks() {
             </div>
           )}
         </div>
+        )}
       </div>
       {/* phones: the price and the form before a long list of locks */}
       <div className="order-2 flex flex-col gap-4 lg:order-none">
@@ -234,7 +244,7 @@ function LockTile({ l, epoch, px, claimable, listings }: { l: LockInfo; epoch: n
 
 /** The $1UP price now, how it moved over the last day (sampled by the app's server), and what yours is worth. */
 function OneupPrice({ px, locked }: { px: bigint; locked: bigint }) {
-  const { o, me, d } = useOneUp();
+  const { o, me, d, viewOnly } = useOneUp();
   const wallet = BigInt(usePoll(() => o.oneupBalance(me), [me]) ?? "0");
   const [samples, setSamples] = useState<[number, number][]>([]);
   useEffect(() => {
@@ -277,7 +287,7 @@ function OneupPrice({ px, locked }: { px: bigint; locked: bigint }) {
         </svg>
       )}
       <p className="label mt-1">{d.network === "localnet" ? "Quote from the swap pool, sampled every minute. The price can change." : "Current quote from the test swap pool. Historical prices are unavailable on testnet."}</p>
-      <dl className="num mt-3 flex flex-col gap-1.5 border-t border-[var(--line)] pt-3 text-sm">
+      {!viewOnly && <dl className="num mt-3 flex flex-col gap-1.5 border-t border-[var(--line)] pt-3 text-sm">
         <div className="ticket-row">
           <dt className="label">In your wallet</dt>
           <dd className="font-bold">
@@ -290,26 +300,29 @@ function OneupPrice({ px, locked }: { px: bigint; locked: bigint }) {
             {fmtOneup(locked.toString())} <span className="label font-normal">{px > 0n ? `≈ ${fmtUsd((locked * px) / ONEUP)}` : ""}</span>
           </dd>
         </div>
-      </dl>
+      </dl>}
     </div>
   );
 }
 
 function LockForm({ px }: { px: bigint }) {
-  const { o, me, tx, run } = useOneUp();
+  const { o, me, tx, run, viewOnly, wallet: account } = useOneUp();
   const wallet = BigInt(usePoll(() => o.oneupBalance(me), [me]) ?? "0");
   const whole = wallet / ONEUP;
   const [amount, setAmount] = useState("");
   const [epochs, setEpochs] = useState(MAX);
   const raw = parseTokenAmount(amount, 18);
-  const over = raw > wallet;
+  // without a wallet there is no balance to exceed: the button asks for one
+  const over = !viewOnly && raw > wallet;
   return (
     <div className="panel flex flex-col gap-3 p-4">
       <h2 className="text-lg font-extrabold">Lock $1UP</h2>
-      <div className="ticket-row text-sm">
-        <span className="label">Available to lock</span>
-        <span className="num font-bold">{fmtOneup(wallet.toString())} $1UP</span>
-      </div>
+      {!viewOnly && (
+        <div className="ticket-row text-sm">
+          <span className="label">Available to lock</span>
+          <span className="num font-bold">{fmtOneup(wallet.toString())} $1UP</span>
+        </div>
+      )}
       <span className="field">
         <input className="input num" value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="$1UP amount" inputMode="decimal" placeholder="0" />
         <span className="field-unit">$1UP</span>
@@ -328,7 +341,7 @@ function LockForm({ px }: { px: bigint }) {
       )}
       {raw > 0n && px > 0n && !over && <span className="label num -mt-1">≈ {fmtUsd((raw * px) / ONEUP)} at the current price</span>}
       {over && <span className="text-sm text-[var(--short)]">This amount exceeds your wallet balance.</span>}
-      {wallet === 0n && (
+      {wallet === 0n && !viewOnly && (
         <p className="label">
           Your wallet has no unlocked $1UP. Trading rewards arrive in locks, and you can buy locks on the market.
         </p>
@@ -353,10 +366,17 @@ function LockForm({ px }: { px: bigint }) {
       <p className="label num">
         Starting weight: {((Number(amount) || 0) * epochs / MAX).toLocaleString("en-US", { maximumFractionDigits: 0 })}. Weight decreases each round. Early withdrawal costs up to 50% of the locked amount; the penalty decreases over time.
       </p>
-      <button className="btn btn-accent" disabled={raw === 0n || over} onClick={() => run(`Lock ${amount} $1UP`, () => tx.lock(raw, epochs)).then((ok) => ok && setAmount(""))}>
-        <Icon name="lock" />
-        {raw > 0n ? `Lock ${Number(amount).toLocaleString("en-US")} $1UP` : "Lock"}
-      </button>
+      {viewOnly ? (
+        <button className="btn btn-accent" disabled={account.busy} onClick={() => void account.connect()}>
+          <Icon name="wallet" />
+          Connect wallet to lock
+        </button>
+      ) : (
+        <button className="btn btn-accent" disabled={raw === 0n || over} onClick={() => run(`Lock ${amount} $1UP`, () => tx.lock(raw, epochs)).then((ok) => ok && setAmount(""))}>
+          <Icon name="lock" />
+          {raw > 0n ? `Lock ${Number(amount).toLocaleString("en-US")} $1UP` : "Lock"}
+        </button>
+      )}
     </div>
   );
 }

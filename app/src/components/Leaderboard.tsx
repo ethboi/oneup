@@ -17,7 +17,7 @@ type Period = "round" | "day" | "all";
 const short = displayAccount;
 const usd = (x: bigint) => fmtUsd(x, true);
 
-export function Leaderboard() {
+export function Leaderboard({ go }: { go: (tab: "Jackpot") => void }) {
   const { o, me, d } = useOneUp();
   const epoch = usePoll(() => o.epoch(), [], 10_000);
   const [period, setPeriod] = useState<Period>("day");
@@ -74,7 +74,8 @@ export function Leaderboard() {
         </div>
       </div>
 
-      <Jackpot />
+      {/* the prize and the last winner; every draw is on the Jackpot tab */}
+      <Jackpot compact more={() => go("Jackpot")} />
 
       {mine && (
         <div className="panel num flex flex-wrap items-center gap-x-6 gap-y-1 p-4 text-sm">
@@ -162,7 +163,7 @@ function Board({ title, note, icon, rows, me, empty }: { title: string; note?: s
                     {you && <span className="you-tag">you</span>}
                     {r.liquidations > 0 && <span className="label" title={`${r.liquidations} liquidations`}> · {r.liquidations}× liquidated</span>}
                   </td>
-                  <td className="py-2 text-right font-bold" style={{ color: pnl >= 0n ? "var(--long)" : "var(--short)" }}>
+                  <td className="whitespace-nowrap py-2 pl-2 text-right font-bold" style={{ color: pnl >= 0n ? "var(--long)" : "var(--short)" }}>
                     {usd(pnl)}
                   </td>
                   <td className="hidden py-2 text-right sm:table-cell">{r.trades}</td>

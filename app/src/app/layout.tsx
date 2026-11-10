@@ -27,12 +27,12 @@ export const viewport: Viewport = { themeColor: "#15162a" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    // dark only; the script marks a session that has already seen the power-on screen, before anything paints
+    // dark only; the script marks a session that has already seen the power-on screen, or a link straight to a tab, before anything paints
     <html lang="en" className={`${pixel.variable} ${rounded.variable}`} suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{if(sessionStorage.getItem("oneup.booted")==="1"&&!new URLSearchParams(location.search).has("boot"))document.documentElement.dataset.booted="1"}catch(e){}`,
+            __html: `try{if((sessionStorage.getItem("oneup.booted")==="1"||location.pathname!=="/")&&!new URLSearchParams(location.search).has("boot"))document.documentElement.dataset.booted="1"}catch(e){}`,
           }}
         />
       </head>

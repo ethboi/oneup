@@ -27,6 +27,26 @@ export function PageTitle({ children }: { children: React.ReactNode }) {
   return <h1 className="page-title text-[var(--text)]">{children}</h1>;
 }
 
+const span = (s: number) => {
+  const n = (x: number, unit: string) => `${x} ${unit}${x === 1 ? "" : "s"}`;
+  return s < 5400 ? n(Math.round(s / 60), "minute") : s < 172_800 ? n(Math.round(s / 3600), "hour") : n(Math.round(s / 86_400), "day");
+};
+const WEEK = 604_800;
+
+/** A round is a week at launch but minutes here. Says so wherever a number of rounds is quoted, so "104 rounds"
+ *  and a 20-minute round timer don't read as a contradiction. */
+export function RoundPace({ rounds, className }: { rounds?: number; className?: string }) {
+  const { d } = useOneUp();
+  if (d.epochLengthS >= WEEK) return null;
+  const atLaunch = rounds && (rounds % 52 === 0 ? `${rounds / 52 === 2 ? "two" : rounds / 52} year${rounds === 52 ? "" : "s"}` : `${rounds} weeks`);
+  return (
+    <p className={`label ${className ?? ""}`}>
+      Rounds are planned to last a week at launch. On this {d.network === "testnet" ? "testnet" : "local demo"} they are sped up: a round lasts {span(d.epochLengthS)}
+      {rounds ? `, so ${rounds} rounds pass in about ${span(rounds * d.epochLengthS)} instead of ${atLaunch}` : ""}.
+    </p>
+  );
+}
+
 /** One plain line; the longer explanation stays folded until asked for. */
 export function Explainer({ title, line, children }: { title?: string; line: React.ReactNode; children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -71,6 +91,26 @@ export function Empty({ icon, children }: { icon: Parameters<typeof Icon>[0]["na
     <div className="flex items-center gap-3 p-4 text-sm text-[var(--muted)]">
       <Icon name={icon} size={20} />
       <div>{children}</div>
+    </div>
+  );
+}
+
+/** Without a wallet there is nothing of yours to show: what would be here, and the way in. */
+export function ConnectPrompt({ icon, children, also }: { icon: Parameters<typeof Icon>[0]["name"]; children: React.ReactNode; also?: React.ReactNode }) {
+  const { wallet } = useOneUp();
+  return (
+    <div className="flex flex-col items-start gap-3 p-4 sm:flex-row sm:items-center">
+      <div className="flex flex-1 items-center gap-3 text-sm text-[var(--muted)]">
+        <Icon name={icon} size={20} className="shrink-0" />
+        <div>{children}</div>
+      </div>
+      <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row">
+        {also}
+        <button type="button" className="btn btn-accent" disabled={wallet.busy} onClick={() => void wallet.connect()}>
+          <Icon name="wallet" />
+          Connect wallet
+        </button>
+      </div>
     </div>
   );
 }

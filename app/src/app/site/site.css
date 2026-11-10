@@ -152,6 +152,12 @@
   font-weight: 700;
   line-height: 1.4;
 }
+/* wide screens: the hero leaves room for the live numbers in the first screen */
+@media (min-width: 760px) {
+  .site-hero {
+    min-height: clamp(460px, 100dvh - 280px, 760px);
+  }
+}
 @media (max-width: 700px) {
   .site-hero {
     padding-bottom: 200px;

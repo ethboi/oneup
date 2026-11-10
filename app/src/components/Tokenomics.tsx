@@ -6,10 +6,12 @@ import { useMemo } from "react";
 import { TokenomicsReader } from "@/lib/tokenomics";
 import { EMISSIONS_TOTAL, EMISSION_EPOCHS, ONEUP, ONEUP_PER_USDC, SUPPLY, fmtUsdc } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
+import { usePublishedRounds } from "@/lib/rounds";
 import { useOneupPrice } from "@/lib/value";
 import { fmtOneup } from "./Header";
 import { PixelHeart, PixelLock } from "./Pixel";
 import { Icon } from "./Icon";
+import { RoundPace } from "./ui";
 
 const M = 1_000_000n * ONEUP;
 
@@ -28,10 +30,13 @@ export function Tokenomics() {
   const carry = usePoll(() => o.emissionCarry(), [], 10_000);
   const round = usePoll(() => o.backing(), [], 10_000);
   const reader = useMemo(() => new TokenomicsReader(o), [o]);
-  const totals = usePoll(() => reader.read(Math.max(0, (epoch?.id ?? 1) - 1)), [reader, epoch?.id], 30_000);
-  const history = totals?.history;
-  const released = (history ?? []).reduce((sum, row) => sum + BigInt(row.released), 0n);
-  const buybacks = totals?.buybacks;
+  // testnet: the indexer's totals, in one request. Otherwise every closed round is read from the chain.
+  const published = usePublishedRounds();
+  const fromChain = published === null && epoch !== undefined;
+  const totals = usePoll(async () => (fromChain ? reader.read(Math.max(0, epoch.id - 1)) : undefined), [reader, epoch?.id, fromChain], 30_000);
+  const history = published ? published.emissions : totals?.history;
+  const released = published ? BigInt(published.released) : (history ?? []).reduce((sum, row) => sum + BigInt(row.released), 0n);
+  const buybacks = published ? BigInt(published.buybacks) : totals?.buybacks;
   const backersUsed = round ? 7_500_000n * ONEUP - BigInt(round.oneup_left) : 0n;
   const perRound = EMISSIONS_TOTAL / EMISSION_EPOCHS;
   const last = (history ?? []).slice(-24);
@@ -50,6 +55,7 @@ export function Tokenomics() {
             House profit determines how many tokens are released, and every reward is locked for 104 rounds.
             Locks share in buyback rewards. There is no separate team or investor allocation.
           </p>
+          <RoundPace rounds={104} className="mt-2 max-w-2xl" />
           <dl className="num mt-5 grid max-w-3xl grid-cols-2 gap-4 sm:grid-cols-4">
             <Stat label="Price" value={px > 0n ? `$${(Number(px) / 1e6).toFixed(4)}` : "…"} />
             <Stat label="Supply" value="1,000,000,000" />
@@ -126,7 +132,9 @@ export function Tokenomics() {
           Tokens released as trader loss rewards each round. The schedule adds up to {fmtOneup(perRound.toString())} a round; the rest
           carries forward.
         </p>
-        {last.length === 0 ? (
+        {history === undefined ? (
+          <p className="label mt-3" role="status">Loading rounds…</p>
+        ) : last.length === 0 ? (
           <p className="label mt-3">No rounds have closed yet.</p>
         ) : (
           <div className="mt-4 flex h-40 items-end gap-1.5" role="img" aria-label="$1UP released per round against the schedule">

@@ -40,15 +40,34 @@ export function fmtDuration(s: number) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
-export function Jackpot({ compact }: { compact?: boolean }) {
-  const { o, d, me } = useOneUp();
+/** The Jackpot tab: the prize, the countdown, your tickets and every past draw. */
+export function JackpotPage() {
+  const { o } = useOneUp();
+  const every = usePoll(() => o.params(), [], 60_000)?.jackpot_epochs;
+  return (
+    <div className="flex flex-col gap-5">
+      <div>
+        <h1 className="page-title">Jackpot</h1>
+        <p className="label">
+          {every ? `Drawn every ${every === 1 ? "round" : `${every} rounds`}` : "Drawn every few rounds"} among traders with a net loss since the last draw. A bigger loss means more tickets, not a certain win.
+        </p>
+      </div>
+      <Jackpot page />
+    </div>
+  );
+}
+
+export function Jackpot({ compact, page, more }: { compact?: boolean; page?: boolean; more?: () => void }) {
+  const { o, d, me, viewOnly } = useOneUp();
   const now = useNow();
   const t = usePoll(() => o.treasury(), [], 5000);
   const epoch = usePoll(() => o.epoch(), [], 10_000);
   const mine = usePoll(() => o.tickets(me), [me], 5000);
   const pending = usePoll(() => o.pendingLife(me), [me], 5000);
   const draws = useDraws();
-  if (!t || !t.vault) return null;
+  // on its own page there is always something to say; beside other things it simply isn't there
+  if (!t) return page ? <p className="panel label p-5" role="status">Loading the jackpot…</p> : null;
+  if (!t.vault) return page ? <p className="panel label p-5">This deployment has no jackpot: the house pool isn&apos;t earning interest.</p> : null;
 
   const pot = BigInt(t.jackpot);
   const total = BigInt(t.tickets);
@@ -75,21 +94,35 @@ export function Jackpot({ compact }: { compact?: boolean }) {
             <dt className="label">Next draw</dt>
             <dd className="text-xl font-extrabold">{left === null ? "…" : fmtDuration(left)}</dd>
           </div>
-          <div>
-            <dt className="label">Your tickets</dt>
-            <dd className="text-xl font-extrabold">{fmtUsdc(myTickets, 0)}</dd>
-          </div>
-          <div>
-            <dt className="label">Current odds</dt>
-            <dd className="text-xl font-extrabold">{myTickets > 0n ? `${odds.toFixed(odds < 1 ? 2 : 1)}%` : "–"}</dd>
-          </div>
+          {viewOnly ? (
+            <div className="col-span-2">
+              <dt className="label">Tickets in this draw</dt>
+              <dd className="text-xl font-extrabold">{fmtUsdc(total, 0)}</dd>
+            </div>
+          ) : (
+            <>
+              <div>
+                <dt className="label">Your tickets</dt>
+                <dd className="text-xl font-extrabold">{fmtUsdc(myTickets, 0)}</dd>
+              </div>
+              <div>
+                <dt className="label">Current odds</dt>
+                <dd className="text-xl font-extrabold">{myTickets > 0n ? `${odds.toFixed(odds < 1 ? 2 : 1)}%` : "–"}</dd>
+              </div>
+            </>
+          )}
         </dl>
       </div>
       <p className="label mt-3">
         The demo jackpot is funded by simulated vault interest. Each $1 of eligible net loss adds a ticket. One winning ticket receives the full prize.
-        {myTickets === 0n && " You have no tickets for this draw."}
+        {viewOnly ? " Connect a wallet to see your tickets." : myTickets === 0n && " You have no tickets for this draw."}
       </p>
       {compact ? <LastWinner draws={draws} me={me} /> : <PastDraws draws={draws} me={me} />}
+      {more && (
+        <button type="button" className="label mt-2 font-bold underline decoration-dotted underline-offset-2" onClick={more}>
+          Every past draw
+        </button>
+      )}
     </div>
   );
 }

@@ -8,7 +8,6 @@ import type { AppDeployment } from "./app-config";
 import { useNearWallet } from "./near-wallet";
 import { accessOf, type Access } from "./access";
 import { reportFailure } from "./report";
-import { WalletWelcome } from "@/components/WalletWelcome";
 import { sfx } from "./sound";
 import { pollSerial } from "./poll";
 import { loadSession, saveSession, sessionExists, sessionSender, type Session } from "./session";
@@ -65,7 +64,6 @@ function withoutAccount(o: OneUp): OneUp {
     },
   });
 }
-const WATCH_KEY = "oneup.testnet.viewOnly";
 
 const OneUpContext = createContext<Ctx | null>(null);
 
@@ -108,23 +106,15 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
     [d],
   );
   const wallet = useNearWallet(d);
-  // a visitor can look around before connecting a wallet; remembered for this browser
-  // read straight away (this only renders in the browser), so the wallet screen doesn't flash for someone already looking around
-  const [watching, setWatching] = useState(() => {
-    try { return localStorage.getItem(WATCH_KEY) === "1"; } catch { return false; }
-  });
-  const watch = useCallback(() => {
-    setWatching(true);
-    try { localStorage.setItem(WATCH_KEY, "1"); } catch {}
-  }, []);
   const accounts = useMemo(
     () => d.demo ? [{ id: d.demo.id, label: "demo" }, ...d.bots.map((b, i) => ({ id: b.id, label: `bot ${i + 1}` }))] : [],
     [d],
   );
   const [localMe, setMeState] = useState(d.demo?.id ?? "");
   const me = d.network === "localnet" ? localMe : wallet.accountId;
-  const access = accessOf(d.network, me, watching);
-  const viewOnly = access === "welcome" || access === "watching";
+  // testnet opens view-only: the header's Connect button, or any action, asks for a wallet
+  const access = accessOf(d.network, me);
+  const viewOnly = access === "watching";
   useEffect(() => {
     try {
       const saved = localStorage.getItem("oneup.account");
@@ -194,6 +184,14 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
       return false;
     }
   }, [viewOnly, connect, d.network, me]);
+  // a wallet that couldn't connect says why (once connected, the account menu shows its errors)
+  useEffect(() => {
+    if (!viewOnly || !wallet.error) return;
+    const id = nextId.current++;
+    setToasts((t) => [...t, { id, text: wallet.error!, kind: "error" }]);
+    const timer = setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 8000);
+    return () => clearTimeout(timer);
+  }, [viewOnly, wallet.error]);
 
   // Prices: poll the oracle every second and keep the last 1,800 updates (30 minutes) per market. A point is added only
   // when the oracle publishes a new price, at the moment it arrives, so the chart moves with real updates
@@ -202,8 +200,6 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
   const [history, setHistory] = useState<Record<string, { t: number; p: number }[]>>({});
   const [publishedAt, setPublishedAt] = useState<Record<string, number>>({});
   useEffect(() => {
-    // the connect screen shows no prices
-    if (access === "welcome") return;
     let live = true;
     const published = new Map<string, number>();
     const tick = async () => {
@@ -257,10 +253,10 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
       live = false;
       stop();
     };
-  }, [o, d.network, access]);
+  }, [o, d.network]);
 
   const value: Ctx = { d, o, accounts, me, setMe, tx, main, mainKey, session, wallet, run, toasts, prices, history, publishedAt, version, viewOnly, access };
-  return <OneUpContext.Provider value={value}>{access === "welcome" ? <WalletWelcome connect={wallet.connect} busy={wallet.busy} error={wallet.error} watch={watch} /> : children}</OneUpContext.Provider>;
+  return <OneUpContext.Provider value={value}>{children}</OneUpContext.Provider>;
 }
 
 /** Polls `f` every `ms` and whenever `deps` or the transaction version change. */

@@ -7,6 +7,7 @@ import { fmtUsdc, ppmToNumber, type EpochSummary } from "@oneup/sdk";
 import { Fairness } from "./Fairness";
 import { fmtUsd } from "./Header";
 import { useOneUp, usePoll } from "@/lib/oneup";
+import { usePublishedRounds } from "@/lib/rounds";
 import { Icon } from "./Icon";
 import { Governance } from "./Governance";
 import { JumpLinks, PageTitle } from "./ui";
@@ -19,11 +20,16 @@ export function Solvency() {
   const { o } = useOneUp();
   const s = usePoll(() => o.solvency(), []);
   const epoch = usePoll(() => o.epoch(), []);
-  const history = usePoll(async () => {
-    if (!epoch) return [];
+  // testnet: the rounds the indexer published, in one request. Otherwise they are read from the chain.
+  const published = usePublishedRounds();
+  const fromChain = published === null && epoch !== undefined;
+  const read = usePoll(async () => {
+    if (!fromChain) return undefined;
     const ids = Array.from({ length: Math.min(12, epoch.id - 1) }, (_, i) => epoch.id - 1 - i);
     return (await Promise.all(ids.map((e) => o.epochSummary(e)))).filter(Boolean) as EpochSummary[];
-  }, [epoch?.id], 10_000);
+  }, [epoch?.id, fromChain], 10_000);
+  /** Not yet known while it loads: an empty list means no round has closed. */
+  const history = published ? published.summaries : read;
 
   if (!s) return <p className="label">Loading house reserves…</p>;
   const pool = big(s.pool);
@@ -146,7 +152,9 @@ export function Solvency() {
 
         <div className="-mx-5 mt-5 overflow-x-auto border-t border-[var(--line)] px-5 pt-5">
           <h2 id="house-rounds" className="scroll-mt-4 text-lg font-extrabold">Rounds</h2>
-          {(history ?? []).length === 0 ? (
+          {history === undefined ? (
+            <p className="label mt-2" role="status">Loading rounds…</p>
+          ) : history.length === 0 ? (
             <p className="label mt-2">No closed rounds yet.</p>
           ) : (
             // phones: the round, what traders lost, the house's result, what lives got and the pool; the rest from 640px
@@ -166,7 +174,7 @@ export function Solvency() {
                 </tr>
               </thead>
               <tbody>
-                {history!.map((e) => (
+                {history.map((e) => (
                   <tr key={e.epoch} className="border-t border-[var(--line)]">
                     <td className="py-2">{e.epoch}</td>
                     <td className="text-right">{fmtUsd(big(e.losses))}</td>

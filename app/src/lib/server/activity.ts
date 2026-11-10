@@ -452,6 +452,16 @@ export function jackpotDraws(): ActivityItem[] {
   return state.items.filter((i) => i.kind === "jackpot" && i.draw).reverse();
 }
 
+/** The newest sales, newest first, from the sellers' histories: the feed keeps only its newest events, and a quiet
+ *  market's last sale is older than those. */
+export function recentSales(keep = 20): ActivityItem[] {
+  const sales: ActivityItem[] = [];
+  for (const [seller, list] of state.history)
+    for (const h of list)
+      if (h.kind === "sold") sales.push({ seq: h.seq, t: h.t, kind: "sold", who: short(h.other), text: `${short(h.other)} bought ${short(seller)}'s ${h.what} for ${usd(h.price)}`, tx: h.tx });
+  return sales.sort((a, b) => b.seq - a.seq).slice(0, keep);
+}
+
 /** An account's history, newest first, and how far the scan has got (it starts from block 1). */
 export function historyFor(account: string): { items: HistoryItem[]; synced: boolean; progress: number } {
   const done = (state.next ?? 1) - 1;

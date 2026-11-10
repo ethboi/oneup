@@ -11,10 +11,10 @@ import { PixelHeart } from "./Pixel";
 import { useListings } from "./Sell";
 import { LifeCard, lifeState } from "./LifeCard";
 import { LifeDetail } from "./LifeDetail";
-import { Empty, Explainer, PanelHead, Stat, SummaryBar } from "./ui";
+import { ConnectPrompt, Empty, Explainer, PanelHead, Stat, SummaryBar } from "./ui";
 
 export function Lives() {
-  const { o, me, tx, run } = useOneUp();
+  const { o, me, tx, run, viewOnly } = useOneUp();
   const lives = usePoll(() => o.lives(me), [me]);
   const expiry = usePoll(() => o.params(), [], 60_000)?.life_expiry_epochs;
   const epoch = usePoll(() => o.epoch(), []);
@@ -64,6 +64,14 @@ export function Lives() {
         If someone buys your Life, its unclaimed USDC and remaining payout rights transfer to them. The payout limit is not a sale price.
       </Explainer>
 
+      {viewOnly ? (
+        <div className="panel">
+          <ConnectPrompt icon="heart" also={<a className="btn btn-ghost" href="/market">See Life NFTs for sale</a>}>
+            <b className="text-[var(--text)]">Connect a wallet to see your Life NFTs.</b>{" "}
+            {last && BigInt(last.lives_pot) > 0n ? `Last round, ${money(BigInt(last.lives_pot))} was shared among all Life NFTs.` : "They appear here once a round with an eligible net loss settles."}
+          </ConnectPrompt>
+        </div>
+      ) : (
       <div className="panel divide-y divide-[var(--line)]">
         <SummaryBar action={
           <div className="flex flex-col gap-1">
@@ -88,6 +96,7 @@ export function Lives() {
           {finished.length > 0 && <div className="divide-y divide-[var(--line)]"><PanelHead title={`Finished · no USDC to claim (${finished.length})`} action={<button className="chip" onClick={() => setShowDone(!showDone)} aria-expanded={showDone}>{showDone ? "Hide" : "Show"}</button>} />{showDone && rows(finished)}</div>}
         </>}
       </div>
+      )}
     </div>
   );
 }

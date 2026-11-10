@@ -439,7 +439,7 @@ export function Trade() {
 /** What you hold, as an exchange's account box sums it: your wallet, your balance in OneUp, the margin your
  *  positions and pending opens lock up and what positions would pay if closed now. */
 function Account({ t, positions, orders }: { t: Ticket; positions: Position[]; orders: Order[] }) {
-  const { prices } = useOneUp();
+  const { prices, viewOnly, wallet } = useOneUp();
   const margin = reservedMargin(positions, orders);
   const open = positions.reduce((a, p) => {
     const mark = prices[p.market_id];
@@ -447,6 +447,18 @@ function Account({ t, positions, orders }: { t: Ticket; positions: Position[]; o
   }, 0n);
   const equity = t.wallet + t.free + margin + open;
   const usd = (x: bigint) => `${x < 0n ? "−" : ""}$${fmtUsdc(x < 0n ? -x : x, (x < 0n ? -x : x) < 1_000n * USDC ? 2 : 0)}`;
+  if (viewOnly) {
+    return (
+      <section className="panel flex flex-col gap-3 p-4" aria-label="Account">
+        <h3 className="font-extrabold">Account</h3>
+        <p className="label">Connect a NEAR testnet wallet to see your balances and positions. Test USDC is free from the faucet.</p>
+        <button type="button" className="btn btn-ghost" disabled={wallet.busy} onClick={() => void wallet.connect()}>
+          <Icon name="wallet" />
+          Connect wallet
+        </button>
+      </section>
+    );
+  }
   return (
     <section className="panel p-4" aria-label="Account">
       <div className="ticket-row">

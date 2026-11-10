@@ -1,6 +1,6 @@
 "use client";
 
-// The power-on screen, once a browser session: a handheld with trading keys. The power light comes on, the LCD
+// The power-on screen, once a browser session and only at the app's root: a handheld with trading keys. The power light comes on, the LCD
 // flickers awake, the logo drops in in pixel steps, the tagline types, then a live price line draws itself behind
 // it and the markets scroll along the bottom while VIEW MARKETS blinks, and Life NFT cards are dealt out from
 // behind the console (around it on a wide screen, fanned above it on a tall one); they tilt toward the pointer.
@@ -110,7 +110,8 @@ export function Boot() {
     try {
       if (sessionStorage.getItem(KEY) === "1" && !forced()) return setState("gone");
     } catch {}
-    if (automated() && !forced()) return setState("gone");
+    // a link straight to a tab (/market, /leaders…) opens that tab: the power-on screen belongs to the front door
+    if ((automated() || location.pathname !== "/") && !forced()) return setState("gone");
   }, []);
 
   useEffect(() => {
