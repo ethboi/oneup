@@ -354,6 +354,8 @@ export function Trade() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [top?.id]);
   const orders = usePoll(() => o.orders(me), [me]) ?? [];
+  // the walkthrough ticks its trade steps from these
+  const trading = { positions: positions.length, orders: orders.length };
   const ticket = useTicket(market, markets.find((m) => m.id === market)?.max_leverage ?? 100);
   // the chart details one position: the one picked below, or the top one in this market; the rest show faintly
   const [focus, setFocus] = useState<number | null>(null);
@@ -394,12 +396,15 @@ export function Trade() {
 
   return (
     // Phones: one column in the order banner, chart, order form, then positions and activity (the left column
-    // dissolves via `contents` and `order` interleaves them), with a trade bar while the form is out of view.
+    // dissolves via `contents` and `order` interleaves them), with a trade bar while the form is out of view
+    // (once there is an account to trade with).
     // Desktop: chart over positions and activity on the left, the form on the right.
     <div className="flex flex-col gap-4 pb-24 lg:grid lg:grid-cols-[1fr_340px] lg:items-start lg:pb-0 2xl:grid-cols-[1fr_380px]">
       <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
         {/* notices about the round: the result of the one that just ended, and a loss in this one */}
         <div className="order-1 flex flex-col gap-4 empty:hidden">
+          {/* phones: the walkthrough is one strip above the chart; desktop keeps the checklist beside the form */}
+          <Tour slot="phone" trading={trading} />
           <EpochResults />
           <LossBanner />
         </div>
@@ -416,7 +421,7 @@ export function Trade() {
           />
           <TradesTape market={market} info={markets.find((m) => m.id === market)} />
         </div>
-        <div className="order-4 min-w-0">
+        <div id="positions" className="order-4 min-w-0 scroll-mt-4">
           <Below positions={positions} orders={orders} focused={focused?.id} pick={pick} market={market} />
         </div>
         {/* the guide to recovery, under the trading itself */}
@@ -425,7 +430,7 @@ export function Trade() {
         </div>
       </div>
       <div id="order-form" className="order-3 flex flex-col gap-4">
-        <Tour />
+        <Tour slot="desktop" trading={trading} />
         <OrderForm t={ticket} />
         <Account t={ticket} positions={positions} orders={orders} />
         {/* bringing USDC from another chain: a real 1Click quote, asked as a dry run */}
@@ -997,7 +1002,8 @@ function OrderForm({ t }: { t: Ticket }) {
 
   return (
     <div
-      className="panel ticket flex flex-col gap-2 p-3 sm:gap-3.5 sm:p-4"
+      id="order-ticket"
+      className="panel ticket flex scroll-mt-4 flex-col gap-2 p-3 sm:gap-3.5 sm:p-4"
       onPointerEnter={() => t.setPreviewHeld(true)}
       onPointerLeave={() => t.setPreviewHeld(false)}
       onFocus={() => t.setPreviewHeld(true)}
@@ -1192,7 +1198,7 @@ function OrderForm({ t }: { t: Ticket }) {
         )
       )}
 
-      <OrderButton side={side} blocked={blocked} label={t.label} submit={t.submit} />
+      <OrderButton side={side} blocked={blocked} label={t.label} submit={t.submit} pin={!viewOnly} />
       {t.intentStep && (
         <span className="label flex items-center gap-2" role="status">
           <Icon name="spinner" /> {t.intentStep}
@@ -1833,8 +1839,9 @@ function LossBanner() {
   );
 }
 
-/** The order button, with a copy pinned above the phone tab bar while the real one is scrolled out of view. */
-function OrderButton({ side, blocked, label, submit }: { side: Side; blocked: boolean; label: string; submit: () => void }) {
+/** The order button, with a copy pinned above the phone tab bar while the real one is scrolled out of view.
+ *  `pin`: false without an account, where a floating "Connect wallet" would only cover the page. */
+function OrderButton({ side, blocked, label, submit, pin }: { side: Side; blocked: boolean; label: string; submit: () => void; pin: boolean }) {
   const ref = useRef<HTMLButtonElement>(null);
   const [inView, setInView] = useState(true);
   useEffect(() => {
@@ -1855,7 +1862,8 @@ function OrderButton({ side, blocked, label, submit }: { side: Side; blocked: bo
       <button ref={ref} className="btn btn-big" style={style} disabled={blocked} onClick={submit}>
         {inner}
       </button>
-      {!inView &&
+      {pin &&
+        !inView &&
         createPortal(
           <div className="pinned-cta">
             <button className="btn btn-big" style={style} disabled={blocked} onClick={submit}>

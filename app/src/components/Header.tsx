@@ -20,7 +20,7 @@ import { sfx } from "@/lib/sound";
 import { endSession, saveSession, sessionAllowance, startSession } from "@/lib/session";
 import { intentsBalances, payFromChain } from "@/lib/intents";
 import { GuestButton } from "./ui";
-import { SHOW_TOUR } from "@/lib/tour";
+import { showTour } from "@/lib/tour";
 
 export interface NavTab {
   name: string;
@@ -273,11 +273,8 @@ function DemoMenu() {
             className="chip self-start"
             onClick={() => {
               close();
-              try {
-                localStorage.removeItem("oneup.tour.hidden");
-              } catch {}
+              showTour();
               if (location.pathname !== "/") location.href = "/";
-              else window.dispatchEvent(new Event(SHOW_TOUR));
             }}
           >
             Show the walkthrough

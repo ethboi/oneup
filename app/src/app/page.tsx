@@ -17,6 +17,7 @@ import { BackPage } from "@/components/BackPage";
 import { Leaderboard } from "@/components/Leaderboard";
 import { JackpotPage } from "@/components/Jackpot";
 import { TABS, slug, tabAt, tabTitle, type Tab } from "@/lib/tabs";
+import { showTour } from "@/lib/tour";
 import { Tokenomics } from "@/components/Tokenomics";
 import { Toasts } from "@/components/Toasts";
 import { SoundEvents } from "@/components/Sounds";
@@ -151,6 +152,17 @@ export default function Home() {
                 {t}
               </button>
             ))}
+            {/* the walkthrough on the Trade page (components/Tour.tsx): the way back to it once hidden */}
+            <button
+              className="flex items-center gap-2 rounded-lg border-t border-[var(--line)] px-3 py-2.5 text-left font-bold hover:bg-[var(--panel-2)]"
+              onClick={() => {
+                showTour();
+                go("Trade");
+              }}
+            >
+              <Icon name="check" />
+              Walkthrough
+            </button>
           </div>
         )}
         {PHONE_TABS.map((t) => (
@@ -205,6 +217,19 @@ function Footer({ go }: { go: (t: Tab, at?: string) => void }) {
         <div>
           <b className="block text-[var(--text)]">Read more</b>
           <ul className="label mt-1.5 flex flex-col gap-1">
+            {/* the walkthrough on the Trade page (components/Tour.tsx): here on every tab, and the way back once hidden */}
+            <li>
+              <button
+                type="button"
+                className={link}
+                onClick={() => {
+                  showTour();
+                  go("Trade");
+                }}
+              >
+                Take the walkthrough
+              </button>
+            </li>
             <li>
               <a className={link} href={process.env.ONEUP_SITE_URL}>
                 OneUp website
