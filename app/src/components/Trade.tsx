@@ -42,7 +42,7 @@ import { Jackpot, fmtDuration } from "./Jackpot";
 import { useHistory } from "./History";
 import { GameFx, GameHud, Quests } from "./Game";
 import { CrossChain } from "./CrossChain";
-import { AgentBadge } from "./ui";
+import { AgentBadge, GuestButton } from "./ui";
 import { emitFx } from "@/lib/fx";
 import { sfx } from "@/lib/sound";
 
@@ -457,7 +457,8 @@ function Account({ t, positions, orders }: { t: Ticket; positions: Position[]; o
     return (
       <section className="panel flex flex-col gap-3 p-4" aria-label="Account">
         <h3 className="font-extrabold">Account</h3>
-        <p className="label">Connect a NEAR testnet wallet to see your balances and positions. Test USDC is free from the faucet.</p>
+        <p className="label">Connect a NEAR testnet wallet to see your balances and positions, or try it as a guest: a throwaway testnet account made in this browser, with 1,000 test USDC.</p>
+        <GuestButton className="btn btn-accent" />
         <button type="button" className="btn btn-ghost" disabled={wallet.busy} onClick={() => void wallet.connect()}>
           <Icon name="wallet" />
           Connect wallet

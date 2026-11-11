@@ -9,6 +9,7 @@ import { fmtUsdc } from "@oneup/sdk";
 import { Icon } from "./Icon";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { explorer } from "@/lib/explorer";
+import { GuestButton } from "./ui";
 
 const big = (x?: string | null) => (x === undefined || x === null ? undefined : BigInt(x));
 const sum = (xs: bigint[]) => xs.reduce((a, b) => a + b, 0n);
@@ -140,10 +141,13 @@ export function WhereFunds({ pool }: { pool: bigint }) {
           {viewOnly ? (
             <div className="flex flex-col items-start gap-3 py-2.5">
               <p className="label">Connect a NEAR testnet wallet to see your wallet USDC, your trading balance and the margin in your open positions.</p>
-              <button type="button" className="btn btn-ghost" disabled={wallet.busy} onClick={() => void wallet.connect()}>
-                <Icon name="wallet" />
-                Connect wallet
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <GuestButton />
+                <button type="button" className="btn btn-ghost" disabled={wallet.busy} onClick={() => void wallet.connect()}>
+                  <Icon name="wallet" />
+                  Connect wallet
+                </button>
+              </div>
             </div>
           ) : (
             <ul className="divide-y divide-[var(--line)]">

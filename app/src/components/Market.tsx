@@ -13,7 +13,7 @@ import { fmtOneup, fmtUsd } from "./Header";
 import { PixelHeart, PixelLock } from "./Pixel";
 import { Sell, useListings } from "./Sell";
 import type { ActivityItem } from "./Activity";
-import { Explainer, PanelHead } from "./ui";
+import { Explainer, GuestButton, PanelHead } from "./ui";
 import { Icon } from "./Icon";
 
 type Item =
@@ -185,10 +185,13 @@ function YourItems({ px, listings, epoch, expiryEpochs }: { px: bigint; listings
     return (
       <div className="flex flex-col items-start gap-3 px-4 pb-4">
         <p className="label">Connect a wallet to list your Life NFTs and $1UP locks. Eligible net losses in profitable rounds can earn you both.</p>
-        <button type="button" className="btn btn-ghost" disabled={wallet.busy} onClick={() => void wallet.connect()}>
-          <Icon name="wallet" size={16} />
-          Connect wallet
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <GuestButton />
+          <button type="button" className="btn btn-ghost" disabled={wallet.busy} onClick={() => void wallet.connect()}>
+            <Icon name="wallet" size={16} />
+            Connect wallet
+          </button>
+        </div>
       </div>
     );
   }

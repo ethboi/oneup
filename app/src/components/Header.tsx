@@ -19,6 +19,7 @@ import { emitFx, winTier } from "@/lib/fx";
 import { sfx } from "@/lib/sound";
 import { endSession, saveSession, sessionAllowance, startSession } from "@/lib/session";
 import { intentsBalances, payFromChain } from "@/lib/intents";
+import { GuestButton } from "./ui";
 
 export interface NavTab {
   name: string;
@@ -277,16 +278,19 @@ function AccountMenu() {
   const { viewOnly, wallet } = useOneUp();
   if (viewOnly)
     return (
-      <button type="button" className="btn btn-accent" disabled={wallet.busy} onClick={() => void wallet.connect()}>
-        <Icon name="wallet" />
-        {wallet.busy ? (
-          "Waiting…"
-        ) : (
-          <span>
-            Connect<span className="hidden sm:inline"> wallet</span>
-          </span>
-        )}
-      </button>
+      <div className="flex items-center gap-2">
+        <GuestButton className="btn btn-ghost hidden sm:inline-flex" />
+        <button type="button" className="btn btn-accent" disabled={wallet.busy} onClick={() => void wallet.connect()}>
+          <Icon name="wallet" />
+          {wallet.busy ? (
+            "Waiting…"
+          ) : (
+            <span>
+              Connect<span className="hidden sm:inline"> wallet</span>
+            </span>
+          )}
+        </button>
+      </div>
     );
   return <AccountFunds />;
 }

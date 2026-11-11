@@ -5,6 +5,7 @@
 
 import { Account, KeyPair, type KeyPairString } from "near-api-js";
 import { nep413Hash, toBase64 } from "./nep413";
+import { createGuest, guestsAvailable, loadGuest, saveGuest, type Guest } from "./guest";
 import type { AppDeployment } from "./app-config";
 import { useNearWallet } from "./near-wallet";
 import { accessOf, type Access } from "./access";
@@ -49,6 +50,16 @@ interface Ctx {
   viewOnly: boolean;
   /** Who's using the app (see Access). */
   access: Access;
+  /** Testnet: the guest account in this browser (lib/guest.ts), when one is in use and no wallet is connected. */
+  guest: Guest | null;
+  /** Whether this deployment offers guest accounts. */
+  guestsOn: boolean;
+  /** A guest account is being made. */
+  guestBusy: boolean;
+  /** Makes a guest account, readies it, and switches to it. */
+  startGuest: () => Promise<boolean>;
+  /** Forgets the guest key in this browser. */
+  leaveGuest: () => void;
   /** A NEP-413 signed message from the current account: the wallet on testnet, the dev wallet's key locally. */
   signMessage: (p: { message: string; recipient: string; nonce: Uint8Array }) => Promise<{ accountId: string; publicKey: string; signature: string }>;
 }
@@ -115,7 +126,16 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
     [d],
   );
   const [localMe, setMeState] = useState(d.demo?.id ?? "");
-  const me = d.network === "localnet" ? localMe : wallet.accountId;
+  // testnet without a wallet: a guest account made in this browser, when the visitor asked for one
+  const [guest, setGuest] = useState<Guest | null>(null);
+  const [guestsOn, setGuestsOn] = useState(false);
+  useEffect(() => {
+    if (d.network !== "testnet") return;
+    setGuest(loadGuest(d.contracts.house));
+    void guestsAvailable().then(setGuestsOn);
+  }, [d]);
+  const asGuest = d.network === "testnet" && !wallet.accountId && !!guest;
+  const me = d.network === "localnet" ? localMe : wallet.accountId || (guest?.accountId ?? "");
   // testnet opens view-only: the header's Connect button, or any action, asks for a wallet
   const access = accessOf(d.network, me);
   const viewOnly = access === "watching";
@@ -134,7 +154,10 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
   }, [d.network, accounts]);
 
   // the main key (localnet dev wallet), and a session key for trades when one is on (lib/session.ts)
-  const mainKey = useMemo(() => d.network === "localnet" ? [d.demo, ...d.bots].find(a => a?.id === me)?.key ?? null : null, [d, me]);
+  const mainKey = useMemo(
+    () => (d.network === "localnet" ? [d.demo, ...d.bots].find(a => a?.id === me)?.key ?? null : asGuest ? guest!.key : null),
+    [d, me, asGuest, guest],
+  );
   const main = useMemo(() => mainKey ? new Account(me, o.provider, mainKey as KeyPairString) : null, [o, me, mainKey]);
   const [session, setSession] = useState<Session | null>(null);
   useEffect(() => {
@@ -265,7 +288,36 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
     const { signature } = kp.sign(await nep413Hash(p.message, p.nonce, p.recipient));
     return { accountId: me, publicKey: kp.getPublicKey().toString(), signature: toBase64(signature) };
   }, [mainKey, me, wallet]);
-  const value: Ctx = { d, o, accounts, me, setMe, tx, main, mainKey, session, wallet, run, toasts, prices, history, publishedAt, version, viewOnly, access, signMessage };
+  // not through run(): with no account yet, run() would open the wallet picker instead
+  const [guestBusy, setGuestBusy] = useState(false);
+  const startGuest = useCallback(async () => {
+    if (guestBusy) return false;
+    setGuestBusy(true);
+    const id = nextId.current++;
+    const show = (kind: Toast["kind"], text: string) =>
+      setToasts((t) => (t.some((x) => x.id === id) ? t.map((x) => (x.id === id ? { ...x, kind, text } : x)) : [...t, { id, kind, text }]));
+    try {
+      setGuest(await createGuest(o, (step) => show("pending", step)));
+      show("ok", "Guest account ready, with 1,000 test USDC");
+      setVersion((v) => v + 1);
+      return true;
+    } catch (e) {
+      show("error", `Guest account: ${cleanError(e)}`);
+      // made but not readied: it stays in use, and the account menu can finish it
+      const saved = loadGuest(d.contracts.house);
+      if (saved) setGuest(saved);
+      reportFailure("Start a guest account", e, saved?.accountId ?? "");
+      return false;
+    } finally {
+      setGuestBusy(false);
+      setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 6000);
+    }
+  }, [guestBusy, o, d.contracts.house]);
+  const leaveGuest = useCallback(() => {
+    saveGuest(null);
+    setGuest(null);
+  }, []);
+  const value: Ctx = { d, o, accounts, me, setMe, tx, main, mainKey, session, wallet, run, toasts, prices, history, publishedAt, version, viewOnly, access, signMessage, guest: asGuest ? guest : null, guestsOn, guestBusy, startGuest, leaveGuest };
   return <OneUpContext.Provider value={value}>{children}</OneUpContext.Provider>;
 }
 

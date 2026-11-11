@@ -95,6 +95,18 @@ export function Empty({ icon, children }: { icon: Parameters<typeof Icon>[0]["na
   );
 }
 
+/** Testnet without a wallet: a throwaway guest account made in this browser (lib/guest.ts), when the site offers them. */
+export function GuestButton({ className = "btn btn-ghost" }: { className?: string }) {
+  const { d, me, guestsOn, guestBusy, startGuest } = useOneUp();
+  if (d.network !== "testnet" || !guestsOn || me) return null;
+  return (
+    <button type="button" className={className} disabled={guestBusy} onClick={() => void startGuest()} title="A throwaway testnet account made in this browser, with 1,000 test USDC. No wallet, test money only.">
+      <Icon name={guestBusy ? "spinner" : "demo"} />
+      {guestBusy ? "Setting up…" : "Try as a guest"}
+    </button>
+  );
+}
+
 /** Without a wallet there is nothing of yours to show: what would be here, and the way in. */
 export function ConnectPrompt({ icon, children, also }: { icon: Parameters<typeof Icon>[0]["name"]; children: React.ReactNode; also?: React.ReactNode }) {
   const { wallet } = useOneUp();
@@ -106,6 +118,7 @@ export function ConnectPrompt({ icon, children, also }: { icon: Parameters<typeo
       </div>
       <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row">
         {also}
+        <GuestButton />
         <button type="button" className="btn btn-accent" disabled={wallet.busy} onClick={() => void wallet.connect()}>
           <Icon name="wallet" />
           Connect wallet

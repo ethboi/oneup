@@ -16,6 +16,7 @@ next-env.d.ts
 
 .next-judge/
 .next-verify/
+.next-testnet/
 
 .oneup-tsconfig-*.json
 
