@@ -8,6 +8,8 @@ import { fmtUsd as money } from "./Header";
 import { HealthBar } from "./Pixel";
 import { LifeCard, lifeState } from "./LifeCard";
 import { Icon } from "./Icon";
+import { HolderRoom } from "./HolderRoom";
+import { LifeHistoryList } from "./LifeHistory";
 import { Sell, useListings } from "./Sell";
 import { OnExplorer, Stat } from "./ui";
 
@@ -84,8 +86,14 @@ export function LifeDetail({ tokenId, onBack }: { tokenId: string; onBack: () =>
           <h2 className="font-extrabold">Lifetime totals</h2>
           <HealthBar value={progress} label="USDC allocated toward the maximum payout" />
           <div className="grid grid-cols-2 gap-4"><Stat label="Total USDC allocated" value={money(economics.allocated)} /><Stat label="Total USDC withdrawn" value={money(economics.withdrawn)} /></div>
-          <p className="text-sm text-[var(--muted)]">These totals cover this Life across all owners, so they do not show your personal profit. A transaction history for individual Life NFTs is not available.</p>
+          <p className="text-sm text-[var(--muted)]">These totals cover this Life across all owners, so they do not show your personal profit.</p>
         </div>
+        <div className="space-y-2 p-5">
+          <h2 className="font-extrabold">History of this Life</h2>
+          <p className="text-sm text-[var(--muted)]">Every owner it has had, each sale and each claim, from the chain. A claim of several Lives at once shows its total, because the contract records only that.</p>
+          <LifeHistoryList tokenId={life.token_id} />
+        </div>
+        <HolderRoom tokenId={life.token_id} owner={life.owner_id} />
       </div>
     </section>
   );

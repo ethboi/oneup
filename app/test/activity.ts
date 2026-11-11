@@ -81,3 +81,57 @@ test("a failed receipt's logs aren't activity: its state changes rolled back", a
   );
   assert.deepEqual(logs, [["house", '{"a":1}', "tx1"], ["market", '{"c":3}', "tx1"]]);
 });
+
+test("a Life's history: its mint, a gift, a sale (not also counted as a transfer) and only the house's events", async () => {
+  const { recordBlock, lifeHistoryFor } = await import("../src/lib/server/activity.ts");
+  const id = "7:alice.test.near";
+  const ev = (standard: string, event: string, data: unknown) => JSON.stringify({ standard, version: "1.0.0", event, data: [data] });
+  recordBlock({ t: 1, logs: [[c.life, ev("nep171", "nft_mint", { owner_id: "alice.test.near", token_ids: [id] }), "tx-mint"]] }, c);
+  recordBlock({ t: 2, logs: [[c.life, ev("nep171", "nft_transfer", { old_owner_id: "alice.test.near", new_owner_id: "bob.test.near", token_ids: [id] }), "tx-gift"]] }, c);
+  // a forged transfer from another contract is ignored
+  recordBlock({ t: 3, logs: [["evil.test.near", ev("nep171", "nft_transfer", { old_owner_id: "bob.test.near", new_owner_id: "evil.test.near", token_ids: [id] }), "tx-evil"]] }, c);
+  recordBlock(
+    {
+      t: 4,
+      logs: [
+        [c.life, ev("nep171", "nft_transfer", { old_owner_id: "bob.test.near", new_owner_id: "carol.test.near", token_ids: [id] }), "tx-sale"],
+        [c.market, ev("oneup_market", "sold", { nft_contract: c.life, token_id: id, seller: "bob.test.near", buyer: "carol.test.near", price: "5000000" }), "tx-sale"],
+      ],
+    },
+    c,
+  );
+  const kinds = lifeHistoryFor(id).items.map((i) => `${i.kind}@${i.tx}`);
+  assert.deepEqual(kinds, ["sold@tx-sale", "transferred@tx-gift", "minted@tx-mint"]);
+});
+
+test("a claim's Lives come from its arguments, and only once the Life contract logged the payout", async () => {
+  const { lifeClaimLogs, recordBlock, lifeHistoryFor, LIFE_CLAIM } = await import("../src/lib/server/activity.ts");
+  const ids = ["8:dave.test.near", "9:dave.test.near"];
+  const call = { FunctionCall: { method_name: "claim", args: Buffer.from(JSON.stringify({ token_ids: ids })).toString("base64") } };
+  const paid = [{ executor_id: c.life, logs: ["dave.test.near claimed 1500000"], status: { SuccessValue: "dHJ1ZQ==" } }];
+  const logs = lifeClaimLogs({ receiver_id: c.life, actions: [call] }, paid, "tx-claim", c);
+  assert.equal(logs.length, 1);
+  recordBlock({ t: 5, logs }, c);
+  for (const id of ids) {
+    const [item] = lifeHistoryFor(id).items;
+    assert.equal(item.kind, "claimed");
+    assert.ok(item.kind === "claimed" && item.amount === "1500000" && item.lives === 2 && item.owner === "dave.test.near" && item.tx === "tx-claim");
+  }
+  // a failed claim logged no payout; a call to another contract isn't a Life claim
+  assert.equal(lifeClaimLogs({ receiver_id: c.life, actions: [call] }, [{ executor_id: c.life, logs: [], status: { Failure: {} } }], "tx-f", c).length, 0);
+  assert.equal(lifeClaimLogs({ receiver_id: "evil.test.near", actions: [call] }, paid, "tx-e", c).length, 0);
+  // a claim record logged by any other contract is refused
+  assert.equal(trusted({ standard: LIFE_CLAIM }, "evil.test.near", c), false);
+  assert.ok(trusted({ standard: LIFE_CLAIM }, c.life, c));
+});
+
+test("the testnet backfill puts older Life events in front of live ones and marks histories complete", async () => {
+  const { recordBlock, lifeHistoryFor, mergeLifeBackfill, livesComplete } = await import("../src/lib/server/activity.ts");
+  const id = "10:erin.test.near";
+  const ev = (event: string, data: unknown) => JSON.stringify({ standard: "nep171", version: "1.0.0", event, data: [data] });
+  recordBlock({ t: 20, logs: [[c.life, ev("nft_transfer", { old_owner_id: "erin.test.near", new_owner_id: "finn.test.near", token_ids: [id] }), "tx-live"]] }, c);
+  mergeLifeBackfill([{ t: 10, logs: [[c.life, ev("nft_mint", { owner_id: "erin.test.near", token_ids: [id] }), "tx-old"]] }], c);
+  assert.deepEqual(lifeHistoryFor(id).items.map((i) => i.tx), ["tx-live", "tx-old"]);
+  assert.ok(livesComplete());
+  assert.equal(lifeHistoryFor(id).complete, true);
+});

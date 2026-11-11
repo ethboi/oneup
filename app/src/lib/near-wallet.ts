@@ -146,8 +146,16 @@ export function useNearWallet(d: AppDeployment) {
     }
     finally { setRequest(null); }
   }, [boundSend]);
+  /** A NEP-413 signed message from the connected wallet (it signs nothing on chain). */
+  const signMessage = useCallback(async (p: { message: string; recipient: string; nonce: Uint8Array }) => {
+    const wallet = chosenWallet.current, account = selected.current;
+    if (!wallet || !account) throw new Error("Connect a wallet first.");
+    setRequest("signing");
+    try { return await wallet.signMessage({ ...p, network: "testnet", signerId: account }); }
+    finally { setRequest(null); }
+  }, []);
   const status: WalletStatus = !enabled ? "unavailable" : request ?? (accountId ? "connected" : "disconnected");
   /** A wallet request is under way: connect, disconnect and other requests wait for it. */
   const busy = request !== null;
-  return { accountId, status, busy, error, connect, disconnect, send };
+  return { accountId, status, busy, error, connect, disconnect, send, signMessage };
 }

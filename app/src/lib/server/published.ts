@@ -22,3 +22,20 @@ export async function published(name: string, empty: unknown): Promise<Response>
     return Response.json(empty, { headers: { "cache-control": "no-store" } });
   }
 }
+
+/** The JSON stored under `name`, parsed; `empty` when there's no store or nothing there. For server code that needs the
+ *  value itself rather than a response. */
+export async function publishedValue<T>(name: string, empty: T): Promise<T> {
+  const url = process.env.KV_REST_API_URL;
+  const token = process.env.KV_REST_API_READ_ONLY_TOKEN ?? process.env.KV_REST_API_TOKEN;
+  if (!url || !token) return empty;
+  try {
+    const key = `oneup:${publicTestnetConfig().contracts.house}:${name}`;
+    const r = await fetch(`${url}/get/${encodeURIComponent(key)}`, { headers: { authorization: `Bearer ${token}` }, cache: "no-store", signal: AbortSignal.timeout(8000) });
+    if (!r.ok) return empty;
+    const { result } = (await r.json()) as { result: string | null };
+    return result ? (JSON.parse(result) as T) : empty;
+  } catch {
+    return empty;
+  }
+}

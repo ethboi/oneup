@@ -65,6 +65,17 @@ type HistoryEntry = { t: number; tx?: string } & (
   | { kind: "bought" | "sold"; what: "Life NFT" | "$1UP lock"; price: string; other: string }
 );
 
+/** One event in a Life NFT's own history: how it was minted, changed hands and paid out. `tx`: the transaction, for an
+ *  explorer link. A claim can cover up to 30 Lives at once and the contract logs only its total, so `lives` says how
+ *  many shared `amount`; with one Life, `amount` is exactly what that Life paid. */
+export type LifeEntry = { t: number; tx?: string } & (
+  | { kind: "minted"; owner: string }
+  | { kind: "transferred"; from: string; to: string }
+  | { kind: "sold"; from: string; to: string; price: string }
+  | { kind: "claimed"; owner: string; amount: string; lives: number }
+);
+export type LifeItem = LifeEntry & { seq: number };
+
 interface Opened {
   market_id: string;
   side: "Long" | "Short";
@@ -86,12 +97,20 @@ interface State {
   opened: Map<number, Opened>;
   /** Testnet: the last transaction read, "<block height>:<index>" (scripts/testnet-indexer.ts). */
   cursor: string | null;
+  /** Each Life NFT's history, oldest first, by token id. */
+  lives: Map<string, LifeItem[]>;
+  /** Whether `lives` covers every Life from its mint: false for state saved before Lives had histories, until a
+   *  rescan (local) or the testnet indexer's backfill fills them in. */
+  livesComplete: boolean;
+  /** Testnet: the cursor when Lives' histories began to be recorded live; the backfill covers what came before. */
+  livesFrom: string | null;
 }
 
 /** Blocks behind the head before a block is read, so the receipts it started have run. */
 const LAG = 4;
 const KEEP = 200;
 const KEEP_PER_ACCOUNT = 1000;
+const KEEP_PER_LIFE = 200;
 /** Blocks read at once while catching up. */
 const BATCH = 25;
 const short = displayAccount;
@@ -113,6 +132,9 @@ const state: State = (g.__oneupActivity2 ??= {
   history: new Map(),
   opened: new Map(),
   cursor: null,
+  lives: new Map(),
+  livesComplete: false,
+  livesFrom: null,
 });
 
 const SAVE = resolve(stateDir(), "indexer.json");
@@ -123,7 +145,17 @@ function load(genesis: string) {
   try {
     const j = JSON.parse(readFileSync(SAVE, "utf8"));
     if (j.genesis !== genesis) return; // a different chain
-    Object.assign(state, { next: j.next, items: j.items, seq: j.seq, history: new Map(j.history), opened: new Map(j.opened), cursor: j.cursor ?? null });
+    Object.assign(state, {
+      next: j.next,
+      items: j.items,
+      seq: j.seq,
+      history: new Map(j.history),
+      opened: new Map(j.opened),
+      cursor: j.cursor ?? null,
+      lives: new Map(j.lives ?? []),
+      livesComplete: j.livesComplete === true,
+      livesFrom: j.livesFrom ?? null,
+    });
   } catch {
     // unreadable: rescan
   }
@@ -132,8 +164,11 @@ function load(genesis: string) {
 function save() {
   if (!state.dirty) return;
   state.dirty = false;
-  const { genesis, next, items, seq, cursor } = state;
-  writeFileSync(SAVE, JSON.stringify({ genesis, next, items, seq, cursor, history: [...state.history], opened: [...state.opened] }));
+  const { genesis, next, items, seq, cursor, livesComplete, livesFrom } = state;
+  writeFileSync(
+    SAVE,
+    JSON.stringify({ genesis, next, items, seq, cursor, livesComplete, livesFrom, history: [...state.history], opened: [...state.opened], lives: [...state.lives] }),
+  );
 }
 
 function config() {
@@ -160,13 +195,18 @@ interface Event {
   data: Record<string, unknown>[] | Record<string, unknown>;
 }
 
-export type Out = { feed: Omit<ActivityItem, "seq">[]; history: [string, HistoryEntry][] };
+export type Out = { feed: Omit<ActivityItem, "seq">[]; history: [string, HistoryEntry][]; lives?: [string, LifeEntry][] };
+
+/** The standard of the records `lifeClaimLogs` makes from a claim's arguments; the Life contract logs no event for a
+ *  claim, so only records attributed to the Life contract are taken. */
+export const LIFE_CLAIM = "oneup_life_claim";
 
 /** Whether an event comes from the contract that owns its standard: anyone can deploy a contract that logs
  *  `oneup` events, so only the house's count (and the market's `oneup_market` ones). */
 export function trusted(ev: Pick<Event, "standard">, executor: string, c: Record<string, string>): boolean {
   if (ev.standard === "oneup") return executor === c.house;
   if (ev.standard === "oneup_market") return executor === c.market;
+  if (ev.standard === LIFE_CLAIM) return executor === c.life;
   return true; // nep171/nep141: each branch below checks its executor
 }
 
@@ -174,6 +214,7 @@ export function toItems(ev: Event, executor: string, t: number, c: Record<string
   if (!trusted(ev, executor, c)) return;
   const rows = Array.isArray(ev.data) ? ev.data : [ev.data];
   const mine = (account: string, item: HistoryEntry) => out.history.push([account, item]);
+  const life = (token: string, item: LifeEntry) => (out.lives ??= []).push([token, item]);
   for (const d of rows) {
     if (ev.standard === "oneup" && ev.event === "position_closed") {
       const account = String(d.account_id);
@@ -257,6 +298,7 @@ export function toItems(ev: Event, executor: string, t: number, c: Record<string
       });
     } else if (ev.standard === "nep171" && ev.event === "nft_mint" && executor === c.life) {
       const owner = String(d.owner_id);
+      for (const id of d.token_ids as string[]) if (!String(id).startsWith("0:")) life(String(id), { t, kind: "minted", owner });
       const token = String((d.token_ids as string[])[0]);
       if (token.startsWith("0:")) continue; // the seed's life
       out.feed.push({ t, kind: "life", who: short(owner), text: `${short(owner)} got a Life NFT` });
@@ -265,10 +307,16 @@ export function toItems(ev: Event, executor: string, t: number, c: Record<string
       const owner = String(d.owner_id);
       out.feed.push({ t, kind: "lock", who: short(owner), text: `${short(owner)} got a $1UP lock` });
       mine(owner, { t, kind: "lock", token_id: String((d.token_ids as string[])[0]) });
+    } else if (ev.standard === "nep171" && ev.event === "nft_transfer" && executor === c.life) {
+      for (const id of d.token_ids as string[]) life(String(id), { t, kind: "transferred", from: String(d.old_owner_id), to: String(d.new_owner_id) });
+    } else if (ev.standard === LIFE_CLAIM && ev.event === "claimed") {
+      const ids = d.token_ids as string[];
+      for (const id of ids) life(String(id), { t, kind: "claimed", owner: String(d.account_id), amount: String(d.amount), lives: ids.length });
     } else if (ev.standard === "oneup_market" && ev.event === "sold") {
       const what = d.nft_contract === c.life ? "Life NFT" : "$1UP lock";
       const buyer = String(d.buyer);
       const seller = String(d.seller);
+      if (d.nft_contract === c.life) life(String(d.token_id), { t, kind: "sold", from: seller, to: buyer, price: String(d.price) });
       out.feed.push({
         t,
         kind: "sold",
@@ -297,6 +345,44 @@ export function eventLogs(outcomes: { logs: string[]; executor_id: string; statu
   return out;
 }
 
+/** A Life claim names its tokens only in the call's arguments, and the Life contract logs just "<account> claimed
+ *  <amount>" once the USDC has gone. This turns each claim that logged that line into a record attributed to the Life
+ *  contract, so the claimed Lives' histories show it. The n-th `claim` call in the transaction is paired with the n-th
+ *  such line; a claim that failed logged nothing and is left out. */
+export function lifeClaimLogs(
+  tx: { receiver_id: string; actions?: unknown[] },
+  outcomes: { logs: string[]; executor_id: string; status?: unknown }[],
+  hash: string,
+  c: Record<string, string>,
+): [string, string, string][] {
+  if (tx.receiver_id !== c.life) return [];
+  const paid: { account: string; amount: string }[] = [];
+  for (const o of outcomes) {
+    if (o.executor_id !== c.life || (o.status && typeof o.status === "object" && "Failure" in o.status)) continue;
+    for (const line of o.logs) {
+      const m = /^(\S+) claimed (\d+)$/.exec(line);
+      if (m) paid.push({ account: m[1], amount: m[2] });
+    }
+  }
+  const out: [string, string, string][] = [];
+  for (const action of tx.actions ?? []) {
+    const call = (action as { FunctionCall?: { method_name?: string; args?: string } } | null)?.FunctionCall;
+    if (call?.method_name !== "claim" || !call.args) continue;
+    const next = paid.shift();
+    if (!next) break;
+    let ids: unknown;
+    try {
+      ids = JSON.parse(Buffer.from(call.args, "base64").toString("utf8")).token_ids;
+    } catch {
+      continue;
+    }
+    if (!Array.isArray(ids) || !ids.length || !ids.every((id) => typeof id === "string")) continue;
+    const data = { account_id: next.account, token_ids: ids, amount: next.amount };
+    out.push([c.life, JSON.stringify({ standard: LIFE_CLAIM, version: "1.0.0", event: "claimed", data: [data] }), hash]);
+  }
+  return out;
+}
+
 /** Reads one block's OneUp events, without recording them (blocks are read in parallel, recorded in order). */
 async function readBlock(url: string, height: number, c: Record<string, string>): Promise<{ t: number; logs: [string, string, string][] } | null> {
   const block = await rpc<{ header: { timestamp_nanosec: string }; chunks: { chunk_hash: string; tx_root: string }[] }>(url, "block", { block_id: height }).catch((error: unknown) => {
@@ -312,21 +398,25 @@ async function readBlock(url: string, height: number, c: Record<string, string>)
     const chunk = await rpc<{ transactions: { hash: string; signer_id: string; receiver_id: string }[] }>(url, "chunk", { chunk_id: ch.chunk_hash });
     for (const tx of chunk.transactions) {
       if (tx.receiver_id === c.oracle) continue; // price pushes: no events
-      const res = await rpc<{ receipts_outcome: { outcome: { logs: string[]; executor_id: string; status?: unknown } }[] }>(url, "EXPERIMENTAL_tx_status", {
+      const res = await rpc<{
+        transaction?: { receiver_id: string; actions?: unknown[] };
+        receipts_outcome: { outcome: { logs: string[]; executor_id: string; status?: unknown } }[];
+      }>(url, "EXPERIMENTAL_tx_status", {
         tx_hash: tx.hash,
         sender_account_id: tx.signer_id,
         wait_until: "FINAL",
       });
-      logs.push(...eventLogs((res?.receipts_outcome ?? []).map((r) => r.outcome), tx.hash));
+      const outcomes = (res?.receipts_outcome ?? []).map((r) => r.outcome);
+      logs.push(...eventLogs(outcomes, tx.hash), ...lifeClaimLogs(res?.transaction ?? tx, outcomes, tx.hash, c));
     }
   }
   return { t, logs };
 }
 
-function record(block: { t: number; logs: [string, string, string][] }, c: Record<string, string>) {
-  const out: Out = { feed: [], history: [] };
+function collect(block: { t: number; logs: [string, string, string][] }, c: Record<string, string>): Out {
+  const out: Out = { feed: [], history: [], lives: [] };
   for (const [executor, json, tx] of block.logs) {
-    const [f, h] = [out.feed.length, out.history.length];
+    const [f, h, l] = [out.feed.length, out.history.length, out.lives!.length];
     try {
       toItems(JSON.parse(json), executor, block.t, c, out);
     } catch {
@@ -335,7 +425,28 @@ function record(block: { t: number; logs: [string, string, string][] }, c: Recor
     // what this event added carries its transaction
     for (const item of out.feed.slice(f)) item.tx = tx;
     for (const [, item] of out.history.slice(h)) item.tx = tx;
+    for (const [, item] of out.lives!.slice(l)) item.tx = tx;
   }
+  return out;
+}
+
+/** Adds what a block did to each Life's history. A market sale moves the Life with an ordinary NEP-171 transfer, so a
+ *  transfer in the same transaction as the Life's sale is the sale and is left out. */
+function recordLives(out: Out) {
+  const lives = out.lives ?? [];
+  const sales = new Set(lives.filter(([, e]) => e.kind === "sold").map(([id, e]) => `${id} ${e.tx}`));
+  for (const [id, entry] of lives) {
+    if (entry.kind === "transferred" && sales.has(`${id} ${entry.tx}`)) continue;
+    const list = state.lives.get(id) ?? [];
+    list.push({ ...entry, seq: ++state.seq } as LifeItem);
+    if (list.length > KEEP_PER_LIFE) list.splice(1, list.length - KEEP_PER_LIFE); // the mint stays first
+    state.lives.set(id, list);
+  }
+}
+
+function record(block: { t: number; logs: [string, string, string][] }, c: Record<string, string>) {
+  const out = collect(block, c);
+  recordLives(out);
   for (const item of out.feed) {
     // a live sale waits for its valuation (valueSales), so it reaches the feed with it
     if (item.sale && Date.now() - item.t < 120_000) pendingSales.push(item);
@@ -398,6 +509,11 @@ async function step() {
   const head = await rpc<{ header: { height: number } }>(url, "block", { finality: "final" });
   const target = head.header.height - LAG;
   state.head = target;
+  if (state.next !== null && state.next > 1 && !state.livesComplete) {
+    // saved before Lives had histories: scan again from block 1 so every Life's is complete
+    Object.assign(state, { next: 1, items: [], seq: 0, history: new Map(), opened: new Map(), lives: new Map(), dirty: true });
+  }
+  if ((state.next ?? 1) <= 1) state.livesComplete = true; // a scan from block 1 sees every Life from its mint
   state.next ??= 1;
   // catch up in parallel batches, recorded in block order; a missing height (skipped block) is passed over
   for (let n = 0; state.next <= target && n < 20; n++) {
@@ -412,6 +528,35 @@ export const saveIndexerState = () => save();
 export const indexerCursor = () => state.cursor;
 export const indexedAccounts = () => [...state.history.keys()];
 export const recentActivity = () => state.items;
+export const indexedLives = () => [...state.lives.keys()];
+export const livesComplete = () => state.livesComplete;
+export function markLivesComplete() {
+  state.livesComplete = true;
+  state.dirty = true;
+}
+/** Testnet: where live recording of Lives' histories began. Set once, the first time the indexer runs this code. */
+export function livesFrom(): string | null {
+  if (state.livesFrom === null && !state.livesComplete) {
+    state.livesFrom = state.cursor ?? "";
+    state.dirty = true;
+  }
+  return state.livesFrom;
+}
+/** For the testnet indexer's one-off backfill: the Life events of every transaction up to `livesFrom`, oldest first,
+ *  put in front of what has been recorded live since. Only the Lives' histories change, so the feed and account
+ *  histories aren't counted twice, and running it again after a failure starts from the same point. */
+export function mergeLifeBackfill(blocks: { t: number; logs: [string, string, string][] }[], c: Record<string, string>) {
+  const live = state.lives;
+  state.lives = new Map();
+  for (const b of blocks) recordLives(collect(b, c));
+  for (const [id, later] of live) {
+    const list = [...(state.lives.get(id) ?? []), ...later];
+    if (list.length > KEEP_PER_LIFE) list.splice(1, list.length - KEEP_PER_LIFE);
+    state.lives.set(id, list);
+  }
+  state.livesComplete = true;
+  state.dirty = true;
+}
 export function setIndexerCursor(cursor: string) {
   state.cursor = cursor;
   state.dirty = true;
@@ -460,6 +605,13 @@ export function recentSales(keep = 20): ActivityItem[] {
     for (const h of list)
       if (h.kind === "sold") sales.push({ seq: h.seq, t: h.t, kind: "sold", who: short(h.other), text: `${short(h.other)} bought ${short(seller)}'s ${h.what} for ${usd(h.price)}`, tx: h.tx });
   return sales.sort((a, b) => b.seq - a.seq).slice(0, keep);
+}
+
+/** A Life NFT's history, newest first. `complete` is false while Lives minted before histories were kept are still
+ *  being filled in. */
+export function lifeHistoryFor(token: string): { items: LifeItem[]; complete: boolean; synced: boolean } {
+  const done = (state.next ?? 1) - 1;
+  return { items: [...(state.lives.get(token) ?? [])].reverse(), complete: state.livesComplete, synced: state.head > 0 && done >= state.head - 10 };
 }
 
 /** An account's history, newest first, and how far the scan has got (it starts from block 1). */

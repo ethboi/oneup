@@ -3,7 +3,8 @@
 // App-wide state: the deployment, the SDK client, the dev wallet (localnet keys), live prices with history,
 // and a `run` helper that shows each transaction's progress.
 
-import { Account, type KeyPairString } from "near-api-js";
+import { Account, KeyPair, type KeyPairString } from "near-api-js";
+import { nep413Hash, toBase64 } from "./nep413";
 import type { AppDeployment } from "./app-config";
 import { useNearWallet } from "./near-wallet";
 import { accessOf, type Access } from "./access";
@@ -48,6 +49,8 @@ interface Ctx {
   viewOnly: boolean;
   /** Who's using the app (see Access). */
   access: Access;
+  /** A NEP-413 signed message from the current account: the wallet on testnet, the dev wallet's key locally. */
+  signMessage: (p: { message: string; recipient: string; nonce: Uint8Array }) => Promise<{ accountId: string; publicKey: string; signature: string }>;
 }
 
 
@@ -256,7 +259,13 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
     };
   }, [o, d.network]);
 
-  const value: Ctx = { d, o, accounts, me, setMe, tx, main, mainKey, session, wallet, run, toasts, prices, history, publishedAt, version, viewOnly, access };
+  const signMessage = useCallback<Ctx["signMessage"]>(async (p) => {
+    if (!mainKey) return wallet.signMessage(p);
+    const kp = KeyPair.fromString(mainKey as KeyPairString);
+    const { signature } = kp.sign(await nep413Hash(p.message, p.nonce, p.recipient));
+    return { accountId: me, publicKey: kp.getPublicKey().toString(), signature: toBase64(signature) };
+  }, [mainKey, me, wallet]);
+  const value: Ctx = { d, o, accounts, me, setMe, tx, main, mainKey, session, wallet, run, toasts, prices, history, publishedAt, version, viewOnly, access, signMessage };
   return <OneUpContext.Provider value={value}>{children}</OneUpContext.Provider>;
 }
 

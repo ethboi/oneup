@@ -66,6 +66,7 @@ pooled house with capped profit is an existing design; OneUp doesn't claim it.
 | Function-call access keys, NEP-366 meta transactions | One-tap trading: a session key that can call only `place_open`, `place_close` and `set_triggers` on the house, relayed so the trader pays no gas. Two keeper loops sign with function-call keys: prices (`push_prices` on the oracle) and risk (`liquidate`, `take_profit`, `hit_target`, `hit_stop` on the house). The keeper's other jobs (fills, expiries, round closes, vault moves) still sign with the keeper account's full-access key | [app/src/lib/session.ts](app/src/lib/session.ts), [app/src/app/api/relay/route.ts](app/src/app/api/relay/route.ts), [app/src/lib/server/relay.ts](app/src/lib/server/relay.ts), [keeper/src/index.ts](keeper/src/index.ts) | [app/test/session.ts](app/test/session.ts), [app/test/relay.ts](app/test/relay.ts) | Session keys and relayer: local. Keeper keys: testnet, local |
 | Block randomness | The jackpot draw picks the winning ticket from `env::random_seed()` | `draw_jackpot` in [house/treasury.rs](contracts/house/src/treasury.rs) | House test `losers_get_tickets_and_one_takes_the_jackpot` | Testnet, local |
 | Wallets | NEAR Connect (`@hot-labs/near-connect`) for testnet wallets | [app/src/lib/near-wallet.ts](app/src/lib/near-wallet.ts) | [app/test/wallet.ts](app/test/wallet.ts) | Testnet |
+| NEP-413 signed messages | A Life's holder room opens only for the account holding it now: the wallet signs a message naming the Life, and the server checks the signature, that the key is the account's full-access key, and the Life's owner on chain | [app/src/app/api/life-holder/route.ts](app/src/app/api/life-holder/route.ts), [app/src/lib/nep413.ts](app/src/lib/nep413.ts), [app/src/lib/server/holder.ts](app/src/lib/server/holder.ts) | [app/test/holder.ts](app/test/holder.ts) | Testnet, local |
 | MCP agents | Thirteen tools over the same SDK the app uses; each action is journalled with the agent's stated reason | [mcp/src/index.ts](mcp/src/index.ts), [mcp/src/agent.ts](mcp/src/agent.ts) | `pnpm agent`, then the app's Agents tab | Local |
 
 Not used: Chain Signatures, NEAR AI and a real cross-chain deposit (the bridge is simulated; see
@@ -76,7 +77,7 @@ contract holds the USDC and keeps each token's share.
 
 | Track | What OneUp does for it | What it doesn't do |
 |---|---|---|
-| NFTs That Do Something (`nfts`) | An NFT that owns money: a Life collects USDC from the house's profit for 13 rounds, pays its owner on `claim`, redraws its picture as it fills, and sells with its unclaimed USDC and future payouts attached. Locks are NFTs too, earning buybacks. How control passes, and the seller attacks it's tested against, are in [How a Life changes hands](#how-a-life-changes-hands-and-what-stops-the-seller) | No sub-account per NFT, no royalties, no per-Life history view or holder-only page |
+| NFTs That Do Something (`nfts`) | An NFT that owns money: a Life collects USDC from the house's profit for 13 rounds, pays its owner on `claim`, redraws its picture as it fills, and sells with its unclaimed USDC and future payouts attached. Locks are NFTs too, earning buybacks. Each Life has its own history and a holder room only its current holder can open. How control passes, and the seller attacks it's tested against, are in [How a Life changes hands](#how-a-life-changes-hands-and-what-stops-the-seller) | No sub-account per NFT, no royalties |
 | Unstoppable DeFi (`defi`) | A perpetuals house whose pool must cover every open position's maximum win before an order is accepted; deposits through NEAR Intents; on testnet nobody holds a key to the nine contracts | The cross-chain leg is simulated and there is no 1Click integration (no quotes, status tracking, REFUNDED/FAILED handling or dry run). A trusted keeper fills orders and the oracle is a mock. The owner account can halt markets, swap the oracle and move the pool's idle USDC; see [Who controls what on testnet](#who-controls-what-on-testnet) |
 | Agent Economy (`agents`) | An agent that earns and spends: it trades, buys Lives on the market and claims them, paying in USDC, with a journal of what it did and why | Local demo only; the agent doesn't hire other agents or pay for APIs, and its risk limits are instructions, not code |
 | Open Innovation (`open`) | A trading loss becomes an asset with a price. The Life is a claim on the house's later profit that its owner can hold, claim or sell, and a buyer can value it against the USDC it can still pay. That turns a venue's profit into a market in its losers' claims, which agents can trade as well as people | Test money on testnet only. The house's profit, and so what Lives pay, comes from the author's bots trading against it, so the market in Lives has no outside buyers yet |
@@ -126,8 +127,28 @@ Every way we found for a seller to keep money that was sold, and what stops it. 
 
 What this doesn't cover: the Life contract's owner can appoint a different house, which could mint Lives that share
 later pots (see [Who controls what on testnet](#who-controls-what-on-testnet)). A Life is not an account of its own:
-the Life contract holds the USDC. The app shows each Life's lifetime totals across all owners, but has no per-Life
-transaction history and no holder-only page; history is per account, under History.
+the Life contract holds the USDC.
+
+**Each Life's history.** A Life's page lists every event in its life from the chain: its mint, every transfer and
+market sale, and every claim, each with its transaction. The indexer builds it from the Life contract's NEP-171
+events and the market's `sold` events; a sale's transfer is shown once, as the sale. The contract logs a claim only
+as "<account> claimed <total>", so the claimed token ids are read from the `claim` call's arguments, and a claim of
+several Lives at once shows its total with the number of Lives it covered. Code: `toItems`, `lifeClaimLogs` and
+`lifeHistoryFor` in [app/src/lib/server/activity.ts](app/src/lib/server/activity.ts), `backfillLives` in
+[scripts/testnet-indexer.ts](scripts/testnet-indexer.ts) (it reads the Lives minted before histories were kept),
+[app/src/components/LifeHistory.tsx](app/src/components/LifeHistory.tsx). Tests: the three Life history tests in
+[app/test/activity.ts](app/test/activity.ts).
+
+**The holder room.** A Life's page has a room only its current holder can open. The wallet signs a NEP-413 message
+naming the Life (no transaction, no fee). The server checks the signature, that the key is a full-access key of the
+signing account, and that the account owns the Life on chain at that moment, then shows how the holder got it, what
+they have claimed since, what is unclaimed and, if they bought it, their result so far. Ownership is checked on
+every opening, so once a Life is sold the room opens for the buyer and refuses the seller. A signed message opens it
+for five minutes. Code: [app/src/app/api/life-holder/route.ts](app/src/app/api/life-holder/route.ts),
+[app/src/lib/server/holder.ts](app/src/lib/server/holder.ts), [app/src/lib/nep413.ts](app/src/lib/nep413.ts),
+[app/src/components/HolderRoom.tsx](app/src/components/HolderRoom.tsx). Tests: [app/test/holder.ts](app/test/holder.ts)
+signs with near-api-js's own NEP-413 signer and checks that a message naming another Life, an expired one or one
+signed for another site is refused.
 
 ## Try it live
 

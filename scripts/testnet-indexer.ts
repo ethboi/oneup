@@ -1,5 +1,5 @@
 // Feeds the hosted app's Leaderboard, History, Activity, recent sales, past jackpots, round results, the $1UP and
-// House pages' closed rounds, and the Agents page on testnet.
+// House pages' closed rounds, each Life NFT's own history, and the Agents page on testnet.
 // It follows the contracts' transactions through FastNEAR's public transaction API, runs their events through the
 // same code as the local indexer (app/src/lib/server/activity.ts), and writes the results to Redis every 30 seconds.
 // The app's API routes read them from there (app/src/lib/server/published.ts), so visitors never reach this machine.
@@ -16,10 +16,17 @@ import {
   eventLogs,
   historyFor,
   indexedAccounts,
+  indexedLives,
   indexerCursor,
   jackpotDraws,
+  lifeClaimLogs,
+  lifeHistoryFor,
+  livesComplete,
+  livesFrom,
   loadIndexerState,
+  markLivesComplete,
   markSynced,
+  mergeLifeBackfill,
   recordBlock,
   recentActivity,
   recentSales,
@@ -58,20 +65,31 @@ interface Row {
   tx_block_timestamp: number;
 }
 interface Tx {
-  transaction: { hash: string };
+  transaction: { hash: string; receiver_id: string; actions?: unknown[] };
   receipts: { execution_outcome: { outcome: { executor_id: string; logs: string[]; status?: unknown } } }[];
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {
-  const r = await fetch(API + path, {
-    method: "POST",
-    headers: { "content-type": "application/json", "user-agent": "oneup-indexer" },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!r.ok) throw Error(`${path} answered ${r.status}`);
-  return (await r.json()) as T;
+  // the free API answers 429 when asked too often: wait and ask again, a little longer each time
+  for (let attempt = 0; ; attempt++) {
+    const r = await fetch(API + path, {
+      method: "POST",
+      headers: { "content-type": "application/json", "user-agent": "oneup-indexer" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (r.status === 429 && attempt < 6) {
+      await new Promise((done) => setTimeout(done, 2_000 * 2 ** attempt));
+      continue;
+    }
+    if (!r.ok) throw Error(`${path} answered ${r.status}`);
+    return (await r.json()) as T;
+  }
 }
+
+/** Between the backfill's requests, so it doesn't crowd out the live indexer's. */
+const BACKFILL_PAUSE_MS = 400;
+const pause = () => new Promise((done) => setTimeout(done, BACKFILL_PAUSE_MS));
 
 const order = (x: Row) => [x.tx_block_height, x.tx_index] as const;
 const after = (x: Row, cursor: readonly [number, number] | null) =>
@@ -107,7 +125,8 @@ async function ingest(rows: Row[]): Promise<{ from: number; to: number }[]> {
       const tx = byHash.get(row.transaction_hash);
       // not there yet: stop here, and the cursor brings it back next time
       if (!tx) return closed;
-      const logs = eventLogs(tx.receipts.map((r) => r.execution_outcome.outcome), row.transaction_hash);
+      const outcomes = tx.receipts.map((r) => r.execution_outcome.outcome);
+      const logs = [...eventLogs(outcomes, row.transaction_hash), ...lifeClaimLogs(tx.transaction, outcomes, row.transaction_hash, c)];
       for (const [executor_id, json] of logs) {
         if (executor_id !== c.house || !json.includes('"epoch_closed"')) continue;
         try {
@@ -123,6 +142,52 @@ async function ingest(rows: Row[]): Promise<{ from: number; to: number }[]> {
     }
   }
   return closed;
+}
+
+/** The transactions to backfill, kept between attempts so a retry doesn't list them again. */
+let backfillRows: Row[] | null = null;
+
+/** Lives minted before this indexer kept their histories: once, reads every transaction that touched the Life
+ *  contract up to where live recording began, and puts their Life events in front of what came after. */
+async function backfillLives() {
+  const from = livesFrom();
+  const m = /^(\d+):(\d+)$/.exec(from ?? "");
+  if (!m) {
+    markLivesComplete(); // a first run reads everything through ingest
+    return;
+  }
+  const until = [Number(m[1]), Number(m[2])] as const;
+  if (!backfillRows) {
+    const rows = new Map<string, Row>();
+    let resume_token: string | undefined;
+    for (;;) {
+      const page: { account_txs: Row[]; resume_token?: string | null } = await post("/v0/account", resume_token ? { account_id: c.life, resume_token } : { account_id: c.life });
+      for (const row of page.account_txs) if (!after(row, until)) rows.set(row.transaction_hash, row);
+      if (!page.resume_token || !page.account_txs.length) break;
+      resume_token = page.resume_token;
+      await pause();
+    }
+    backfillRows = [...rows.values()].sort((a, b) => a.tx_block_height - b.tx_block_height || a.tx_index - b.tx_index);
+  }
+  const list = backfillRows;
+  log(`backfilling Life histories from ${list.length} transactions up to ${from}`);
+  const blocks: { t: number; logs: [string, string, string][] }[] = [];
+  for (let i = 0; i < list.length; i += BATCH) {
+    const batch = list.slice(i, i + BATCH);
+    const { transactions } = await post<{ transactions: Tx[] }>("/v0/transactions", { tx_hashes: batch.map((r) => r.transaction_hash) });
+    await pause();
+    const byHash = new Map(transactions.map((tx) => [tx.transaction.hash, tx]));
+    for (const row of batch) {
+      const tx = byHash.get(row.transaction_hash);
+      if (!tx) throw Error(`transaction ${row.transaction_hash} not returned`);
+      const outcomes = tx.receipts.map((r) => r.execution_outcome.outcome);
+      const logs = [...eventLogs(outcomes, row.transaction_hash), ...lifeClaimLogs(tx.transaction, outcomes, row.transaction_hash, c)];
+      blocks.push({ t: Math.floor(row.tx_block_timestamp / 1e6), logs });
+    }
+  }
+  mergeLifeBackfill(blocks, c);
+  saveIndexerState();
+  log(`Life histories complete: ${indexedLives().length} Lives`);
 }
 
 const sent = new Map<string, string>();
@@ -224,6 +289,7 @@ async function tick() {
   const rounds = await closedRounds(epoch.id - 1).catch(() => null);
   if (rounds) values.set("rounds", rounds);
   for (const account of indexedAccounts()) values.set(`history:${account}`, historyFor(account));
+  for (const id of indexedLives()) values.set(`life:${id}`, lifeHistoryFor(id));
   for (const { from, to } of closed) values.set(`board:${from}`, boardBetween(from, to));
   const written = await publish(values);
   saveIndexerState();
@@ -232,6 +298,13 @@ async function tick() {
 
 loadIndexerState(c.house);
 markSynced(1);
+for (let attempt = 1; !livesComplete() && attempt <= 5; attempt++) {
+  // the feed waits a few minutes for this, once; if it keeps failing, Lives' histories stay marked incomplete
+  await backfillLives().catch(async (e) => {
+    log(`Life backfill attempt ${attempt} failed: ${e instanceof Error ? e.message.slice(0, 160) : e}`);
+    await new Promise((r) => setTimeout(r, 15_000));
+  });
+}
 log(`following ${followed.join(", ")} from ${indexerCursor() ?? "the start"}; ${store.url ? "publishing" : "not publishing: no store set"}`);
 for (;;) {
   const start = Date.now();
