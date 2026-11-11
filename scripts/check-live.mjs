@@ -106,7 +106,7 @@ export function disclosures(s) {
     `Test money: USDC here is a test token with a faucet, and the swap and vault are mocks.`,
     `Prices: the oracle is a mock, and the author's keeper feeds it Binance prices from their own machine.`,
     `Who's trading: ${outside.length ? `${new Set(outside).size} outside accounts among the open positions and Life owners; the rest are the author's bots.` : "every open position and Life owner right now is the author's bots or operator."}`,
-    `Control: nobody can change the code, but ${s.owner} can still change settings such as the oracle, keeper and market limits.`,
+    `Control: nobody can change the code, but ${s.owner} can still halt markets, change the oracle, keeper and parameters, and move the pool's idle USDC (README: Who controls what on testnet).`,
     `Not audited. The DAO, Intents, one-tap trading and agents run in the local demo, not here.`,
   ];
 }
