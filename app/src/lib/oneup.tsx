@@ -15,6 +15,7 @@ import { pollSerial } from "./poll";
 import { readFailed, readGone, readOk } from "./read-health";
 import { loadSession, saveSession, sessionExists, sessionSender, type Session } from "./session";
 import { FailoverProvider, OneUp, accountSender, normalizePrice, rpcList } from "@oneup/sdk";
+import { ReadShare } from "./shared-reads";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 export interface Toast {
@@ -80,6 +81,14 @@ function withoutAccount(o: OneUp): OneUp {
   });
 }
 
+/** Testnet: the same view asked for by several parts of the page at once goes to the RPC once (lib/shared-reads.ts). */
+function sharingReads(o: OneUp, reads: ReadShare): OneUp {
+  const view = o.view.bind(o);
+  o.view = <T,>(contractId: string, method: string, args: Record<string, unknown> = {}) =>
+    reads.get(`${contractId} ${method} ${JSON.stringify(args)}`, () => view<T>(contractId, method, args));
+  return o;
+}
+
 const OneUpContext = createContext<Ctx | null>(null);
 
 /** Public testnet RPCs limit each IP, and a tab at the local chain's pace (about 230 requests a minute) runs into
@@ -116,10 +125,11 @@ function viaProxy(d: AppDeployment): AppDeployment {
 }
 
 function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
-  const o = useMemo(
-    () => withoutAccount(d.network === "testnet" ? new OneUp(d, new FailoverProvider(rpcList(d.rpcUrl))) : new OneUp(d)),
-    [d],
-  );
+  const { o, reads } = useMemo(() => {
+    if (d.network !== "testnet") return { o: withoutAccount(new OneUp(d)), reads: null };
+    const reads = new ReadShare();
+    return { o: withoutAccount(sharingReads(new OneUp(d, new FailoverProvider(rpcList(d.rpcUrl))), reads)), reads };
+  }, [d]);
   const wallet = useNearWallet(d);
   const accounts = useMemo(
     () => d.demo ? [{ id: d.demo.id, label: "demo" }, ...d.bots.map((b, i) => ({ id: b.id, label: `bot ${i + 1}` }))] : [],
@@ -180,6 +190,11 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
 
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [version, setVersion] = useState(0);
+  // after a transaction: every poll reads again, and none is handed an answer from before it
+  const refresh = useCallback(() => {
+    reads?.clear();
+    setVersion((v) => v + 1);
+  }, [reads]);
   const nextId = useRef(1);
   const connect = wallet.connect;
   const run = useCallback(async (label: string, f: () => Promise<unknown>) => {
@@ -201,7 +216,7 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
       await f();
       if (/^Claim/.test(label)) sfx("claim");
       done("ok", label);
-      setVersion((v) => v + 1);
+      refresh();
       return true;
     } catch (e) {
       sfx("error");
@@ -210,7 +225,7 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
       if (d.network === "testnet") reportFailure(label, e, me);
       return false;
     }
-  }, [viewOnly, connect, d.network, me]);
+  }, [viewOnly, connect, d.network, me, refresh]);
   // a wallet that couldn't connect says why (once connected, the account menu shows its errors)
   useEffect(() => {
     if (!viewOnly || !wallet.error) return;
@@ -299,7 +314,7 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
     try {
       setGuest(await createGuest(o, (step) => show("pending", step)));
       show("ok", "Guest account ready, with 1,000 test USDC");
-      setVersion((v) => v + 1);
+      refresh();
       return true;
     } catch (e) {
       show("error", `Guest account: ${cleanError(e)}`);
@@ -312,7 +327,7 @@ function Loaded({ d, children }: { d: AppDeployment; children: ReactNode }) {
       setGuestBusy(false);
       setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 6000);
     }
-  }, [guestBusy, o, d.contracts.house]);
+  }, [guestBusy, o, d.contracts.house, refresh]);
   const leaveGuest = useCallback(() => {
     saveGuest(null);
     setGuest(null);

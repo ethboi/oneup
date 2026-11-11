@@ -56,10 +56,44 @@ export async function createGuest(o: OneUp, onStep?: (s: string) => void): Promi
   const guest: Guest = { accountId: j.accountId, key: kp.toString(), house, createdAt: Date.now() };
   saveGuest(guest);
   const account = new Account(guest.accountId, o.provider, guest.key as KeyPairString);
+  // OneUp made the account a moment ago, through its own RPC. Until the one answering this browser has the new key
+  // as well, a transaction signed with it is refused ("access key does not exist"), so wait for the key to show
+  await until(() => o.provider.viewAccessKey({ accountId: guest.accountId, publicKey: kp.getPublicKey() }).then(() => true));
   onStep?.("Registering for $1UP…");
   const bounds = await o.view<{ min: string }>(oneup, "storage_balance_bounds");
-  await account.callFunction({ contractId: oneup, methodName: "storage_deposit", args: { account_id: guest.accountId, registration_only: true }, deposit: BigInt(bounds.min) });
+  await onceCaughtUp(() => account.callFunction({ contractId: oneup, methodName: "storage_deposit", args: { account_id: guest.accountId, registration_only: true }, deposit: BigInt(bounds.min) }));
   onStep?.("Getting 1,000 test USDC…");
-  await account.callFunction({ contractId: usdc, methodName: "faucet", args: { amount: String(1000n * USDC) } });
+  await onceCaughtUp(() => account.callFunction({ contractId: usdc, methodName: "faucet", args: { amount: String(GUEST_USDC) } }));
+  // the send returns when the faucet has run, which can be a block before the RPC that answers the next read has
+  // it. Ready means the USDC can be read: otherwise the order form opens on $0.00 and "Not enough USDC"
+  await until(async () => BigInt((await o.provider.callFunction<string>({ contractId: usdc, method: "ft_balance_of", args: { account_id: guest.accountId } })) ?? "0") >= GUEST_USDC);
   return guest;
+}
+
+const GUEST_USDC = 1000n * USDC;
+
+const pause = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/** Sends again, a moment later, when the RPC that was asked hadn't caught up with what came just before: it doesn't
+ *  have the new key yet, or still has the key's nonce from before the last transaction. Either way the transaction
+ *  was refused before it reached the chain, so sending it again cannot run it twice. */
+export async function onceCaughtUp<T>(send: () => Promise<T>, tries = 4, waitMs = 700, sleep = pause): Promise<T> {
+  for (let i = 1; ; i++) {
+    try {
+      return await send();
+    } catch (e) {
+      if (i >= tries || !/does not exist|nonce/i.test(e instanceof Error ? e.message : String(e))) throw e;
+      await sleep(waitMs);
+    }
+  }
+}
+
+/** Waits for `seen` to answer true, asking every `everyMs`. Gives up quietly after `tries`: the page's own reads
+ *  catch up a little later, and a failed read is no reason to fail what has already happened on chain. */
+export async function until(seen: () => Promise<boolean>, tries = 20, everyMs = 400, sleep = pause): Promise<boolean> {
+  for (let i = 0; i < tries; i++) {
+    if (await seen().catch(() => false)) return true;
+    if (i < tries - 1) await sleep(everyMs);
+  }
+  return false;
 }
