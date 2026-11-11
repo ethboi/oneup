@@ -80,7 +80,7 @@ export function LifeDetail({ tokenId, onBack }: { tokenId: string; onBack: () =>
               </div>
               {listings.some(l => l.nft_contract === d.contracts.life && l.token_id === life.token_id) && <p className="text-xs text-[var(--muted)]">Claiming USDC makes the current listing invalid. Select Update price to list it again. Any purchase using the old listing is refunded.</p>}
             </>
-          ) : <p className="text-sm text-[var(--muted)]">This Life belongs to {life.owner_id}. Only the current owner can claim USDC or list it for sale. You are using {me}. <a className="font-semibold text-[var(--primary)] underline" href="/market">View the market</a>.</p>}
+          ) : <p className="text-sm text-[var(--muted)]">This Life belongs to {life.owner_id}. Only the current owner can claim USDC or list it for sale.{me ? ` You are using ${me}.` : ""} <a className="font-semibold text-[var(--primary)] underline" href="/market">View the market</a>.</p>}
         </div>
         <div className="space-y-3 p-5">
           <h2 className="font-extrabold">Lifetime totals</h2>
