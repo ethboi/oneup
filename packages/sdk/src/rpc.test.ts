@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { JsonRpcProvider } from "near-api-js";
-import { FailoverProvider, PacedProvider, TESTNET_RPCS, isRateLimited, rpcList } from "./rpc.ts";
+import { FailoverProvider, PacedProvider, TESTNET_RPCS, holdsRequests, isRateLimited, rpcList, sendList } from "./rpc.ts";
 
 const limitError = Error('{"jsonrpc": "2.0", "error": {"code": -429, "message": "Rate limits exceeded."}}');
 const send = (p: PacedProvider) => p.sendJsonRpc("status" as never, {} as never);
@@ -78,6 +78,16 @@ describe("PacedProvider's backoff", () => {
   });
 });
 
+describe("sendList", () => {
+  it("keeps the RPC that drops slow requests for last", () => {
+    const hosts = sendList("https://near-testnet.drpc.org").map((u) => new URL(u).hostname);
+    expect(hosts.at(-1)).toBe("near-testnet.drpc.org");
+    expect(hosts).toHaveLength(TESTNET_RPCS.length);
+    expect(hosts.slice(0, -1).every((h) => holdsRequests(`https://${h}`))).toBe(true);
+    expect(holdsRequests("https://test.rpc.fastnear.com")).toBe(true);
+  });
+});
+
 describe("FailoverProvider", () => {
   const rpc = (answer: () => unknown) => {
     const p = new JsonRpcProvider({ url: "http://rpc.invalid" });
@@ -129,6 +139,29 @@ describe("FailoverProvider", () => {
     expect(await call(f)).toBe("b");
   });
 
+  // the first RPC reads but drops a request that waits (dRPC's free plan, after two seconds)
+  const readerFirst = (reader: ReturnType<typeof rpc>, ...rest: ReturnType<typeof rpc>[]) => {
+    const all = [reader, ...rest];
+    return new FailoverProvider(all.map((_, i) => `http://${i}.invalid`), 30_000, () => 1000, (url) => all[Number(new URL(url).hostname[0])]!.p, 30_000, (url) => !url.includes("0."));
+  };
+
+  it("reads from the first RPC and sends a transaction through one that holds the request", async () => {
+    const reader = rpc(() => "read");
+    const sender = rpc(() => "sent");
+    const f = readerFirst(reader, sender);
+    expect(await call(f)).toBe("read");
+    for (const method of ["send_tx", "broadcast_tx_commit", "tx", "EXPERIMENTAL_tx_status"]) expect(await f.sendJsonRpc(method as never, {} as never)).toBe("sent");
+    expect(reader.spy).toHaveBeenCalledTimes(1);
+    // and the reader is still awake for the reads that follow the send
+    expect(await call(f)).toBe("read");
+  });
+
+  it("sends through the reader when no RPC holds a request", async () => {
+    const reader = rpc(() => "read");
+    const f = new FailoverProvider(["http://0.invalid"], 30_000, () => 1000, () => reader.p, 30_000, () => false);
+    expect(await f.sendJsonRpc("send_tx" as never, {} as never)).toBe("read");
+  });
+
   it("passes on a contract's error without trying another RPC", async () => {
     const b = rpc(() => "b");
     const { f } = setup(rpc(() => { throw Error("Smart contract panicked: Epoch not finished"); }), b);
@@ -150,10 +183,16 @@ describe("FailoverProvider", () => {
 
 describe("rpcList", () => {
   it("puts the configured RPC first, once", () => {
-    const list = rpcList("https://near-testnet.drpc.org");
-    expect(list[0]).toBe("https://near-testnet.drpc.org/");
+    const list = rpcList("https://testnet-rpc.intea.rs");
+    expect(list[0]).toBe("https://testnet-rpc.intea.rs/");
     expect(list).toHaveLength(TESTNET_RPCS.length);
     expect(new Set(list).size).toBe(list.length);
+  });
+  it("falls through the quick public RPCs before the slow ones", () => {
+    // intea.rs holds each keyless request for a second; rpc.testnet.near.org takes three
+    const hosts = rpcList("https://near-testnet.drpc.org").map((url) => new URL(url).hostname);
+    expect(hosts.slice(0, 2)).toEqual(["near-testnet.drpc.org", "test.rpc.fastnear.com"]);
+    expect(hosts.indexOf("testnet-rpc.intea.rs")).toBeGreaterThan(1);
   });
   it("keeps an RPC that isn't on the list", () => {
     expect(rpcList("https://other.invalid")).toHaveLength(TESTNET_RPCS.length + 1);

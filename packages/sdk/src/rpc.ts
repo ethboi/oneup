@@ -68,12 +68,14 @@ export class PacedProvider extends JsonRpcProvider {
 
 /**
  * Public NEAR testnet RPCs that take requests from anywhere, browsers included. They all limit each IP, so the app,
- * keeper and bots fall through them (FailoverProvider). The last two are slow and for when the others refuse.
+ * keeper and bots fall through them (FailoverProvider), quickest first. intea.rs holds every request without an API
+ * key for a second and refuses most of a page's reads when they come together, so it follows the two that answer in
+ * a tenth of that. The last two are slow and for when the others refuse. dRPC reads but doesn't send (`holdsRequests`).
  */
 export const TESTNET_RPCS = [
-  "https://testnet-rpc.intea.rs/",
-  "https://test.rpc.fastnear.com/",
   "https://near-testnet.drpc.org/",
+  "https://test.rpc.fastnear.com/",
+  "https://testnet-rpc.intea.rs/",
   "https://rpc.testnet.near.org/",
   "https://archival-rpc.testnet.near.org/",
 ];
@@ -83,6 +85,19 @@ export const rpcList = (primary: string) => {
   return [first, ...TESTNET_RPCS.filter((url) => url !== first)];
 };
 
+/** dRPC's free plan drops any request after two seconds (HTTP 408, "Request timeout on the free plan"). A read is
+ *  back long before that; a send that waits for its transaction to run usually isn't. */
+const DROPS_SLOW_REQUESTS = new Set(["near-testnet.drpc.org"]);
+/** Whether an RPC keeps a request open for as long as a transaction takes. */
+export const holdsRequests = (url: string) => !DROPS_SLOW_REQUESTS.has(new URL(url).hostname);
+/** `rpcList` for something that only sends, such as a wallet: the RPCs that hold a request first. */
+export const sendList = (primary: string) => {
+  const all = rpcList(primary);
+  return [...all.filter(holdsRequests), ...all.filter((url) => !holdsRequests(url))];
+};
+/** The RPC methods that answer only once a transaction has got somewhere. */
+const WAITS_FOR_A_TRANSACTION = new Set(["send_tx", "broadcast_tx_commit", "tx", "EXPERIMENTAL_tx_status"]);
+
 /** The RPC couldn't answer, as opposed to answering with an error such as a contract panic. */
 export const isUnavailable = (e: unknown) =>
   e instanceof TypeError || isRateLimited(e) || /retries|attempts|bad gateway|unavailable|timeout|no answer|internal server error|fetch/i.test(String(e instanceof Error ? e.message : e));
@@ -91,9 +106,11 @@ export const isUnavailable = (e: unknown) =>
  * Reads and sends through the first RPC that isn't resting. One that refuses or fails rests for `restMs` while the
  * others carry on. Each gets a single attempt, because the library's own 12 retries turn one refusal into a burst
  * that keeps the limit tripped. Resending a signed transaction is safe: it has one hash and one nonce.
+ * A request that waits for a transaction goes only to the RPCs that hold one open (`holds`), so the quickest reader
+ * can come first without every send timing out on it and putting it to rest.
  */
 export class FailoverProvider extends JsonRpcProvider {
-  private readonly rpcs: { provider: JsonRpcProvider; restUntil: number }[];
+  private readonly rpcs: { provider: JsonRpcProvider; restUntil: number; holds: boolean }[];
 
   constructor(
     urls: string[],
@@ -101,17 +118,20 @@ export class FailoverProvider extends JsonRpcProvider {
     private readonly now = () => Date.now(),
     make = (url: string) => new JsonRpcProvider({ url }, { retries: 1, wait: 0, backoff: 1 }),
     private readonly timeoutMs = 30_000,
+    holds = holdsRequests,
   ) {
     super({ url: urls[0]! });
-    this.rpcs = urls.map((url) => ({ provider: make(url), restUntil: 0 }));
+    this.rpcs = urls.map((url) => ({ provider: make(url), restUntil: 0, holds: holds(url) }));
   }
 
   // the parent's signature is generic over every RPC method; this only forwards it
   override async sendJsonRpc(...a: Parameters<JsonRpcProvider["sendJsonRpc"]>): Promise<any> {
     const t = this.now();
-    const awake = this.rpcs.filter((r) => r.restUntil <= t);
+    const holding = WAITS_FOR_A_TRANSACTION.has(String(a[0])) ? this.rpcs.filter((r) => r.holds) : [];
+    const able = holding.length ? holding : this.rpcs;
+    const awake = able.filter((r) => r.restUntil <= t);
     // all resting: only the one due back soonest, so a tab doesn't hammer every RPC at once
-    const order = awake.length ? awake : [this.rpcs.reduce((a, b) => (b.restUntil < a.restUntil ? b : a))];
+    const order = awake.length ? awake : [able.reduce((a, b) => (b.restUntil < a.restUntil ? b : a))];
     let last: unknown;
     for (const rpc of order) {
       try {

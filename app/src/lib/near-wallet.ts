@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { NearConnector, NearWalletBase, EventMap } from "@hot-labs/near-connect";
-import { FailoverProvider, rpcList } from "@oneup/sdk";
+import { FailoverProvider, rpcList, sendList } from "@oneup/sdk";
 import { JsonRpcProvider } from "near-api-js";
 import type { AppDeployment } from "./app-config";
 import { assertTestnetWallet, walletOptions, signedInAccount } from "./wallet-config";
@@ -38,7 +38,8 @@ export function useNearWallet(d: AppDeployment) {
     if (!enabled) return Promise.reject(new Error("NEAR wallets connect to the testnet profile, not the local demo"));
     if (!pending.current) {
       pending.current = import("@hot-labs/near-connect").then(({ NearConnector }) => new NearConnector({
-        ...walletOptions(d.network === "testnet" ? rpcList(d.rpcUrl) : [d.rpcUrl]),
+        // a wallet sends through these itself
+        ...walletOptions(d.network === "testnet" ? sendList(d.rpcUrl) : [d.rpcUrl]),
         storage: {
           async get(key) { return localStorage.getItem(`oneup.testnet.wallet.${key}`); },
           async set(key, value) { localStorage.setItem(`oneup.testnet.wallet.${key}`, value); },

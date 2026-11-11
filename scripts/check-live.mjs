@@ -12,7 +12,7 @@ const NAMES = ["house", "life", "oneup", "ve", "market", "usdc", "oracle", "swap
 const contract = name => `${name}.${ROOT}`;
 const NODES = process.env.ONEUP_LIVE_RPC
   ? [process.env.ONEUP_LIVE_RPC]
-  : ["https://testnet-rpc.intea.rs/", "https://test.rpc.fastnear.com/", "https://near-testnet.drpc.org/", "https://rpc.testnet.near.org/"];
+  : ["https://near-testnet.drpc.org/", "https://test.rpc.fastnear.com/", "https://testnet-rpc.intea.rs/", "https://rpc.testnet.near.org/"];
 
 // From epoch_payout in contracts/math/src/lib.rs: half the surplus is paid out, 60% of that to Lives and 30% to
 // buybacks. Whatever Lives can't take because they're fully paid goes to buybacks instead.
