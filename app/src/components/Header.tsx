@@ -10,6 +10,7 @@ import { useOneUp, usePoll } from "@/lib/oneup";
 import { Logo, PixelCoin, PixelHeart } from "./Pixel";
 import { Icon } from "./Icon";
 import { WalletActions } from "./WalletActions";
+import { CrossChain } from "./CrossChain";
 import { Popover } from "./Popover";
 import { MuteButton } from "./Sounds";
 import { openBadges } from "./Achievements";
@@ -338,6 +339,10 @@ function AccountFunds() {
           </div>
           <p className="label">You can deposit now, or let your next trade transfer the USDC it needs from your wallet.</p>
           {d.network === "localnet" ? <><ChainDeposit /><FastTrading /></> : <WalletActions />}
+          <details className="rounded-lg border border-[var(--line)] p-3">
+            <summary className="cursor-pointer text-sm font-bold">From another chain: dry-run quote</summary>
+            <div className="mt-3"><CrossChain /></div>
+          </details>
           <button className="btn btn-ghost justify-start" onClick={() => (close(), openBadges())}>
             <Icon name="trophy" />
             Achievements and console skins

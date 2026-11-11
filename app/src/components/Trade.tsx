@@ -41,6 +41,7 @@ import { ShareButton, type CardData } from "./PnlCard";
 import { Jackpot, fmtDuration } from "./Jackpot";
 import { useHistory } from "./History";
 import { GameFx, GameHud, Quests } from "./Game";
+import { CrossChain } from "./CrossChain";
 import { AgentBadge } from "./ui";
 import { emitFx } from "@/lib/fx";
 import { sfx } from "@/lib/sound";
@@ -425,6 +426,11 @@ export function Trade() {
       <div id="order-form" className="order-3 flex flex-col gap-4">
         <OrderForm t={ticket} />
         <Account t={ticket} positions={positions} orders={orders} />
+        {/* bringing USDC from another chain: a real 1Click quote, asked as a dry run */}
+        <details className="panel p-3" id="cross-chain">
+          <summary className="cursor-pointer text-sm font-semibold">From another chain: dry-run quote</summary>
+          <div className="mt-3"><CrossChain /></div>
+        </details>
         <Quests />
         {/* under the form on every screen: on a desktop it fills the column beside the tall chart */}
         <details className="panel p-3">

@@ -104,7 +104,8 @@ const NEAR: { title: string; status: Status; body: string; points: string[]; mar
     points: [
       "The official Verifier and PoA token factory (release 0.4.2) run on the local chain",
       "Intents are signed with the official SDK; OneUp's solver fills them with execute_intents",
-      "Real Ethereum and Solana deposits and 1Click are not integrated. Initial setup may require an extra signature",
+      "1Click prices a deposit from another chain with a real mainnet quote, asked as a dry run, and checks a 1Click deposit address's status. Nothing is executed",
+      "Real Ethereum and Solana deposits are not integrated. Initial setup may require an extra signature",
     ],
   },
   {

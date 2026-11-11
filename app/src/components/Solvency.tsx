@@ -12,6 +12,7 @@ import { Icon } from "./Icon";
 import { Governance } from "./Governance";
 import { JumpLinks, PageTitle } from "./ui";
 import { PoolAtWork } from "./PoolAtWork";
+import { WhereFunds } from "./WhereFunds";
 
 const big = (x?: string) => (x === undefined ? 0n : BigInt(x));
 const pct = (a: bigint, b: bigint) => (b === 0n ? 0 : Number((a * 10_000n) / b) / 100);
@@ -45,7 +46,7 @@ export function Solvency() {
         <PageTitle>The house</PageTitle>
         <p className="label mt-1.5">View the house’s on-chain reserves and explore modeled recovery scenarios. Reserves do not remove oracle, custody or contract risks.</p>
       </div>
-      <JumpLinks items={[["house-markets", "Capacity"], ["house-rounds", "Rounds"], ["house-pool", "The pool"]]} />
+      <JumpLinks items={[["house-markets", "Capacity"], ["house-rounds", "Rounds"], ["house-pool", "The pool"], ["house-usdc", "Where the USDC sits"]]} />
       <div className="panel p-5">
         <p className="text-lg">
           Accepted trades reserve up to{" "}
@@ -194,6 +195,7 @@ export function Solvency() {
         </div>
       </div>
       <PoolAtWork pool={pool} liability={liability} />
+      <WhereFunds pool={pool} />
 
       <div className="panel p-5 text-sm">
         <b>How the pool is funded:</b> initial house funding and contributions from backers. Open the Backing tab to see
