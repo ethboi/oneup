@@ -20,6 +20,7 @@ import { sfx } from "@/lib/sound";
 import { endSession, saveSession, sessionAllowance, startSession } from "@/lib/session";
 import { intentsBalances, payFromChain } from "@/lib/intents";
 import { GuestButton } from "./ui";
+import { SHOW_TOUR } from "@/lib/tour";
 
 export interface NavTab {
   name: string;
@@ -265,6 +266,21 @@ function DemoMenu() {
           {/* the power-on screen shows once a session; this brings it back */}
           <button type="button" className="chip self-start" onClick={() => (close(), showBoot())}>
             Replay the intro
+          </button>
+          {/* the walkthrough on the Trade page (components/Tour.tsx), once hidden */}
+          <button
+            type="button"
+            className="chip self-start"
+            onClick={() => {
+              close();
+              try {
+                localStorage.removeItem("oneup.tour.hidden");
+              } catch {}
+              if (location.pathname !== "/") location.href = "/";
+              else window.dispatchEvent(new Event(SHOW_TOUR));
+            }}
+          >
+            Show the walkthrough
           </button>
         </div>
       )}

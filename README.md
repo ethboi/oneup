@@ -67,6 +67,7 @@ pooled house with capped profit is an existing design; OneUp doesn't claim it.
 | Function-call access keys, NEP-366 meta transactions | One-tap trading: a session key that can call only `place_open`, `place_close` and `set_triggers` on the house, relayed so the trader pays no gas. Two keeper loops sign with function-call keys: prices (`push_prices` on the oracle) and risk (`liquidate`, `take_profit`, `hit_target`, `hit_stop` on the house). The keeper's other jobs (fills, expiries, round closes, vault moves) still sign with the keeper account's full-access key | [app/src/lib/session.ts](app/src/lib/session.ts), [app/src/app/api/relay/route.ts](app/src/app/api/relay/route.ts), [app/src/lib/server/relay.ts](app/src/lib/server/relay.ts), [keeper/src/index.ts](keeper/src/index.ts) | [app/test/session.ts](app/test/session.ts), [app/test/relay.ts](app/test/relay.ts) | Session keys and relayer: local. Keeper keys: testnet, local |
 | Block randomness | The jackpot draw picks the winning ticket from `env::random_seed()` | `draw_jackpot` in [house/treasury.rs](contracts/house/src/treasury.rs) | House test `losers_get_tickets_and_one_takes_the_jackpot` | Testnet, local |
 | Wallets | NEAR Connect (`@hot-labs/near-connect`) for testnet wallets | [app/src/lib/near-wallet.ts](app/src/lib/near-wallet.ts) | [app/test/wallet.ts](app/test/wallet.ts) | Testnet |
+| Sub-accounts and full-access keys (guest accounts) | **Try as a guest** makes a key in the browser and sends only its public half. A sponsor account creates `g<random>.guests.oneupmarkets.testnet` with that key and 1 test NEAR in one transaction; the guest's own key then registers for $1UP, takes test USDC from the faucet and signs every trade, with nothing to approve. Limited per visitor and in total each hour | [app/src/lib/server/guest.ts](app/src/lib/server/guest.ts), [app/src/app/api/guest/route.ts](app/src/app/api/guest/route.ts), [app/src/lib/guest.ts](app/src/lib/guest.ts) | [app/test/guest.ts](app/test/guest.ts) | Testnet |
 | NEP-413 signed messages | A Life's holder room opens only for the account holding it now: the wallet signs a message naming the Life, and the server checks the signature, that the key is the account's full-access key, and the Life's owner on chain | [app/src/app/api/life-holder/route.ts](app/src/app/api/life-holder/route.ts), [app/src/lib/nep413.ts](app/src/lib/nep413.ts), [app/src/lib/server/holder.ts](app/src/lib/server/holder.ts) | [app/test/holder.ts](app/test/holder.ts) | Testnet, local |
 | MCP agents | Thirteen tools over the same SDK the app uses; each action is journalled with the agent's stated reason | [mcp/src/index.ts](mcp/src/index.ts), [mcp/src/agent.ts](mcp/src/agent.ts) | `pnpm agent`, then the app's Agents tab | Local |
 
@@ -158,7 +159,7 @@ signed for another site is refused.
 | 1 | Open https://oneup.markets, then **Open the app** | What OneUp is, then the app's power-on screen (any key skips it) |
 | 2 | Look around before connecting | The Trade screen with no wallet: the live chart and the long/short split. Any action asks for a wallet |
 | 3 | Open the **Market** and **Jackpot** tabs | The Lives and locks the bots have listed; the jackpot's prize, its countdown and every past draw |
-| 4 | **Connect wallet** (a NEAR testnet wallet such as Meteor; see [wallet setup](docs/NEAR_WALLET_SETUP.md)), then in the account menu **Register test tokens** and **Get 1,000 test USDC** | Test USDC in your wallet |
+| 4 | **Try as a guest**: no wallet needed. Or **Connect wallet** (a NEAR testnet wallet such as Meteor; see [wallet setup](docs/NEAR_WALLET_SETUP.md)), then in the account menu **Register test tokens** and **Get 1,000 test USDC** | As a guest, a throwaway testnet account made in your browser, registered and holding 1,000 test USDC, in a few seconds. The **See the whole loop** checklist on the Trade page ticks off each of the next steps as you do them |
 | 5 | Open a 1000× long on NEAR-USD | The order fills on the next price. A small move against it liquidates it, with the LIQUIDATED banner |
 | 6 | Wait for the round to close (the countdown is in the header), then open **Life NFTs** | If the house ended the round in profit, your Life NFT, its picture filling as it pays |
 | 7 | **Claim** what it has collected, or list it on the **Market** | USDC in your wallet, or your listing |
@@ -186,6 +187,12 @@ own, or change the marketplace, the $1UP token or the locks, which have no owner
 `keeper.v5.oneupmarkets.testnet`, also holds a full-access key, which signs fills, expiries, round closes and vault
 moves (see [What NEAR does here](#what-near-does-here)). In the local demo a Sputnik DAO is the owner instead; that
 handover hasn't been made on testnet.
+
+Guest accounts come from a separate sponsor, `guests.oneupmarkets.testnet`, whose key is in the hosted app's settings.
+It holds only test NEAR for new guests. It can't sign for a guest after creating it, and it has no role in any
+OneUp contract. A guest's own key stays in its browser's storage: whoever uses that browser controls the guest
+account, and clearing the site's data forgets it. `check-live` counts guest accounts apart from outside traders,
+because anyone can make one, the author included.
 
 ## Try it locally
 

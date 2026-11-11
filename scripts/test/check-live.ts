@@ -89,3 +89,11 @@ test("the disclosure names outside traders only when there are any", () => {
   snapshot.positions.push({ owner: "alice.testnet" });
   assert.match(disclosures(snapshot).join(" "), /1 outside accounts/);
 });
+
+test("guest accounts are counted apart from outside traders: anyone can make one, the author included", () => {
+  const snapshot = healthy();
+  snapshot.positions.push({ owner: "g1a2b3.guests.oneupmarkets.testnet" });
+  const text = disclosures(snapshot).join(" ");
+  assert.match(text, /0 outside accounts and 1 guest accounts/);
+  assert.match(text, /the author included/);
+});

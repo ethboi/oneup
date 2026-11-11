@@ -99,13 +99,17 @@ export function evaluate(s) {
 /** Plain facts the checks can't prove or that a reader should weigh, computed from the same snapshot. */
 export function disclosures(s) {
   const ours = id => id === ROOT || id.endsWith(`.${ROOT}`);
+  // guest accounts are made in a browser by anyone, the author included (app/src/lib/server/guest.ts)
+  const guest = id => id.endsWith(".guests.oneupmarkets.testnet");
   const traders = new Set(s.positions.map(p => p.owner));
   const holders = new Set(s.lives.map(l => l.owner_id));
-  const outside = [...traders, ...holders].filter(id => !ours(id));
+  const everyone = new Set([...traders, ...holders]);
+  const outside = [...everyone].filter(id => !ours(id) && !guest(id));
+  const guests = [...everyone].filter(guest);
   return [
     `Test money: USDC here is a test token with a faucet, and the swap and vault are mocks.`,
     `Prices: the oracle is a mock, and the author's keeper feeds it Binance prices from their own machine.`,
-    `Who's trading: ${outside.length ? `${new Set(outside).size} outside accounts among the open positions and Life owners; the rest are the author's bots.` : "every open position and Life owner right now is the author's bots or operator."}`,
+    `Who's trading: ${outside.length || guests.length ? `${outside.length} outside accounts and ${guests.length} guest accounts (made in a browser by anyone, the author included) among the open positions and Life owners; the rest are the author's bots.` : "every open position and Life owner right now is the author's bots or operator."}`,
     `Control: nobody can change the code, but ${s.owner} can still halt markets, change the oracle, keeper and parameters, and move the pool's idle USDC (README: Who controls what on testnet).`,
     `Not audited. The DAO, Intents, one-tap trading and agents run in the local demo, not here.`,
   ];

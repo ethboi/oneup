@@ -43,6 +43,7 @@ import { useHistory } from "./History";
 import { GameFx, GameHud, Quests } from "./Game";
 import { CrossChain } from "./CrossChain";
 import { AgentBadge, GuestButton } from "./ui";
+import { Tour } from "./Tour";
 import { emitFx } from "@/lib/fx";
 import { sfx } from "@/lib/sound";
 
@@ -424,6 +425,7 @@ export function Trade() {
         </div>
       </div>
       <div id="order-form" className="order-3 flex flex-col gap-4">
+        <Tour />
         <OrderForm t={ticket} />
         <Account t={ticket} positions={positions} orders={orders} />
         {/* bringing USDC from another chain: a real 1Click quote, asked as a dry run */}

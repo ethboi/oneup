@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { displayAccount, fmtUsdc } from "@oneup/sdk";
 import { useOneUp } from "@/lib/oneup";
 import { HOLDER_RECIPIENT, holderMessage, toBase64 } from "@/lib/nep413";
+import { markHolderOpened } from "@/lib/tour";
 import type { SinceHeld } from "@/lib/server/holder";
 import { Icon } from "./Icon";
 
@@ -46,7 +47,10 @@ export function HolderRoom({ tokenId, owner }: { tokenId: string; owner: string 
       });
       const j = await r.json().catch(() => ({ error: "The server didn't answer." }));
       if (!r.ok) setError(j.error ?? "The room didn't open.");
-      else setRoom(j as Room);
+      else {
+        setRoom(j as Room);
+        markHolderOpened((j as Room).holder);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
