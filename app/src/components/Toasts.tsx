@@ -15,11 +15,12 @@ export function Toasts() {
   const { toasts, wallet } = useOneUp();
   const waitingOn = WAITING_ON[wallet.status];
   return (
-    <div className="fixed bottom-[140px] right-4 z-50 flex w-[min(380px,calc(100vw-32px))] flex-col gap-2 lg:bottom-4">
+    // phones: at the top, since what a transaction changes (the order, then the position) shows under the form
+    <div className="fixed right-4 top-[calc(8px+env(safe-area-inset-top,0px))] z-50 flex w-[min(380px,calc(100vw-32px))] flex-col gap-2 lg:bottom-4 lg:top-auto">
       {toasts.map((t) => (
         <div
           key={t.id}
-          className="panel px-4 py-3 text-sm font-bold shadow-[var(--panel-shadow)]"
+          className="panel px-4 py-3 text-sm font-bold shadow-[var(--panel-shadow)] [overflow-wrap:anywhere]"
           style={{ borderColor: t.kind === "error" ? "var(--short)" : t.kind === "ok" ? "var(--long)" : "var(--line)" }}
         >
           <span className="mr-2 inline-flex align-[-3px]" style={{ color: t.kind === "ok" ? "var(--long)" : t.kind === "error" ? "var(--short)" : "var(--muted)" }}>

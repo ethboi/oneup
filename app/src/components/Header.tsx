@@ -113,7 +113,8 @@ export function Header({ tabs, tab, go }: { tabs: readonly NavTab[]; tab: string
                 {result.net < 0n ? "−" : "+"}${fmtUsdc(result.net < 0n ? -result.net : result.net, (result.net < 0n ? -result.net : result.net) < 100n * USDC ? 2 : 0)}
               </b>
               {result.net < 0n && (
-                <span aria-label="A Life NFT may be issued if the house makes a profit this round">
+                // the narrowest phones have room for the amount or the heart, not both
+                <span className="hidden min-[400px]:inline" aria-label="A Life NFT may be issued if the house makes a profit this round">
                   <PixelHeart size={14} />
                 </span>
               )}

@@ -1,6 +1,5 @@
 "use client";
 
-import { createPortal } from "react-dom";
 import { orderStage, parseTokenAmount } from "@oneup/sdk";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -337,11 +336,26 @@ function useChartStyle(): ["line" | "candles", (s: "line" | "candles") => void] 
   ];
 }
 
+/** Waiting on the keeper's next price, not on the market reaching a limit. */
+const fillsAtNextPrice = (x: Order) => !("Open" in x.kind) || x.kind.Open.limit === null;
+
 export function Trade() {
-  const { o, me, prices } = useOneUp();
+  const { o, me, prices, version } = useOneUp();
   const markets = usePoll(() => o.markets(), [], 5000) ?? [];
   const [market, setMarketState] = useState("NEAR-USD");
-  const positions = usePoll(() => o.positions(me), [me]) ?? [];
+  // Positions and orders are read four times as often for a few seconds after a transaction of yours (the RPC that
+  // reads can be a block behind the one that sent it), and while an order waits for the keeper's next price, which
+  // takes seconds: the order shows as soon as it's placed and the position as it opens, not a poll later.
+  const [sent, setSent] = useState(false);
+  useEffect(() => {
+    if (!version) return;
+    setSent(true);
+    const t = setTimeout(() => setSent(false), 12_000);
+    return () => clearTimeout(t);
+  }, [version]);
+  const [filling, setFilling] = useState(false);
+  const pace = sent || filling ? 500 : 2000;
+  const positions = usePoll(() => o.positions(me), [me], pace) ?? [];
   // until you pick a market or a position, the chart follows your top position
   const chose = useRef(false);
   const setMarket = (m: string) => {
@@ -353,7 +367,15 @@ export function Trade() {
     if (!chose.current && top && top.market_id !== market) setMarketState(top.market_id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [top?.id]);
-  const orders = usePoll(() => o.orders(me), [me]) ?? [];
+  const orders = usePoll(() => o.orders(me), [me], pace) ?? [];
+  const fillsNext = orders.some(fillsAtNextPrice);
+  useEffect(() => {
+    setFilling(fillsNext);
+    if (!fillsNext) return;
+    // a keeper that isn't answering leaves the order waiting: back to the usual pace once its window has passed
+    const t = setTimeout(() => setFilling(false), (FILL_WINDOW_S + 15) * 1000);
+    return () => clearTimeout(t);
+  }, [fillsNext]);
   // the walkthrough ticks its trade steps from these
   const trading = { positions: positions.length, orders: orders.length };
   const ticket = useTicket(market, markets.find((m) => m.id === market)?.max_leverage ?? 100);
@@ -395,11 +417,11 @@ export function Trade() {
   });
 
   return (
-    // Phones: one column in the order banner, chart, order form, then positions and activity (the left column
-    // dissolves via `contents` and `order` interleaves them), with a trade bar while the form is out of view
-    // (once there is an account to trade with).
+    // Phones: one column in the order banner, chart, order form, positions and activity, then the account and the
+    // rest (both columns dissolve via `contents` and `order` interleaves them). Positions sit right under the form,
+    // so an order shows where it was sent from: waiting, then open.
     // Desktop: chart over positions and activity on the left, the form on the right.
-    <div className="flex flex-col gap-4 pb-24 lg:grid lg:grid-cols-[1fr_340px] lg:items-start lg:pb-0 2xl:grid-cols-[1fr_380px]">
+    <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[1fr_340px] lg:items-start 2xl:grid-cols-[1fr_380px]">
       <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
         {/* notices about the round: the result of the one that just ended, and a loss in this one */}
         <div className="order-1 flex flex-col gap-4 empty:hidden">
@@ -425,25 +447,28 @@ export function Trade() {
           <Below positions={positions} orders={orders} focused={focused?.id} pick={pick} market={market} />
         </div>
         {/* the guide to recovery, under the trading itself */}
-        <div className="order-5 min-w-0">
+        <div className="order-6 min-w-0">
           <Onboarding />
         </div>
       </div>
-      <div id="order-form" className="order-3 flex flex-col gap-4">
+      <div className="contents lg:flex lg:flex-col lg:gap-4">
         <Tour slot="desktop" trading={trading} />
         <OrderForm t={ticket} />
-        <Account t={ticket} positions={positions} orders={orders} />
-        {/* bringing USDC from another chain: a real 1Click quote, asked as a dry run */}
-        <details className="panel p-3" id="cross-chain">
-          <summary className="cursor-pointer text-sm font-semibold">From another chain: dry-run quote</summary>
-          <div className="mt-3"><CrossChain /></div>
-        </details>
-        <Quests />
-        {/* under the form on every screen: on a desktop it fills the column beside the tall chart */}
-        <details className="panel p-3">
-          <summary className="cursor-pointer text-sm font-semibold">Jackpot and tickets</summary>
-          <div className="mt-3"><Jackpot compact /></div>
-        </details>
+        {/* phones: under the positions */}
+        <div className="order-5 flex flex-col gap-4">
+          <Account t={ticket} positions={positions} orders={orders} />
+          {/* bringing USDC from another chain: a real 1Click quote, asked as a dry run */}
+          <details className="panel p-3" id="cross-chain">
+            <summary className="cursor-pointer text-sm font-semibold">From another chain: dry-run quote</summary>
+            <div className="mt-3"><CrossChain /></div>
+          </details>
+          <Quests />
+          {/* under the form on every screen: on a desktop it fills the column beside the tall chart */}
+          <details className="panel p-3">
+            <summary className="cursor-pointer text-sm font-semibold">Jackpot and tickets</summary>
+            <div className="mt-3"><Jackpot compact /></div>
+          </details>
+        </div>
       </div>
     </div>
   );
@@ -1003,7 +1028,7 @@ function OrderForm({ t }: { t: Ticket }) {
   return (
     <div
       id="order-ticket"
-      className="panel ticket flex scroll-mt-4 flex-col gap-2 p-3 sm:gap-3.5 sm:p-4"
+      className="panel ticket order-3 flex scroll-mt-4 flex-col gap-2 p-3 sm:gap-3.5 sm:p-4"
       onPointerEnter={() => t.setPreviewHeld(true)}
       onPointerLeave={() => t.setPreviewHeld(false)}
       onFocus={() => t.setPreviewHeld(true)}
@@ -1198,7 +1223,7 @@ function OrderForm({ t }: { t: Ticket }) {
         )
       )}
 
-      <OrderButton side={side} blocked={blocked} label={t.label} submit={t.submit} pin={!viewOnly} />
+      <OrderButton side={side} blocked={blocked} label={t.label} submit={t.submit} />
       {t.intentStep && (
         <span className="label flex items-center gap-2" role="status">
           <Icon name="spinner" /> {t.intentStep}
@@ -1839,39 +1864,12 @@ function LossBanner() {
   );
 }
 
-/** The order button, with a copy pinned above the phone tab bar while the real one is scrolled out of view.
- *  `pin`: false without an account, where a floating "Connect wallet" would only cover the page. */
-function OrderButton({ side, blocked, label, submit, pin }: { side: Side; blocked: boolean; label: string; submit: () => void; pin: boolean }) {
-  const ref = useRef<HTMLButtonElement>(null);
-  const [inView, setInView] = useState(true);
-  useEffect(() => {
-    if (!ref.current || typeof IntersectionObserver === "undefined") return;
-    const seen = new IntersectionObserver(([e]) => setInView(e.isIntersecting), { rootMargin: "0px 0px -68px 0px", threshold: 1 });
-    seen.observe(ref.current);
-    return () => seen.disconnect();
-  }, []);
-  const style = { "--btn-bg": side === "Long" ? "var(--long-fill)" : "var(--short-fill)", color: "var(--on-fill)" } as React.CSSProperties;
-  const inner = (
-    <>
+/** The order button: one button in the form, long or short in its side's colour. */
+function OrderButton({ side, blocked, label, submit }: { side: Side; blocked: boolean; label: string; submit: () => void }) {
+  return (
+    <button className="btn btn-big" style={{ "--btn-bg": side === "Long" ? "var(--long-fill)" : "var(--short-fill)", color: "var(--on-fill)" } as React.CSSProperties} disabled={blocked} onClick={submit}>
       {!blocked && <Icon name={side === "Long" ? "up" : "down"} size={20} />}
       {label}
-    </>
-  );
-  return (
-    <>
-      <button ref={ref} className="btn btn-big" style={style} disabled={blocked} onClick={submit}>
-        {inner}
-      </button>
-      {pin &&
-        !inView &&
-        createPortal(
-          <div className="pinned-cta">
-            <button className="btn btn-big" style={style} disabled={blocked} onClick={submit}>
-              {inner}
-            </button>
-          </div>,
-          document.body,
-        )}
-    </>
+    </button>
   );
 }

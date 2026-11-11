@@ -3008,23 +3008,6 @@ kbd {
     display: block;
   }
 }
-/* the order button, kept in reach while it's scrolled out of view */
-.pinned-cta {
-  position: fixed;
-  left: 12px;
-  right: 12px;
-  bottom: calc(68px + env(safe-area-inset-bottom, 0px));
-  z-index: 30;
-}
-.pinned-cta .btn {
-  width: 100%;
-  box-shadow: 0 8px 18px rgb(0 0 0 / 0.45);
-}
-@media (min-width: 1024px) {
-  .pinned-cta {
-    display: none;
-  }
-}
 /* jump links at the top of a long page */
 .jump-links {
   display: flex;
@@ -3122,8 +3105,7 @@ kbd {
   .ticket-head .ticket-row {
     font-size: 13px;
   }
-  .ticket .btn-big,
-  .pinned-cta .btn-big {
+  .ticket .btn-big {
     min-height: 44px;
     font-size: 16px;
   }
