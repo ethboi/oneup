@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { fmtUsdc, previewLossEmission, type LifeInfo, type Listing } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
+import { markClaimedOrListed } from "@/lib/tour";
 import { lifeEconomics, lifeEarningLabel } from "@/lib/life-economics";
 import { groupLives, lifeClaimBatch, lifeFromHash, lifeHref } from "@/lib/recovery-journey";
 import { fmtOneup, fmtUsd as money, roundEnds, useRound } from "./Header";
@@ -75,7 +76,7 @@ export function Lives() {
       <div className="panel divide-y divide-[var(--line)]">
         <SummaryBar action={
           <div className="flex flex-col gap-1">
-            <button className="btn btn-accent w-full sm:w-auto" disabled={batch.amount === 0n} onClick={() => run(`Claim $${fmtUsdc(batch.amount)} from ${batch.tokenIds.length} ${batch.tokenIds.length === 1 ? "Life" : "Life NFTs"}`, () => tx.claimLives(batch.tokenIds))}>
+            <button className="btn btn-accent w-full sm:w-auto" disabled={batch.amount === 0n} onClick={() => run(`Claim $${fmtUsdc(batch.amount)} from ${batch.tokenIds.length} ${batch.tokenIds.length === 1 ? "Life" : "Life NFTs"}`, () => tx.claimLives(batch.tokenIds)).then((ok) => ok && markClaimedOrListed(me))}>
               <Icon name="claim" />{batch.amount > 0n ? `Claim $${fmtUsdc(batch.amount)}${batch.remainingCount > 0 ? " from 30 Life NFTs" : ""}` : "Nothing to claim yet"}
             </button>
             {batch.remainingCount > 0 && <span className="label">{batch.remainingCount} more {batch.remainingCount === 1 ? "Life has" : "Life NFTs have"} USDC to claim after this batch</span>}

@@ -8,6 +8,7 @@ import { useState } from "react";
 import { type Listing } from "@oneup/sdk";
 import { listingPriceInput } from "@/lib/market-pricing";
 import { useOneUp, usePoll } from "@/lib/oneup";
+import { markClaimedOrListed } from "@/lib/tour";
 import { Icon } from "./Icon";
 
 export function useListings() {
@@ -18,7 +19,7 @@ export function useListings() {
 /** `compact`: no top margin, for use inside a row. */
 export function Sell({ nft, tokenId, listings, compact }: { nft: string; tokenId: string; listings: Listing[]; compact?: boolean }) {
   const mt = compact ? "" : "mt-3";
-  const { tx, run } = useOneUp();
+  const { tx, run, d, me } = useOneUp();
   const listing = listings.find((l) => l.nft_contract === nft && l.token_id === tokenId);
   const [open, setOpen] = useState(false);
   const [price, setPrice] = useState("");
@@ -63,7 +64,11 @@ export function Sell({ nft, tokenId, listings, compact }: { nft: string; tokenId
       <button
         className="btn btn-accent shrink-0"
         disabled={raw === 0n}
-        onClick={() => run(`List for sale at $${price}`, () => tx.list(nft, tokenId, raw)).then((ok) => ok && setOpen(false))}
+        onClick={() => run(`List for sale at $${price}`, () => tx.list(nft, tokenId, raw)).then((ok) => {
+            if (!ok) return;
+            setOpen(false);
+            if (nft === d.contracts.life && me) markClaimedOrListed(me);
+          })}
       >
         {listing ? "Update price" : "List"}
       </button>

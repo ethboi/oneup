@@ -8,7 +8,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useOneUp, usePoll } from "@/lib/oneup";
 import { lifeHref } from "@/lib/recovery-journey";
-import { SHOW_TOUR, currentStep, hideTour, holderOpened, tourHidden, tourSteps, watchStart, watchTrading, type TourStep } from "@/lib/tour";
+import { SHOW_TOUR, claimedOrListedHere, currentStep, hideTour, holderOpened, tourHidden, tourSteps, watchStart, watchTrading, type TourStep } from "@/lib/tour";
 import { useHistory } from "./History";
 import { Icon } from "./Icon";
 import { useListings } from "./Sell";
@@ -83,7 +83,10 @@ function Steps({ compact, hide, reveal, trading }: { compact: boolean; hide: () 
       traded: seen.traded || trading.positions > 0 || trading.orders > 0,
       tradeEnded: seen.ended || roundLoss || items.some((i) => i.kind === "trade"),
       lives: lives.length,
-      claimedOrListed: items.some((i) => i.kind === "claim_usdc" || (i.kind === "sold" && i.what === "Life NFT")) || listings.some((l) => l.seller === me && l.nft_contract === d.contracts.life),
+      claimedOrListed:
+        (!!me && claimedOrListedHere(me)) ||
+        items.some((i) => i.kind === "claim_usdc" || (i.kind === "sold" && i.what === "Life NFT")) ||
+        listings.some((l) => l.seller === me && l.nft_contract === d.contracts.life),
       holderOpened: !!me && holderOpened(me),
     },
     Math.round(d.epochLengthS / 60),

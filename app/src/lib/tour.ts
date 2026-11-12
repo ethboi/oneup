@@ -125,6 +125,22 @@ export function showTour() {
   window.dispatchEvent(new Event(SHOW_TOUR));
 }
 
+const DONE_FLAG = "oneup.tour.claimed";
+/** A claim or a Life listing this browser saw go through. The published history shows it a minute or so later, and
+ *  the walkthrough shouldn't wait for that. */
+export function markClaimedOrListed(account: string) {
+  try {
+    localStorage.setItem(`${DONE_FLAG}:${account}`, "1");
+  } catch {}
+}
+export function claimedOrListedHere(account: string): boolean {
+  try {
+    return localStorage.getItem(`${DONE_FLAG}:${account}`) === "1";
+  } catch {
+    return false;
+  }
+}
+
 const HOLDER_FLAG = "oneup.tour.holder";
 export function markHolderOpened(account: string) {
   try {

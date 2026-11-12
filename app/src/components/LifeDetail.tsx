@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { fmtUsdc, ppmToNumber } from "@oneup/sdk";
 import { useOneUp, usePoll } from "@/lib/oneup";
+import { markClaimedOrListed } from "@/lib/tour";
 import { lifeEconomics } from "@/lib/life-economics";
 import { fmtUsd as money } from "./Header";
 import { HealthBar } from "./Pixel";
@@ -73,7 +74,7 @@ export function LifeDetail({ tokenId, onBack }: { tokenId: string; onBack: () =>
             <>
               <p className="text-sm text-[var(--muted)]">Claim USDC already allocated to this Life. If someone buys it, they receive the NFT, its unclaimed USDC and any remaining payout rights.</p>
               <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
-                <button className="btn btn-accent" disabled={economics.claimable === 0n} onClick={() => run(`Claim $${fmtUsdc(economics.claimable)} from Life ${life.token_id}`, () => tx.claimLives([life.token_id]))}>
+                <button className="btn btn-accent" disabled={economics.claimable === 0n} onClick={() => run(`Claim $${fmtUsdc(economics.claimable)} from Life ${life.token_id}`, () => tx.claimLives([life.token_id])).then((ok) => ok && markClaimedOrListed(me))}>
                   <Icon name="claim" />{economics.claimable > 0n ? `Claim $${fmtUsdc(economics.claimable)}` : "No USDC to claim"}
                 </button>
                 {economics.hasRecoverableFunds && <div className="min-w-0 sm:min-w-64"><Sell key={`${me}:${life.token_id}`} nft={d.contracts.life} tokenId={life.token_id} listings={listings} compact /></div>}
