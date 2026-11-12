@@ -128,10 +128,12 @@ async function pushPrices(pusher: ReturnType<OneUp["calls"]>, forced: boolean) {
   }
 }
 
+/** The orders just filled or expired (orders.ts SETTLED_FOR_S). */
+const settledOrders = new Map<number, number>();
 async function handleOrders() {
   const read: Order[] = [];
   const list = (from: number, limit: number) => oneup.listOrders(from, limit).then((page) => (read.push(...page), page));
-  const waiting = await processOrders(list, keeper, feeds, latest, nowS, FILL_WINDOW_S, LIMIT_EXPIRY_S, log);
+  const waiting = await processOrders(list, keeper, feeds, latest, nowS, FILL_WINDOW_S, LIMIT_EXPIRY_S, log, settledOrders);
   openOrders = read;
   // an order fills only on a price published after it: push one now rather than at the next scheduled push, so a
   // slow --price-tick (to save gas on testnet) never lets an order run out its fill window
