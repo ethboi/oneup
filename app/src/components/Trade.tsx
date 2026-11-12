@@ -1028,7 +1028,7 @@ function OrderForm({ t }: { t: Ticket }) {
   return (
     <div
       id="order-ticket"
-      className="panel ticket order-3 flex scroll-mt-4 flex-col gap-2 p-3 sm:gap-3.5 sm:p-4"
+      className="panel ticket order-3 flex scroll-mt-4 flex-col gap-3.5 p-4"
       onPointerEnter={() => t.setPreviewHeld(true)}
       onPointerLeave={() => t.setPreviewHeld(false)}
       onFocus={() => t.setPreviewHeld(true)}
@@ -1094,13 +1094,14 @@ function OrderForm({ t }: { t: Ticket }) {
             />
             <span className="field-unit">USD</span>
           </span>
-          <span className="label flex justify-between">
+          {/* the note keeps its line; the link goes under it when the two don't fit side by side */}
+          <span className="label flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
             <span>
               {side === "Long" ? "Fills at this price or lower" : "Fills at this price or higher"}
               {t.limitAt && price ? ` · ${away(price, t.limitAt)} from the current price` : ""}
             </span>
             {price && (
-              <button type="button" className="underline decoration-dotted underline-offset-2 hover:text-[var(--text)]" onClick={() => t.setLimitPrice(String(priceToNumber(price)))}>
+              <button type="button" className="whitespace-nowrap underline decoration-dotted underline-offset-2 hover:text-[var(--text)]" onClick={() => t.setLimitPrice(String(priceToNumber(price)))}>
                 Use current price
               </button>
             )}
@@ -1271,14 +1272,16 @@ function OrderForm({ t }: { t: Ticket }) {
       {/* the promise, where the decision is made */}
       {m > 0n && (
         <div className="extra-life-note text-sm">
-          <div className="flex items-center gap-2">
-            <PixelHeart size={18} className="shrink-0" />
+          {/* the sentence has the card's width; "Details" follows it rather than taking a column of its own */}
+          <div className="flex items-start gap-2.5">
+            <PixelHeart size={18} className="mt-0.5 shrink-0" />
             <span className="min-w-0 flex-1">
-              If you lose: possible recovery of <b className="num">$0 to ${fmtUsdc(lifeUpTo, 0)}</b> and up to <b className="num">{oneupUpTo.toLocaleString("en-US")} $1UP</b>. It can be nothing.
+              If you lose: possible recovery of <b className="num whitespace-nowrap">$0 to ${fmtUsdc(lifeUpTo, 0)}</b> and up to{" "}
+              <b className="num whitespace-nowrap">{oneupUpTo.toLocaleString("en-US")} $1UP</b>. It can be nothing.{" "}
+              <button type="button" className="label whitespace-nowrap underline decoration-dotted underline-offset-2" aria-expanded={why} onClick={() => setWhy(!why)}>
+                {why ? "Hide" : "Details"}
+              </button>
             </span>
-            <button type="button" className="label shrink-0 underline decoration-dotted underline-offset-2" aria-expanded={why} onClick={() => setWhy(!why)}>
-              {why ? "Hide" : "Details"}
-            </button>
           </div>
           {why && (
             <p className="label mt-1.5">
@@ -1868,8 +1871,12 @@ function LossBanner() {
 function OrderButton({ side, blocked, label, submit }: { side: Side; blocked: boolean; label: string; submit: () => void }) {
   return (
     <button className="btn btn-big" style={{ "--btn-bg": side === "Long" ? "var(--long-fill)" : "var(--short-fill)", color: "var(--on-fill)" } as React.CSSProperties} disabled={blocked} onClick={submit}>
-      {!blocked && <Icon name={side === "Long" ? "up" : "down"} size={20} />}
-      {label}
+      {/* one run of text with its arrow in it: a label too long for the form's width ("Deposit & Limit short at
+          3.6030") breaks into two even lines, and the arrow stays beside the first */}
+      <span className="text-center [text-wrap:balance]">
+        {!blocked && <Icon name={side === "Long" ? "up" : "down"} size={20} className="mr-1.5 inline-block align-[-0.2em]" />}
+        {label}
+      </span>
     </button>
   );
 }

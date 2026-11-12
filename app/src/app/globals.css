@@ -3079,16 +3079,9 @@ kbd {
     gap: 6px 10px;
     margin: 0 0 6px;
   }
-  /* the order form: side, type, margin, leverage and the button together on the first screen */
+  /* the order form: every part the full width, with room between them */
   .ticket .chip-track:empty {
     display: none;
-  }
-  .ticket .segmented {
-    padding: 3px;
-  }
-  .ticket .segmented > button {
-    min-height: 36px;
-    font-size: 15px;
   }
   .ticket-head {
     flex-direction: row;
@@ -3105,30 +3098,34 @@ kbd {
   .ticket-head .ticket-row {
     font-size: 13px;
   }
-  .ticket .btn-big {
-    min-height: 44px;
-    font-size: 16px;
+  /* with no rule under the tabs, the first one starts at the card's edge like the fields below it */
+  .ticket-head .ticket-tab:first-child {
+    padding-left: 0;
   }
-  /* what the order would do, in three columns rather than six rows */
-  .ticket-facts {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px 10px;
-    padding-top: 8px;
+  .ticket-head .ticket-tab:first-child::after {
+    left: 0;
+  }
+  /* the leverage stops: one even row from edge to edge. Each at its own place on a track this narrow, 500× and
+     1000× ran into each other and 1000× stuck out of the card. */
+  .lev-stops {
+    display: flex;
+    gap: 2px;
+    height: auto;
+  }
+  .lev-stop {
+    position: static;
+    transform: none;
+    flex: 1 1 auto;
+    min-height: 36px;
+    padding: 0 2px;
     font-size: 12.5px;
+    border-radius: 8px;
   }
-  .ticket-facts .ticket-row {
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: flex-start;
-    gap: 1px;
+  .ticket-facts {
+    gap: 8px;
   }
-  .ticket-facts .label {
-    font-size: 11px;
-    line-height: 1.2;
-  }
-  .ticket-facts dd {
-    text-align: left;
+  .extra-life-note {
+    padding: 12px;
   }
 }
 
