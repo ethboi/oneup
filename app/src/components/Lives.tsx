@@ -58,7 +58,7 @@ export function Lives() {
   if (selected) return <LifeDetail key={selected} tokenId={selected} onBack={closeLife} />;
 
   return (
-    <div ref={list} tabIndex={-1} className="flex flex-col gap-5">
+    <div ref={list} tabIndex={-1} className="flex flex-col gap-3 sm:gap-5">
       <Explainer title="Life NFTs" line="View your Life NFTs, claim USDC or list a Life for sale.">
         An eligible net loss in a profitable round can earn you a Life NFT. Its face value is based on your share of that round&apos;s house profit. Each round, half the surplus above the reserve forms the payout budget; 60% of that budget is shared among eligible Life NFTs. Payouts depend on available profit and each Life&apos;s remaining limit, and may be zero.
         {expiry === undefined ? " The contract sets each Life's earning period." : ` A recovery Life is eligible for payouts in the round it is created and up to ${expiry} more rounds. It keeps any unclaimed USDC after that.`}{" "}

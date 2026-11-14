@@ -50,7 +50,7 @@ export function Leaderboard({ go }: { go: (tab: "Jackpot") => void }) {
   const mine = myRank >= 0 ? rows[myRank] : null;
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-3 sm:gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="page-title">Leaderboard</h1>

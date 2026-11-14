@@ -41,7 +41,7 @@ export function Solvency() {
   const houseNet = epoch ? big(epoch.losses) - big(epoch.payouts) : 0n;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3 sm:gap-4">
       <div>
         <PageTitle>The house</PageTitle>
         <p className="label mt-1.5">View the house’s on-chain reserves and explore modeled recovery scenarios. Reserves do not remove oracle, custody or contract risks.</p>

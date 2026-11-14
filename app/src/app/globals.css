@@ -3476,3 +3476,17 @@ kbd {
     white-space: nowrap;
   }
 }
+
+/* phones: the reading pages' panels take less room around their text, and the lead paragraph steps down */
+@media (max-width: 639px) {
+  .panel.p-5,
+  .case.p-5,
+  section.p-5 {
+    padding: 14px;
+  }
+  .case .text-base,
+  .case .text-lg {
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+}

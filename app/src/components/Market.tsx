@@ -116,7 +116,7 @@ export function Market() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-3 sm:gap-5">
         <div id="sell" className="panel scroll-mt-4">
           <PanelHead title="List an NFT" />
           <YourItems px={px} listings={listings} epoch={epoch?.id} expiryEpochs={params?.life_expiry_epochs} />
@@ -262,8 +262,8 @@ function Row({ x, wallet, epoch, expiryEpochs, totalPower }: { x: Item; wallet: 
 
   return (
     // phones: price and button on their own line under the details
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3 sm:flex-nowrap sm:px-4">
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--panel-2)]">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 p-3 sm:flex-nowrap sm:gap-y-2 sm:px-4">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center self-start rounded-xl bg-[var(--panel-2)] sm:h-11 sm:w-11 sm:self-center">
         {x.kind === "life" ? <PixelHeart size={28} fill={x.info.full_heal ? 1 : lifeProgress(x.info)} live={!x.info.full_heal && !x.info.expired} /> : <PixelLock size={24} />}
       </span>
       <div className="min-w-0 flex-1">
@@ -271,17 +271,18 @@ function Row({ x, wallet, epoch, expiryEpochs, totalPower }: { x: Item; wallet: 
           <b className="truncate">{title}</b>
         </div>
         {x.kind === "life" ? (
-          <div className="mt-1 grid gap-x-5 gap-y-1 text-sm sm:grid-cols-2">
+          <div className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:gap-x-5">
             <span><span className="label block">Available to claim</span><b className="num">{usd(lifeEconomics(x.info).claimable)}</b></span>
             <span><span className="label block">Remaining payout limit</span><b className="num">Up to {usd(lifeEconomics(x.info).additionalCap)}</b></span>
           </div>
         ) : <div className="label num">Estimated value after exit penalty: {usd(x.value)}</div>}
         <div className="label mt-1">{detail}</div>
-        <div className="label num break-all">Token {x.l.token_id}</div>
+        <div className="label num break-all max-sm:hidden">Token {x.l.token_id}</div>
         {x.kind === "life" && <a className="mt-1 inline-block text-sm font-bold underline decoration-dotted underline-offset-2" href={lifeHref(x.l.token_id)}>View Life details</a>}
       </div>
-      <div className="flex w-full shrink-0 items-center justify-between gap-2 pl-14 sm:w-auto sm:flex-col sm:items-end sm:gap-1 sm:pl-0">
-        <span className="text-right"><span className="label block">Asking price</span><span className="display num text-lg" title={`$${listingPriceInput(x.l)} exactly`}>{askingPrice}</span></span>
+      <div className="flex w-full shrink-0 items-center justify-between gap-2 pl-12 sm:w-auto sm:flex-col sm:items-end sm:gap-1 sm:pl-0">
+        {/* phones: the label beside the price, so the price and its button are one short line */}
+        <span className="flex items-baseline gap-2 text-right sm:block"><span className="label sm:block">Asking price</span><span className="display num text-lg" title={`$${listingPriceInput(x.l)} exactly`}>{askingPrice}</span></span>
         {mine ? (
           <button className="btn btn-ghost px-3 py-1" onClick={() => run("Remove listing", () => tx.delist(x.l.nft_contract, x.l.token_id))}>
             Remove listing

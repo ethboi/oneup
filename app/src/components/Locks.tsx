@@ -151,7 +151,7 @@ export function Locks() {
         )}
       </div>
       {/* phones: the price and the form before a long list of locks */}
-      <div className="order-2 flex flex-col gap-4 lg:order-none">
+      <div className="order-2 flex flex-col gap-3 sm:gap-4 lg:order-none">
         <OneupPrice px={px} locked={locked} />
         <LockForm px={px} />
       </div>

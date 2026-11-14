@@ -97,7 +97,7 @@ export function Agents() {
 
   if (testnet)
     return (
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-3 sm:gap-5">
         <Explainer title="Agents" line="OneUp is built to be traded by AI agents as well as people, through its MCP server. Here, rule-based bots keep the market moving.">
           An agent gets the same tools a trader has: markets, quotes, open and close, Life NFTs and the market. Each action goes in a public journal with
           the agent&apos;s own reason. That runs in the local demo; on this testnet site there is no AI agent yet, and the bots below provide the flow you see.
@@ -108,7 +108,7 @@ export function Agents() {
     );
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-3 sm:gap-5">
       <Explainer
         title="Agents"
         line="OneUp is built to be traded by AI agents as well as people. Through its MCP server an agent reads the markets, sizes a trade, sets its exits and buys Life NFTs on the market. Every action is logged here with the reason it gave."

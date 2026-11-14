@@ -195,7 +195,7 @@ export function About() {
   const { d } = useOneUp();
   const testnet = d.network === "testnet";
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3 sm:gap-4">
       <section className="case relative overflow-hidden p-5 sm:p-8">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
           <div className="flex-1">

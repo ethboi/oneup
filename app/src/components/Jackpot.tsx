@@ -45,7 +45,7 @@ export function JackpotPage() {
   const { o } = useOneUp();
   const every = usePoll(() => o.params(), [], 60_000)?.jackpot_epochs;
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-3 sm:gap-5">
       <div>
         <h1 className="page-title">Jackpot</h1>
         <p className="label">

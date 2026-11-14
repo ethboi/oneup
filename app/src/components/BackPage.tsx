@@ -50,7 +50,7 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
   const backerPot = (recent ?? []).reduce((s, x) => s + BigInt(x!.lives_pot), 0n) / 3n;
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-3 sm:gap-5">
       <section className="case relative overflow-hidden p-5 sm:p-8">
         <div className="flex items-center gap-8">
           <div className="min-w-0 flex-1">
@@ -230,9 +230,12 @@ export function BackPage({ go }: { go: (tab: string) => void }) {
 function Card({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
   return (
     <div className="panel p-5">
-      <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--panel-2)]">{icon}</span>
-      <h3 className="mt-3 font-extrabold">{title}</h3>
-      <p className="mt-1 text-sm text-[var(--muted)]">{children}</p>
+      {/* phones: the icon sits beside the title, not on a line of its own */}
+      <div className="flex items-center gap-3 sm:block">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--panel-2)] sm:h-11 sm:w-11">{icon}</span>
+        <h3 className="font-extrabold sm:mt-3">{title}</h3>
+      </div>
+      <p className="mt-1.5 text-sm text-[var(--muted)] sm:mt-1">{children}</p>
     </div>
   );
 }
