@@ -3370,3 +3370,37 @@ kbd {
     font-size: 12px;
   }
 }
+
+/* phones: one size down. The root size carries everything set in rem (most text and spacing); the rest are
+   the sizes set in px. */
+@media (max-width: 639px) {
+  html {
+    font-size: 15px;
+  }
+  /* typed text stays at 16px: under that, iOS zooms the page when the field takes focus */
+  .input {
+    font-size: 16px;
+  }
+  .btn {
+    font-size: 13px;
+  }
+  .btn-big {
+    min-height: 42px;
+    font-size: 15px;
+  }
+  .segmented > button {
+    font-size: 14.5px;
+  }
+  .tab,
+  .ticket-tab {
+    font-size: 13px;
+  }
+  .label {
+    font-size: 12px;
+  }
+  .hdr-tools > * > .btn,
+  .net-badge {
+    height: 36px;
+    min-height: 36px;
+  }
+}

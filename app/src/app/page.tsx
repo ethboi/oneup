@@ -101,7 +101,7 @@ export default function Home() {
     <OneUpProvider>
       {/* what this is, on every page: a hackathon entry running on test money */}
       <div className="bg-[var(--primary)] text-white">
-        <div className="mx-auto flex max-w-[1280px] items-center justify-center gap-x-2 px-4 py-1.5 text-center text-[12.5px] font-bold">
+        <div className="mx-auto flex max-w-[1280px] items-center justify-center gap-x-2 px-4 py-1 text-center text-[11.5px] font-bold sm:py-1.5 sm:text-[12.5px]">
           <span>
             <span className="hidden sm:inline">In development for </span>
             <span className="font-extrabold">NEAR HACKATHON</span>
