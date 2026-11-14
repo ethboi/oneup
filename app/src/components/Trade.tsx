@@ -993,6 +993,9 @@ function OrderForm({ t }: { t: Ticket }) {
   const [payOpen, setPayWith] = useState(false);
   const showPayWith = payOpen || t.payWith !== "wallet" || topUp > wallet;
   const [why, setWhy] = useState(false);
+  // phones: the order's finer points wait behind one tap
+  const [more, setMore] = useState(false);
+  const fine = more ? "" : "max-sm:hidden";
   const spendable = free + wallet;
   const levPos = levToPos(leverage, maxLeverage);
   const hot = leverage >= 50;
@@ -1208,7 +1211,8 @@ function OrderForm({ t }: { t: Ticket }) {
       ) : (
         topUp > wallet && (
           <div className="flex flex-col gap-2">
-            <p className="text-sm text-[var(--short)]">
+            {/* phones: the faucet button says it, where there is one */}
+            <p className={`text-sm text-[var(--short)] ${d.testUsdcFaucet ? "max-sm:hidden" : ""}`}>
               Not enough USDC.{d.network === "localnet" && " Open Demo and select Get test USDC to add funds."}
             </p>
             {d.testUsdcFaucet && <GetTestUsdc short={topUp - wallet} className="btn btn-accent" />}
@@ -1216,7 +1220,10 @@ function OrderForm({ t }: { t: Ticket }) {
         )
       )}
 
-      <OrderButton side={side} blocked={blocked} label={t.label} submit={t.submit} />
+      {/* phones: with nothing to trade with, the faucet is the one button; the order button it blocks comes back with the USDC */}
+      <div className={`flex flex-col ${!viewOnly && topUp > wallet && d.testUsdcFaucet ? "max-sm:hidden" : ""}`}>
+        <OrderButton side={side} blocked={blocked} label={t.label} submit={t.submit} />
+      </div>
       {t.intentStep && (
         <span className="label flex items-center gap-2" role="status">
           <Icon name="spinner" /> {t.intentStep}
@@ -1237,11 +1244,11 @@ function OrderForm({ t }: { t: Ticket }) {
             )}
           </dd>
         </div>
-        <div className="ticket-row">
+        <div className={`ticket-row ${fine}`}>
           <dt className="label">Position size</dt>
           <dd className="font-bold">${fmtUsdc(m * BigInt(leverage), 0)}</dd>
         </div>
-        <div className="ticket-row">
+        <div className={`ticket-row ${fine}`}>
           <dt className="label">You risk</dt>
           <dd className="font-bold">${fmtUsdc(m, 0)}</dd>
         </div>
@@ -1251,14 +1258,17 @@ function OrderForm({ t }: { t: Ticket }) {
             ${fmtUsdc(maxLiability(m), 0)}
           </dd>
         </div>
-        <div className="ticket-row">
+        <div className={`ticket-row ${fine}`}>
           <dt className="label">Fee on profits</dt>
           <dd className="font-bold">{quote ? `${(Number(quote.cut_ppm) / 1e4).toFixed(1)}%` : "…"}</dd>
         </div>
-        <div className="ticket-row">
+        <div className={`ticket-row ${fine}`}>
           <dt className="label">Entry / funding fees</dt>
           <dd className="font-bold">None</dd>
         </div>
+        <button type="button" className="label self-start underline decoration-dotted underline-offset-2 sm:hidden" aria-expanded={more} onClick={() => setMore(!more)}>
+          {more ? "Fewer details" : "Size, fees and how it fills"}
+        </button>
       </dl>
 
       {/* the promise, where the decision is made */}
@@ -1286,7 +1296,7 @@ function OrderForm({ t }: { t: Ticket }) {
         </div>
       )}
 
-      <div className="label flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+      <div className={`label flex flex-wrap items-center justify-between gap-x-3 gap-y-1 ${!t.viaAsset && t.orderType !== "limit" && !d.intents ? fine : ""}`}>
         <span>
           {t.viaAsset
             ? `NEAR Intents converts your ${t.viaAsset.symbol} to USDC in this local simulation.`
