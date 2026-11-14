@@ -1,18 +1,32 @@
 # OneUp
 
-**Perpetuals on NEAR where a losing trade can leave you a Life NFT: an NFT that holds USDC and a share of
-the house's future profit, which you can claim or sell.**
+**Perps on NEAR where a losing trade can leave you a Life NFT: a claim on the house's future profit you can collect or sell.**
 
-When one sells, the buyer gets its unclaimed USDC and every payout still to come. A purchase names the listing
-the buyer saw, so one the seller claimed or repriced in the meantime fails and refunds the buyer.
+[![Live on testnet](https://img.shields.io/badge/live-NEAR%20testnet-2ea44f)](https://app.oneup.markets)
+[![Demo video](https://img.shields.io/badge/demo-video%20on%20X-111111)](https://x.com/EthBoi_/status/2118836495641461214)
+[![CI](https://github.com/ethboi/oneup/actions/workflows/verify.yml/badge.svg?branch=main)](https://github.com/ethboi/oneup/actions/workflows/verify.yml)
+[![Track: NFTs That Do Something](https://img.shields.io/badge/track-NFTs%20That%20Do%20Something-8a2be2)](#by-track)
+[![Licence: AGPL-3.0-only](https://img.shields.io/badge/licence-AGPL--3.0--only-blue)](LICENSE)
 
-![A 50× long is liquidated; when the round closes the loss becomes a Life NFT, whose USDC is claimed](docs/media/oneup.gif)
+[![A 50× long is liquidated; when the round closes the loss becomes a Life NFT, whose USDC is claimed](docs/media/oneup.gif)](https://x.com/EthBoi_/status/2118836495641461214)
 
-A NEAR HACKATHON entry for **NFTs That Do Something**, **Unstoppable DeFi**, **Agent Economy** and **Open Innovation**. It is live
-on NEAR testnet at **https://oneup.markets** (the app is at https://app.oneup.markets), and runs as a fuller
-local demo, both with test USDC; nothing is on mainnet. All of it was written in the
-hackathon window: the first commit is 20 October 2026, the day after the announcement
-(`git log --reverse --format=%ad | head -1`).
+[Watch the demo (48s)](https://x.com/EthBoi_/status/2118836495641461214)
+
+| Live app | Lead track | What NEAR does here | Check it in a minute |
+|---|---|---|---|
+| [app.oneup.markets](https://app.oneup.markets) | [NFTs That Do Something](#by-track) (also DeFi, Agents, Open) | NEP-171/178 Life NFTs holding a USDC claim (live on testnet); NEP-366 gasless trading and MCP agent trading (local demo). [All of it, with code and tests](#what-near-does-here) | `node scripts/check-live.mjs` ([what it checks](#check-the-claims)) |
+
+What is new ([more, and what is borrowed](#what-is-new-and-what-is-borrowed)):
+
+- **A loss becomes an NFT with a price.** The claim on the house's profit is a Life NFT, so its owner can sell it
+  and a buyer can price it against the USDC it can still pay.
+- **A buyer can't be front-run by a claim.** Claiming a Life drops its approvals, and the purchase names the
+  `approval_id` it saw, so a Life claimed or repriced after the buyer looked fails and the payment is refunded.
+- **Payouts come only from surplus above the reserve.** A Life is sized from the round's house profit, never
+  above the wallet's loss, and paid only from what the pool holds above its reserve.
+
+**Local demo only:** NEAR Intents end to end, Sputnik DAO ownership, gasless one-tap trading (NEP-366) and the MCP
+agent. See [What is real and what is mocked](#what-is-real-and-what-is-mocked).
 
 To review it:
 
@@ -153,6 +167,9 @@ signs with near-api-js's own NEP-413 signer and checks that a message naming ano
 signed for another site is refused.
 
 ## Try it live
+
+Live on NEAR testnet at https://oneup.markets (the app is at https://app.oneup.markets), with test USDC; nothing is
+on mainnet. Short on time? [Watch the 48-second demo on X](https://x.com/EthBoi_/status/2118836495641461214).
 
 | Step | Do | See |
 |---|---|---|
@@ -352,6 +369,9 @@ is prepared, with no results yet.
 Licences for these are in [third-party notices](THIRD_PARTY_NOTICES.md).
 
 ## Repository
+
+A NEAR HACKATHON entry. All of it was written in the hackathon window: the first commit is 20 October 2026, the day
+after the announcement (`git log --reverse --format=%ad | head -1`).
 
 - `contracts/`: five product contracts, four mocks, shared integer maths and sandbox tests on built WASM.
 - `packages/sdk/`: typed calls and the maths mirrored for previews. `keeper/`: prices, fills, rounds, retries.
