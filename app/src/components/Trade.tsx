@@ -654,7 +654,7 @@ function Below({ positions: all, orders, focused, pick, market }: { positions: P
   const [onlyHere, setOnlyHere] = useState(false);
   const positions = onlyHere ? all.filter((p) => p.market_id === market) : all;
   return (
-    <div className="panel p-4 pt-2 max-sm:px-3 max-sm:pb-2">
+    <div className="pos-panel panel p-4 pt-2 max-sm:px-3 max-sm:pb-1 max-sm:pt-1">
       {/* wraps, so a narrow phone drops Close all under the tabs and nothing pushes the page sideways */}
       <div className="tabs-inline mb-2 flex flex-wrap items-center justify-between gap-y-1 border-b border-[var(--line)]" role="tablist">
         <div className="flex gap-1">
@@ -1385,7 +1385,7 @@ function Positions({ positions, orders, focused, pick }: { positions: Position[]
         {rows.map(({ p, mark, v, hold }) => (
           <div
             key={p.id}
-            className="num -mx-2 cursor-pointer rounded-lg border-b border-[var(--line)] px-2 py-2.5 text-sm last:border-0"
+            className="pos-card num -mx-2 cursor-pointer rounded-lg border-b border-[var(--line)] px-2 py-2 text-sm last:border-0"
             style={p.id === focused ? { background: "var(--panel-2)" } : undefined}
             onClick={(e) => !(e.target as Element).closest("button, a, input") && pick(p)}
           >
@@ -1396,11 +1396,14 @@ function Positions({ positions, orders, focused, pick }: { positions: Position[]
                 {fmtUsdc(v)}
               </div>
             </div>
-            <dl className="mt-1.5 grid grid-cols-4 gap-x-2">
+            <dl className="mt-1 grid grid-cols-4 gap-x-2 leading-tight">
               <dt className="label">Size</dt>
               <dt className="label">Entry</dt>
               <dt className="label">Mark</dt>
-              <dt className="label">Liq.</dt>
+              {/* how far liquidation is rides in its label, so the bar under the prices needs no words */}
+              <dt className="label whitespace-nowrap">
+                Liq.{mark && <span style={{ color: "var(--text)" }}> {away(mark, liquidationPrice(p.side, BigInt(p.entry_price), p.leverage))}</span>}
+              </dt>
               <dd>${fmtUsdc(BigInt(p.margin) * BigInt(p.leverage), 0)}</dd>
               <dd>{fmtPrice(BigInt(p.entry_price))}</dd>
               <dd>{mark ? fmtPrice(mark) : "…"}</dd>
@@ -1408,9 +1411,8 @@ function Positions({ positions, orders, focused, pick }: { positions: Position[]
             </dl>
             {/* margin health on its own thin line, the full width, so the row of prices stays one row */}
             {mark && (
-              <div className="pos-health mt-1.5 flex items-center gap-2">
+              <div className="pos-health mt-1.5 flex">
                 <PositionHp p={p} mark={mark} wide />
-                <span className="label whitespace-nowrap">{away(mark, liquidationPrice(p.side, BigInt(p.entry_price), p.leverage))} from liq.</span>
               </div>
             )}
             {(p.triggers.take_profit || p.triggers.stop_loss) && (
@@ -1419,7 +1421,7 @@ function Positions({ positions, orders, focused, pick }: { positions: Position[]
               </div>
             )}
             {/* every control in one row: close and reverse share the width, the two small ones keep theirs */}
-            <div className="pos-actions mt-2 grid items-stretch gap-1.5">
+            <div className="pos-actions mt-1.5 grid items-stretch gap-1.5">
               <CloseButton p={p} hold={hold} wide />
               <ReverseButton p={p} hold={hold} />
               <ShareButton compact data={() => openCard(p, mark, v, me)} />

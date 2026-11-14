@@ -227,7 +227,8 @@ body {
   .pos-actions .btn {
     width: 100%;
     height: 100%;
-    min-height: 40px;
+    min-height: 36px;
+    padding-block: 4px;
     padding-inline: 8px;
     white-space: nowrap;
   }
@@ -2612,6 +2613,20 @@ kbd {
 /* a position's card on a phone: the bar runs the card's width beside how far liquidation is */
 .pos-health .hp-bar.small {
   max-width: none;
+  padding: 1px;
+}
+.pos-health .hp-bar.small > span {
+  height: 4px;
+}
+/* phones: the tabs over the positions take less height */
+@media (max-width: 639px) {
+  .pos-panel .tab {
+    padding-block: 6px;
+    font-size: 13px;
+  }
+  .pos-panel .tabs-inline {
+    margin-bottom: 4px;
+  }
 }
 .hp-bar.small > span {
   height: 6px;
