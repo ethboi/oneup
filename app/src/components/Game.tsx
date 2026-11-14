@@ -133,14 +133,14 @@ export function Quests() {
   const done = qs.filter((q) => q.n >= q.of).length;
   const resetIn = (today() + 1) * 86_400 - now;
   return (
-    <section className="panel p-4" aria-label="Daily goals">
+    <section className="panel p-3 sm:p-4" aria-label="Daily goals">
       <div className="ticket-row">
         <h3 className="display text-sm">Daily goals</h3>
         <span className="label num">
           {done}/{qs.length} · new in {fmtDuration(Math.max(0, resetIn))}
         </span>
       </div>
-      <ul className="mt-2 flex flex-col gap-2 text-sm">
+      <ul className="mt-2 flex flex-col gap-1 text-sm sm:gap-2">
         {qs.map((q) => {
           const ok = q.n >= q.of;
           return (

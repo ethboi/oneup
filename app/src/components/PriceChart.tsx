@@ -223,9 +223,10 @@ export function PriceChart({
   const marks = allMarks.filter((m) => !m.faint);
   const faint = allMarks.filter((m) => m.faint);
   const narrow = W < 480;
-  // phones: the chart is the screen's focus, about 45% of the screen's height; desktops fill the column
+  // phones: the chart is the screen's focus, about 40% of the screen's height, so what's held shows under it;
+  // desktops fill the column
   const vh = useViewportHeight();
-  const H = narrow ? Math.round(Math.min(440, Math.max(280, vh * 0.45))) : Math.max(420, tall ?? 0);
+  const H = narrow ? Math.round(Math.min(400, Math.max(260, vh * 0.4))) : Math.max(420, tall ?? 0);
   const [hover, setHover] = useState<number | null>(null);
   // a trigger being dragged: its kind once known (a drag from the entry line picks it by direction), the price
   // under the pointer, and whether it's being saved

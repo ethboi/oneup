@@ -163,7 +163,7 @@ function Steps({ compact, hide, reveal, trading }: { compact: boolean; hide: () 
 
   if (compact) {
     return (
-      <section ref={ref} id="tour" className="panel flex scroll-mt-4 flex-col gap-2.5 p-3.5" aria-label="Walkthrough">
+      <section ref={ref} id="tour" className="tour-strip panel flex scroll-mt-4 flex-col gap-2 p-3" aria-label="Walkthrough">
         <button type="button" className="-my-1 flex min-h-9 items-center justify-between gap-3 text-left" aria-expanded={open} aria-controls="tour-steps" onClick={() => setOpen(!open)}>
           {/* folded: the step you're on; open: the list below names it, so the strip names the walkthrough */}
           <span className="flex min-w-0 items-center gap-2 font-extrabold leading-tight">
@@ -176,7 +176,7 @@ function Steps({ compact, hide, reveal, trading }: { compact: boolean; hide: () 
             <Icon name="chevron" size={16} className={open ? "rotate-180" : undefined} />
           </span>
         </button>
-        <div id="tour-steps" className="flex flex-col gap-2.5">
+        <div id="tour-steps" className="flex flex-col gap-2">
           {open && list}
           <p className="text-sm text-[var(--muted)]">{now ? (open ? now.hint : now.short) : done}</p>
         </div>

@@ -422,10 +422,10 @@ export function Trade() {
     // under the form; once an order is waiting or a position is open they move up between the chart and the form,
     // so what you hold is on screen with the chart instead of a long scroll below the form.
     // Desktop: chart over positions and activity on the left, the form on the right.
-    <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[1fr_340px] lg:items-start 2xl:grid-cols-[1fr_380px]">
+    <div className="flex flex-col gap-2.5 sm:gap-4 lg:grid lg:grid-cols-[1fr_340px] lg:items-start 2xl:grid-cols-[1fr_380px]">
       <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
         {/* notices about the round: the result of the one that just ended, and a loss in this one */}
-        <div className="order-1 flex flex-col gap-4 empty:hidden">
+        <div className="order-1 flex flex-col gap-2.5 empty:hidden sm:gap-4">
           {/* phones: the walkthrough is one strip above the chart; desktop keeps the checklist beside the form */}
           <Tour slot="phone" trading={trading} />
           <EpochResults />
@@ -456,7 +456,7 @@ export function Trade() {
         <Tour slot="desktop" trading={trading} />
         <OrderForm t={ticket} />
         {/* phones: under the positions */}
-        <div className="order-5 flex flex-col gap-4">
+        <div className="order-5 flex flex-col gap-2.5 sm:gap-4">
           <Account t={ticket} positions={positions} orders={orders} />
           {/* bringing USDC from another chain: a real 1Click quote, asked as a dry run */}
           <details className="panel p-3" id="cross-chain">
@@ -500,14 +500,14 @@ function Account({ t, positions, orders }: { t: Ticket; positions: Position[]; o
     );
   }
   return (
-    <section className="panel p-4" aria-label="Account">
+    <section className="panel p-3 sm:p-4" aria-label="Account">
       <div className="ticket-row">
         <h3 className="font-extrabold">Account</h3>
         <span className="num text-lg font-extrabold" title="Wallet and trading balances, reserved margin, and unrealized profit or loss after fees">
           {usd(equity)}
         </span>
       </div>
-      <dl className="num mt-2 flex flex-col gap-1.5 text-sm">
+      <dl className="num mt-1.5 flex flex-col gap-1 text-sm sm:mt-2 sm:gap-1.5">
         <div className="ticket-row">
           <dt className="label">Wallet</dt>
           <dd className="font-bold">{usd(t.wallet)}</dd>
@@ -1160,7 +1160,8 @@ function OrderForm({ t }: { t: Ticket }) {
         </label>
       )}
 
-      <div className="flex flex-col gap-1">
+      {/* phones: the label, the slider and the reading share one line */}
+      <div className="lev-block flex flex-col gap-1">
         <div className="ticket-row">
           <span className="label">Leverage</span>
           <span className="lev-readout num" style={{ color: hot ? "var(--short)" : undefined }}>

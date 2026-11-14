@@ -3152,6 +3152,33 @@ kbd {
     font-size: 12.5px;
     border-radius: 8px;
   }
+  /* the walkthrough strip: its button no taller than the form's chips need */
+  .tour-strip .btn {
+    min-height: 36px;
+    padding-block: 5px;
+  }
+  .tour-strip > button:first-child {
+    min-height: 28px;
+  }
+  .lev-block {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 4px 10px;
+  }
+  .lev-block > .ticket-row {
+    display: contents;
+  }
+  .lev-block > .slider {
+    order: 1;
+  }
+  .lev-block .lev-readout {
+    order: 2;
+  }
+  .lev-block > .lev-stops {
+    order: 3;
+    grid-column: 1 / -1;
+  }
   /* closer together: the whole form, down to its button, in one screen with a position above it */
   .ticket {
     gap: 10px;
