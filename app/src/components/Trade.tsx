@@ -654,7 +654,8 @@ function Below({ positions: all, orders, focused, pick, market }: { positions: P
   const positions = onlyHere ? all.filter((p) => p.market_id === market) : all;
   return (
     <div className="panel p-4 pt-2">
-      <div className="tabs-inline mb-2 flex items-center justify-between border-b border-[var(--line)]" role="tablist">
+      {/* wraps, so a narrow phone drops Close all under the tabs and nothing pushes the page sideways */}
+      <div className="tabs-inline mb-2 flex flex-wrap items-center justify-between gap-y-1 border-b border-[var(--line)] max-sm:pb-1" role="tablist">
         <div className="flex gap-1">
           {(
             [
@@ -674,7 +675,7 @@ function Below({ positions: all, orders, focused, pick, market }: { positions: P
           </span>
         )}
         {view === "positions" && all.length > 0 && (
-          <div className="flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-3">
             <label className="hidden cursor-pointer items-center gap-1.5 text-xs font-bold text-[var(--muted)] sm:flex">
               <input type="checkbox" className="check" checked={onlyHere} onChange={(e) => setOnlyHere(e.target.checked)} />
               {market} only
@@ -883,19 +884,8 @@ function Console({
     ),
     ...mine.map((p) => ({ t: p.opened_at * 1000, price: priceToNumber(BigInt(p.entry_price)), open: true, long: p.side === "Long" })),
   ];
-  const reverse = () => {
-    if (!pos) return;
-    const other: Side = pos.side === "Long" ? "Short" : "Long";
-    const margin = BigInt(pos.margin);
-    run(`Reverse #${pos.id} to ${other.toLowerCase()} ${pos.leverage}×`, async () => {
-      await tx.placeClose(pos.id);
-      // the close pays back when it fills, so the open's margin comes from the balance now, topped up from the wallet
-      const free = BigInt(await o.balance(me));
-      const top = margin > free ? margin - free : 0n;
-      if (top > 0n) await tx.depositAndOpen(top, pos.market_id, other, margin, pos.leverage);
-      else await tx.placeOpen(pos.market_id, other, margin, pos.leverage);
-    });
-  };
+  const reversePosition = useReverse();
+  const reverse = () => pos && reversePosition(pos);
   const entryActions =
     pos && pos.close_order === null ? (
       <>
@@ -1406,15 +1396,17 @@ function Positions({ positions, orders, focused, pick }: { positions: Position[]
                   {mark && <PositionHp p={p} mark={mark} />}
               </dd>
             </dl>
-            <div className="mt-2 flex items-center justify-between gap-2">
-              <TriggerSummary p={p} />
-              <EditTriggers key={JSON.stringify(p.triggers)} p={p} />
-            </div>
-            <div className="mt-3 flex gap-2">
-              <div className="flex-1">
-                <CloseButton p={p} hold={hold} wide />
+            {(p.triggers.take_profit || p.triggers.stop_loss) && (
+              <div className="mt-1.5">
+                <TriggerSummary p={p} inline />
               </div>
-              <ShareButton data={() => openCard(p, mark, v, me)} />
+            )}
+            {/* every control in one row: close and reverse share the width, the two small ones keep theirs */}
+            <div className="pos-actions mt-2.5 grid items-stretch gap-1.5">
+              <CloseButton p={p} hold={hold} wide />
+              <ReverseButton p={p} hold={hold} />
+              <ShareButton compact data={() => openCard(p, mark, v, me)} />
+              <EditTriggers key={JSON.stringify(p.triggers)} p={p} text />
             </div>
           </div>
         ))}
@@ -1609,9 +1601,56 @@ function CloseAll({ positions }: { positions: Position[] }) {
   );
 }
 
+/** Close a position, then open the other side with the same margin and leverage. */
+function useReverse() {
+  const { o, tx, run, me } = useOneUp();
+  return (p: Position) => {
+    const other: Side = p.side === "Long" ? "Short" : "Long";
+    const margin = BigInt(p.margin);
+    return run(`Reverse #${p.id} to ${other.toLowerCase()} ${p.leverage}×`, async () => {
+      await tx.placeClose(p.id);
+      // the close pays back when it fills, so the open's margin comes from the balance now, topped up from the wallet
+      const free = BigInt(await o.balance(me));
+      const top = margin > free ? margin - free : 0n;
+      if (top > 0n) await tx.depositAndOpen(top, p.market_id, other, margin, p.leverage);
+      else await tx.placeOpen(p.market_id, other, margin, p.leverage);
+    });
+  };
+}
+
+/** Reverse on a phone: a second tap confirms, since it sits beside Close under a thumb. */
+function ReverseButton({ p, hold }: { p: Position; hold: number }) {
+  const reverse = useReverse();
+  const [asking, setAsking] = useState(false);
+  useEffect(() => {
+    if (!asking) return;
+    // a confirm left alone goes away
+    const t = setTimeout(() => setAsking(false), 4000);
+    return () => clearTimeout(t);
+  }, [asking]);
+  if (p.close_order !== null) return null;
+  const other = p.side === "Long" ? "short" : "long";
+  return (
+    <button
+      type="button"
+      className="btn btn-ghost w-full"
+      style={asking ? { borderColor: other === "long" ? "var(--long)" : "var(--short)", color: other === "long" ? "var(--long)" : "var(--short)" } : undefined}
+      disabled={hold > 0}
+      title={`Close, then open a ${other} of the same size`}
+      onClick={() => {
+        if (!asking) return setAsking(true);
+        setAsking(false);
+        reverse(p);
+      }}
+    >
+      {asking ? `Go ${other}?` : "Reverse"}
+    </button>
+  );
+}
+
 function CloseButton({ p, hold, wide }: { p: Position; hold: number; wide?: boolean }) {
   const { tx, run } = useOneUp();
-  if (p.close_order !== null) return <div className={`label ${wide ? "py-2 text-center" : ""}`}>Closing…</div>;
+  if (p.close_order !== null) return <div className={`label ${wide ? "col-span-2 py-2 text-center" : ""}`}>Closing…</div>;
   return (
     <button
       className={`btn btn-ghost ${wide ? "w-full" : "py-1"}`}
@@ -1772,19 +1811,20 @@ function chartTriggerCheck(p: Position, kind: "tp" | "sl", price: number, mark: 
   return { text: `${sign}$${fmtUsdc(capped < 0n ? -capped : capped, 0)} (${sign}${Math.abs((Number(capped) / Number(margin)) * 100).toFixed(0)}%)` };
 }
 
-function TriggerSummary({ p }: { p: Position }) {
+function TriggerSummary({ p, inline }: { p: Position; inline?: boolean }) {
   const { take_profit: tp, stop_loss: sl } = p.triggers;
   if (!tp && !sl) return <span className="label">–</span>;
+  const each = inline ? "mr-3 inline-block" : "block";
   return (
     <span className="num text-xs leading-tight">
-      {tp && <span className="block text-[var(--long)]">TP {fmtPrice(BigInt(tp))}</span>}
-      {sl && <span className="block text-[var(--short)]">SL {fmtPrice(BigInt(sl))}</span>}
+      {tp && <span className={`${each} text-[var(--long)]`}>TP {fmtPrice(BigInt(tp))}</span>}
+      {sl && <span className={`${each} text-[var(--short)]`}>SL {fmtPrice(BigInt(sl))}</span>}
     </span>
   );
 }
 
 /** Set or clear an open position's take-profit and stop-loss. */
-function EditTriggers({ p }: { p: Position }) {
+function EditTriggers({ p, text }: { p: Position; text?: boolean }) {
   const { tx, run, prices } = useOneUp();
   const mark = prices[p.market_id];
   const show = editablePrice;
@@ -1796,7 +1836,7 @@ function EditTriggers({ p }: { p: Position }) {
   return (
     <Popover
       label="Edit take profit and stop loss"
-      button={<Icon name="edit" size={14} />}
+      button={text ? "TP/SL" : <Icon name="edit" size={14} />}
       small
     >
       {(close) => (

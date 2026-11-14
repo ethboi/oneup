@@ -219,6 +219,33 @@ body {
     outline: 3px solid var(--info);
     outline-offset: 2px;
   }
+  /* a position's controls on a phone: one row of equal height, the words never wrapping */
+  .pos-actions {
+    /* close is the wider of the two: it counts down the minimum hold in words */
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) auto auto;
+  }
+  .pos-actions .btn {
+    width: 100%;
+    height: 100%;
+    min-height: 40px;
+    padding-inline: 8px;
+    white-space: nowrap;
+  }
+  @media (max-width: 379px) {
+    .pos-actions .btn {
+      font-size: 13px;
+      padding-inline: 6px;
+    }
+  }
+  /* the narrowest phones: two rows of two */
+  @media (max-width: 339px) {
+    .pos-actions {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+  }
+  .pos-actions > .relative {
+    display: flex;
+  }
   .btn-ghost {
     --btn-bg: var(--field);
     --btn-edge: var(--input-edge);
