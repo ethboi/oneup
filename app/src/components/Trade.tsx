@@ -41,7 +41,7 @@ import { Jackpot, fmtDuration } from "./Jackpot";
 import { useHistory } from "./History";
 import { GameFx, GameHud, Quests } from "./Game";
 import { CrossChain } from "./CrossChain";
-import { AgentBadge, GuestButton } from "./ui";
+import { AgentBadge, Fold, GuestButton } from "./ui";
 import { Tour } from "./Tour";
 import { emitFx } from "@/lib/fx";
 import { sfx } from "@/lib/sound";
@@ -448,15 +448,9 @@ export function Trade() {
         <div id="positions" className={`${holding ? "order-2" : "order-4"} min-w-0 scroll-mt-4`}>
           <Below positions={positions} orders={orders} focused={focused?.id} pick={pick} market={market} part={holding ? "held" : "all"} />
         </div>
-        {/* phones, with something open: what's held sits under the chart with no tabs, and history and activity
-            keep their own panel under the form */}
-        {holding && (
-          <div className="order-4 min-w-0 sm:hidden">
-            <Below positions={positions} orders={orders} focused={focused?.id} pick={pick} market={market} part="rest" />
-          </div>
-        )}
+
         {/* the guide to recovery, under the trading itself */}
-        <div className="order-6 min-w-0">
+        <div className="order-6 min-w-0 max-sm:-mt-1">
           <Onboarding />
         </div>
       </div>
@@ -464,16 +458,26 @@ export function Trade() {
         <Tour slot="desktop" trading={trading} />
         <OrderForm t={ticket} />
         {/* phones: under the positions */}
-        <div className="order-5 flex flex-col gap-2.5 sm:gap-4">
+        {/* phones: a list of rows that open, a little closer together than the panels above */}
+        <div className="order-5 flex flex-col gap-1.5 sm:gap-4">
           <Account t={ticket} positions={positions} orders={orders} />
+          {/* phones, with something open: what's held sits under the chart with no tabs, and history and activity
+              keep a row of their own here */}
+          {holding && (
+            <div className="min-w-0 sm:hidden">
+              <Fold title="History and activity">
+                <Below positions={positions} orders={orders} focused={focused?.id} pick={pick} market={market} part="rest" />
+              </Fold>
+            </div>
+          )}
           {/* bringing USDC from another chain: a real 1Click quote, asked as a dry run */}
-          <details className="panel p-3" id="cross-chain">
+          <details className="fold panel p-3" id="cross-chain">
             <summary className="cursor-pointer text-sm font-semibold">From another chain: dry-run quote</summary>
             <div className="mt-3"><CrossChain /></div>
           </details>
           <Quests />
           {/* under the form on every screen: on a desktop it fills the column beside the tall chart */}
-          <details className="panel p-3">
+          <details className="fold panel p-3">
             <summary className="cursor-pointer text-sm font-semibold">Jackpot and tickets</summary>
             <div className="mt-3"><Jackpot compact /></div>
           </details>
@@ -508,8 +512,9 @@ function Account({ t, positions, orders }: { t: Ticket; positions: Position[]; o
     );
   }
   return (
+    <Fold title="Account" value={usd(equity)}>
     <section className="panel p-3 sm:p-4" aria-label="Account">
-      <div className="ticket-row">
+      <div className="ticket-row max-sm:hidden">
         <h3 className="font-extrabold">Account</h3>
         <span className="num text-lg font-extrabold" title="Wallet and trading balances, reserved margin, and unrealized profit or loss after fees">
           {usd(equity)}
@@ -537,6 +542,7 @@ function Account({ t, positions, orders }: { t: Ticket; positions: Position[]; o
         </div>
       </dl>
     </section>
+    </Fold>
   );
 }
 

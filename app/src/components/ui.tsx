@@ -4,11 +4,33 @@
 // one-line explainer that opens into "How it works", and a summary row of stats. A tab's summary, status and
 // rows sit in one panel, split by hairlines (PanelHead names each group), rather than a box per piece.
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Icon } from "./Icon";
 import { useOneUp } from "@/lib/oneup";
 import { useAgentOf } from "@/lib/agents";
 import { explorer } from "@/lib/explorer";
+
+const PHONE = "(max-width: 639px)";
+const onPhone = (changed: () => void) => {
+  const q = window.matchMedia(PHONE);
+  q.addEventListener("change", changed);
+  return () => q.removeEventListener("change", changed);
+};
+
+/** A panel that folds to one row on a phone: its title and, at the row's end, one value. Wider screens show it
+ *  open and unchanged, with no row. The lower half of the Trade page is a list of these on a phone. */
+export function Fold({ title, value, children }: { title: React.ReactNode; value?: React.ReactNode; children: React.ReactNode }) {
+  const phone = useSyncExternalStore(onPhone, () => window.matchMedia(PHONE).matches, () => false);
+  return (
+    <details className="fold" open={!phone}>
+      <summary className="sm:hidden">
+        {title}
+        {value !== undefined && <span className="fold-value num">{value}</span>}
+      </summary>
+      {children}
+    </details>
+  );
+}
 
 export function Section({ title, action, children }: { title: React.ReactNode; action?: React.ReactNode; children: React.ReactNode }) {
   return (

@@ -36,18 +36,21 @@ export function Onboarding() {
     { icon: <Icon name="store" size={20} />, title: "List your Life for sale", line: "Set your asking price. If someone buys your Life, its unclaimed USDC and remaining payout rights transfer to them. Listing it does not guarantee a sale.", href: next.tokenId ? lifeHref(next.tokenId) : "/market", action: next.tokenId ? "View your Life" : "Explore the market" },
   ];
   return (
-    <details className="panel p-4" open={expanded} onToggle={event => { const open = event.currentTarget.open; setExpanded(open); try { localStorage.setItem(KEY, open ? "0" : "1"); } catch {} }}>
+    <details className="fold panel p-4" open={expanded} onToggle={event => { const open = event.currentTarget.open; setExpanded(open); try { localStorage.setItem(KEY, open ? "0" : "1"); } catch {} }}>
       <summary className="cursor-pointer text-sm font-bold marker:text-[var(--primary)]">
         How recovery works{" "}
-        <span className="mt-1 block font-normal text-[var(--muted)] sm:ml-3 sm:mt-0 sm:inline">{status}</span>
+        <span className="hidden font-normal text-[var(--muted)] sm:ml-3 sm:inline">{status}</span>
       </summary>
-      <div className="mt-4 flex flex-col justify-between gap-3 rounded-lg bg-[var(--panel-2)] p-3 text-sm sm:flex-row sm:items-center">
+      {/* one body, so a phone's folded row gives it one set of side padding */}
+      <div className="mt-4 flex flex-col gap-4">
+      <div className="flex flex-col justify-between gap-3 rounded-lg bg-[var(--panel-2)] p-3 text-sm sm:flex-row sm:items-center">
         <div><div className="label break-all">Selected wallet: {me}</div><p className="mt-1 font-semibold">{status}</p></div>
         {next.phase !== "loading" && <a className="btn btn-accent shrink-0 text-center" href={next.tokenId ? lifeHref(next.tokenId) : "/life-nfts"}>{action}</a>}
       </div>
-      <ol className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <ol className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {steps.map((step, i) => <li key={step.title} className="flex gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--panel-2)] text-[var(--primary)]">{step.icon}</span><div className="text-sm"><b className="block">{i + 1}. {step.title}</b><p className="mt-1 text-[var(--muted)]">{step.line}</p><a className="mt-2 inline-block font-semibold text-[var(--primary)] underline underline-offset-2" href={step.href}>{step.action}</a></div></li>)}
       </ol>
+      </div>
     </details>
   );
 }

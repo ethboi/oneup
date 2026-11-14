@@ -3405,3 +3405,63 @@ kbd {
     min-height: 36px;
   }
 }
+
+/* phones: the lower half of the Trade page is a list of rows that open (components/ui.tsx Fold, and the
+   details that were already there): a title, one value at the row's end, and a chevron */
+@media (max-width: 639px) {
+  .fold {
+    padding: 0;
+    border: 1px solid var(--panel-edge);
+    border-radius: 12px;
+    background: var(--panel);
+    box-shadow: none;
+  }
+  .fold > summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 40px;
+    padding: 0 12px;
+    font-size: 13px;
+    font-weight: 800;
+    list-style: none;
+    cursor: pointer;
+  }
+  .fold > summary::-webkit-details-marker {
+    display: none;
+  }
+  .fold > summary::after {
+    content: "";
+    flex: none;
+    width: 7px;
+    height: 7px;
+    margin-left: auto;
+    border-right: 2px solid var(--muted);
+    border-bottom: 2px solid var(--muted);
+    transform: translateY(-2px) rotate(45deg);
+    transition: transform 0.15s;
+  }
+  .fold[open] > summary::after {
+    transform: translateY(2px) rotate(-135deg);
+  }
+  .fold > summary .fold-value {
+    margin-left: auto;
+    font-weight: 700;
+    color: var(--muted);
+  }
+  .fold > summary .fold-value + *,
+  .fold > summary:has(.fold-value)::after {
+    margin-left: 0;
+  }
+  /* what a row opens: the panel it wraps loses its own box, and plain content gets the row's side padding */
+  .fold > :not(summary) {
+    margin-top: 0;
+    padding: 2px 12px 12px;
+  }
+  .fold > .panel {
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+  }
+}

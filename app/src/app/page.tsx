@@ -295,7 +295,7 @@ function Footer({ go }: { go: (t: Tab, at?: string) => void }) {
     </>
   );
   return (
-    <footer className="mt-10 border-t border-[var(--line)] pt-6 text-sm">
+    <footer className="mt-5 border-t border-[var(--line)] pt-2 text-sm sm:mt-10 sm:pt-6">
       <div className="hidden sm:block">{body}</div>
       <details className="sm:hidden">
         <summary className="label cursor-pointer py-2">{d.network === "testnet" ? "A NEAR testnet prototype" : "A local NEAR demo"} using test money. Not audited. More</summary>

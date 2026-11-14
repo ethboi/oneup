@@ -14,6 +14,7 @@ import { useHistory } from "./History";
 import { fmtDuration } from "./Jackpot";
 import { useNow } from "./Header";
 import { useSkin } from "./Achievements";
+import { Fold } from "./ui";
 
 /** The house's P&L this round: what traders lost to it less what it paid winners. */
 function useHouseRound() {
@@ -133,11 +134,12 @@ export function Quests() {
   const done = qs.filter((q) => q.n >= q.of).length;
   const resetIn = (today() + 1) * 86_400 - now;
   return (
+    <Fold title="Daily goals" value={`${done}/${qs.length}`}>
     <section className="panel p-3 sm:p-4" aria-label="Daily goals">
       <div className="ticket-row">
-        <h3 className="display text-sm">Daily goals</h3>
+        <h3 className="display text-sm max-sm:hidden">Daily goals</h3>
         <span className="label num">
-          {done}/{qs.length} · new in {fmtDuration(Math.max(0, resetIn))}
+          <span className="max-sm:hidden">{done}/{qs.length} · </span>new in {fmtDuration(Math.max(0, resetIn))}
         </span>
       </div>
       <ul className="mt-2 flex flex-col gap-1 text-sm sm:gap-2">
@@ -162,5 +164,6 @@ export function Quests() {
         })}
       </ul>
     </section>
+    </Fold>
   );
 }
