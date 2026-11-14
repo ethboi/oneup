@@ -416,6 +416,7 @@ export function Trade() {
     ];
   });
 
+  const holding = positions.length > 0 || orders.some((x) => "Open" in x.kind);
   return (
     // Phones: one column in the order banner, chart, order form, positions and activity, then the account and the
     // rest (both columns dissolve via `contents` and `order` interleaves them). With nothing open, positions sit
@@ -444,9 +445,16 @@ export function Trade() {
           />
           <TradesTape market={market} info={markets.find((m) => m.id === market)} />
         </div>
-        <div id="positions" className={`${positions.length > 0 || orders.some((x) => "Open" in x.kind) ? "order-2" : "order-4"} min-w-0 scroll-mt-4`}>
-          <Below positions={positions} orders={orders} focused={focused?.id} pick={pick} market={market} />
+        <div id="positions" className={`${holding ? "order-2" : "order-4"} min-w-0 scroll-mt-4`}>
+          <Below positions={positions} orders={orders} focused={focused?.id} pick={pick} market={market} part={holding ? "held" : "all"} />
         </div>
+        {/* phones, with something open: what's held sits under the chart with no tabs, and history and activity
+            keep their own panel under the form */}
+        {holding && (
+          <div className="order-4 min-w-0 sm:hidden">
+            <Below positions={positions} orders={orders} focused={focused?.id} pick={pick} market={market} part="rest" />
+          </div>
+        )}
         {/* the guide to recovery, under the trading itself */}
         <div className="order-6 min-w-0">
           <Onboarding />
@@ -648,15 +656,19 @@ function TradesTape({ market, info }: { market: string; info?: Market }) {
 }
 
 /** Positions and the live feed share one panel, switched by tabs. */
-function Below({ positions: all, orders, focused, pick, market }: { positions: Position[]; orders: Order[]; focused?: number; pick: (p: Position) => void; market: string }) {
-  const [view, setView] = useState<"positions" | "history" | "activity">("positions");
+/** `part`: "all" is the tabbed panel. On a phone with something open it splits in two: "held" drops its tabs and
+ *  shows the positions alone, and "rest" is a second panel with history and activity. Wider screens show "held"
+ *  as the whole tabbed panel and never see "rest". */
+function Below({ positions: all, orders, focused, pick, market, part = "all" }: { positions: Position[]; orders: Order[]; focused?: number; pick: (p: Position) => void; market: string; part?: "all" | "held" | "rest" }) {
+  const [view, setView] = useState<"positions" | "history" | "activity">(part === "rest" ? "history" : "positions");
+  const held = part === "held";
   const feed = useActivity().filter((a) => a.kind !== "opened");
   const [onlyHere, setOnlyHere] = useState(false);
   const positions = onlyHere ? all.filter((p) => p.market_id === market) : all;
   return (
-    <div className="pos-panel panel p-4 pt-2 max-sm:px-3 max-sm:pb-1 max-sm:pt-1">
+    <div className={`pos-panel panel p-4 pt-2 max-sm:px-3 max-sm:pb-1 ${held ? "max-sm:pt-0" : "max-sm:pt-1"}`}>
       {/* wraps, so a narrow phone drops Close all under the tabs and nothing pushes the page sideways */}
-      <div className="tabs-inline mb-2 flex flex-wrap items-center justify-between gap-y-1 border-b border-[var(--line)]" role="tablist">
+      <div className={`tabs-inline mb-2 flex flex-wrap items-center justify-between gap-y-1 border-b border-[var(--line)] ${held ? "max-sm:hidden" : ""}`} role="tablist">
         <div className="flex gap-1">
           {(
             [
@@ -664,7 +676,7 @@ function Below({ positions: all, orders, focused, pick, market }: { positions: P
               ["history", "History"],
               ["activity", "Activity"],
             ] as const
-          ).map(([k, name]) => (
+          ).filter(([k]) => part !== "rest" || k !== "positions").map(([k, name]) => (
             <button key={k} role="tab" aria-selected={view === k} onClick={() => setView(k)} className="tab">
               {name}
             </button>
@@ -685,9 +697,23 @@ function Below({ positions: all, orders, focused, pick, market }: { positions: P
           </div>
         )}
       </div>
+      {/* phones without the tabs: closing several at once keeps its button, over the cards */}
+      {held && all.length > 1 && (
+        <div className="flex justify-end pt-1.5 sm:hidden">
+          <CloseAll positions={positions} />
+        </div>
+      )}
       {view === "positions" && <Positions positions={positions} orders={orders} focused={focused} pick={pick} />}
-      {view === "history" && <HistoryList />}
-      {view === "activity" && <ActivityList items={feed} />}
+      {/* phones without the tabs always show what's held, whichever tab a wider screen would be on */}
+      {held && view !== "positions" && (
+        <div className="sm:hidden">
+          <Positions positions={positions} orders={orders} focused={focused} pick={pick} />
+        </div>
+      )}
+      <div className={held ? "max-sm:hidden" : undefined}>
+        {view === "history" && <HistoryList />}
+        {view === "activity" && <ActivityList items={feed} />}
+      </div>
     </div>
   );
 }
