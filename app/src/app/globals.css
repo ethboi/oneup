@@ -3152,11 +3152,30 @@ kbd {
     font-size: 12.5px;
     border-radius: 8px;
   }
+  /* closer together: the whole form, down to its button, in one screen with a position above it */
+  .ticket {
+    gap: 10px;
+    padding: 12px;
+  }
+  .ticket .segmented > button {
+    min-height: 38px;
+  }
+  .ticket .field .input {
+    min-height: 40px;
+    padding-block: 6px;
+  }
+  .ticket .chip-track > .chip {
+    min-height: 30px;
+    padding-block: 0;
+  }
+  .ticket .lev-stop {
+    min-height: 32px;
+  }
   .ticket-facts {
-    gap: 8px;
+    gap: 4px;
   }
   .extra-life-note {
-    padding: 12px;
+    padding: 9px 11px;
   }
 }
 
