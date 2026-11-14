@@ -2609,6 +2609,10 @@ kbd {
   border-color: var(--edge);
   background: var(--panel-2);
 }
+/* a position's card on a phone: the bar runs the card's width beside how far liquidation is */
+.pos-health .hp-bar.small {
+  max-width: none;
+}
 .hp-bar.small > span {
   height: 6px;
   background: color-mix(in srgb, var(--muted) 25%, transparent);

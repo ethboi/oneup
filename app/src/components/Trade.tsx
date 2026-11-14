@@ -654,9 +654,9 @@ function Below({ positions: all, orders, focused, pick, market }: { positions: P
   const [onlyHere, setOnlyHere] = useState(false);
   const positions = onlyHere ? all.filter((p) => p.market_id === market) : all;
   return (
-    <div className="panel p-4 pt-2">
+    <div className="panel p-4 pt-2 max-sm:px-3 max-sm:pb-2">
       {/* wraps, so a narrow phone drops Close all under the tabs and nothing pushes the page sideways */}
-      <div className="tabs-inline mb-2 flex flex-wrap items-center justify-between gap-y-1 border-b border-[var(--line)] max-sm:pb-1" role="tablist">
+      <div className="tabs-inline mb-2 flex flex-wrap items-center justify-between gap-y-1 border-b border-[var(--line)]" role="tablist">
         <div className="flex gap-1">
           {(
             [
@@ -676,7 +676,7 @@ function Below({ positions: all, orders, focused, pick, market }: { positions: P
           </span>
         )}
         {view === "positions" && all.length > 0 && (
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-3 empty:hidden">
             <label className="hidden cursor-pointer items-center gap-1.5 text-xs font-bold text-[var(--muted)] sm:flex">
               <input type="checkbox" className="check" checked={onlyHere} onChange={(e) => setOnlyHere(e.target.checked)} />
               {market} only
@@ -1341,9 +1341,10 @@ const openCard = (p: Position, mark: bigint | undefined, v: bigint, me: string):
 
 /** `focused`: the position the chart details; `pick` shows another there. */
 /** A position's margin health: full at its entry or better, empty at liquidation. */
-function PositionHp({ p, mark }: { p: Position; mark: bigint }) {
+function PositionHp({ p, mark, wide }: { p: Position; mark: bigint; wide?: boolean }) {
   const entry = BigInt(p.entry_price);
   const hp = hpOf(priceToNumber(liquidationPrice(p.side, entry, p.leverage)), priceToNumber(entry), priceToNumber(mark));
+  if (wide) return <HpBar hp={hp} small label={`Margin health ${Math.round(hp * 100)}%`} />;
   return (
     <span className="mt-1 flex justify-end">
       <HpBar hp={hp} small label={`Margin health ${Math.round(hp * 100)}%`} />
@@ -1373,7 +1374,7 @@ function Positions({ positions, orders, focused, pick }: { positions: Position[]
         {rows.map(({ p, mark, v, hold }) => (
           <div
             key={p.id}
-            className="num -mx-2 cursor-pointer rounded-lg border-b border-[var(--line)] px-2 py-3 text-sm last:border-0"
+            className="num -mx-2 cursor-pointer rounded-lg border-b border-[var(--line)] px-2 py-2.5 text-sm last:border-0"
             style={p.id === focused ? { background: "var(--panel-2)" } : undefined}
             onClick={(e) => !(e.target as Element).closest("button, a, input") && pick(p)}
           >
@@ -1384,7 +1385,7 @@ function Positions({ positions, orders, focused, pick }: { positions: Position[]
                 {fmtUsdc(v)}
               </div>
             </div>
-            <dl className="mt-2 grid grid-cols-4 gap-x-2">
+            <dl className="mt-1.5 grid grid-cols-4 gap-x-2">
               <dt className="label">Size</dt>
               <dt className="label">Entry</dt>
               <dt className="label">Mark</dt>
@@ -1392,19 +1393,22 @@ function Positions({ positions, orders, focused, pick }: { positions: Position[]
               <dd>${fmtUsdc(BigInt(p.margin) * BigInt(p.leverage), 0)}</dd>
               <dd>{fmtPrice(BigInt(p.entry_price))}</dd>
               <dd>{mark ? fmtPrice(mark) : "…"}</dd>
-              <dd>
-                {fmtPrice(liquidationPrice(p.side, BigInt(p.entry_price), p.leverage))}
-                {mark && <span className="label block">{away(mark, liquidationPrice(p.side, BigInt(p.entry_price), p.leverage))} away</span>}
-                  {mark && <PositionHp p={p} mark={mark} />}
-              </dd>
+              <dd>{fmtPrice(liquidationPrice(p.side, BigInt(p.entry_price), p.leverage))}</dd>
             </dl>
+            {/* margin health on its own thin line, the full width, so the row of prices stays one row */}
+            {mark && (
+              <div className="pos-health mt-1.5 flex items-center gap-2">
+                <PositionHp p={p} mark={mark} wide />
+                <span className="label whitespace-nowrap">{away(mark, liquidationPrice(p.side, BigInt(p.entry_price), p.leverage))} from liq.</span>
+              </div>
+            )}
             {(p.triggers.take_profit || p.triggers.stop_loss) && (
               <div className="mt-1.5">
                 <TriggerSummary p={p} inline />
               </div>
             )}
             {/* every control in one row: close and reverse share the width, the two small ones keep theirs */}
-            <div className="pos-actions mt-2.5 grid items-stretch gap-1.5">
+            <div className="pos-actions mt-2 grid items-stretch gap-1.5">
               <CloseButton p={p} hold={hold} wide />
               <ReverseButton p={p} hold={hold} />
               <ShareButton compact data={() => openCard(p, mark, v, me)} />
@@ -1573,9 +1577,11 @@ function CloseAll({ positions }: { positions: Position[] }) {
     return () => clearTimeout(t);
   }, [asking]);
   if (ready.length === 0) return null;
+  // phones: one position has its own Close right under the tabs, so the chip would only repeat it
+  const solo = ready.length === 1 && positions.length === 1 ? "max-sm:hidden" : "";
   const label = ready.length === 1 ? "Close 1" : `Close all ${ready.length}`;
   return asking ? (
-    <span className="flex items-center gap-1.5 whitespace-nowrap text-xs font-bold" role="group" aria-label="Confirm close all">
+    <span className={`flex items-center gap-1.5 whitespace-nowrap text-xs font-bold ${solo}`} role="group" aria-label="Confirm close all">
       <span className="text-[var(--short)]">{label}?</span>
       <button
         type="button"
@@ -1595,7 +1601,7 @@ function CloseAll({ positions }: { positions: Position[] }) {
       </button>
     </span>
   ) : (
-    <button type="button" className="chip !py-0.5 whitespace-nowrap text-xs" onClick={() => setAsking(true)}>
+    <button type="button" className={`chip !py-0.5 whitespace-nowrap text-xs ${solo}`} onClick={() => setAsking(true)}>
       {ready.length === 1 ? "Close 1" : "Close all"}
       {/* the count where there's room for it */}
       {ready.length > 1 && <span className="hidden sm:inline"> {ready.length}</span>}
