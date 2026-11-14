@@ -44,14 +44,22 @@ function ScreenSwitch() {
       setSkin(next === "light" ? "night" : next);
     }
   };
+  const at = SCREENS.findIndex(([id]) => id === now);
+  const next = SCREENS[(at + 1) % SCREENS.length];
   return (
-    <span className="screen-modes" role="group" aria-label="Screen">
-      {SCREENS.map(([id, name, title]) => (
-        <button key={id} type="button" className="screen-switch" aria-pressed={now === id} title={title} onClick={() => choose(id)}>
-          {name}
-        </button>
-      ))}
-    </span>
+    <>
+      <span className="screen-modes max-sm:!hidden" role="group" aria-label="Screen">
+        {SCREENS.map(([id, name, title]) => (
+          <button key={id} type="button" className="screen-switch" aria-pressed={now === id} title={title} onClick={() => choose(id)}>
+            {name}
+          </button>
+        ))}
+      </span>
+      {/* phones: one button that names the screen and steps to the next, so the strip keeps to its numbers */}
+      <button type="button" className="screen-switch screen-step sm:hidden" aria-label={`Screen: ${SCREENS[at][1]}. Switch to ${next[1]}`} onClick={() => choose(next[0])}>
+        {SCREENS[at][1]}
+      </button>
+    </>
   );
 }
 

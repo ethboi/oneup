@@ -932,7 +932,8 @@ function Console({
             readout={
               // the readout is printed on the screen, in LCD ink
               <span className="flex items-baseline gap-2">
-                <span className="font-[family-name:var(--font-display)] text-base">{market}</span>
+                {/* phones: the market is named in the bar just above */}
+                <span className="hidden font-[family-name:var(--font-display)] text-base sm:inline">{market}</span>
                 {pts.length > 1 && (
                   <span className="text-sm">
                     {change >= 0 ? "▲" : "▼"} {Math.abs(change).toFixed(2)}% · {RANGES.find(([, ms]) => ms === range)?.[0]}

@@ -236,7 +236,8 @@ export function PriceChart({
     <div
       className={`display num pointer-events-none absolute left-3 right-3 top-2 flex text-[var(--lcd-ink)] ${narrow ? "flex-col items-start gap-1" : "items-baseline justify-between gap-3"}`}
     >
-      {readout}
+      {/* phones with a position: the gauge alone, since the market and its range are in the bar just above */}
+      {!(narrow && gauge) && readout}
       {gauge}
     </div>
   );
@@ -277,7 +278,7 @@ export function PriceChart({
   // room at the top for the readout, at the bottom for the time axis, and on the right for the price axis: as
   // wide as its longest price, about 7.6px a character at 13px, past the arrow's slot
   const chars = Math.max(...[hi, lo, ...marks.map((m) => m.price)].map((v) => v.toFixed(digits).length));
-  const PAD = { l: 10, r: Math.ceil(chars * 7.6 + AXIS_TEXT + 10), t: narrow && gauge ? 58 : 36, b: 22 };
+  const PAD = { l: 10, r: Math.ceil(chars * 7.6 + AXIS_TEXT + 10), t: 36, b: 22 };
 
   // the newest price eases in from the one before; the line then holds it out to the present
   const k = now === null ? 1 : Math.min(1, Math.max(0, (now - last.t) / EASE_MS));

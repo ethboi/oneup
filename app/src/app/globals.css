@@ -3255,6 +3255,15 @@ kbd {
     padding: 0 7px;
     font-size: 12px;
   }
+  /* the one-button screen switch: small, and at the end of the first line when a position's result leads it */
+  .screen-step {
+    min-height: 26px;
+    padding: 0 8px;
+    font-size: 11.5px;
+  }
+  .pnl-hero ~ .screen-step {
+    margin-left: auto;
+  }
   .hud-pair {
     gap: 8px;
   }
