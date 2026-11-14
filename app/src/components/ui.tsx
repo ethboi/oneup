@@ -101,8 +101,8 @@ export function Stat({ label, value, tone, sub }: { label: string; value: React.
 /** Stats in a row (two columns on phones), with the main action at the end. Sits at the top of a panel. */
 export function SummaryBar({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
-      <div className="grid flex-1 grid-cols-2 gap-4 sm:grid-cols-4">{children}</div>
+    <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:gap-4 sm:p-4">
+      <div className="grid flex-1 grid-cols-2 gap-x-3 gap-y-2.5 sm:grid-cols-4 sm:gap-4">{children}</div>
       {action && <div className="shrink-0">{action}</div>}
     </div>
   );

@@ -83,8 +83,8 @@ export function Lives() {
           </div>
         }>
           <Stat label="Available to claim" value={lives ? money(claimable) : "…"} tone={claimable > 0n ? "good" : undefined} />
-          <Stat label="Remaining payout limit" value={lives ? money(conditionalCap) : "…"} sub="Maximum additional USDC. Future payouts may be zero." />
-          <Stat label="Lifetime USDC allocated" value={lives ? money(allocated) : "…"} sub="Across these Life NFTs, including previous owners" />
+          <Stat label="Remaining payout limit" value={lives ? money(conditionalCap) : "…"} sub={<><span className="max-sm:hidden">Maximum additional USDC. </span>Future payouts may be zero.</>} />
+          <Stat label="Lifetime USDC allocated" value={lives ? money(allocated) : "…"} sub={<span className="max-sm:hidden">Across these Life NFTs, including previous owners</span>} />
           <Stat label="Allocated last round · all Life NFTs" value={last ? money(BigInt(last.lives_pot)) : "–"} />
         </SummaryBar>
         <NextLife />

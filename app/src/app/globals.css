@@ -1926,10 +1926,12 @@ kbd {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
-@media (max-width: 400px) {
+/* phones: always two across. Left to fit by width, a phone a little wider than 400px fell back to one card a
+   row, each taller than the screen. */
+@media (max-width: 639px) {
   .life-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px 10px;
+    gap: 14px 10px;
     padding: 12px;
   }
   .life-grid .life-card {
@@ -1976,7 +1978,8 @@ kbd {
   gap: 10px;
   min-width: 0;
 }
-@media (min-width: 401px) {
+/* phones keep the Life grid's two across; wider screens give a lock's controls more room */
+@media (min-width: 640px) {
   .lock-grid {
     grid-template-columns: repeat(auto-fill, minmax(min(190px, 100%), 1fr));
   }
@@ -3463,5 +3466,13 @@ kbd {
     border-radius: 0;
     background: none;
     box-shadow: none;
+  }
+}
+/* phones: a lock's buttons under a half-width card keep to one line */
+@media (max-width: 639px) {
+  .lock-tile .btn {
+    padding-inline: 6px;
+    font-size: 12px;
+    white-space: nowrap;
   }
 }
