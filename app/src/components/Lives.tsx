@@ -77,15 +77,17 @@ export function Lives() {
         <SummaryBar action={
           <div className="flex flex-col gap-1">
             <button className="btn btn-accent w-full sm:w-auto" disabled={batch.amount === 0n} onClick={() => run(`Claim $${fmtUsdc(batch.amount)} from ${batch.tokenIds.length} ${batch.tokenIds.length === 1 ? "Life" : "Life NFTs"}`, () => tx.claimLives(batch.tokenIds)).then((ok) => ok && markClaimedOrListed(me))}>
-              <Icon name="claim" />{batch.amount > 0n ? `Claim $${fmtUsdc(batch.amount)}${batch.remainingCount > 0 ? " from 30 Life NFTs" : ""}` : "Nothing to claim yet"}
+              <Icon name="claim" />{batch.amount > 0n ? `Claim $${fmtUsdc(batch.amount)}${batch.remainingCount > 0 ? " from 30 Life NFTs" : ""}` : lives ? "Nothing to claim yet" : "Loading…"}
             </button>
             {batch.remainingCount > 0 && <span className="label">{batch.remainingCount} more {batch.remainingCount === 1 ? "Life has" : "Life NFTs have"} USDC to claim after this batch</span>}
           </div>
         }>
           <Stat label="Available to claim" value={lives ? money(claimable) : "…"} tone={claimable > 0n ? "good" : undefined} />
-          <Stat label="Remaining payout limit" value={lives ? money(conditionalCap) : "…"} sub={<><span className="max-sm:hidden">Maximum additional USDC. </span>Future payouts may be zero.</>} />
+          <Stat label="Remaining payout limit" value={lives ? money(conditionalCap) : "…"} sub={<span className="max-sm:hidden">Maximum additional USDC. Future payouts may be zero.</span>} />
           <Stat label="Lifetime USDC allocated" value={lives ? money(allocated) : "…"} sub={<span className="max-sm:hidden">Across these Life NFTs, including previous owners</span>} />
-          <Stat label="Allocated last round · all Life NFTs" value={last ? money(BigInt(last.lives_pot)) : "–"} />
+          <Stat label={<>Allocated last round<span className="max-sm:hidden"> · all Life NFTs</span></>} value={last ? money(BigInt(last.lives_pot)) : "–"} />
+          {/* phones: the four figures line up two by two, and the caution has the line under them */}
+          <p className="label col-span-2 -mt-1 sm:hidden">Future payouts may be zero. Last round&apos;s figure is for all Life NFTs.</p>
         </SummaryBar>
         <NextLife />
         {lives === undefined ? <Empty icon="heart">Loading your Life NFTs…</Empty> : <>

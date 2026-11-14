@@ -86,7 +86,7 @@ export function Explainer({ title, line, children }: { title?: string; line: Rea
   );
 }
 
-export function Stat({ label, value, tone, sub }: { label: string; value: React.ReactNode; tone?: "good" | "bad"; sub?: React.ReactNode }) {
+export function Stat({ label, value, tone, sub }: { label: React.ReactNode; value: React.ReactNode; tone?: "good" | "bad"; sub?: React.ReactNode }) {
   return (
     <div className="min-w-0">
       <div className="label">{label}</div>
