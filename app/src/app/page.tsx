@@ -295,12 +295,16 @@ function Footer({ go }: { go: (t: Tab, at?: string) => void }) {
     </>
   );
   return (
-    <footer className="mt-5 border-t border-[var(--line)] pt-2 text-sm sm:mt-10 sm:pt-6">
+    <footer className="mt-1.5 text-sm sm:mt-10 sm:border-t sm:border-[var(--line)] sm:pt-6">
       <div className="hidden sm:block">{body}</div>
-      <details className="sm:hidden">
-        <summary className="label cursor-pointer py-2">{d.network === "testnet" ? "A NEAR testnet prototype" : "A local NEAR demo"} using test money. Not audited. More</summary>
-        <div className="mt-3">{body}</div>
+      {/* phones: one more row like those above it, then the one line every page must carry */}
+      <details className="fold sm:hidden">
+        <summary>About OneUp</summary>
+        <div className="pt-2">{body}</div>
       </details>
+      <p className="label mt-3 text-center sm:hidden">
+        {d.network === "testnet" ? "NEAR testnet prototype" : "Local NEAR demo"} · test money · not audited
+      </p>
     </footer>
   );
 }
