@@ -30,12 +30,21 @@ export interface Mark {
  *  thinner candle would mostly be a flat dash. */
 const CANDLE_STEPS = [2_000, 5_000, 10_000, 15_000, 30_000, 60_000, 120_000, 300_000];
 
+/** The least a candle's body is tall, in chart units. */
+const MIN_BODY = 5;
+
 type Candle = { t: number; o: number; h: number; l: number; c: number };
 
-/** Buckets prices into candles of `size` ms from `from`; each opens at the close before it. */
-function candles(points: { t: number; p: number }[], from: number, size: number, head: number): Candle[] {
+/** Buckets prices into candles of `size` ms from `from` to `to`; each opens at the close before it. A stretch
+ *  with no new price still gets its candles, flat at the last close, so a quiet market doesn't leave gaps. */
+function candles(points: { t: number; p: number }[], from: number, size: number, head: number, to?: number): Candle[] {
   const out: Candle[] = [];
   let prevClose = points[0].p;
+  const flatUntil = (t: number) => {
+    const last = out[out.length - 1];
+    if (!last) return;
+    for (let q = last.t + size; q < t; q += size) out.push({ t: q, o: last.c, h: last.c, l: last.c, c: last.c });
+  };
   for (const pt of points) {
     const t = Math.floor(pt.t / size) * size;
     if (t < from - size) {
@@ -48,10 +57,12 @@ function candles(points: { t: number; p: number }[], from: number, size: number,
       c.l = Math.min(c.l, pt.p);
       c.c = pt.p;
     } else {
+      flatUntil(t);
       out.push({ t, o: prevClose, h: Math.max(prevClose, pt.p), l: Math.min(prevClose, pt.p), c: pt.p });
     }
     prevClose = pt.p;
   }
+  if (to !== undefined) flatUntil(Math.floor(to / size) * size + size);
   // the newest price eases in, as on the line
   const c = out[out.length - 1];
   if (c) {
@@ -368,7 +379,7 @@ export function PriceChart({
   for (let a = tStep; a <= (t1 - t0) * 0.94; a += tStep) times.push(a);
 
   const cSize = CANDLE_STEPS.find((s) => (t1 - t0) / s <= 24) ?? CANDLE_STEPS[CANDLE_STEPS.length - 1];
-  const bars = asCandles ? candles(points, t0, cSize, headP) : null;
+  const bars = asCandles ? candles(points, t0, cSize, headP, t1) : null;
   const cW = Math.max(2, ((plotR - PAD.l) * cSize) / Math.max(1, t1 - t0) * 0.62);
 
   // the focused position's entry, and which way is profit: a drag picks take-profit or stop-loss by direction
@@ -513,7 +524,9 @@ export function PriceChart({
             bars.map((c) => {
               const cx = x(c.t + cSize / 2);
               const up = c.c >= c.o;
-              const top = y(Math.max(c.o, c.c));
+              // a candle that didn't move still shows as a small block on its price, not a hairline
+              const body = Math.max(MIN_BODY, y(Math.min(c.o, c.c)) - y(Math.max(c.o, c.c)));
+              const top = (y(c.o) + y(c.c)) / 2 - body / 2;
               return (
                 <g key={c.t}>
                   <line x1={cx} x2={cx} y1={y(c.h)} y2={y(c.l)} stroke={up ? "var(--lcd-up)" : "var(--lcd-down)"} strokeWidth="1.5" style={{ filter: "brightness(0.7)" }} />
@@ -522,7 +535,7 @@ export function PriceChart({
                     x={cx - cW / 2}
                     y={top}
                     width={cW}
-                    height={Math.max(1.5, y(Math.min(c.o, c.c)) - top)}
+                    height={body}
                     // colour screens: green and red; the mono screen: up candles hollow, down solid
                     fill={up ? "var(--lcd-up)" : "var(--lcd-down)"}
                     stroke="var(--lcd-ink)"
