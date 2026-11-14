@@ -418,8 +418,9 @@ export function Trade() {
 
   return (
     // Phones: one column in the order banner, chart, order form, positions and activity, then the account and the
-    // rest (both columns dissolve via `contents` and `order` interleaves them). Positions sit right under the form,
-    // so an order shows where it was sent from: waiting, then open.
+    // rest (both columns dissolve via `contents` and `order` interleaves them). With nothing open, positions sit
+    // under the form; once an order is waiting or a position is open they move up between the chart and the form,
+    // so what you hold is on screen with the chart instead of a long scroll below the form.
     // Desktop: chart over positions and activity on the left, the form on the right.
     <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[1fr_340px] lg:items-start 2xl:grid-cols-[1fr_380px]">
       <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
@@ -443,7 +444,7 @@ export function Trade() {
           />
           <TradesTape market={market} info={markets.find((m) => m.id === market)} />
         </div>
-        <div id="positions" className="order-4 min-w-0 scroll-mt-4">
+        <div id="positions" className={`${positions.length > 0 || orders.some((x) => "Open" in x.kind) ? "order-2" : "order-4"} min-w-0 scroll-mt-4`}>
           <Below positions={positions} orders={orders} focused={focused?.id} pick={pick} market={market} />
         </div>
         {/* the guide to recovery, under the trading itself */}
