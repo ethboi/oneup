@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 // @ts-expect-error A plain .mjs file on purpose, so a reader can run it with no install.
-import { ROOT, disclosures, evaluate } from "../check-live.mjs";
+import { ROOT, disclosures, evaluate, readOwned } from "../check-live.mjs";
 
 const NOW = 1_800_000_000;
 const media = { media: "data:image/svg+xml;utf8,<svg/>" };
@@ -96,4 +96,18 @@ test("guest accounts are counted apart from outside traders: anyone can make one
   const text = disclosures(snapshot).join(" ");
   assert.match(text, /0 outside accounts and 1 guest accounts/);
   assert.match(text, /the author included/);
+});
+
+test("an owner holding an exact multiple of the page size is not asked for a page past the end", async () => {
+  const held = Array.from({ length: 200 }, (_, i) => i);
+  const asked: number[] = [];
+  const read = async (from: number, limit: number) => {
+    asked.push(from);
+    if (from >= held.length) throw Error("Out of bounds, please use a smaller from_index.");
+    return held.slice(from, from + limit);
+  };
+  assert.deepEqual(await readOwned(held.length, read), held);
+  assert.deepEqual(asked, [0, 100]);
+  assert.deepEqual(await readOwned(0, read), []);
+  assert.equal((await readOwned(145, async (from: number, limit: number) => held.slice(from, Math.min(145, from + limit)))).length, 145);
 });

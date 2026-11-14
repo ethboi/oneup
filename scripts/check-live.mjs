@@ -156,13 +156,21 @@ async function allTokens(account) {
   return (await inBatches(starts, from => view(account, "nft_tokens", { from_index: String(from), limit: 50 }))).flat();
 }
 
-async function readLives(account, owner) {
-  const lives = [];
-  for (;;) {
-    const page = await view(account, "lives_for_owner", { account_id: owner, from_index: String(lives.length), limit: 100 });
-    lives.push(...page);
-    if (page.length < 100) return lives;
+// Stops at the owner's count: the contract refuses a page that starts at or past it, which is where an owner
+// holding an exact multiple of the page size would otherwise be asked for one page too many.
+export async function readOwned(count, read, size = 100) {
+  const items = [];
+  while (items.length < count) {
+    const page = await read(items.length, size);
+    items.push(...page);
+    if (page.length < size) break;
   }
+  return items;
+}
+
+async function readLives(account, owner) {
+  const count = Number(await view(account, "nft_supply_for_owner", { account_id: owner }));
+  return readOwned(count, (from, limit) => view(account, "lives_for_owner", { account_id: owner, from_index: String(from), limit }));
 }
 
 async function snapshot() {
